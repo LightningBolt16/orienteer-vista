@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Compass, User } from 'lucide-react';
+import { Compass, User, Globe } from 'lucide-react';
 import { useUser } from '../context/UserContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const Header: React.FC = () => {
   const location = useLocation();
   const { user } = useUser();
+  const { language, setLanguage, t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -21,6 +23,10 @@ const Header: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrolled]);
 
+  const toggleLanguage = () => {
+    setLanguage(language === 'sv' ? 'en' : 'sv');
+  };
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 px-6 py-4 transition-all duration-300 ${
       scrolled ? 'glass-morphism shadow-sm' : 'bg-transparent'
@@ -28,7 +34,7 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2 hover-scale">
           <Compass className="h-8 w-8 text-orienteering" />
-          <span className="text-xl font-semibold tracking-tight">OrientVista</span>
+          <span className="text-xl font-semibold tracking-tight">OL.se</span>
         </Link>
         
         <nav className="flex items-center space-x-8">
@@ -38,7 +44,7 @@ const Header: React.FC = () => {
               location.pathname === '/' ? 'text-orienteering' : 'text-foreground'
             }`}
           >
-            Home
+            {t('home')}
           </Link>
           <Link 
             to="/profile" 
@@ -46,12 +52,20 @@ const Header: React.FC = () => {
               location.pathname === '/profile' ? 'text-orienteering' : 'text-foreground'
             }`}
           >
-            Profile
+            {t('profile')}
           </Link>
+          
+          <button 
+            onClick={toggleLanguage}
+            className="text-sm font-medium nav-link flex items-center space-x-1"
+          >
+            <Globe className="h-4 w-4" />
+            <span>{language === 'sv' ? 'EN' : 'SV'}</span>
+          </button>
           
           <div className="flex items-center space-x-2 ml-4">
             <div className="rounded-full p-2 bg-orienteering/10 text-orienteering">
-              {user?.points || 0} pts
+              {user?.points || 0} {t('points')}
             </div>
             <Link to="/profile" className="transition-all-300 hover:brightness-110">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">

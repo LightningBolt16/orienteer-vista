@@ -84,14 +84,6 @@ const RouteSelector: React.FC = () => {
 
   return (
     <div className="relative w-full">
-      {/* Title section */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold">Orienteering Vista</h1>
-        <p className="text-xl text-muted-foreground mt-2">
-          Navigate through the wilderness, make split-second decisions, and climb the ranks.
-        </p>
-      </div>
-      
       {/* Main card with image and controls */}
       <div className="glass-card overflow-hidden">
         {/* Image container */}
@@ -142,8 +134,8 @@ const RouteSelector: React.FC = () => {
         
         {/* Instructions */}
         <div className="p-6 text-center">
-          <h2 className="text-xl font-medium mb-2">Route Selector</h2>
-          <p className="text-muted-foreground">Choose the correct direction for this route to earn points</p>
+          <h2 className="text-xl font-medium mb-2">Välj rutt</h2>
+          <p className="text-muted-foreground">Välj rätt riktning för den här rutten för att tjäna poäng</p>
         </div>
       </div>
     </div>
