@@ -1,0 +1,58 @@
+
+import React from 'react';
+import { Trophy, Users } from 'lucide-react';
+import { useUser } from '../context/UserContext';
+
+const Leaderboard: React.FC = () => {
+  const { leaderboard, user } = useUser();
+
+  return (
+    <div className="glass-card p-6 animate-fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Trophy className="h-5 w-5 text-orienteering mr-2" />
+          <h2 className="text-xl font-medium">Leaderboard</h2>
+        </div>
+        <div className="flex items-center text-sm text-muted-foreground">
+          <Users className="h-4 w-4 mr-1" />
+          <span>{leaderboard.length} orienteers</span>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        {leaderboard.slice(0, 10).map((entry, index) => (
+          <div 
+            key={entry.id} 
+            className={`flex items-center p-3 rounded-lg transition-all ${
+              entry.id === user?.id ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
+            }`}
+          >
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full mr-3 ${
+              index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+            }`}>
+              {index + 1}
+            </div>
+            
+            <div className="flex-grow">
+              <div className="flex items-center">
+                <span className="font-medium">{entry.name}</span>
+                {entry.id === user?.id && (
+                  <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
+                    You
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <span className="font-semibold">{entry.points}</span>
+              <span className="text-muted-foreground text-sm ml-1">pts</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default Leaderboard;
