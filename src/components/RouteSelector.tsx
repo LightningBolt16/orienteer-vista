@@ -21,6 +21,8 @@ const RouteSelector: React.FC = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
   const [correctDirection, setCorrectDirection] = useState<'left' | 'right'>('left');
+  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [earnedPoints, setEarnedPoints] = useState<number>(0);
   const { addPoints } = useUser();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
@@ -35,6 +37,9 @@ const RouteSelector: React.FC = () => {
     // Randomly set the correct direction
     setCorrectDirection(Math.random() > 0.5 ? 'left' : 'right');
     
+    // Reset the timer for the new image
+    setStartTime(Date.now());
+    
     return () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
       if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
@@ -45,15 +50,21 @@ const RouteSelector: React.FC = () => {
     if (isTransitioning) return;
     
     const isCorrect = direction === correctDirection;
-    setShowResult(isCorrect ? 'win' : 'lose');
+    
+    // Calculate points based on time spent (faster = more points)
+    const timeSpent = (Date.now() - startTime) / 1000; // in seconds
+    let pointsEarned = 0;
     
     if (isCorrect) {
-      addPoints(10);
-      toast({
-        title: "Correct Choice!",
-        description: "You earned 10 points",
-      });
+      // Base points are 10, up to a maximum of 20 for quick decisions
+      // The formula gives 20 points for decisions under 1 second,
+      // and decreases down to 10 points for decisions taking 5+ seconds
+      pointsEarned = Math.max(10, Math.round(20 - (timeSpent / 5) * 10));
+      addPoints(pointsEarned);
+      setEarnedPoints(pointsEarned);
     }
+    
+    setShowResult(isCorrect ? 'win' : 'lose');
     
     setIsTransitioning(true);
     
@@ -73,6 +84,14 @@ const RouteSelector: React.FC = () => {
 
   return (
     <div className="relative w-full">
+      {/* Title section */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold">Orienteering Vista</h1>
+        <p className="text-xl text-muted-foreground mt-2">
+          Navigate through the wilderness, make split-second decisions, and climb the ranks.
+        </p>
+      </div>
+      
       {/* Main card with image and controls */}
       <div className="glass-card overflow-hidden">
         {/* Image container */}
@@ -85,9 +104,16 @@ const RouteSelector: React.FC = () => {
           
           {/* Win/Lose overlay */}
           {showResult && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
               {showResult === 'win' ? (
-                <CheckCircle className="text-green-500 w-32 h-32 animate-win-animation" />
+                <>
+                  <CheckCircle className="text-green-500 w-32 h-32 animate-win-animation" />
+                  {earnedPoints > 0 && (
+                    <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
+                      +{earnedPoints} points
+                    </div>
+                  )}
+                </>
               ) : (
                 <XCircle className="text-red-500 w-32 h-32 animate-lose-animation" />
               )}

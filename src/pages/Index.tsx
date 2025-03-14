@@ -7,16 +7,6 @@ import Leaderboard from '../components/Leaderboard';
 const Index: React.FC = () => {
   return (
     <div className="pb-20 space-y-16">
-      {/* Hero Section */}
-      <section className="text-center py-16">
-        <div className="space-y-4 max-w-3xl mx-auto">
-          <h1 className="text-4xl font-bold">Orienteering Vista</h1>
-          <p className="text-xl text-muted-foreground">
-            Navigate through the wilderness, make split-second decisions, and climb the ranks.
-          </p>
-        </div>
-      </section>
-      
       {/* Main Features Section */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
