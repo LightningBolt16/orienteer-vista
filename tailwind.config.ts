@@ -108,26 +108,26 @@ export default {
 				'win-animation': {
 					'0%': { transform: 'scale(1)', opacity: '0' },
 					'50%': { transform: 'scale(1.2)', opacity: '1' },
-					'100%': { transform: 'scale(1)', opacity: '0' }
+					'100%': { transform: 'scale(1)', opacity: '1' }
 				},
 				'lose-animation': {
 					'0%': { transform: 'rotate(0deg)', opacity: '0' },
 					'50%': { transform: 'rotate(5deg)', opacity: '1' },
-					'100%': { transform: 'rotate(0deg)', opacity: '0' }
+					'100%': { transform: 'rotate(0deg)', opacity: '1' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'fade-in': 'fade-in 0.3s ease-out',
-				'fade-out': 'fade-out 0.3s ease-out',
-				'slide-in': 'slide-in 0.4s ease-out',
-				'slide-out': 'slide-out 0.4s ease-out',
-				'scale-in': 'scale-in 0.3s ease-out',
-				'scale-out': 'scale-out 0.3s ease-out',
+				'fade-in': 'fade-in 0.2s ease-out',
+				'fade-out': 'fade-out 0.2s ease-out',
+				'slide-in': 'slide-in 0.3s ease-out',
+				'slide-out': 'slide-out 0.3s ease-out',
+				'scale-in': 'scale-in 0.2s ease-out',
+				'scale-out': 'scale-out 0.2s ease-out',
 				'pulse-scale': 'pulse-scale 1.5s infinite',
-				'win-animation': 'win-animation 0.6s ease-out',
-				'lose-animation': 'lose-animation 0.6s ease-out'
+				'win-animation': 'win-animation 0.4s ease-out',
+				'lose-animation': 'lose-animation 0.4s ease-out'
 			},
 			backgroundImage: {
 				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

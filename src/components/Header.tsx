@@ -56,14 +56,6 @@ const Header: React.FC = () => {
             <PenTool className="h-4 w-4" />
             <span>{t('course.setter')}</span>
           </Link>
-          <Link 
-            to="/profile" 
-            className={`nav-link text-sm font-medium ${
-              location.pathname === '/profile' ? 'text-orienteering' : 'text-foreground'
-            }`}
-          >
-            {t('profile')}
-          </Link>
           
           <button 
             onClick={toggleLanguage}

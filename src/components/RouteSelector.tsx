@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { toast } from '../components/ui/use-toast';
+import { useLanguage } from '../context/LanguageContext';
 
 // Sample images - in real implementation, these would be fetched from your folder
 const routeImages = [
@@ -24,6 +25,7 @@ const RouteSelector: React.FC = () => {
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [earnedPoints, setEarnedPoints] = useState<number>(0);
   const { addPoints } = useUser();
+  const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
 
@@ -51,15 +53,18 @@ const RouteSelector: React.FC = () => {
     
     const isCorrect = direction === correctDirection;
     
-    // Calculate points based on time spent (faster = more points)
-    const timeSpent = (Date.now() - startTime) / 1000; // in seconds
+    // Calculate points based on milliseconds spent (faster = more points)
+    const timeSpent = Date.now() - startTime; // in milliseconds
     let pointsEarned = 0;
     
     if (isCorrect) {
-      // Base points are 10, up to a maximum of 20 for quick decisions
-      // The formula gives 20 points for decisions under 1 second,
-      // and decreases down to 10 points for decisions taking 5+ seconds
-      pointsEarned = Math.max(10, Math.round(20 - (timeSpent / 5) * 10));
+      // Base points are 20, decreasing by 1 for every 100ms, with a minimum of 10
+      pointsEarned = Math.max(10, Math.round(30 - (timeSpent / 100)));
+      addPoints(pointsEarned);
+      setEarnedPoints(pointsEarned);
+    } else {
+      // Lose points on incorrect choice (up to -10 points)
+      pointsEarned = -10;
       addPoints(pointsEarned);
       setEarnedPoints(pointsEarned);
     }
@@ -72,14 +77,14 @@ const RouteSelector: React.FC = () => {
     if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
     if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     
-    // Show result for a short time
+    // Show result for a shorter time (400ms instead of 800ms)
     resultTimeout.current = window.setTimeout(() => {
       setShowResult(null);
       transitionTimeout.current = window.setTimeout(() => {
         setCurrentImageIndex((currentImageIndex + 1) % routeImages.length);
         setIsTransitioning(false);
-      }, 300);
-    }, 800);
+      }, 200); // Faster transition (200ms instead of 300ms)
+    }, 400); // Faster result display
   };
 
   return (
@@ -91,7 +96,7 @@ const RouteSelector: React.FC = () => {
           <img 
             src={routeImages[currentImageIndex]} 
             alt="Orienteering route" 
-            className={`w-full h-full object-cover transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
+            className={`w-full h-full object-cover transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
           />
           
           {/* Win/Lose overlay */}
@@ -99,15 +104,18 @@ const RouteSelector: React.FC = () => {
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
               {showResult === 'win' ? (
                 <>
-                  <CheckCircle className="text-green-500 w-32 h-32 animate-win-animation" />
-                  {earnedPoints > 0 && (
-                    <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
-                      +{earnedPoints} points
-                    </div>
-                  )}
+                  <CheckCircle className="text-green-500 w-32 h-32 animate-[win-animation_0.4s_ease-out]" />
+                  <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
+                    +{earnedPoints} poäng
+                  </div>
                 </>
               ) : (
-                <XCircle className="text-red-500 w-32 h-32 animate-lose-animation" />
+                <>
+                  <XCircle className="text-red-500 w-32 h-32 animate-[lose-animation_0.4s_ease-out]" />
+                  <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
+                    {earnedPoints} poäng
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -130,12 +138,6 @@ const RouteSelector: React.FC = () => {
               <ChevronRight className="h-8 w-8" />
             </button>
           </div>
-        </div>
-        
-        {/* Instructions */}
-        <div className="p-6 text-center">
-          <h2 className="text-xl font-medium mb-2">Välj rutt</h2>
-          <p className="text-muted-foreground">Välj rätt riktning för den här rutten för att tjäna poäng</p>
         </div>
       </div>
     </div>
