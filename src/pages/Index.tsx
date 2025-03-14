@@ -1,28 +1,16 @@
 
-import React from 'react';
-import ComingSoon from '../components/ComingSoon';
-import RouteSelector from '../components/RouteSelector';
-import Leaderboard from '../components/Leaderboard';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Index: React.FC = () => {
-  return (
-    <div className="pb-20 space-y-16">
-      {/* Main Features Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <RouteSelector />
-        </div>
-        <div>
-          <ComingSoon />
-        </div>
-      </section>
-      
-      {/* Leaderboard Section */}
-      <section className="max-w-2xl mx-auto">
-        <Leaderboard />
-      </section>
-    </div>
-  );
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Redirect to the route game page
+    navigate('/route-game');
+  }, [navigate]);
+  
+  return null; // No content needed as we're redirecting
 };
 
 export default Index;

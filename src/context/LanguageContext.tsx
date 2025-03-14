@@ -11,7 +11,8 @@ interface LanguageContextType {
 
 const translations = {
   sv: {
-    'home': 'Hem',
+    'route.game': 'Vägvalsspel',
+    'course.setter': 'Banläggare',
     'profile': 'Profil',
     'points': 'poäng',
     'route.choose': 'Välj rutt',
@@ -21,7 +22,8 @@ const translations = {
     'coming.soon.description': 'Nya spännande funktioner på gång!'
   },
   en: {
-    'home': 'Home',
+    'route.game': 'Route Choice Game',
+    'course.setter': 'Course Setter',
     'profile': 'Profile',
     'points': 'points',
     'route.choose': 'Route Selector',

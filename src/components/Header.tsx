@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Compass, User, Globe } from 'lucide-react';
+import { Compass, User, Globe, Map, PenTool } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -39,12 +39,22 @@ const Header: React.FC = () => {
         
         <nav className="flex items-center space-x-8">
           <Link 
-            to="/" 
-            className={`nav-link text-sm font-medium ${
-              location.pathname === '/' ? 'text-orienteering' : 'text-foreground'
+            to="/route-game" 
+            className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+              location.pathname === '/route-game' ? 'text-orienteering' : 'text-foreground'
             }`}
           >
-            {t('home')}
+            <Map className="h-4 w-4" />
+            <span>{t('route.game')}</span>
+          </Link>
+          <Link 
+            to="/course-setter" 
+            className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+              location.pathname === '/course-setter' ? 'text-orienteering' : 'text-foreground'
+            }`}
+          >
+            <PenTool className="h-4 w-4" />
+            <span>{t('course.setter')}</span>
           </Link>
           <Link 
             to="/profile" 

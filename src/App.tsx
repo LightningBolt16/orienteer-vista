@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
+import RouteGame from "./pages/RouteGame";
+import CourseSetter from "./pages/CourseSetter";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import { LanguageProvider } from "./context/LanguageContext";
@@ -22,6 +24,8 @@ const App = () => (
           <Layout>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/route-game" element={<RouteGame />} />
+              <Route path="/course-setter" element={<CourseSetter />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
