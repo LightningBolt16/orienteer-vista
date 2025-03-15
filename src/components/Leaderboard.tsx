@@ -1,21 +1,23 @@
 
 import React from 'react';
-import { Trophy, Users } from 'lucide-react';
+import { Trophy, Users, Zap, Target } from 'lucide-react';
 import { useUser } from '../context/UserContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const Leaderboard: React.FC = () => {
   const { leaderboard, user } = useUser();
+  const { t } = useLanguage();
 
   return (
     <div className="glass-card p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <Trophy className="h-5 w-5 text-orienteering mr-2" />
-          <h2 className="text-xl font-medium">Leaderboard</h2>
+          <h2 className="text-xl font-medium">{t('leaderboard')}</h2>
         </div>
         <div className="flex items-center text-sm text-muted-foreground">
           <Users className="h-4 w-4 mr-1" />
-          <span>{leaderboard.length} orienteers</span>
+          <span>{leaderboard.length} {t('orienteers')}</span>
         </div>
       </div>
       
@@ -38,15 +40,23 @@ const Leaderboard: React.FC = () => {
                 <span className="font-medium">{entry.name}</span>
                 {entry.id === user?.id && (
                   <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
-                    You
+                    {t('you')}
                   </span>
                 )}
               </div>
             </div>
             
-            <div className="text-right">
-              <span className="font-semibold">{entry.points}</span>
-              <span className="text-muted-foreground text-sm ml-1">pts</span>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <Target className="h-4 w-4 text-orienteering mr-1" />
+                <span className="font-semibold">{entry.accuracy}%</span>
+              </div>
+              
+              <div className="flex items-center">
+                <Zap className="h-4 w-4 text-amber-500 mr-1" />
+                <span className="font-semibold">{entry.speed || 0}</span>
+                <span className="text-muted-foreground text-sm ml-1">ms</span>
+              </div>
             </div>
           </div>
         ))}

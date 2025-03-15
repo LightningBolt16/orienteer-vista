@@ -23,19 +23,11 @@ const RouteSelector: React.FC = () => {
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
   const [correctDirection, setCorrectDirection] = useState<'left' | 'right'>('left');
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [earnedPoints, setEarnedPoints] = useState<number>(0);
-  const { addPoints, user } = useUser();
+  const [resultMessage, setResultMessage] = useState<string>('');
+  const { updatePerformance } = useUser();
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
-  const attemptsRef = useRef<{total: number, timeSum: number}>({total: 0, timeSum: 0});
-
-  // Initialize attempts from user if available
-  useEffect(() => {
-    if (user && user.attempts) {
-      attemptsRef.current = user.attempts;
-    }
-  }, [user]);
 
   // Add keyboard support
   useEffect(() => {
@@ -80,32 +72,20 @@ const RouteSelector: React.FC = () => {
     // Calculate response time in milliseconds
     const responseTime = Date.now() - startTime;
     
-    // Update attempts tracker
+    // Update performance in the user context
+    updatePerformance(isCorrect, responseTime);
+    
+    // Set result message based on response time
     if (isCorrect) {
-      // Only count correct attempts in the average
-      attemptsRef.current.total += 1;
-      attemptsRef.current.timeSum += responseTime;
-      
-      // Calculate average time (lower is better)
-      const avgTime = attemptsRef.current.timeSum / attemptsRef.current.total;
-      
-      // Calculate points: 100 points baseline, subtract based on average time
-      // Faster responses = more points (up to 30 points maximum per attempt)
-      const basePoints = 20;
-      const timeDeduction = Math.min(10, Math.floor(responseTime / 150)); // Lose up to 10 points based on time
-      const pointsEarned = Math.max(5, basePoints - timeDeduction);
-      
-      // Calculate new total points as an average of performance
-      const totalPoints = Math.round((attemptsRef.current.total * avgTime) / 100);
-      
-      // Update user's attempts data and recalculate points
-      addPoints(pointsEarned, attemptsRef.current);
-      setEarnedPoints(pointsEarned);
+      if (responseTime < 1000) {
+        setResultMessage(t('excellent'));
+      } else if (responseTime < 2000) {
+        setResultMessage(t('good'));
+      } else {
+        setResultMessage(t('correct'));
+      }
     } else {
-      // Penalty for wrong answers
-      const penalty = -10;
-      addPoints(penalty, attemptsRef.current);
-      setEarnedPoints(penalty);
+      setResultMessage(t('wrong'));
     }
     
     setShowResult(isCorrect ? 'win' : 'lose');
@@ -144,14 +124,14 @@ const RouteSelector: React.FC = () => {
                 <>
                   <CheckCircle className="text-green-500 w-32 h-32 animate-[win-animation_0.4s_ease-out]" />
                   <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
-                    +{earnedPoints} {t('points')}
+                    {resultMessage}
                   </div>
                 </>
               ) : (
                 <>
                   <XCircle className="text-red-500 w-32 h-32 animate-[lose-animation_0.4s_ease-out]" />
                   <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
-                    {earnedPoints} {t('points')}
+                    {resultMessage}
                   </div>
                 </>
               )}

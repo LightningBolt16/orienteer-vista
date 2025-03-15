@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { User, Award, Edit2, Save, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { User, Award, Edit2, Save, Clock, CheckCircle, XCircle, Target, Zap, Medal } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 
 const Profile: React.FC = () => {
-  const { user, setUser } = useUser();
+  const { user, setUser, getUserRank } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [userName, setUserName] = useState(user?.name || '');
   const { t } = useLanguage();
@@ -38,15 +38,13 @@ const Profile: React.FC = () => {
 
   if (!user) return <div>Loading...</div>;
 
-  // Calculate average response time in seconds (if attempts exist)
-  const avgResponseTime = user.attempts && user.attempts.total > 0 
-    ? (user.attempts.timeSum / user.attempts.total / 1000).toFixed(2)
-    : '0.00';
-
-  // Calculate correct rate based on points and attempts
+  // Get user stats
   const totalAttempts = user.attempts?.total || 0;
-  const correctAttempts = totalAttempts > 0 ? Math.ceil(user.points / 10) : 0;
-  const correctRate = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
+  const correctAttempts = user.attempts?.correct || 0;
+  const incorrectAttempts = totalAttempts - correctAttempts;
+  const avgResponseTime = user.speed ? `${user.speed}` : '0';
+  const accuracy = user.accuracy || 0;
+  const rank = getUserRank();
 
   return (
     <div className="max-w-4xl mx-auto py-12 animate-fade-in">
@@ -92,11 +90,12 @@ const Profile: React.FC = () => {
               <p className="text-muted-foreground mt-1">{t('orienteering.enthusiast')}</p>
             </div>
             
-            <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
-              <Award className="h-5 w-5 mr-2" />
-              <span className="font-semibold">{user.points}</span>
-              <span className="ml-1">{t('total.points')}</span>
-            </div>
+            {totalAttempts > 0 && (
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
+                <Medal className="h-5 w-5 mr-2" />
+                <span className="font-semibold">{t('rank')} {rank}</span>
+              </div>
+            )}
           </div>
         </div>
         
@@ -106,8 +105,9 @@ const Profile: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-secondary/50">
-              <div className="text-3xl font-bold text-orienteering">
-                {avgResponseTime}s
+              <div className="text-3xl font-bold text-orienteering flex items-center">
+                {avgResponseTime}
+                <span className="text-sm ml-1">ms</span>
               </div>
               <div className="text-sm text-muted-foreground">{t('avg.response.time')}</div>
             </div>
@@ -119,9 +119,9 @@ const Profile: React.FC = () => {
             
             <div className="p-4 rounded-lg bg-secondary/50">
               <div className="text-3xl font-bold text-orienteering">
-                {correctRate}%
+                {accuracy}%
               </div>
-              <div className="text-sm text-muted-foreground">{t('correct.rate')}</div>
+              <div className="text-sm text-muted-foreground">{t('accuracy')}</div>
             </div>
           </div>
           
@@ -137,7 +137,7 @@ const Profile: React.FC = () => {
             <div className="p-4 rounded-lg border border-border flex items-center">
               <XCircle className="h-10 w-10 text-red-500 mr-4" />
               <div>
-                <div className="text-lg font-medium">{totalAttempts - correctAttempts}</div>
+                <div className="text-lg font-medium">{incorrectAttempts}</div>
                 <div className="text-sm text-muted-foreground">{t('incorrect.choices')}</div>
               </div>
             </div>

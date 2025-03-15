@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Compass, User, Globe, Map, PenTool, FolderOpen } from 'lucide-react';
+import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 
 const Header: React.FC = () => {
   const location = useLocation();
-  const { user } = useUser();
+  const { user, getUserRank } = useUser();
   const { language, setLanguage, t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
 
@@ -78,10 +78,11 @@ const Header: React.FC = () => {
           </button>
           
           <div className="flex items-center space-x-2 ml-4">
-            {location.pathname !== '/course-setter' && (
-              <div className="rounded-full p-2 bg-orienteering/10 text-orienteering">
-                {user?.points || 0} {t('points')}
-              </div>
+            {location.pathname !== '/course-setter' && user?.attempts?.total !== undefined && user.attempts.total > 0 && (
+              <Link to="/route-game" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center">
+                <Medal className="h-4 w-4 mr-1" />
+                {t('rank')} {getUserRank()}
+              </Link>
             )}
             <Link to="/profile" className="transition-all-300 hover:brightness-110">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
