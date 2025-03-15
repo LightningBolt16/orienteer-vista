@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Compass, User, Globe, Map, PenTool } from 'lucide-react';
+import { Compass, User, Globe, Map, PenTool, FolderOpen } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -57,6 +57,18 @@ const Header: React.FC = () => {
             <span>{t('course.setter')}</span>
           </Link>
           
+          {location.pathname === '/course-setter' && (
+            <Link 
+              to="/my-files" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                location.pathname === '/my-files' ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <FolderOpen className="h-4 w-4" />
+              <span>{t('my.files')}</span>
+            </Link>
+          )}
+          
           <button 
             onClick={toggleLanguage}
             className="text-sm font-medium nav-link flex items-center space-x-1"
@@ -66,9 +78,11 @@ const Header: React.FC = () => {
           </button>
           
           <div className="flex items-center space-x-2 ml-4">
-            <div className="rounded-full p-2 bg-orienteering/10 text-orienteering">
-              {user?.points || 0} {t('points')}
-            </div>
+            {location.pathname !== '/course-setter' && (
+              <div className="rounded-full p-2 bg-orienteering/10 text-orienteering">
+                {user?.points || 0} {t('points')}
+              </div>
+            )}
             <Link to="/profile" className="transition-all-300 hover:brightness-110">
               <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
                 <User className="h-5 w-5 text-orienteering" />

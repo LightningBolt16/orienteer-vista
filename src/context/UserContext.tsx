@@ -6,6 +6,10 @@ type User = {
   name: string;
   points: number;
   profileImage?: string;
+  attempts?: {
+    total: number;
+    timeSum: number;
+  };
 };
 
 type LeaderboardEntry = {
@@ -17,7 +21,7 @@ type LeaderboardEntry = {
 interface UserContextType {
   user: User | null;
   leaderboard: LeaderboardEntry[];
-  addPoints: (points: number) => void;
+  addPoints: (points: number, attempts?: {total: number, timeSum: number}) => void;
   setUser: (user: User) => void;
 }
 
@@ -35,6 +39,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: '1',
       name: 'Guest',
       points: 0,
+      attempts: {
+        total: 0,
+        timeSum: 0
+      }
     };
   });
 
@@ -79,11 +87,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const addPoints = (points: number) => {
+  const addPoints = (points: number, attempts?: {total: number, timeSum: number}) => {
     if (user) {
       setUserState({
         ...user,
-        points: user.points + points
+        points: user.points + points,
+        attempts: attempts || user.attempts
       });
     }
   };

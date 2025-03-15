@@ -24,10 +24,34 @@ const RouteSelector: React.FC = () => {
   const [correctDirection, setCorrectDirection] = useState<'left' | 'right'>('left');
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [earnedPoints, setEarnedPoints] = useState<number>(0);
-  const { addPoints } = useUser();
+  const { addPoints, user } = useUser();
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
+  const attemptsRef = useRef<{total: number, timeSum: number}>({total: 0, timeSum: 0});
+
+  // Initialize attempts from user if available
+  useEffect(() => {
+    if (user && user.attempts) {
+      attemptsRef.current = user.attempts;
+    }
+  }, [user]);
+
+  // Add keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTransitioning) return;
+      
+      if (e.key === 'ArrowLeft') {
+        handleDirectionSelect('left');
+      } else if (e.key === 'ArrowRight') {
+        handleDirectionSelect('right');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [correctDirection, isTransitioning]);
 
   // Preload next image
   useEffect(() => {
@@ -53,24 +77,38 @@ const RouteSelector: React.FC = () => {
     
     const isCorrect = direction === correctDirection;
     
-    // Calculate points based on milliseconds spent (faster = more points)
-    const timeSpent = Date.now() - startTime; // in milliseconds
-    let pointsEarned = 0;
+    // Calculate response time in milliseconds
+    const responseTime = Date.now() - startTime;
     
+    // Update attempts tracker
     if (isCorrect) {
-      // Base points are 20, decreasing by 1 for every 100ms, with a minimum of 10
-      pointsEarned = Math.max(10, Math.round(30 - (timeSpent / 100)));
-      addPoints(pointsEarned);
+      // Only count correct attempts in the average
+      attemptsRef.current.total += 1;
+      attemptsRef.current.timeSum += responseTime;
+      
+      // Calculate average time (lower is better)
+      const avgTime = attemptsRef.current.timeSum / attemptsRef.current.total;
+      
+      // Calculate points: 100 points baseline, subtract based on average time
+      // Faster responses = more points (up to 30 points maximum per attempt)
+      const basePoints = 20;
+      const timeDeduction = Math.min(10, Math.floor(responseTime / 150)); // Lose up to 10 points based on time
+      const pointsEarned = Math.max(5, basePoints - timeDeduction);
+      
+      // Calculate new total points as an average of performance
+      const totalPoints = Math.round((attemptsRef.current.total * avgTime) / 100);
+      
+      // Update user's attempts data and recalculate points
+      addPoints(pointsEarned, attemptsRef.current);
       setEarnedPoints(pointsEarned);
     } else {
-      // Lose points on incorrect choice (up to -10 points)
-      pointsEarned = -10;
-      addPoints(pointsEarned);
-      setEarnedPoints(pointsEarned);
+      // Penalty for wrong answers
+      const penalty = -10;
+      addPoints(penalty, attemptsRef.current);
+      setEarnedPoints(penalty);
     }
     
     setShowResult(isCorrect ? 'win' : 'lose');
-    
     setIsTransitioning(true);
     
     // Clear any existing timeouts
@@ -106,14 +144,14 @@ const RouteSelector: React.FC = () => {
                 <>
                   <CheckCircle className="text-green-500 w-32 h-32 animate-[win-animation_0.4s_ease-out]" />
                   <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
-                    +{earnedPoints} poäng
+                    +{earnedPoints} {t('points')}
                   </div>
                 </>
               ) : (
                 <>
                   <XCircle className="text-red-500 w-32 h-32 animate-[lose-animation_0.4s_ease-out]" />
                   <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
-                    {earnedPoints} poäng
+                    {earnedPoints} {t('points')}
                   </div>
                 </>
               )}

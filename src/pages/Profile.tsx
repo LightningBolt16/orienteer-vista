@@ -1,21 +1,23 @@
 
 import React, { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { User, Award, Edit2, Save } from 'lucide-react';
+import { User, Award, Edit2, Save, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
+import { useLanguage } from '../context/LanguageContext';
 
 const Profile: React.FC = () => {
   const { user, setUser } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [userName, setUserName] = useState(user?.name || '');
+  const { t } = useLanguage();
 
   const handleSave = () => {
     if (!user) return;
     
     if (userName.trim() === '') {
       toast({
-        title: "Invalid Name",
-        description: "Name cannot be empty",
+        title: t('invalid.name'),
+        description: t('name.empty'),
         variant: "destructive"
       });
       return;
@@ -29,12 +31,22 @@ const Profile: React.FC = () => {
     setIsEditing(false);
     
     toast({
-      title: "Profile Updated",
-      description: "Your profile has been successfully updated"
+      title: t('profile.updated'),
+      description: t('profile.update.success')
     });
   };
 
   if (!user) return <div>Loading...</div>;
+
+  // Calculate average response time in seconds (if attempts exist)
+  const avgResponseTime = user.attempts && user.attempts.total > 0 
+    ? (user.attempts.timeSum / user.attempts.total / 1000).toFixed(2)
+    : '0.00';
+
+  // Calculate correct rate based on points and attempts
+  const totalAttempts = user.attempts?.total || 0;
+  const correctAttempts = totalAttempts > 0 ? Math.ceil(user.points / 10) : 0;
+  const correctRate = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
 
   return (
     <div className="max-w-4xl mx-auto py-12 animate-fade-in">
@@ -77,37 +89,57 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
               )}
-              <p className="text-muted-foreground mt-1">Orienteering Enthusiast</p>
+              <p className="text-muted-foreground mt-1">{t('orienteering.enthusiast')}</p>
             </div>
             
             <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
               <Award className="h-5 w-5 mr-2" />
               <span className="font-semibold">{user.points}</span>
-              <span className="ml-1">total points</span>
+              <span className="ml-1">{t('total.points')}</span>
             </div>
           </div>
         </div>
         
         {/* Stats Section */}
         <div className="mt-10 border-t border-muted pt-8">
-          <h2 className="text-xl font-semibold mb-6">Your Statistics</h2>
+          <h2 className="text-xl font-semibold mb-6">{t('your.statistics')}</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-secondary/50">
-              <div className="text-3xl font-bold text-orienteering">{user.points}</div>
-              <div className="text-sm text-muted-foreground">Total Points</div>
+              <div className="text-3xl font-bold text-orienteering">
+                {avgResponseTime}s
+              </div>
+              <div className="text-sm text-muted-foreground">{t('avg.response.time')}</div>
             </div>
             
             <div className="p-4 rounded-lg bg-secondary/50">
-              <div className="text-3xl font-bold text-orienteering">{Math.floor(user.points / 10)}</div>
-              <div className="text-sm text-muted-foreground">Routes Completed</div>
+              <div className="text-3xl font-bold text-orienteering">{totalAttempts}</div>
+              <div className="text-sm text-muted-foreground">{t('total.attempts')}</div>
             </div>
             
             <div className="p-4 rounded-lg bg-secondary/50">
               <div className="text-3xl font-bold text-orienteering">
-                {user.points > 0 ? Math.round((user.points / 10) * 0.7) : 0}
+                {correctRate}%
               </div>
-              <div className="text-sm text-muted-foreground">Correct Routes</div>
+              <div className="text-sm text-muted-foreground">{t('correct.rate')}</div>
+            </div>
+          </div>
+          
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 rounded-lg border border-border flex items-center">
+              <CheckCircle className="h-10 w-10 text-green-500 mr-4" />
+              <div>
+                <div className="text-lg font-medium">{correctAttempts}</div>
+                <div className="text-sm text-muted-foreground">{t('correct.choices')}</div>
+              </div>
+            </div>
+            
+            <div className="p-4 rounded-lg border border-border flex items-center">
+              <XCircle className="h-10 w-10 text-red-500 mr-4" />
+              <div>
+                <div className="text-lg font-medium">{totalAttempts - correctAttempts}</div>
+                <div className="text-sm text-muted-foreground">{t('incorrect.choices')}</div>
+              </div>
             </div>
           </div>
         </div>
