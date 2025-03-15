@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useUser } from '../context/UserContext';
-import { User, Award, Edit2, Save, Clock, CheckCircle, XCircle, Target, Zap, Medal } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -92,7 +92,6 @@ const Profile: React.FC = () => {
             
             {totalAttempts > 0 && (
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
-                <Medal className="h-5 w-5 mr-2" />
                 <span className="font-semibold">{t('rank')} {rank}</span>
               </div>
             )}

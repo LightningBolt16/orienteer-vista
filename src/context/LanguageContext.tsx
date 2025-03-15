@@ -19,7 +19,25 @@ const translations = {
     'route.instruction': 'Välj rätt riktning för den här rutten för att tjäna poäng',
     'leaderboard': 'Topplista',
     'coming.soon': 'Kommer snart',
-    'coming.soon.description': 'Nya spännande funktioner på gång!'
+    'coming.soon.description': 'Nya spännande funktioner på gång!',
+    'orienteers': 'orienterare',
+    'orienteering.enthusiast': 'Orienteringsentusiast',
+    'rank': 'Rankning',
+    'your.statistics': 'Dina statistik',
+    'avg.response.time': 'Genomsnittlig svarstid',
+    'total.attempts': 'Totala försök',
+    'accuracy': 'Precision',
+    'correct.choices': 'Korrekta val',
+    'incorrect.choices': 'Felaktiga val',
+    'you': 'du',
+    'profile.updated': 'Profil uppdaterad',
+    'profile.update.success': 'Din profil har uppdaterats framgångsrikt',
+    'invalid.name': 'Ogiltigt namn',
+    'name.empty': 'Namnet kan inte vara tomt',
+    'excellent': 'Utmärkt!',
+    'good': 'Bra!',
+    'correct': 'Korrekt!',
+    'wrong': 'Fel!'
   },
   en: {
     'route.game': 'Route Choice Game',
@@ -30,7 +48,25 @@ const translations = {
     'route.instruction': 'Choose the correct direction for this route to earn points',
     'leaderboard': 'Leaderboard',
     'coming.soon': 'Coming Soon',
-    'coming.soon.description': 'New exciting features are on the way!'
+    'coming.soon.description': 'New exciting features are on the way!',
+    'orienteers': 'orienteers',
+    'orienteering.enthusiast': 'Orienteering Enthusiast',
+    'rank': 'Rank',
+    'your.statistics': 'Your Statistics',
+    'avg.response.time': 'Average Response Time',
+    'total.attempts': 'Total Attempts',
+    'accuracy': 'Accuracy',
+    'correct.choices': 'Correct Choices',
+    'incorrect.choices': 'Incorrect Choices',
+    'you': 'you',
+    'profile.updated': 'Profile Updated',
+    'profile.update.success': 'Your profile has been updated successfully',
+    'invalid.name': 'Invalid Name',
+    'name.empty': 'Name cannot be empty',
+    'excellent': 'Excellent!',
+    'good': 'Good!',
+    'correct': 'Correct!',
+    'wrong': 'Wrong!'
   }
 };
 

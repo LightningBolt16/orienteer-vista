@@ -66,7 +66,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Calculate user rank based on accuracy and speed
   const getUserRank = (): number => {
-    if (!user) return 0;
+    if (!user || !user.attempts || user.attempts.total === 0) return 0;
     
     // Create a sorted copy of the leaderboard including the current user
     const fullLeaderboard = [...leaderboard];
