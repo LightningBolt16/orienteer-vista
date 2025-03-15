@@ -1,9 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal } from 'lucide-react';
+import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, ChevronDown } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
+import { cn } from '@/lib/utils';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -27,6 +36,9 @@ const Header: React.FC = () => {
     setLanguage(language === 'sv' ? 'en' : 'sv');
   };
 
+  // Helper for path checking with proper types
+  const isCurrentPath = (path: string) => location.pathname === path;
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 px-6 py-4 transition-all duration-300 ${
       scrolled ? 'glass-morphism shadow-sm' : 'bg-transparent'
@@ -41,33 +53,53 @@ const Header: React.FC = () => {
           <Link 
             to="/route-game" 
             className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-              location.pathname === '/route-game' ? 'text-orienteering' : 'text-foreground'
+              isCurrentPath('/route-game') ? 'text-orienteering' : 'text-foreground'
             }`}
           >
             <Map className="h-4 w-4" />
             <span>{t('route.game')}</span>
           </Link>
-          <Link 
-            to="/course-setter" 
-            className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-              location.pathname === '/course-setter' ? 'text-orienteering' : 'text-foreground'
-            }`}
-          >
-            <PenTool className="h-4 w-4" />
-            <span>{t('course.setter')}</span>
-          </Link>
           
-          {location.pathname === '/course-setter' && (
-            <Link 
-              to="/my-files" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                location.pathname === '/my-files' ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <FolderOpen className="h-4 w-4" />
-              <span>{t('my.files')}</span>
-            </Link>
-          )}
+          <NavigationMenu>
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger
+                  className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                    isCurrentPath('/course-setter') || isCurrentPath('/my-files') ? 'text-orienteering' : 'text-foreground'
+                  }`}
+                >
+                  <PenTool className="h-4 w-4 mr-1" />
+                  <span>{t('course.setter')}</span>
+                </NavigationMenuTrigger>
+                <NavigationMenuContent className="min-w-[8rem]">
+                  <div className="grid gap-2 p-2">
+                    <NavigationMenuLink asChild>
+                      <Link 
+                        to="/course-setter" 
+                        className={`flex items-center space-x-2 p-2 rounded-md hover:bg-muted ${
+                          isCurrentPath('/course-setter') ? 'bg-muted' : ''
+                        }`}
+                      >
+                        <PenTool className="h-4 w-4" />
+                        <span>{t('course.setter')}</span>
+                      </Link>
+                    </NavigationMenuLink>
+                    <NavigationMenuLink asChild>
+                      <Link 
+                        to="/my-files" 
+                        className={`flex items-center space-x-2 p-2 rounded-md hover:bg-muted ${
+                          isCurrentPath('/my-files') ? 'bg-muted' : ''
+                        }`}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        <span>{t('my.files')}</span>
+                      </Link>
+                    </NavigationMenuLink>
+                  </div>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
           
           <button 
             onClick={toggleLanguage}
@@ -78,7 +110,7 @@ const Header: React.FC = () => {
           </button>
           
           <div className="flex items-center space-x-2 ml-4">
-            {location.pathname !== '/course-setter' && user?.attempts?.total !== undefined && user.attempts.total > 0 && (
+            {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
               <Link to="/route-game" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                 <Medal className="h-4 w-4 mr-1" />
                 {t('rank')} {getUserRank()}
