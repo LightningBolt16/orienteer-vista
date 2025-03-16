@@ -5,15 +5,16 @@ import { useUser } from '../context/UserContext';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 
-// Sample images - in real implementation, these would be fetched from your folder
+// Images will be stored in the /public/routes/ folder
+// This approach allows you to easily add/remove images by modifying this folder
 const routeImages = [
-  "https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1458668383970-8ddd3927deed?auto=format&fit=crop&w=1200&q=80"
+  "/routes/route1.png",
+  "/routes/route2.png",
+  "/routes/route3.png",
+  "/routes/route4.png",
+  "/routes/route5.png",
+  "/routes/route6.png",
+  "/routes/route7.png"
 ];
 
 const RouteSelector: React.FC = () => {
