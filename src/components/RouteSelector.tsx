@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
-import { getRouteData, RouteData } from '../utils/routeDataUtils';
+import { getRouteData, RouteData, fetchRouteDataFromCSV } from '../utils/routeDataUtils';
 
 const RouteSelector: React.FC = () => {
   const [availableRoutes, setAvailableRoutes] = useState<RouteData[]>([]);
@@ -117,8 +117,22 @@ const RouteSelector: React.FC = () => {
   }
   
   const currentImageUrl = `/routes/candidate_${currentRoute.candidateIndex}.png`;
-  const leftButtonColor = currentRoute.shortestSide === 'left' ? currentRoute.shortestColor : 'white';
-  const rightButtonColor = currentRoute.shortestSide === 'right' ? currentRoute.shortestColor : 'white';
+  
+  // Map color strings to actual color values
+  const getColorValue = (colorStr: string): string => {
+    if (colorStr.toLowerCase() === 'red') return '#FF5733';
+    if (colorStr.toLowerCase() === 'blue') return '#3357FF';
+    return colorStr; // If it's already a hex color or other value, use as is
+  };
+  
+  // Set button colors based on shortest side and color
+  const leftButtonColor = currentRoute.shortestSide === 'left' 
+    ? getColorValue(currentRoute.shortestColor) 
+    : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
+    
+  const rightButtonColor = currentRoute.shortestSide === 'right' 
+    ? getColorValue(currentRoute.shortestColor) 
+    : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
 
   return (
     <div className="relative w-full">
