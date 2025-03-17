@@ -4,25 +4,17 @@ import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
+import { getRouteData, RouteData } from '../utils/routeDataUtils';
 
-// Images will be stored in the /public/routes/ folder
-// This approach allows you to easily add/remove images by modifying this folder
-const routeImages = [
-  "/routes/route1.png",
-  "/routes/route2.png",
-  "/routes/route3.png",
-  "/routes/route4.png",
-  "/routes/route5.png",
-  "/routes/route6.png",
-  "/routes/route7.png"
-];
+// Use the uploaded images - adjust the count based on what you uploaded
+const routeImages = Array.from({ length: 32 }, (_, i) => `/routes/route${i + 1}.png`);
 
 const RouteSelector: React.FC = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [nextImage, setNextImage] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
-  const [correctDirection, setCorrectDirection] = useState<'left' | 'right'>('left');
+  const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [resultMessage, setResultMessage] = useState<string>('');
   const { updatePerformance } = useUser();
@@ -30,10 +22,20 @@ const RouteSelector: React.FC = () => {
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
 
+  // Load route data
+  useEffect(() => {
+    const data = getRouteData();
+    setRouteData(data);
+    
+    // In future, you can load the CSV from GitHub with:
+    // fetchRouteDataFromCSV('https://your-github-repo-url/route-data.csv')
+    //   .then(data => setRouteData(data));
+  }, []);
+
   // Add keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTransitioning) return;
+      if (isTransitioning || !routeData[currentImageIndex]) return;
       
       if (e.key === 'ArrowLeft') {
         handleDirectionSelect('left');
@@ -44,7 +46,7 @@ const RouteSelector: React.FC = () => {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [correctDirection, isTransitioning]);
+  }, [currentImageIndex, isTransitioning, routeData]);
 
   // Preload next image
   useEffect(() => {
@@ -52,9 +54,6 @@ const RouteSelector: React.FC = () => {
     const img = new Image();
     img.src = routeImages[nextIndex];
     setNextImage(routeImages[nextIndex]);
-    
-    // Randomly set the correct direction
-    setCorrectDirection(Math.random() > 0.5 ? 'left' : 'right');
     
     // Reset the timer for the new image
     setStartTime(Date.now());
@@ -66,9 +65,10 @@ const RouteSelector: React.FC = () => {
   }, [currentImageIndex]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning) return;
+    if (isTransitioning || !routeData[currentImageIndex]) return;
     
-    const isCorrect = direction === correctDirection;
+    const currentRoute = routeData[currentImageIndex];
+    const isCorrect = direction === currentRoute.shortestSide;
     
     // Calculate response time in milliseconds
     const responseTime = Date.now() - startTime;
@@ -96,15 +96,20 @@ const RouteSelector: React.FC = () => {
     if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
     if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     
-    // Show result for a shorter time (400ms instead of 800ms)
+    // Show result for a shorter time
     resultTimeout.current = window.setTimeout(() => {
       setShowResult(null);
       transitionTimeout.current = window.setTimeout(() => {
         setCurrentImageIndex((currentImageIndex + 1) % routeImages.length);
         setIsTransitioning(false);
-      }, 200); // Faster transition (200ms instead of 300ms)
-    }, 400); // Faster result display
+      }, 200);
+    }, 400);
   };
+
+  // Get current route data
+  const currentRouteData = routeData[currentImageIndex];
+  const leftButtonColor = currentRouteData?.shortestSide === 'left' ? currentRouteData?.shortestColor : 'white';
+  const rightButtonColor = currentRouteData?.shortestSide === 'right' ? currentRouteData?.shortestColor : 'white';
 
   return (
     <div className="relative w-full">
@@ -143,7 +148,8 @@ const RouteSelector: React.FC = () => {
           <div className="absolute inset-x-0 bottom-0 p-6 flex justify-between">
             <button 
               onClick={() => handleDirectionSelect('left')} 
-              className="bg-white/80 hover:bg-white text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+              style={{ backgroundColor: currentRouteData ? `${leftButtonColor}CC` : 'rgba(255, 255, 255, 0.8)' }}
+              className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
               disabled={isTransitioning}
             >
               <ChevronLeft className="h-8 w-8" />
@@ -151,7 +157,8 @@ const RouteSelector: React.FC = () => {
             
             <button 
               onClick={() => handleDirectionSelect('right')} 
-              className="bg-white/80 hover:bg-white text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+              style={{ backgroundColor: currentRouteData ? `${rightButtonColor}CC` : 'rgba(255, 255, 255, 0.8)' }}
+              className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
               disabled={isTransitioning}
             >
               <ChevronRight className="h-8 w-8" />
@@ -159,6 +166,13 @@ const RouteSelector: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Optional: Display route information for debugging */}
+      {currentRouteData && (
+        <div className="mt-4 text-sm text-gray-500">
+          <p>Length comparison: Main {currentRouteData.mainRouteLength}m vs Alt {currentRouteData.altRouteLength}m</p>
+        </div>
+      )}
     </div>
   );
 };
