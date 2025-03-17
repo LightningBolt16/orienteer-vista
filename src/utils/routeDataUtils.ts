@@ -1,4 +1,3 @@
-
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -17,9 +16,11 @@ export const getRouteData = (): RouteData[] => {
     // Example data format - replace with your actual data
     { candidateIndex: 1, shortestSide: 'left', shortestColor: '#FF5733', mainRouteLength: 100, altRouteLength: 120 },
     { candidateIndex: 2, shortestSide: 'right', shortestColor: '#33FF57', mainRouteLength: 90, altRouteLength: 80 },
-    { candidateIndex: 3, shortestSide: 'left', shortestColor: '#3357FF', mainRouteLength: 110, altRouteLength: 130 },
-    { candidateIndex: 4, shortestSide: 'right', shortestColor: '#FF33A8', mainRouteLength: 85, altRouteLength: 75 },
-    // Add more placeholder entries to match your image count
+    { candidateIndex: 7, shortestSide: 'left', shortestColor: '#3357FF', mainRouteLength: 110, altRouteLength: 130 },
+    { candidateIndex: 8, shortestSide: 'right', shortestColor: '#FF33A8', mainRouteLength: 85, altRouteLength: 75 },
+    // Add more placeholder entries to match your available images
+    { candidateIndex: 3, shortestSide: 'left', shortestColor: '#33FFF0', mainRouteLength: 95, altRouteLength: 85 },
+    
     { candidateIndex: 5, shortestSide: 'left', shortestColor: '#33FFF0', mainRouteLength: 95, altRouteLength: 85 },
     { candidateIndex: 6, shortestSide: 'right', shortestColor: '#F0FF33', mainRouteLength: 105, altRouteLength: 95 },
     { candidateIndex: 7, shortestSide: 'left', shortestColor: '#FF8833', mainRouteLength: 120, altRouteLength: 110 },
@@ -49,7 +50,7 @@ export const getRouteData = (): RouteData[] => {
     { candidateIndex: 30, shortestSide: 'right', shortestColor: '#8080FF', mainRouteLength: 120, altRouteLength: 110 },
     { candidateIndex: 31, shortestSide: 'left', shortestColor: '#FFFF80', mainRouteLength: 95, altRouteLength: 85 },
     { candidateIndex: 32, shortestSide: 'right', shortestColor: '#80FFFF', mainRouteLength: 105, altRouteLength: 95 },
-  ];
+  ].sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex to ensure consistent order
 };
 
 // You can fetch the CSV from GitHub once you've uploaded it using this function
@@ -62,16 +63,21 @@ export const fetchRouteDataFromCSV = async (url: string): Promise<RouteData[]> =
     const lines = csvText.split('\n');
     const header = lines[0].split(',');
     
-    return lines.slice(1).map((line) => {
-      const values = line.split(',');
-      return {
-        candidateIndex: parseInt(values[0]),
-        shortestSide: values[1].toLowerCase() === 'left' ? 'left' : 'right',
-        shortestColor: values[2],
-        mainRouteLength: parseFloat(values[3]),
-        altRouteLength: parseFloat(values[4])
-      };
-    });
+    const data = lines.slice(1)
+      .filter(line => line.trim() !== '') // Skip empty lines
+      .map((line) => {
+        const values = line.split(',');
+        return {
+          candidateIndex: parseInt(values[0]),
+          shortestSide: values[1].toLowerCase() === 'left' ? 'left' : 'right',
+          shortestColor: values[2],
+          mainRouteLength: parseFloat(values[3]),
+          altRouteLength: parseFloat(values[4])
+        };
+      })
+      .sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex
+      
+    return data;
   } catch (error) {
     console.error('Error fetching or parsing CSV:', error);
     return getRouteData(); // Fallback to default data
