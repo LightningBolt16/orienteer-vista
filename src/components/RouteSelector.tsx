@@ -21,7 +21,8 @@ const RouteSelector: React.FC = () => {
 
   // Load route data
   useEffect(() => {
-    const data = getRouteData();
+    fetchRouteDataFromCSV('https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/refs/heads/main/shortest_route_side.csv')
+      .then(data => setAvailableRoutes(data));
     setAvailableRoutes(data);
     
     // In future, you can load the CSV from GitHub with:
