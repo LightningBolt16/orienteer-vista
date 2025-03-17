@@ -21,19 +21,26 @@ const RouteSelector: React.FC = () => {
 
   // Load route data
   useEffect(() => {
-    fetchRouteDataFromCSV('https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/refs/heads/main/shortest_route_side.csv')
-      .then(data => setAvailableRoutes(data));
-    setAvailableRoutes(data);
+    // First try to load the local data
+    setAvailableRoutes(getRouteData());
     
-    // In future, you can load the CSV from GitHub with:
-    // fetchRouteDataFromCSV('https://your-github-repo-url/route-data.csv')
-    //   .then(data => setAvailableRoutes(data));
+    // Then try to fetch from GitHub
+    fetchRouteDataFromCSV('https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv')
+      .then(data => {
+        if (data && data.length > 0) {
+          console.log('Loaded CSV data:', data);
+          setAvailableRoutes(data);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch CSV:', err);
+      });
   }, []);
 
   // Add keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTransitioning || !availableRoutes[currentRouteIndex]) return;
+      if (isTransitioning || !availableRoutes || availableRoutes.length === 0) return;
       
       if (e.key === 'ArrowLeft') {
         handleDirectionSelect('left');
@@ -68,7 +75,7 @@ const RouteSelector: React.FC = () => {
   }, [currentRouteIndex, availableRoutes]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || !availableRoutes[currentRouteIndex]) return;
+    if (isTransitioning || !availableRoutes || availableRoutes.length === 0) return;
     
     const currentRoute = availableRoutes[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
@@ -109,12 +116,17 @@ const RouteSelector: React.FC = () => {
     }, 400);
   };
 
+  // If no routes are loaded yet, show a loading state
+  if (availableRoutes.length === 0) {
+    return <div className="flex justify-center items-center h-64">Loading routes...</div>;
+  }
+  
   // Get current route data
   const currentRoute = availableRoutes[currentRouteIndex];
   
-  // If no routes are loaded yet, show a loading state
+  // If current route is still undefined for some reason, show loading
   if (!currentRoute) {
-    return <div className="flex justify-center items-center h-64">Loading routes...</div>;
+    return <div className="flex justify-center items-center h-64">Loading route data...</div>;
   }
   
   const currentImageUrl = `/routes/candidate_${currentRoute.candidateIndex}.png`;
@@ -194,7 +206,7 @@ const RouteSelector: React.FC = () => {
       {/* Optional: Display route information for debugging */}
       {currentRoute && (
         <div className="mt-4 text-sm text-gray-500">
-          <p>Route #{currentRoute.candidateIndex} - Length comparison: Main {currentRoute.mainRouteLength}m vs Alt {currentRoute.altRouteLength}m</p>
+          <p>Route #{currentRoute.candidateIndex} - Length comparison: Main {currentRoute.mainRouteLength.toFixed(2)}m vs Alt {currentRoute.altRouteLength.toFixed(2)}m</p>
         </div>
       )}
     </div>

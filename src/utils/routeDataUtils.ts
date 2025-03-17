@@ -15,41 +15,17 @@ export const getRouteData = (): RouteData[] => {
   return [
     // Example data format - replace with your actual data
     { candidateIndex: 1, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1451.24, altRouteLength: 1466.53 },
-    { candidateIndex: 2, shortestSide: 'right', shortestColor: 'blue', mainRouteLength: 90, altRouteLength: 80 },
-    { candidateIndex: 7, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 110, altRouteLength: 130 },
-    { candidateIndex: 8, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 85, altRouteLength: 75 },
-    // Add more placeholder entries to match your available images
-    { candidateIndex: 3, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 95, altRouteLength: 85 },
-    
-    { candidateIndex: 5, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 95, altRouteLength: 85 },
-    { candidateIndex: 6, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 105, altRouteLength: 95 },
-    { candidateIndex: 7, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 120, altRouteLength: 110 },
-    { candidateIndex: 8, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 100, altRouteLength: 90 },
-    // Add more entries for all 32 images
-    { candidateIndex: 9, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 130, altRouteLength: 120 },
-    { candidateIndex: 10, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 110, altRouteLength: 100 },
-    { candidateIndex: 11, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 95, altRouteLength: 85 },
-    { candidateIndex: 12, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 120, altRouteLength: 110 },
-    { candidateIndex: 13, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 105, altRouteLength: 95 },
-    { candidateIndex: 14, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 115, altRouteLength: 105 },
-    { candidateIndex: 15, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 125, altRouteLength: 115 },
-    { candidateIndex: 16, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 100, altRouteLength: 90 },
-    { candidateIndex: 17, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 110, altRouteLength: 100 },
-    { candidateIndex: 18, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 120, altRouteLength: 110 },
-    { candidateIndex: 19, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 95, altRouteLength: 85 },
-    { candidateIndex: 20, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 105, altRouteLength: 95 },
-    { candidateIndex: 21, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 130, altRouteLength: 120 },
-    { candidateIndex: 22, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 110, altRouteLength: 100 },
-    { candidateIndex: 23, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 100, altRouteLength: 90 },
-    { candidateIndex: 24, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 120, altRouteLength: 110 },
-    { candidateIndex: 25, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 115, altRouteLength: 105 },
-    { candidateIndex: 26, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 125, altRouteLength: 115 },
-    { candidateIndex: 27, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 105, altRouteLength: 95 },
-    { candidateIndex: 28, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 100, altRouteLength: 90 },
-    { candidateIndex: 29, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 110, altRouteLength: 100 },
-    { candidateIndex: 30, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 120, altRouteLength: 110 },
-    { candidateIndex: 31, shortestSide: 'left', shortestColor: 'blue', mainRouteLength: 95, altRouteLength: 85 },
-    { candidateIndex: 32, shortestSide: 'right', shortestColor: 'red', mainRouteLength: 105, altRouteLength: 95 },
+    { candidateIndex: 2, shortestSide: 'right', shortestColor: 'blue', mainRouteLength: 1532.60, altRouteLength: 1542.85 },
+    { candidateIndex: 3, shortestSide: 'right', shortestColor: 'blue', mainRouteLength: 1205.36, altRouteLength: 1216.65 },
+    { candidateIndex: 4, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1651.07, altRouteLength: 1663.30 },
+    { candidateIndex: 5, shortestSide: 'right', shortestColor: 'blue', mainRouteLength: 1429.73, altRouteLength: 1452.24 },
+    { candidateIndex: 6, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1157.17, altRouteLength: 1169.77 },
+    { candidateIndex: 7, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1598.61, altRouteLength: 1620.62 },
+    { candidateIndex: 8, shortestSide: 'right', shortestColor: 'blue', mainRouteLength: 1079.92, altRouteLength: 1092.79 },
+    { candidateIndex: 9, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1564.17, altRouteLength: 1594.24 },
+    { candidateIndex: 10, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1060.21, altRouteLength: 1072.47 },
+    { candidateIndex: 11, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1419.95, altRouteLength: 1438.81 },
+    { candidateIndex: 12, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1295.52, altRouteLength: 1306.98 },
   ].sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex to ensure consistent order
 };
 
@@ -67,8 +43,9 @@ export const fetchRouteDataFromCSV = async (url: string): Promise<RouteData[]> =
       .filter(line => line.trim() !== '') // Skip empty lines
       .map((line) => {
         const values = line.split(',');
+        // Ensure the side value is a valid 'left' or 'right' value
         const sideValue = values[1].toLowerCase();
-        const shortestSide: 'left' | 'right' = sideValue === 'left' ? 'left' : 'right';
+        const shortestSide = sideValue === 'left' ? 'left' : 'right';
         
         // Color mapping - use the actual color value from CSV
         const colorValue = values[2].toLowerCase();
