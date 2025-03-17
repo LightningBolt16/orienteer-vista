@@ -1,3 +1,4 @@
+
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -67,9 +68,18 @@ export const fetchRouteDataFromCSV = async (url: string): Promise<RouteData[]> =
       .filter(line => line.trim() !== '') // Skip empty lines
       .map((line) => {
         const values = line.split(',');
+        const side = values[1].toLowerCase();
+        
+        // Ensure shortestSide is strictly 'left' or 'right'
+        if (side !== 'left' && side !== 'right') {
+          console.error(`Invalid side value: ${side}. Defaulting to 'left'.`);
+        }
+        
+        const shortestSide = (side === 'left' || side === 'right') ? side : 'left';
+        
         return {
           candidateIndex: parseInt(values[0]),
-          shortestSide: values[1].toLowerCase() === 'left' ? 'left' : 'right',
+          shortestSide: shortestSide as 'left' | 'right',
           shortestColor: values[2],
           mainRouteLength: parseFloat(values[3]),
           altRouteLength: parseFloat(values[4])
