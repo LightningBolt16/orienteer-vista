@@ -1,3 +1,4 @@
+
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -43,9 +44,10 @@ export const fetchRouteDataFromCSV = async (url: string): Promise<RouteData[]> =
       .filter(line => line.trim() !== '') // Skip empty lines
       .map((line) => {
         const values = line.split(',');
+        
         // Ensure the side value is a valid 'left' or 'right' value
         const sideValue = values[1].toLowerCase();
-        const shortestSide = sideValue === 'left' ? 'left' : 'right';
+        const shortestSide = sideValue === 'left' ? 'left' : 'right' as 'left' | 'right';
         
         // Color mapping - use the actual color value from CSV
         const colorValue = values[2].toLowerCase();

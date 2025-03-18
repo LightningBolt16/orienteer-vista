@@ -6,10 +6,12 @@ import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { getRouteData, RouteData, fetchRouteDataFromCSV } from '../utils/routeDataUtils';
 
+// Number of images to preload ahead of the current image
+const PRELOAD_AHEAD_COUNT = 10;
+
 const RouteSelector: React.FC = () => {
   const [availableRoutes, setAvailableRoutes] = useState<RouteData[]>([]);
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
-  const [nextImageUrl, setNextImageUrl] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
   const [startTime, setStartTime] = useState<number>(Date.now());
@@ -18,6 +20,7 @@ const RouteSelector: React.FC = () => {
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
+  const preloadedImages = useRef<Map<number, HTMLImageElement>>(new Map());
 
   // Load route data
   useEffect(() => {
@@ -37,6 +40,44 @@ const RouteSelector: React.FC = () => {
       });
   }, []);
 
+  // Preload images when availableRoutes change or currentRouteIndex changes
+  useEffect(() => {
+    if (availableRoutes.length === 0) return;
+    
+    // Clear old preloaded images to prevent memory issues if not needed anymore
+    const currentlyNeededImages = new Set<number>();
+    
+    // Preload current image and PRELOAD_AHEAD_COUNT images ahead
+    for (let i = 0; i < PRELOAD_AHEAD_COUNT; i++) {
+      const index = (currentRouteIndex + i) % availableRoutes.length;
+      const candidateIndex = availableRoutes[index].candidateIndex;
+      currentlyNeededImages.add(candidateIndex);
+      
+      // If we haven't preloaded this image yet, preload it
+      if (!preloadedImages.current.has(candidateIndex)) {
+        const img = new Image();
+        img.src = `/routes/candidate_${candidateIndex}.png`;
+        preloadedImages.current.set(candidateIndex, img);
+      }
+    }
+    
+    // Optional: Clean up preloaded images that are no longer needed
+    // This prevents memory issues if the game runs for a long time
+    preloadedImages.current.forEach((_, key) => {
+      if (!currentlyNeededImages.has(key)) {
+        preloadedImages.current.delete(key);
+      }
+    });
+    
+    // Reset the timer for the new image
+    setStartTime(Date.now());
+    
+    return () => {
+      if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
+      if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
+    };
+  }, [currentRouteIndex, availableRoutes]);
+
   // Add keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,27 +93,6 @@ const RouteSelector: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentRouteIndex, isTransitioning, availableRoutes]);
-
-  // Preload next image
-  useEffect(() => {
-    if (availableRoutes.length > 0) {
-      const nextIndex = (currentRouteIndex + 1) % availableRoutes.length;
-      const nextCandidateIndex = availableRoutes[nextIndex].candidateIndex;
-      const nextImagePath = `/routes/candidate_${nextCandidateIndex}.png`;
-      
-      const img = new Image();
-      img.src = nextImagePath;
-      setNextImageUrl(nextImagePath);
-      
-      // Reset the timer for the new image
-      setStartTime(Date.now());
-    }
-    
-    return () => {
-      if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
-      if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
-    };
-  }, [currentRouteIndex, availableRoutes]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
     if (isTransitioning || !availableRoutes || availableRoutes.length === 0) return;
