@@ -1,3 +1,4 @@
+
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -15,40 +16,63 @@ export interface MapSource {
   description?: string;
 }
 
-// Available map sources
+// Helper function to capitalize the first letter of each word
+const capitalizeMapName = (folderName: string): string => {
+  return folderName
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Available map sources - now using folder names for the map names
 export const mapSources: MapSource[] = [
   {
     id: 'default-landscape',
-    name: 'Default Map (Landscape)',
+    name: 'Default (Landscape)',
     aspect: '16:9',
-    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv',
-    imagePathPrefix: '/routes/candidate_',
+    csvUrl: '/csv_files/default.csv',
+    imagePathPrefix: '/routes/default/candidate_',
     description: 'The original orienteering map in landscape format'
   },
   {
     id: 'default-portrait',
-    name: 'Default Map (Portrait)',
+    name: 'Default (Portrait)',
     aspect: '9:16',
-    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv',
-    imagePathPrefix: '/routes/candidate_',
+    csvUrl: '/csv_files/default.csv',
+    imagePathPrefix: '/routes/default/candidate_',
     description: 'The original orienteering map adapted for mobile devices'
   },
-  // You can add more map sources here
   {
     id: 'forest-landscape',
-    name: 'Forest Map (Landscape)',
+    name: 'Forest (Landscape)',
     aspect: '16:9',
-    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv', // Replace with actual URL
+    csvUrl: '/csv_files/forest.csv',
     imagePathPrefix: '/routes/forest/candidate_',
     description: 'A dense forest map with complex route choices'
   },
   {
+    id: 'forest-portrait',
+    name: 'Forest (Portrait)',
+    aspect: '9:16',
+    csvUrl: '/csv_files/forest.csv',
+    imagePathPrefix: '/routes/forest/candidate_',
+    description: 'A dense forest map with complex route choices for mobile'
+  },
+  {
     id: 'urban-landscape',
-    name: 'Urban Map (Landscape)',
+    name: 'Urban (Landscape)',
     aspect: '16:9',
-    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv', // Replace with actual URL
+    csvUrl: '/csv_files/urban.csv',
     imagePathPrefix: '/routes/urban/candidate_',
     description: 'An urban environment with buildings and streets'
+  },
+  {
+    id: 'urban-portrait',
+    name: 'Urban (Portrait)',
+    aspect: '9:16',
+    csvUrl: '/csv_files/urban.csv',
+    imagePathPrefix: '/routes/urban/candidate_',
+    description: 'An urban environment with buildings and streets for mobile'
   }
 ];
 
