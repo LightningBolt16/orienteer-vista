@@ -1,4 +1,3 @@
-
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -7,33 +6,80 @@ export interface RouteData {
   altRouteLength: number;
 }
 
-// This function would typically fetch and parse a CSV file
-// For now, we'll use a placeholder that should be replaced with the actual CSV data
+export interface MapSource {
+  id: string;
+  name: string;
+  aspect: '16:9' | '9:16';
+  csvUrl: string;
+  imagePathPrefix: string;
+  description?: string;
+}
+
+// Available map sources
+export const mapSources: MapSource[] = [
+  {
+    id: 'default-landscape',
+    name: 'Default Map (Landscape)',
+    aspect: '16:9',
+    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv',
+    imagePathPrefix: '/routes/candidate_',
+    description: 'The original orienteering map in landscape format'
+  },
+  {
+    id: 'default-portrait',
+    name: 'Default Map (Portrait)',
+    aspect: '9:16',
+    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv',
+    imagePathPrefix: '/routes/candidate_',
+    description: 'The original orienteering map adapted for mobile devices'
+  },
+  // You can add more map sources here
+  {
+    id: 'forest-landscape',
+    name: 'Forest Map (Landscape)',
+    aspect: '16:9',
+    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv', // Replace with actual URL
+    imagePathPrefix: '/routes/forest/candidate_',
+    description: 'A dense forest map with complex route choices'
+  },
+  {
+    id: 'urban-landscape',
+    name: 'Urban Map (Landscape)',
+    aspect: '16:9',
+    csvUrl: 'https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv', // Replace with actual URL
+    imagePathPrefix: '/routes/urban/candidate_',
+    description: 'An urban environment with buildings and streets'
+  }
+];
+
+// Fallback data for when CSV fetch fails
+const fallbackRouteData: RouteData[] = [
+  { candidateIndex: 1, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1451.24, altRouteLength: 1466.53 },
+  { candidateIndex: 2, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1532.60, altRouteLength: 1542.85 },
+  { candidateIndex: 3, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1205.36, altRouteLength: 1216.65 },
+  { candidateIndex: 4, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1651.07, altRouteLength: 1663.30 },
+  { candidateIndex: 5, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1429.73, altRouteLength: 1452.24 },
+  { candidateIndex: 6, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1157.17, altRouteLength: 1169.77 },
+  { candidateIndex: 7, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1598.61, altRouteLength: 1620.62 },
+  { candidateIndex: 8, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1079.92, altRouteLength: 1092.79 },
+  { candidateIndex: 9, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1564.17, altRouteLength: 1594.24 },
+  { candidateIndex: 10, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1060.21, altRouteLength: 1072.47 },
+  { candidateIndex: 11, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1419.95, altRouteLength: 1438.81 },
+  { candidateIndex: 12, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1295.52, altRouteLength: 1306.98 },
+].sort((a, b) => a.candidateIndex - b.candidateIndex);
+
+// Get default route data (for backward compatibility)
 export const getRouteData = (): RouteData[] => {
-  // This is a placeholder for the CSV data
-  // The actual implementation should fetch and parse the CSV file from your GitHub repo
-  // Format: Candidate_Index,Shortest_Side,Shortest_Color,Main_Route_Length,Alt_Route_Length
-  return [
-    // Example data format - replace with your actual data
-    { candidateIndex: 1, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1451.24, altRouteLength: 1466.53 },
-    { candidateIndex: 2, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1532.60, altRouteLength: 1542.85 },
-    { candidateIndex: 3, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1205.36, altRouteLength: 1216.65 },
-    { candidateIndex: 4, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1651.07, altRouteLength: 1663.30 },
-    { candidateIndex: 5, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1429.73, altRouteLength: 1452.24 },
-    { candidateIndex: 6, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1157.17, altRouteLength: 1169.77 },
-    { candidateIndex: 7, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1598.61, altRouteLength: 1620.62 },
-    { candidateIndex: 8, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1079.92, altRouteLength: 1092.79 },
-    { candidateIndex: 9, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1564.17, altRouteLength: 1594.24 },
-    { candidateIndex: 10, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1060.21, altRouteLength: 1072.47 },
-    { candidateIndex: 11, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1419.95, altRouteLength: 1438.81 },
-    { candidateIndex: 12, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1295.52, altRouteLength: 1306.98 },
-  ].sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex to ensure consistent order
+  return fallbackRouteData;
 };
 
-// You can fetch the CSV from GitHub once you've uploaded it using this function
-export const fetchRouteDataFromCSV = async (url: string): Promise<RouteData[]> => {
+// Fetch route data from a specific map source
+export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(mapSource.csvUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
+    }
     const csvText = await response.text();
     
     // Parse CSV
@@ -45,26 +91,42 @@ export const fetchRouteDataFromCSV = async (url: string): Promise<RouteData[]> =
       .map((line) => {
         const values = line.split(',');
         
+        // Skip header line if it's repeated in the data
+        if (values[0].toLowerCase() === 'candidate_index') {
+          return null;
+        }
+        
         // Ensure the side value is a valid 'left' or 'right' value
-        const sideValue = values[1].toLowerCase();
+        const sideValue = values[1]?.toLowerCase() || '';
         const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
         
         // Color mapping - use the actual color value from CSV
-        const colorValue = values[2].toLowerCase();
+        const colorValue = values[2]?.toLowerCase() || 'red';
+        
+        const candidateIndex = parseInt(values[0]);
+        if (isNaN(candidateIndex)) {
+          return null; // Skip invalid data
+        }
         
         return {
-          candidateIndex: parseInt(values[0]),
-          shortestSide: shortestSide,
+          candidateIndex,
+          shortestSide,
           shortestColor: colorValue,
-          mainRouteLength: parseFloat(values[3]),
-          altRouteLength: parseFloat(values[4])
+          mainRouteLength: parseFloat(values[3]) || 0,
+          altRouteLength: parseFloat(values[4]) || 0
         };
       })
-      .sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex
+      .filter(item => item !== null) as RouteData[];
       
-    return data;
+    return data.sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex
   } catch (error) {
     console.error('Error fetching or parsing CSV:', error);
-    return getRouteData(); // Fallback to default data
+    return fallbackRouteData; // Fallback to default data
   }
+};
+
+// Helper to get image URL based on map source and candidate index
+export const getImageUrl = (mapSource: MapSource, candidateIndex: number, isMobile: boolean): string => {
+  const suffix = mapSource.aspect === '9:16' || isMobile ? '_mobile' : '';
+  return `${mapSource.imagePathPrefix}${candidateIndex}${suffix}.png`;
 };

@@ -3,14 +3,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
-import { getRouteData, RouteData, fetchRouteDataFromCSV } from '../utils/routeDataUtils';
+import { RouteData, MapSource, getImageUrl } from '../utils/routeDataUtils';
 import { AspectRatio } from './ui/aspect-ratio';
 
 // Number of images to preload ahead of the current image
 const PRELOAD_AHEAD_COUNT = 10;
 
-const MobileRouteSelector: React.FC = () => {
-  const [availableRoutes, setAvailableRoutes] = useState<RouteData[]>([]);
+interface MobileRouteSelectorProps {
+  routeData: RouteData[];
+  mapSource: MapSource;
+}
+
+const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, mapSource }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
@@ -20,49 +24,31 @@ const MobileRouteSelector: React.FC = () => {
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
-  const preloadedImages = useRef<Map<number, HTMLImageElement>>(new Map());
+  const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Load route data
+  // Preload images when routeData changes or currentRouteIndex changes
   useEffect(() => {
-    // First try to load the local data
-    setAvailableRoutes(getRouteData());
+    if (routeData.length === 0 || !mapSource) return;
     
-    // Then try to fetch from GitHub
-    fetchRouteDataFromCSV('https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv')
-      .then(data => {
-        if (data && data.length > 0) {
-          console.log('Loaded CSV data:', data);
-          setAvailableRoutes(data);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to fetch CSV:', err);
-      });
-  }, []);
-
-  // Preload images when availableRoutes change or currentRouteIndex changes
-  useEffect(() => {
-    if (availableRoutes.length === 0) return;
-    
-    // Clear old preloaded images to prevent memory issues if not needed anymore
-    const currentlyNeededImages = new Set<number>();
+    // Clear old preloaded images to prevent memory issues
+    const currentlyNeededImages = new Set<string>();
     
     // Preload current image and PRELOAD_AHEAD_COUNT images ahead
     for (let i = 0; i < PRELOAD_AHEAD_COUNT; i++) {
-      const index = (currentRouteIndex + i) % availableRoutes.length;
-      const candidateIndex = availableRoutes[index].candidateIndex;
-      currentlyNeededImages.add(candidateIndex);
+      const index = (currentRouteIndex + i) % routeData.length;
+      const candidateIndex = routeData[index].candidateIndex;
+      const imageUrl = getImageUrl(mapSource, candidateIndex, true);
+      currentlyNeededImages.add(imageUrl);
       
       // If we haven't preloaded this image yet, preload it
-      if (!preloadedImages.current.has(candidateIndex)) {
+      if (!preloadedImages.current.has(imageUrl)) {
         const img = new Image();
-        // Use mobile-specific images with _mobile suffix
-        img.src = `/routes/candidate_${candidateIndex}_mobile.png`;
-        preloadedImages.current.set(candidateIndex, img);
+        img.src = imageUrl;
+        preloadedImages.current.set(imageUrl, img);
       }
     }
     
-    // Optional: Clean up preloaded images that are no longer needed
+    // Clean up preloaded images that are no longer needed
     preloadedImages.current.forEach((_, key) => {
       if (!currentlyNeededImages.has(key)) {
         preloadedImages.current.delete(key);
@@ -76,12 +62,12 @@ const MobileRouteSelector: React.FC = () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
       if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     };
-  }, [currentRouteIndex, availableRoutes]);
+  }, [currentRouteIndex, routeData, mapSource]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || !availableRoutes || availableRoutes.length === 0) return;
+    if (isTransitioning || routeData.length === 0) return;
     
-    const currentRoute = availableRoutes[currentRouteIndex];
+    const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
     
     // Calculate response time in milliseconds
@@ -114,27 +100,27 @@ const MobileRouteSelector: React.FC = () => {
     resultTimeout.current = window.setTimeout(() => {
       setShowResult(null);
       transitionTimeout.current = window.setTimeout(() => {
-        setCurrentRouteIndex((currentRouteIndex + 1) % availableRoutes.length);
+        setCurrentRouteIndex((currentRouteIndex + 1) % routeData.length);
         setIsTransitioning(false);
       }, 200);
     }, 400);
   };
 
   // If no routes are loaded yet, show a loading state
-  if (availableRoutes.length === 0) {
+  if (routeData.length === 0) {
     return <div className="flex justify-center items-center h-64">Loading routes...</div>;
   }
   
   // Get current route data
-  const currentRoute = availableRoutes[currentRouteIndex];
+  const currentRoute = routeData[currentRouteIndex];
   
   // If current route is still undefined for some reason, show loading
   if (!currentRoute) {
     return <div className="flex justify-center items-center h-64">Loading route data...</div>;
   }
   
-  // Mobile-specific image path (assuming you'll add _mobile suffix to your mobile-optimized images)
-  const currentImageUrl = `/routes/candidate_${currentRoute.candidateIndex}_mobile.png`;
+  // Mobile-specific image path using the map source
+  const currentImageUrl = getImageUrl(mapSource, currentRoute.candidateIndex, true);
   
   // Map color strings to actual color values for the side glow effect
   const getColorValue = (colorStr: string): string => {
@@ -158,14 +144,14 @@ const MobileRouteSelector: React.FC = () => {
       <div className="glass-card overflow-hidden relative">
         {/* Side glow effects */}
         <div 
-          className="absolute left-0 top-0 bottom-0 w-3 z-10"
+          className="absolute left-0 top-0 bottom-0 w-3 z-10 side-glow"
           style={{
             background: `linear-gradient(to right, ${leftGlowColor}99, transparent)`,
             boxShadow: `0 0 15px 0 ${leftGlowColor}88`
           }}
         />
         <div 
-          className="absolute right-0 top-0 bottom-0 w-3 z-10"
+          className="absolute right-0 top-0 bottom-0 w-3 z-10 side-glow"
           style={{
             background: `linear-gradient(to left, ${rightGlowColor}99, transparent)`,
             boxShadow: `0 0 15px 0 ${rightGlowColor}88`

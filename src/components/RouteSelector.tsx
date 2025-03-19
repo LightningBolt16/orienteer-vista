@@ -4,13 +4,17 @@ import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
-import { getRouteData, RouteData, fetchRouteDataFromCSV } from '../utils/routeDataUtils';
+import { RouteData, MapSource, getImageUrl } from '../utils/routeDataUtils';
 
 // Number of images to preload ahead of the current image
 const PRELOAD_AHEAD_COUNT = 10;
 
-const RouteSelector: React.FC = () => {
-  const [availableRoutes, setAvailableRoutes] = useState<RouteData[]>([]);
+interface RouteSelectorProps {
+  routeData: RouteData[];
+  mapSource: MapSource;
+}
+
+const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
@@ -20,49 +24,31 @@ const RouteSelector: React.FC = () => {
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
-  const preloadedImages = useRef<Map<number, HTMLImageElement>>(new Map());
+  const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Load route data
+  // Preload images when routeData changes or currentRouteIndex changes
   useEffect(() => {
-    // First try to load the local data
-    setAvailableRoutes(getRouteData());
+    if (routeData.length === 0 || !mapSource) return;
     
-    // Then try to fetch from GitHub
-    fetchRouteDataFromCSV('https://raw.githubusercontent.com/LightningBolt16/orienteer-vista/main/shortest_route_side.csv')
-      .then(data => {
-        if (data && data.length > 0) {
-          console.log('Loaded CSV data:', data);
-          setAvailableRoutes(data);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to fetch CSV:', err);
-      });
-  }, []);
-
-  // Preload images when availableRoutes change or currentRouteIndex changes
-  useEffect(() => {
-    if (availableRoutes.length === 0) return;
-    
-    // Clear old preloaded images to prevent memory issues if not needed anymore
-    const currentlyNeededImages = new Set<number>();
+    // Clear old preloaded images to prevent memory issues
+    const currentlyNeededImages = new Set<string>();
     
     // Preload current image and PRELOAD_AHEAD_COUNT images ahead
     for (let i = 0; i < PRELOAD_AHEAD_COUNT; i++) {
-      const index = (currentRouteIndex + i) % availableRoutes.length;
-      const candidateIndex = availableRoutes[index].candidateIndex;
-      currentlyNeededImages.add(candidateIndex);
+      const index = (currentRouteIndex + i) % routeData.length;
+      const candidateIndex = routeData[index].candidateIndex;
+      const imageUrl = getImageUrl(mapSource, candidateIndex, false);
+      currentlyNeededImages.add(imageUrl);
       
       // If we haven't preloaded this image yet, preload it
-      if (!preloadedImages.current.has(candidateIndex)) {
+      if (!preloadedImages.current.has(imageUrl)) {
         const img = new Image();
-        img.src = `/routes/candidate_${candidateIndex}.png`;
-        preloadedImages.current.set(candidateIndex, img);
+        img.src = imageUrl;
+        preloadedImages.current.set(imageUrl, img);
       }
     }
     
-    // Optional: Clean up preloaded images that are no longer needed
-    // This prevents memory issues if the game runs for a long time
+    // Clean up preloaded images that are no longer needed
     preloadedImages.current.forEach((_, key) => {
       if (!currentlyNeededImages.has(key)) {
         preloadedImages.current.delete(key);
@@ -76,12 +62,12 @@ const RouteSelector: React.FC = () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
       if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     };
-  }, [currentRouteIndex, availableRoutes]);
+  }, [currentRouteIndex, routeData, mapSource]);
 
   // Add keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTransitioning || !availableRoutes || availableRoutes.length === 0) return;
+      if (isTransitioning || routeData.length === 0) return;
       
       if (e.key === 'ArrowLeft') {
         handleDirectionSelect('left');
@@ -92,12 +78,12 @@ const RouteSelector: React.FC = () => {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRouteIndex, isTransitioning, availableRoutes]);
+  }, [currentRouteIndex, isTransitioning, routeData]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || !availableRoutes || availableRoutes.length === 0) return;
+    if (isTransitioning || routeData.length === 0) return;
     
-    const currentRoute = availableRoutes[currentRouteIndex];
+    const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
     
     // Calculate response time in milliseconds
@@ -130,26 +116,26 @@ const RouteSelector: React.FC = () => {
     resultTimeout.current = window.setTimeout(() => {
       setShowResult(null);
       transitionTimeout.current = window.setTimeout(() => {
-        setCurrentRouteIndex((currentRouteIndex + 1) % availableRoutes.length);
+        setCurrentRouteIndex((currentRouteIndex + 1) % routeData.length);
         setIsTransitioning(false);
       }, 200);
     }, 400);
   };
 
   // If no routes are loaded yet, show a loading state
-  if (availableRoutes.length === 0) {
+  if (routeData.length === 0) {
     return <div className="flex justify-center items-center h-64">Loading routes...</div>;
   }
   
   // Get current route data
-  const currentRoute = availableRoutes[currentRouteIndex];
+  const currentRoute = routeData[currentRouteIndex];
   
   // If current route is still undefined for some reason, show loading
   if (!currentRoute) {
     return <div className="flex justify-center items-center h-64">Loading route data...</div>;
   }
   
-  const currentImageUrl = `/routes/candidate_${currentRoute.candidateIndex}.png`;
+  const currentImageUrl = getImageUrl(mapSource, currentRoute.candidateIndex, false);
   
   // Map color strings to actual color values
   const getColorValue = (colorStr: string): string => {
