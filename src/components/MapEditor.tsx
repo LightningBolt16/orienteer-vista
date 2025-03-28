@@ -75,7 +75,14 @@ const MapEditor: React.FC<MapEditorProps> = ({ mapUrl, controls, onAddControl })
           >
             {control.type === 'start' && (
               <div className="relative">
-                <Flag className="h-8 w-8 text-green-600" />
+                <svg width="28" height="28" viewBox="0 0 28 28">
+                  <polygon 
+                    points="14,0 28,28 0,28" 
+                    fill="none" 
+                    stroke="#D946EF" 
+                    strokeWidth="2"
+                  />
+                </svg>
               </div>
             )}
             
@@ -92,7 +99,10 @@ const MapEditor: React.FC<MapEditorProps> = ({ mapUrl, controls, onAddControl })
             
             {control.type === 'finish' && (
               <div className="relative">
-                <Flag className="h-8 w-8 text-red-600" />
+                <svg width="28" height="28" viewBox="0 0 28 28">
+                  <circle cx="14" cy="14" r="12" fill="none" stroke="#ef4444" strokeWidth="2" />
+                  <circle cx="14" cy="14" r="8" fill="none" stroke="#ef4444" strokeWidth="2" />
+                </svg>
               </div>
             )}
           </div>

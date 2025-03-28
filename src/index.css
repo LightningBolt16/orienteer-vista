@@ -42,6 +42,8 @@
 
   html {
     @apply scroll-smooth antialiased;
+    scrollbar-gutter: stable; /* Reserves space for the scrollbar */
+    overflow-y: scroll; /* Always shows scrollbar to prevent layout shift */
   }
 
   body {
