@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { PlusCircle, Map as MapIcon, Circle, Flag, Save, Trash2 } from 'lucide-react';
@@ -52,7 +51,6 @@ const CourseSetter: React.FC = () => {
   const [eventDate, setEventDate] = useState('');
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
-  const [controlType, setControlType] = useState<'start' | 'control' | 'finish'>('control');
   const [isEditing, setIsEditing] = useState(false);
   
   // Function to create a new event
@@ -103,20 +101,36 @@ const CourseSetter: React.FC = () => {
   };
   
   // Function to handle adding a control on the map
-  const handleAddControl = (x: number, y: number) => {
+  const handleAddControl = (newControl: Control) => {
     if (!currentCourse) return;
-    
-    const newControl: Control = {
-      id: `control-${Date.now()}`,
-      type: controlType,
-      x,
-      y,
-      number: controlType === 'control' ? currentCourse.controls.filter(c => c.type === 'control').length + 1 : undefined
-    };
     
     const updatedControls = [...currentCourse.controls, newControl];
     const updatedCourse = { ...currentCourse, controls: updatedControls };
     
+    setCurrentCourse(updatedCourse);
+    
+    // Also update the course in the current event
+    if (currentEvent) {
+      const updatedCourses = currentEvent.courses.map(course => 
+        course.id === currentCourse.id ? updatedCourse : course
+      );
+      
+      setCurrentEvent({
+        ...currentEvent,
+        courses: updatedCourses
+      });
+    }
+  };
+  
+  // Function to update control position (for drag and drop)
+  const handleUpdateControlPosition = (controlId: string, x: number, y: number) => {
+    if (!currentCourse) return;
+    
+    const updatedControls = currentCourse.controls.map(control => 
+      control.id === controlId ? { ...control, x, y } : control
+    );
+    
+    const updatedCourse = { ...currentCourse, controls: updatedControls };
     setCurrentCourse(updatedCourse);
     
     // Also update the course in the current event
@@ -158,7 +172,7 @@ const CourseSetter: React.FC = () => {
     const selectedMap = sampleMaps.find(map => map.id === currentEvent.mapId);
     
     return (
-      <div className="pb-20 max-w-7xl mx-auto">
+      <div className="pb-20 max-w-7xl mx-auto overflow-x-hidden">
         <Card className="mt-8">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -177,7 +191,7 @@ const CourseSetter: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Left sidebar - Courses & Controls */}
+              {/* Left sidebar - Courses */}
               <div className="lg:col-span-1 space-y-6">
                 {/* Course selection */}
                 <div className="space-y-2">
@@ -209,40 +223,9 @@ const CourseSetter: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Control tools */}
+                {/* Course details */}
                 {currentCourse && (
                   <div className="space-y-2 border-t pt-4">
-                    <h3 className="text-md font-semibold">{t('controls')}</h3>
-                    
-                    <div className="flex flex-col gap-2">
-                      <Label>{t('add.control.type')}</Label>
-                      <Select value={controlType} onValueChange={(value) => setControlType(value as 'start' | 'control' | 'finish')}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('select.control.type')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="start">
-                            <div className="flex items-center">
-                              <Flag className="h-4 w-4 mr-2 text-green-600" />
-                              {t('start')}
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="control">
-                            <div className="flex items-center">
-                              <Circle className="h-4 w-4 mr-2 text-purple-600" />
-                              {t('control')}
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="finish">
-                            <div className="flex items-center">
-                              <Flag className="h-4 w-4 mr-2 text-red-600" />
-                              {t('finish')}
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
                     <div className="space-y-2 mt-4">
                       <Label>{t('course.name')}</Label>
                       <Input 
@@ -284,11 +267,12 @@ const CourseSetter: React.FC = () => {
               
               {/* Main content - Map Editor */}
               <div className="lg:col-span-3">
-                {selectedMap && (
+                {selectedMap && currentCourse && (
                   <MapEditor 
                     mapUrl={selectedMap.imageUrl}
-                    controls={currentCourse?.controls || []}
+                    controls={currentCourse.controls || []}
                     onAddControl={handleAddControl}
+                    onUpdateControl={handleUpdateControlPosition}
                   />
                 )}
               </div>
@@ -301,7 +285,7 @@ const CourseSetter: React.FC = () => {
   
   // Render the initial setup screen when not editing
   return (
-    <div className="pb-20 max-w-4xl mx-auto">
+    <div className="pb-20 max-w-4xl mx-auto overflow-x-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="new-event">{t('new.event')}</TabsTrigger>
