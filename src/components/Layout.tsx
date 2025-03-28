@@ -10,10 +10,10 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <UserProvider>
-      <div className="min-h-screen flex flex-col overflow-x-hidden scrollbar-gutter-stable">
+      <div className="min-h-screen flex flex-col overflow-x-hidden">
         <Header />
-        <main className="flex-grow pt-24 px-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-grow pt-24 px-6 pb-6">
+          <div className="max-w-7xl mx-auto w-full">
             {children}
           </div>
         </main>

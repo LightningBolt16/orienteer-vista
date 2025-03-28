@@ -1,16 +1,27 @@
+
 import React, { useState, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { PlusCircle, Map as MapIcon, Circle, Flag, Save, Trash2 } from 'lucide-react';
+import { PlusCircle, Map as MapIcon, Circle, Flag, Save, Trash2, Download, Layers, FileText, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
+import { Separator } from '../components/ui/separator';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../components/ui/tooltip';
+import { ScrollArea } from '../components/ui/scroll-area';
+import { toast } from '../components/ui/use-toast';
 import MapEditor from '../components/MapEditor';
 import MapUploader from '../components/MapUploader';
-import { toast } from '../components/ui/use-toast';
+import CourseList from '../components/CourseList';
+import ControlProperties from '../components/ControlProperties';
 
 // Temporary sample maps for demo
 const sampleMaps = [
@@ -26,6 +37,8 @@ interface Control {
   x: number;
   y: number;
   number?: number;
+  code?: string;
+  description?: string;
 }
 
 interface Course {
@@ -33,6 +46,9 @@ interface Course {
   name: string;
   controls: Control[];
   description: string;
+  length?: number;
+  climb?: number;
+  scale?: string;
 }
 
 interface Event {
@@ -41,6 +57,8 @@ interface Event {
   mapId: string;
   date: string;
   courses: Course[];
+  location?: string;
+  organizer?: string;
 }
 
 const CourseSetter: React.FC = () => {
@@ -52,6 +70,9 @@ const CourseSetter: React.FC = () => {
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedControl, setSelectedControl] = useState<Control | null>(null);
+  const [showLayerPanel, setShowLayerPanel] = useState(false);
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   
   // Function to create a new event
   const handleCreateEvent = () => {
@@ -89,7 +110,10 @@ const CourseSetter: React.FC = () => {
       id: `course-${Date.now()}`,
       name: `Course ${currentEvent.courses.length + 1}`,
       controls: [],
-      description: ''
+      description: '',
+      length: 0,
+      climb: 0,
+      scale: '1:10000'
     };
     
     setCurrentEvent({
@@ -146,6 +170,72 @@ const CourseSetter: React.FC = () => {
     }
   };
   
+  // Function to delete a control
+  const handleDeleteControl = (controlId: string) => {
+    if (!currentCourse) return;
+    
+    const updatedControls = currentCourse.controls.filter(control => control.id !== controlId);
+    
+    // Renumber the control points
+    const renumberedControls = updatedControls.map((control, index) => {
+      if (control.type === 'control') {
+        return { ...control, number: index + 1 };
+      }
+      return control;
+    });
+    
+    const updatedCourse = { ...currentCourse, controls: renumberedControls };
+    setCurrentCourse(updatedCourse);
+    
+    // Also update the course in the current event
+    if (currentEvent) {
+      const updatedCourses = currentEvent.courses.map(course => 
+        course.id === currentCourse.id ? updatedCourse : course
+      );
+      
+      setCurrentEvent({
+        ...currentEvent,
+        courses: updatedCourses
+      });
+    }
+    
+    setSelectedControl(null);
+    
+    toast({
+      title: t('success'),
+      description: t('control.deleted'),
+    });
+  };
+  
+  // Function to update control properties
+  const handleUpdateControlProperties = (controlId: string, updates: Partial<Control>) => {
+    if (!currentCourse) return;
+    
+    const updatedControls = currentCourse.controls.map(control => 
+      control.id === controlId ? { ...control, ...updates } : control
+    );
+    
+    const updatedCourse = { ...currentCourse, controls: updatedControls };
+    setCurrentCourse(updatedCourse);
+    
+    // Also update the course in the current event
+    if (currentEvent) {
+      const updatedCourses = currentEvent.courses.map(course => 
+        course.id === currentCourse.id ? updatedCourse : course
+      );
+      
+      setCurrentEvent({
+        ...currentEvent,
+        courses: updatedCourses
+      });
+    }
+    
+    // Update selected control if it's the one being edited
+    if (selectedControl && selectedControl.id === controlId) {
+      setSelectedControl({ ...selectedControl, ...updates });
+    }
+  };
+  
   // Function to save event (would connect to backend in a real implementation)
   const handleSaveEvent = () => {
     if (!currentEvent) return;
@@ -164,7 +254,25 @@ const CourseSetter: React.FC = () => {
     const selected = currentEvent.courses.find(course => course.id === courseId);
     if (selected) {
       setCurrentCourse(selected);
+      setSelectedControl(null); // Reset selected control when changing course
     }
+  };
+  
+  // Function to export the current course
+  const handleExportCourse = () => {
+    if (!currentCourse) return;
+    
+    // In a real implementation, this would generate a file for export
+    console.log('Exporting course:', currentCourse);
+    toast({
+      title: t('success'),
+      description: t('course.exported'),
+    });
+  };
+  
+  // Function to handle control selection
+  const handleControlSelect = (control: Control) => {
+    setSelectedControl(control);
   };
   
   // Render the editor when an event is being created/edited
@@ -172,61 +280,101 @@ const CourseSetter: React.FC = () => {
     const selectedMap = sampleMaps.find(map => map.id === currentEvent.mapId);
     
     return (
-      <div className="pb-20 max-w-7xl mx-auto overflow-x-hidden">
-        <Card className="mt-8">
-          <CardHeader className="flex flex-row items-center justify-between">
+      <div className="pb-20 mx-auto overflow-x-hidden h-[calc(100vh-12rem)]">
+        <Card className="mt-8 h-full overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between p-4 bg-card">
             <div>
               <CardTitle>{currentEvent.name}</CardTitle>
               <CardDescription>{t('event.date')}: {currentEvent.date}</CardDescription>
             </div>
             <div className="flex gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => setViewMode(viewMode === 'edit' ? 'preview' : 'edit')}
+                    >
+                      {viewMode === 'edit' ? <FileText className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {viewMode === 'edit' ? t('preview.mode') : t('edit.mode')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => setShowLayerPanel(!showLayerPanel)}
+                    >
+                      <Layers className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t('toggle.layers')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={handleExportCourse}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {t('export')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
               <Button variant="outline" onClick={() => setIsEditing(false)}>
                 {t('back')}
               </Button>
+              
               <Button onClick={handleSaveEvent}>
                 <Save className="h-4 w-4 mr-2" />
                 {t('save')}
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Left sidebar - Courses */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Course selection */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-md font-semibold">{t('courses')}</h3>
-                    <Button size="sm" variant="ghost" onClick={handleAddCourse}>
-                      <PlusCircle className="h-4 w-4 mr-1" />
-                      {t('add')}
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {currentEvent.courses.map(course => (
-                      <Button 
-                        key={course.id}
-                        variant={currentCourse?.id === course.id ? "default" : "outline"}
-                        className="w-full justify-start"
-                        onClick={() => handleSelectCourse(course.id)}
-                      >
-                        {course.name}
-                      </Button>
-                    ))}
-                    
-                    {currentEvent.courses.length === 0 && (
-                      <div className="text-sm text-muted-foreground text-center py-2">
-                        {t('no.courses.yet')}
-                      </div>
-                    )}
-                  </div>
+          
+          <div className="flex h-[calc(100%-4rem)]">
+            {/* Left sidebar - Courses */}
+            <div className="w-64 border-r flex flex-col">
+              <div className="p-4 border-b">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-md font-semibold">{t('courses')}</h3>
+                  <Button size="sm" variant="ghost" onClick={handleAddCourse}>
+                    <PlusCircle className="h-4 w-4 mr-1" />
+                    {t('add')}
+                  </Button>
                 </div>
                 
-                {/* Course details */}
-                {currentCourse && (
-                  <div className="space-y-2 border-t pt-4">
-                    <div className="space-y-2 mt-4">
+                <ScrollArea className="h-48 pr-3">
+                  <CourseList 
+                    courses={currentEvent.courses}
+                    activeCourseId={currentCourse?.id}
+                    onSelectCourse={handleSelectCourse}
+                  />
+                </ScrollArea>
+              </div>
+              
+              {currentCourse && (
+                <div className="p-4 flex-1 overflow-auto">
+                  <div className="space-y-4">
+                    <div>
                       <Label>{t('course.name')}</Label>
                       <Input 
                         value={currentCourse.name} 
@@ -244,7 +392,74 @@ const CourseSetter: React.FC = () => {
                       />
                     </div>
                     
-                    <div className="space-y-2 mt-4">
+                    <div>
+                      <Label>{t('course.length')} (km)</Label>
+                      <Input 
+                        type="number"
+                        step="0.1"
+                        value={currentCourse.length || ''} 
+                        onChange={(e) => {
+                          const updated = { ...currentCourse, length: parseFloat(e.target.value) || 0 };
+                          setCurrentCourse(updated);
+                          const updatedCourses = currentEvent.courses.map(course => 
+                            course.id === currentCourse.id ? updated : course
+                          );
+                          setCurrentEvent({
+                            ...currentEvent,
+                            courses: updatedCourses
+                          });
+                        }}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label>{t('course.climb')} (m)</Label>
+                      <Input 
+                        type="number"
+                        value={currentCourse.climb || ''} 
+                        onChange={(e) => {
+                          const updated = { ...currentCourse, climb: parseInt(e.target.value) || 0 };
+                          setCurrentCourse(updated);
+                          const updatedCourses = currentEvent.courses.map(course => 
+                            course.id === currentCourse.id ? updated : course
+                          );
+                          setCurrentEvent({
+                            ...currentEvent,
+                            courses: updatedCourses
+                          });
+                        }}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label>{t('course.scale')}</Label>
+                      <Select 
+                        value={currentCourse.scale || '1:10000'}
+                        onValueChange={(value) => {
+                          const updated = { ...currentCourse, scale: value };
+                          setCurrentCourse(updated);
+                          const updatedCourses = currentEvent.courses.map(course => 
+                            course.id === currentCourse.id ? updated : course
+                          );
+                          setCurrentEvent({
+                            ...currentEvent,
+                            courses: updatedCourses
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('select.scale')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1:10000">1:10,000</SelectItem>
+                          <SelectItem value="1:15000">1:15,000</SelectItem>
+                          <SelectItem value="1:7500">1:7,500</SelectItem>
+                          <SelectItem value="1:5000">1:5,000</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
                       <Label>{t('course.description')}</Label>
                       <Textarea 
                         value={currentCourse.description} 
@@ -262,22 +477,66 @@ const CourseSetter: React.FC = () => {
                       />
                     </div>
                   </div>
-                )}
-              </div>
-              
-              {/* Main content - Map Editor */}
-              <div className="lg:col-span-3">
-                {selectedMap && currentCourse && (
-                  <MapEditor 
-                    mapUrl={selectedMap.imageUrl}
-                    controls={currentCourse.controls || []}
-                    onAddControl={handleAddControl}
-                    onUpdateControl={handleUpdateControlPosition}
-                  />
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          </CardContent>
+            
+            {/* Main content - Map Editor */}
+            <div className="flex-1 h-full overflow-hidden relative">
+              {selectedMap && currentCourse && (
+                <MapEditor 
+                  mapUrl={selectedMap.imageUrl}
+                  controls={currentCourse.controls || []}
+                  onAddControl={handleAddControl}
+                  onUpdateControl={handleUpdateControlPosition}
+                  onSelectControl={handleControlSelect}
+                  viewMode={viewMode}
+                />
+              )}
+            </div>
+            
+            {/* Right sidebar - Control Properties */}
+            {viewMode === 'edit' && selectedControl && (
+              <div className="w-64 border-l p-4">
+                <ControlProperties 
+                  control={selectedControl}
+                  onUpdateControl={(updates) => handleUpdateControlProperties(selectedControl.id, updates)}
+                  onDeleteControl={() => handleDeleteControl(selectedControl.id)}
+                />
+              </div>
+            )}
+            
+            {/* Layers panel */}
+            {showLayerPanel && (
+              <div className="absolute top-16 right-4 w-64 bg-card border rounded-lg shadow-lg p-4 z-10">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-semibold">{t('layers')}</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0" 
+                    onClick={() => setShowLayerPanel(false)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <input type="checkbox" id="layer-map" className="mr-2" defaultChecked />
+                    <Label htmlFor="layer-map" className="text-sm">{t('map')}</Label>
+                  </div>
+                  <div className="flex items-center">
+                    <input type="checkbox" id="layer-controls" className="mr-2" defaultChecked />
+                    <Label htmlFor="layer-controls" className="text-sm">{t('controls')}</Label>
+                  </div>
+                  <div className="flex items-center">
+                    <input type="checkbox" id="layer-connections" className="mr-2" defaultChecked />
+                    <Label htmlFor="layer-connections" className="text-sm">{t('connections')}</Label>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </Card>
       </div>
     );
