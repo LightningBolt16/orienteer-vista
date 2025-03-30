@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';

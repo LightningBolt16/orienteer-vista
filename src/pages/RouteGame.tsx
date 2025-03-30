@@ -6,10 +6,11 @@ import Leaderboard from '../components/Leaderboard';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { mapSources, MapSource, fetchRouteDataForMap, RouteData } from '../utils/routeDataUtils';
+import { getAvailableMaps, MapSource, fetchRouteDataForMap, RouteData } from '../utils/routeDataUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
+import { AlertCircle } from 'lucide-react';
 
 const RouteGame: React.FC = () => {
   const { t } = useLanguage();
@@ -17,22 +18,64 @@ const RouteGame: React.FC = () => {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedMapId, setSelectedMapId] = useState<string>('');
   const [selectedMap, setSelectedMap] = useState<MapSource | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
+  const [availableMaps, setAvailableMaps] = useState<MapSource[]>([]);
   
-  // Initialize with appropriate default map based on device
+  // Load available maps
   useEffect(() => {
-    const defaultMapId = isMobile ? 'default-portrait' : 'default-landscape';
-    if (!selectedMapId) {
-      setSelectedMapId(defaultMapId);
-    }
-  }, [isMobile, selectedMapId]);
+    const loadMaps = async () => {
+      setIsLoading(true);
+      try {
+        const maps = await getAvailableMaps();
+        setAvailableMaps(maps);
+        
+        // If no maps are available, show an error
+        if (maps.length === 0) {
+          toast({
+            title: t('error'),
+            description: t('no.maps.available'),
+            variant: "destructive"
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        // Filter maps based on device
+        const filteredMaps = maps.filter(map => 
+          isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
+        );
+        
+        // If no filtered maps available, switch to other aspect ratio
+        if (filteredMaps.length === 0) {
+          console.warn('No maps available for current device, using alternative aspect ratio');
+          // Try to use any available map regardless of aspect ratio
+          if (maps.length > 0) {
+            setSelectedMapId(maps[0].id);
+          }
+        } else {
+          // Default to first filtered map
+          setSelectedMapId(filteredMaps[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load maps:', error);
+        toast({
+          title: t('error'),
+          description: t('error.loading.maps'),
+          variant: "destructive"
+        });
+      }
+      setIsLoading(false);
+    };
+    
+    loadMaps();
+  }, [isMobile, t]);
   
   // Load selected map data
   useEffect(() => {
-    if (!selectedMapId) return;
+    if (!selectedMapId || availableMaps.length === 0) return;
     
-    const mapSource = mapSources.find(map => map.id === selectedMapId);
+    const mapSource = availableMaps.find(map => map.id === selectedMapId);
     if (!mapSource) return;
     
     setSelectedMap(mapSource);
@@ -63,10 +106,10 @@ const RouteGame: React.FC = () => {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [selectedMapId, t]);
+  }, [selectedMapId, availableMaps, t]);
   
   // Filtered map sources based on device
-  const availableMaps = mapSources.filter(map => 
+  const filteredMaps = availableMaps.filter(map => 
     isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
   );
   
@@ -80,18 +123,29 @@ const RouteGame: React.FC = () => {
             <CardDescription>{t('select.map.description')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={t('select.map.placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableMaps.map(map => (
-                  <SelectItem key={map.id} value={map.id}>
-                    {map.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {filteredMaps.length > 0 ? (
+              <Select value={selectedMapId} onValueChange={setSelectedMapId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t('select.map.placeholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredMaps.map(map => (
+                    <SelectItem key={map.id} value={map.id}>
+                      {map.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
+                <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                <span>
+                  {isLoading ? 
+                    t('loading.maps') : 
+                    t('no.maps.available')}
+                </span>
+              </div>
+            )}
             {selectedMap?.description && (
               <p className="mt-2 text-sm text-muted-foreground">{selectedMap.description}</p>
             )}

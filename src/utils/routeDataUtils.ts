@@ -11,8 +11,9 @@ export interface MapSource {
   id: string;
   name: string;
   aspect: '16:9' | '9:16';
-  csvUrl: string;
+  csvPath: string;
   imagePathPrefix: string;
+  mapImagePath?: string; // Path to the full map image (for course setter)
   description?: string;
 }
 
@@ -24,57 +25,91 @@ const capitalizeMapName = (folderName: string): string => {
     .join(' ');
 };
 
-// Available map sources - now using folder names for the map names
-export const mapSources: MapSource[] = [
-  {
-    id: 'default-landscape',
-    name: 'Default (Landscape)',
-    aspect: '16:9',
-    csvUrl: '/csv_files/default.csv',
-    imagePathPrefix: '/routes/default/candidate_',
-    description: 'The original orienteering map in landscape format'
-  },
-  {
-    id: 'default-portrait',
-    name: 'Default (Portrait)',
-    aspect: '9:16',
-    csvUrl: '/csv_files/default.csv',
-    imagePathPrefix: '/routes/default/candidate_',
-    description: 'The original orienteering map adapted for mobile devices'
-  },
-  {
-    id: 'forest-landscape',
-    name: 'Forest (Landscape)',
-    aspect: '16:9',
-    csvUrl: '/csv_files/forest.csv',
-    imagePathPrefix: '/routes/forest/candidate_',
-    description: 'A dense forest map with complex route choices'
-  },
-  {
-    id: 'forest-portrait',
-    name: 'Forest (Portrait)',
-    aspect: '9:16',
-    csvUrl: '/csv_files/forest.csv',
-    imagePathPrefix: '/routes/forest/candidate_',
-    description: 'A dense forest map with complex route choices for mobile'
-  },
-  {
-    id: 'urban-landscape',
-    name: 'Urban (Landscape)',
-    aspect: '16:9',
-    csvUrl: '/csv_files/urban.csv',
-    imagePathPrefix: '/routes/urban/candidate_',
-    description: 'An urban environment with buildings and streets'
-  },
-  {
-    id: 'urban-portrait',
-    name: 'Urban (Portrait)',
-    aspect: '9:16',
-    csvUrl: '/csv_files/urban.csv',
-    imagePathPrefix: '/routes/urban/candidate_',
-    description: 'An urban environment with buildings and streets for mobile'
+// Function to generate map sources based on available maps
+export const getAvailableMaps = async (): Promise<MapSource[]> => {
+  try {
+    // In a production environment, this would be a server-side function
+    // For now, we'll hardcode the available maps based on the folder structure
+    
+    const mapSources: MapSource[] = [
+      {
+        id: 'default-landscape',
+        name: 'Default (Landscape)',
+        aspect: '16:9',
+        csvPath: '/maps/default/default.csv',
+        imagePathPrefix: '/maps/default/16_9/candidate_',
+        mapImagePath: '/maps/default/map.png',
+        description: 'The original orienteering map in landscape format'
+      },
+      {
+        id: 'default-portrait',
+        name: 'Default (Portrait)',
+        aspect: '9:16',
+        csvPath: '/maps/default/default.csv',
+        imagePathPrefix: '/maps/default/9_16/candidate_',
+        mapImagePath: '/maps/default/map.png',
+        description: 'The original orienteering map adapted for mobile devices'
+      },
+      {
+        id: 'forest-landscape',
+        name: 'Forest (Landscape)',
+        aspect: '16:9',
+        csvPath: '/maps/forest/forest.csv',
+        imagePathPrefix: '/maps/forest/16_9/candidate_',
+        mapImagePath: '/maps/forest/map.png',
+        description: 'A dense forest map with complex route choices'
+      },
+      {
+        id: 'forest-portrait',
+        name: 'Forest (Portrait)',
+        aspect: '9:16',
+        csvPath: '/maps/forest/forest.csv',
+        imagePathPrefix: '/maps/forest/9_16/candidate_',
+        mapImagePath: '/maps/forest/map.png',
+        description: 'A dense forest map with complex route choices for mobile'
+      },
+      {
+        id: 'urban-landscape',
+        name: 'Urban (Landscape)',
+        aspect: '16:9',
+        csvPath: '/maps/urban/urban.csv',
+        imagePathPrefix: '/maps/urban/16_9/candidate_',
+        mapImagePath: '/maps/urban/map.png',
+        description: 'An urban environment with buildings and streets'
+      },
+      {
+        id: 'urban-portrait',
+        name: 'Urban (Portrait)',
+        aspect: '9:16',
+        csvPath: '/maps/urban/urban.csv',
+        imagePathPrefix: '/maps/urban/9_16/candidate_',
+        mapImagePath: '/maps/urban/map.png',
+        description: 'An urban environment with buildings and streets for mobile'
+      }
+    ];
+
+    // Filter out maps that don't exist by checking if their map image exists
+    const validMaps = await Promise.all(
+      mapSources.map(async (map) => {
+        try {
+          if (!map.mapImagePath) return null;
+          
+          // Try to fetch the map image to see if it exists
+          const response = await fetch(map.mapImagePath, { method: 'HEAD' });
+          return response.ok ? map : null;
+        } catch (error) {
+          console.warn(`Map ${map.name} not available:`, error);
+          return null;
+        }
+      })
+    );
+
+    return validMaps.filter(Boolean) as MapSource[];
+  } catch (error) {
+    console.error('Error loading available maps:', error);
+    return [];
   }
-];
+};
 
 // Fallback data for when CSV fetch fails
 const fallbackRouteData: RouteData[] = [
@@ -100,7 +135,7 @@ export const getRouteData = (): RouteData[] => {
 // Fetch route data from a specific map source
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
-    const response = await fetch(mapSource.csvUrl);
+    const response = await fetch(mapSource.csvPath);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
     }
@@ -151,6 +186,6 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
 
 // Helper to get image URL based on map source and candidate index
 export const getImageUrl = (mapSource: MapSource, candidateIndex: number, isMobile: boolean): string => {
-  const suffix = mapSource.aspect === '9:16' || isMobile ? '_mobile' : '';
-  return `${mapSource.imagePathPrefix}${candidateIndex}${suffix}.png`;
+  return `${mapSource.imagePathPrefix}${candidateIndex}.png`;
 };
+
