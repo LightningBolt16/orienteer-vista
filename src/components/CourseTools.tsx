@@ -1,26 +1,17 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MousePointer, Move, ZoomIn, ZoomOut, 
   ChevronDown, ChevronUp, LineChart, Circle, Flag, 
   XCircle, TriangleAlert, Fence, Map, Printer
 } from 'lucide-react';
-import { 
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger 
-} from './ui/tooltip';
-import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { Button } from './ui/button';
 import { 
   Collapsible, CollapsibleContent, CollapsibleTrigger 
 } from './ui/collapsible';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  Menubar, 
-  MenubarMenu, 
-  MenubarContent, 
-  MenubarItem, 
-  MenubarTrigger 
-} from './ui/menubar';
+import ToolGroup from './course-setter/ToolGroup';
+import ActionButton from './course-setter/ActionButton';
 
 export type CourseTool = 
   'pointer' | 'move' | 'start' | 'control' | 'finish' | 'zoom-in' | 'zoom-out' | 
@@ -31,13 +22,15 @@ interface CourseToolsProps {
   onToolChange: (tool: CourseTool) => void;
   onResetView: () => void;
   onPrint: () => void;
+  disabled?: boolean;
 }
 
 const CourseTools: React.FC<CourseToolsProps> = ({ 
   selectedTool,
   onToolChange,
   onResetView,
-  onPrint
+  onPrint,
+  disabled = false
 }) => {
   const { t } = useLanguage();
   const [showAdvancedTools, setShowAdvancedTools] = useState(false);
@@ -73,67 +66,34 @@ const CourseTools: React.FC<CourseToolsProps> = ({
     { id: 'zoom-in', icon: <ZoomIn size={18} />, label: t('zoom.in'), shortcut: '+' },
     { id: 'zoom-out', icon: <ZoomOut size={18} />, label: t('zoom.out'), shortcut: '-' }
   ];
+
+  // Add disabled prop to handle UI state for tools
+  useEffect(() => {
+    if (disabled && selectedTool !== 'pointer') {
+      onToolChange('pointer');
+    }
+  }, [disabled, selectedTool, onToolChange]);
   
   return (
-    <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 flex gap-2 items-center w-full">
+    <div className={`bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 flex gap-2 items-center w-full ${disabled ? 'opacity-70 pointer-events-none' : ''}`}>
       {/* Basic Tools */}
-      <ToggleGroup 
-        type="single" 
-        value={selectedTool} 
-        onValueChange={(value: CourseTool) => value && onToolChange(value)}
-        className="flex gap-1"
-      >
-        {basicTools.map(tool => (
-          <TooltipProvider key={tool.id}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem 
-                  value={tool.id} 
-                  aria-label={tool.label}
-                  className="p-2 h-8 w-8 flex items-center justify-center"
-                >
-                  {tool.icon}
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {tool.label} {tool.shortcut && `(${tool.shortcut})`}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ))}
-      </ToggleGroup>
+      <ToolGroup
+        tools={basicTools}
+        selectedTool={selectedTool}
+        onValueChange={onToolChange}
+      />
       
       <div className="w-px h-8 bg-gray-200"></div>
       
       {/* Zoom Tools */}
-      <ToggleGroup 
-        type="single" 
-        value={selectedTool} 
-        onValueChange={(value: CourseTool) => value && onToolChange(value)}
-        className="flex gap-1"
-      >
-        {zoomTools.map(tool => (
-          <TooltipProvider key={tool.id}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem 
-                  value={tool.id} 
-                  aria-label={tool.label}
-                  className="p-2 h-8 w-8 flex items-center justify-center"
-                >
-                  {tool.icon}
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {tool.label} {tool.shortcut && `(${tool.shortcut})`}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ))}
-      </ToggleGroup>
+      <ToolGroup
+        tools={zoomTools}
+        selectedTool={selectedTool}
+        onValueChange={onToolChange}
+      />
       
       {/* Advanced Tools Dropdown */}
-      <Collapsible>
+      <Collapsible open={showAdvancedTools} onOpenChange={setShowAdvancedTools}>
         <div className="flex items-center">
           <CollapsibleTrigger asChild>
             <Button 
@@ -149,31 +109,11 @@ const CourseTools: React.FC<CourseToolsProps> = ({
           </CollapsibleTrigger>
           
           <CollapsibleContent className="absolute top-full mt-1 left-0 bg-white shadow-md rounded-md p-2 z-10">
-            <ToggleGroup 
-              type="single" 
-              value={selectedTool} 
-              onValueChange={(value: CourseTool) => value && onToolChange(value)}
-              className="flex gap-1"
-            >
-              {advancedTools.map(tool => (
-                <TooltipProvider key={tool.id}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem 
-                        value={tool.id} 
-                        aria-label={tool.label}
-                        className="p-2 h-8 w-8 flex items-center justify-center"
-                      >
-                        {tool.icon}
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      {tool.label}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ))}
-            </ToggleGroup>
+            <ToolGroup
+              tools={advancedTools}
+              selectedTool={selectedTool}
+              onValueChange={onToolChange}
+            />
           </CollapsibleContent>
         </div>
       </Collapsible>
@@ -182,40 +122,18 @@ const CourseTools: React.FC<CourseToolsProps> = ({
       
       {/* Reset View and Print Buttons */}
       <div className="flex gap-1">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="h-8 w-8"
-                onClick={onResetView}
-              >
-                <Map className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{t('reset.view')}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <ActionButton
+          icon={<Map className="h-4 w-4" />}
+          label={t('reset.view')}
+          onClick={onResetView}
+        />
         
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="h-8 w-8"
-                onClick={onPrint}
-              >
-                <Printer className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{t('print')}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <ActionButton
+          icon={<Printer className="h-4 w-4" />}
+          label={t('print')}
+          onClick={onPrint}
+        />
       </div>
-      
-      {/* Display options could be moved to a dropdown menu if needed */}
     </div>
   );
 };

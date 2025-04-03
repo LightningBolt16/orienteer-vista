@@ -17,13 +17,15 @@ interface CourseConnectionsProps {
   showConnections: boolean;
   viewMode: 'edit' | 'preview';
   printSettings?: PrintSettings;
+  isAllControlsCourse?: boolean;
 }
 
 const CourseConnections: React.FC<CourseConnectionsProps> = ({
   sortedControls,
   showConnections,
   viewMode,
-  printSettings
+  printSettings,
+  isAllControlsCourse = false
 }) => {
   // Generate print preview styles for elements out of bounds
   const getPrintPreviewStyles = () => {
@@ -41,12 +43,18 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
     return null;
   }
 
+  // All controls course uses path smoothing and a different style
+  const connectionStyle = isAllControlsCourse
+    ? { stroke: "rgba(0, 128, 128, 0.5)", strokeWidth: 1.5, strokeDasharray: "5,5" }
+    : { stroke: "rgba(128, 0, 128, 0.7)", strokeWidth: 2, strokeDasharray: "none" };
+
   return (
     <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
       {sortedControls.map((control, index) => {
         if (index === 0) return null; // Skip first control for lines
         
         const prevControl = sortedControls[index - 1];
+        const isDashed = control.type === 'finish' || isAllControlsCourse;
         
         return (
           <line 
@@ -55,9 +63,9 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
             y1={`${prevControl.y}%`}
             x2={`${control.x}%`}
             y2={`${control.y}%`}
-            stroke="rgba(128, 0, 128, 0.7)"
-            strokeWidth="2"
-            strokeDasharray={control.type === 'finish' ? "5,5" : "none"}
+            stroke={connectionStyle.stroke}
+            strokeWidth={connectionStyle.strokeWidth}
+            strokeDasharray={isDashed ? "5,5" : "none"}
             style={getPrintPreviewStyles()}
           />
         );

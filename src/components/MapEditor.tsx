@@ -97,6 +97,9 @@ const MapEditor: React.FC<MapEditorProps> = ({
   const handleToolChange = (tool: CourseTool) => {
     setSelectedTool(tool);
   };
+
+  // Determine if the toolbar should be disabled
+  const isToolbarDisabled = viewMode === 'preview';
   
   // Get sorted controls for drawing connections
   const sortedControls = [...controls]
@@ -150,6 +153,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
           onToolChange={handleToolChange}
           onResetView={mapInteractions.resetView}
           onPrint={onOpenPrintDialog}
+          disabled={isToolbarDisabled}
         />
         
         <MapDisplayOptions 

@@ -65,6 +65,9 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
   if (!selectedMap) {
     return <div>{t('error.map.not.found')}</div>;
   }
+
+  // Check if we're viewing the "All Controls" course
+  const isAllControlsCourse = currentCourse?.id === 'course-all-controls';
   
   return (
     <Card className="mt-8 h-full overflow-hidden">
@@ -107,9 +110,9 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
               mapUrl={selectedMap.imageUrl}
               controls={currentCourse.controls || []}
               onAddControl={onAddControl}
-              onUpdateControl={onUpdateControlPosition}
-              onSelectControl={onSelectControl}
-              viewMode={viewMode}
+              onUpdateControl={isAllControlsCourse ? undefined : onUpdateControlPosition}
+              onSelectControl={isAllControlsCourse ? undefined : onSelectControl}
+              viewMode={isAllControlsCourse ? 'preview' : viewMode}
               allControls={allControls}
               snapDistance={2}
               courseScale={currentCourse.scale || currentEvent.mapScale}
@@ -122,7 +125,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
         </div>
         
         {/* Right sidebar - Control Properties */}
-        {viewMode === 'edit' && selectedControl && (
+        {viewMode === 'edit' && selectedControl && !isAllControlsCourse && (
           <div className="w-64 border-l p-4">
             <ControlProperties 
               control={selectedControl}

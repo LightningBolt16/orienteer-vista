@@ -42,6 +42,55 @@ export interface MapInfo {
   scale: string;
 }
 
+// Calculate distance between two control points
+const calculateDistance = (controlA: Control, controlB: Control): number => {
+  const dx = controlA.x - controlB.x;
+  const dy = controlA.y - controlB.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+// Find the shortest path that visits all controls using nearest neighbor algorithm
+const findShortestPath = (controls: Control[]): Control[] => {
+  if (controls.length <= 1) return controls;
+
+  const visited = new Set<string>();
+  const path: Control[] = [];
+  
+  // Start with the top-left most control as a simple heuristic
+  let currentControl = controls.reduce((min, control) => 
+    control.x + control.y < min.x + min.y ? control : min, controls[0]);
+  
+  path.push(currentControl);
+  visited.add(currentControl.id);
+  
+  // Find the nearest unvisited control and add it to the path
+  while (visited.size < controls.length) {
+    let nearestControl: Control | null = null;
+    let minDistance = Infinity;
+    
+    for (const control of controls) {
+      if (!visited.has(control.id)) {
+        const distance = calculateDistance(currentControl, control);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestControl = control;
+        }
+      }
+    }
+    
+    if (nearestControl) {
+      path.push(nearestControl);
+      visited.add(nearestControl.id);
+      currentControl = nearestControl;
+    } else {
+      // All controls have been visited
+      break;
+    }
+  }
+  
+  return path;
+}
+
 export function useEventState() {
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
@@ -55,6 +104,8 @@ export function useEventState() {
       // Collect all controls from all courses
       const controls: Control[] = [];
       currentEvent.courses.forEach(course => {
+        if (course.id === 'course-all-controls') return; // Skip all-controls course as it's derived
+        
         course.controls.forEach(control => {
           // Check if control already exists at same position
           const existing = controls.find(c => 
@@ -69,8 +120,38 @@ export function useEventState() {
         });
       });
       setAllControls(controls);
+      
+      // Update the all-controls course with the shortest path
+      if (controls.length > 0) {
+        const allControlsCourseIndex = currentEvent.courses.findIndex(c => c.id === 'course-all-controls');
+        
+        if (allControlsCourseIndex !== -1) {
+          // Get path optimized controls
+          const sortedControls = findShortestPath(controls);
+          
+          // Update the all-controls course with the optimized path
+          const updatedCourses = [...currentEvent.courses];
+          updatedCourses[allControlsCourseIndex] = {
+            ...updatedCourses[allControlsCourseIndex],
+            controls: sortedControls
+          };
+          
+          setCurrentEvent({
+            ...currentEvent,
+            courses: updatedCourses
+          });
+          
+          // Update current course if it's the all-controls course
+          if (currentCourse?.id === 'course-all-controls') {
+            setCurrentCourse({
+              ...currentCourse,
+              controls: sortedControls
+            });
+          }
+        }
+      }
     }
-  }, [currentEvent]);
+  }, [currentEvent?.courses]);
 
   // Function to create a new event
   const createEvent = (name: string, mapId: string, mapScale: string, mapType: 'sprint' | 'forest', date: string) => {
@@ -140,7 +221,7 @@ export function useEventState() {
   
   // Function to handle adding a control on the map
   const addControl = (newControl: Control) => {
-    if (!currentCourse || !currentEvent) return;
+    if (!currentCourse || !currentEvent || currentCourse.id === 'course-all-controls') return;
     
     const updatedControls = [...currentCourse.controls, newControl];
     const updatedCourse = { ...currentCourse, controls: updatedControls };
@@ -153,37 +234,15 @@ export function useEventState() {
       course.id === currentCourse.id ? updatedCourse : course
     );
     
-    // Add to all-controls course if not already there
-    let allControlsUpdated = false;
-    const finalCourses = updatedCourses.map(course => {
-      if (course.id === 'course-all-controls') {
-        // Check if control already exists at similar position
-        const existingSimilar = course.controls.some(c => 
-          Math.abs(c.x - newControl.x) < 0.5 && 
-          Math.abs(c.y - newControl.y) < 0.5 && 
-          c.type === newControl.type
-        );
-        
-        if (!existingSimilar) {
-          allControlsUpdated = true;
-          return {
-            ...course,
-            controls: [...course.controls, newControl]
-          };
-        }
-      }
-      return course;
-    });
-    
     setCurrentEvent({
       ...currentEvent,
-      courses: finalCourses
+      courses: updatedCourses
     });
   };
   
   // Function to update control position (for drag and drop)
   const updateControlPosition = (controlId: string, x: number, y: number) => {
-    if (!currentCourse || !currentEvent) return;
+    if (!currentCourse || !currentEvent || currentCourse.id === 'course-all-controls') return;
     
     const updatedControls = currentCourse.controls.map(control => 
       control.id === controlId ? { ...control, x, y } : control
@@ -192,21 +251,10 @@ export function useEventState() {
     const updatedCourse = { ...currentCourse, controls: updatedControls };
     setCurrentCourse(updatedCourse);
     
-    // Also update the course in the current event and all-controls course if needed
+    // Also update the course in the current event
     const updatedCourses = currentEvent.courses.map(course => {
       if (course.id === currentCourse.id) {
         return updatedCourse;
-      } else if (course.id === 'course-all-controls') {
-        // Update position in all-controls course if it exists there
-        const controlInAllControls = course.controls.find(c => c.id === controlId);
-        if (controlInAllControls) {
-          return {
-            ...course,
-            controls: course.controls.map(c => 
-              c.id === controlId ? { ...c, x, y } : c
-            )
-          };
-        }
       }
       return course;
     });
@@ -219,7 +267,7 @@ export function useEventState() {
   
   // Function to delete a control
   const deleteControl = (controlId: string) => {
-    if (!currentCourse || !currentEvent) return;
+    if (!currentCourse || !currentEvent || currentCourse.id === 'course-all-controls') return;
     
     const updatedControls = currentCourse.controls.filter(control => control.id !== controlId);
     
@@ -242,8 +290,6 @@ export function useEventState() {
       return course;
     });
     
-    // Don't automatically delete from all-controls to avoid affecting other courses
-    
     setCurrentEvent({
       ...currentEvent,
       courses: updatedCourses
@@ -259,7 +305,7 @@ export function useEventState() {
   
   // Function to update control properties
   const updateControlProperties = (controlId: string, updates: Partial<Control>) => {
-    if (!currentCourse || !currentEvent) return;
+    if (!currentCourse || !currentEvent || currentCourse.id === 'course-all-controls') return;
     
     const updatedControls = currentCourse.controls.map(control => 
       control.id === controlId ? { ...control, ...updates } : control
@@ -273,22 +319,9 @@ export function useEventState() {
       course.id === currentCourse.id ? updatedCourse : course
     );
     
-    // Check if this control exists in all-controls and update if needed
-    const updatedAllCourses = updatedCourses.map(course => {
-      if (course.id === 'course-all-controls') {
-        return {
-          ...course,
-          controls: course.controls.map(c => 
-            c.id === controlId ? { ...c, ...updates } : c
-          )
-        };
-      }
-      return course;
-    });
-    
     setCurrentEvent({
       ...currentEvent,
-      courses: updatedAllCourses
+      courses: updatedCourses
     });
     
     // Update selected control if it's the one being edited
