@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import CourseTools, { CourseTool } from './CourseTools';
 import { useLanguage } from '../context/LanguageContext';
+import PrintSettingsDialog, { PrintSettings } from './PrintSettingsDialog';
 
 interface Control {
   id: string;
@@ -26,6 +27,9 @@ interface MapEditorProps {
   viewMode?: 'edit' | 'preview';
   allControls?: Control[]; // All controls from all courses for snapping
   snapDistance?: number; // Distance in percentage for snapping
+  courseScale?: string; // Scale for print preview
+  printSettings?: PrintSettings; // Current print settings
+  onOpenPrintDialog: () => void;
 }
 
 const MapEditor: React.FC<MapEditorProps> = ({ 
@@ -36,8 +40,12 @@ const MapEditor: React.FC<MapEditorProps> = ({
   onSelectControl,
   viewMode = 'edit',
   allControls = [],
-  snapDistance = 2 // Default snap distance in percentage
+  snapDistance = 2, // Default snap distance in percentage
+  courseScale = '10000',
+  printSettings,
+  onOpenPrintDialog
 }) => {
+  const { t } = useLanguage();
   const canvasRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [mapDimensions, setMapDimensions] = useState({ width: 0, height: 0 });
@@ -50,6 +58,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showConnections, setShowConnections] = useState(true);
   const [showControlNumbers, setShowControlNumbers] = useState(true);
+  const [isPrintPreview, setIsPrintPreview] = useState(viewMode === 'preview');
   
   // Handle map click to add a control with snapping
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -247,6 +256,18 @@ const MapEditor: React.FC<MapEditorProps> = ({
       return (a.number || 0) - (b.number || 0);
     });
   
+  // Generate print preview styles for elements out of bounds
+  const getPrintPreviewStyles = () => {
+    if (!printSettings || viewMode !== 'preview') return {};
+    
+    // Calculate if we're showing a print preview with potential out-of-bounds elements
+    const isPrintable = true; // This would be calculated based on print settings
+    
+    return {
+      filter: isPrintable ? 'none' : 'grayscale(70%) opacity(0.7)',
+    };
+  };
+  
   // Render special controls based on type
   const renderControl = (control: Control) => {
     switch (control.type) {
@@ -327,44 +348,50 @@ const MapEditor: React.FC<MapEditorProps> = ({
   };
   
   return (
-    <div className="relative h-full overflow-hidden">
-      {viewMode === 'edit' && (
-        <div className="absolute top-2 left-2 z-10">
-          <CourseTools 
-            selectedTool={selectedTool}
-            onToolChange={handleToolChange}
-            onResetView={resetView}
-          />
-          
-          <div className="mt-2 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 space-y-1">
-            <div className="flex items-center text-xs">
-              <input 
-                type="checkbox" 
-                id="show-connections" 
-                className="mr-1" 
-                checked={showConnections}
-                onChange={() => setShowConnections(!showConnections)}
-              />
-              <label htmlFor="show-connections" className="text-xs">
-                {t('show.connections')}
-              </label>
-            </div>
-            
-            <div className="flex items-center text-xs">
-              <input 
-                type="checkbox" 
-                id="show-numbers" 
-                className="mr-1" 
-                checked={showControlNumbers}
-                onChange={() => setShowControlNumbers(!showControlNumbers)}
-              />
-              <label htmlFor="show-numbers" className="text-xs">
-                {t('show.numbers')}
-              </label>
-            </div>
+    <div className="relative h-full overflow-hidden flex flex-col">
+      {/* Horizontal toolbar at the top */}
+      <div className="p-2 border-b">
+        <CourseTools 
+          selectedTool={selectedTool}
+          onToolChange={handleToolChange}
+          onResetView={resetView}
+          onPrint={onOpenPrintDialog}
+        />
+        
+        <div className="mt-2 flex items-center gap-4 text-sm">
+          <div className="flex items-center">
+            <input 
+              type="checkbox" 
+              id="show-connections" 
+              className="mr-1" 
+              checked={showConnections}
+              onChange={() => setShowConnections(!showConnections)}
+            />
+            <label htmlFor="show-connections" className="text-xs">
+              {t('show.connections')}
+            </label>
           </div>
+          
+          <div className="flex items-center">
+            <input 
+              type="checkbox" 
+              id="show-numbers" 
+              className="mr-1" 
+              checked={showControlNumbers}
+              onChange={() => setShowControlNumbers(!showControlNumbers)}
+            />
+            <label htmlFor="show-numbers" className="text-xs">
+              {t('show.numbers')}
+            </label>
+          </div>
+          
+          {viewMode === 'preview' && (
+            <div className="ml-auto text-xs text-muted-foreground">
+              {t('scale')}: 1:{parseInt(courseScale).toLocaleString()}
+            </div>
+          )}
         </div>
-      )}
+      </div>
       
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50">
@@ -374,12 +401,32 @@ const MapEditor: React.FC<MapEditorProps> = ({
       
       <div 
         ref={mapContainerRef}
-        className="overflow-hidden h-full"
+        className="flex-1 overflow-hidden"
         onMouseDown={handleMapDragStart}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
+        {/* Print preview overlay - shows a simulated paper boundary */}
+        {viewMode === 'preview' && printSettings && (
+          <div className="absolute inset-0 pointer-events-none z-10">
+            <div 
+              className="absolute border-4 border-dashed border-gray-400 bg-transparent"
+              style={{
+                width: printSettings.orientation === 'portrait' ? '80%' : '90%',
+                height: printSettings.orientation === 'portrait' ? '90%' : '80%',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              <div className="absolute top-0 left-0 -mt-6 -ml-6 bg-white px-2 py-1 rounded text-xs">
+                {t('print.area')} ({printSettings.paperSize.toUpperCase()})
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div 
           ref={canvasRef}
           className="relative cursor-crosshair h-full"
@@ -396,6 +443,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
             className="w-full h-full object-contain"
             onLoad={handleImageLoad}
             draggable={false}
+            style={getPrintPreviewStyles()}
           />
           
           {/* Draw connection lines between controls */}
@@ -416,6 +464,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
                     stroke="rgba(128, 0, 128, 0.7)"
                     strokeWidth="2"
                     strokeDasharray={control.type === 'finish' ? "5,5" : "none"}
+                    style={getPrintPreviewStyles()}
                   />
                 );
               })}
@@ -432,6 +481,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
               style={{ 
                 left: `${control.x}%`, 
                 top: `${control.y}%`,
+                ...getPrintPreviewStyles()
               }}
               onMouseDown={(e) => handleControlMouseDown(e, control.id, control)}
               onClick={(e) => handleControlClick(e, control)}
@@ -443,30 +493,6 @@ const MapEditor: React.FC<MapEditorProps> = ({
       </div>
     </div>
   );
-};
-
-// Helper function to translate keys
-const t = (key: string): string => {
-  // This would typically be handled by your language context
-  const translations: Record<string, string> = {
-    'pointer.tool': 'Pointer Tool',
-    'move.map': 'Move Map',
-    'add.control': 'Add Control',
-    'add.start': 'Add Start',
-    'add.finish': 'Add Finish',
-    'zoom.in': 'Zoom In',
-    'zoom.out': 'Zoom Out',
-    'reset.view': 'Reset View',
-    'show.connections': 'Show Connections',
-    'show.numbers': 'Show Control Numbers',
-    'crossing.point': 'Crossing Point',
-    'uncrossable.boundary': 'Uncrossable Boundary',
-    'out.of.bounds': 'Out of Bounds',
-    'water.station': 'Water Station',
-    'advanced.tools': 'Advanced Tools'
-  };
-  
-  return translations[key] || key;
 };
 
 export default MapEditor;

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { PlusCircle, Map as MapIcon, Circle, Flag, Save, Trash2, Download, Layers, FileText, Settings, Printer } from 'lucide-react';
@@ -425,6 +424,8 @@ const CourseSetter: React.FC = () => {
   
   // Function to handle print settings
   const handlePrint = (settings: PrintSettings) => {
+    setCurrentPrintSettings(settings);
+    
     if (!currentCourse || !currentEvent) return;
     
     console.log('Print settings:', settings);
@@ -435,6 +436,8 @@ const CourseSetter: React.FC = () => {
       title: t('success'),
       description: t('preparing.print'),
     });
+    
+    setPrintDialogOpen(false);
   };
   
   // Function to update course details
@@ -452,6 +455,28 @@ const CourseSetter: React.FC = () => {
     
     if (currentCourse?.id === courseId) {
       setCurrentCourse({ ...currentCourse, ...updates });
+    }
+  };
+  
+  // Print dialog and settings
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [currentPrintSettings, setCurrentPrintSettings] = useState<PrintSettings>({
+    paperSize: 'a4',
+    orientation: 'portrait',
+    scale: '10000',
+    copies: 1,
+    showControlDescriptions: true,
+    showCourseDetails: true
+  });
+
+  // Function to open print dialog
+  const handleOpenPrintDialog = () => {
+    if (currentCourse) {
+      setCurrentPrintSettings(prev => ({
+        ...prev,
+        scale: currentCourse.scale || (currentEvent?.mapScale || '10000')
+      }));
+      setPrintDialogOpen(true);
     }
   };
   
@@ -485,13 +510,13 @@ const CourseSetter: React.FC = () => {
                 </Tooltip>
               </TooltipProvider>
               
-              {currentCourse && viewMode === 'preview' && (
-                <PrintSettingsDialog 
-                  courseName={currentCourse.name}
-                  courseScale={currentCourse.scale || currentEvent.mapScale}
-                  onPrint={handlePrint}
-                />
-              )}
+              <PrintSettingsDialog 
+                courseName={currentCourse?.name || ''}
+                courseScale={currentCourse?.scale || currentEvent.mapScale}
+                open={printDialogOpen}
+                onOpenChange={setPrintDialogOpen}
+                onPrint={handlePrint}
+              />
               
               <TooltipProvider>
                 <Tooltip>
@@ -663,6 +688,9 @@ const CourseSetter: React.FC = () => {
                   viewMode={viewMode}
                   allControls={allControls} // For snapping
                   snapDistance={2} // 2% snap distance
+                  courseScale={currentCourse.scale || currentEvent.mapScale}
+                  printSettings={currentPrintSettings}
+                  onOpenPrintDialog={handleOpenPrintDialog}
                 />
               )}
             </div>

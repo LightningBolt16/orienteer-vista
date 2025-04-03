@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Printer, X } from 'lucide-react';
 import {
   Dialog,
@@ -21,6 +21,8 @@ interface PrintSettingsDialogProps {
   courseName: string;
   courseScale: string;
   onPrint: (settings: PrintSettings) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export interface PrintSettings {
@@ -35,10 +37,12 @@ export interface PrintSettings {
 const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
   courseName,
   courseScale,
-  onPrint
+  onPrint,
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange
 }) => {
   const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const [open, setInternalOpen] = useState(false);
   const [settings, setSettings] = useState<PrintSettings>({
     paperSize: 'a4',
     orientation: 'portrait',
@@ -48,6 +52,23 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
     showCourseDetails: true
   });
 
+  // Update settings when props change
+  useEffect(() => {
+    if (courseScale) {
+      setSettings(prev => ({
+        ...prev,
+        scale: courseScale
+      }));
+    }
+  }, [courseScale]);
+  
+  // Sync external state
+  useEffect(() => {
+    if (externalOpen !== undefined) {
+      setInternalOpen(externalOpen);
+    }
+  }, [externalOpen]);
+
   const handleSettingsChange = (key: keyof PrintSettings, value: any) => {
     setSettings(prev => ({
       ...prev,
@@ -55,13 +76,21 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
     }));
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    if (externalOnOpenChange) {
+      externalOnOpenChange(newOpen);
+    } else {
+      setInternalOpen(newOpen);
+    }
+  };
+
   const handlePrint = () => {
     onPrint(settings);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={externalOpen !== undefined ? externalOpen : open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="flex items-center gap-2">
           <Printer className="h-4 w-4" />
@@ -182,7 +211,7 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
         </div>
         
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             <X className="h-4 w-4 mr-2" />
             {t('cancel')}
           </Button>
