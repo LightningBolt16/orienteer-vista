@@ -6,13 +6,33 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from './ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
-const MapUploader: React.FC = () => {
+export interface MapMetadata {
+  name: string;
+  file: File;
+  type: 'sprint' | 'forest';
+  scale: string;
+  customScale?: string;
+}
+
+const MapUploader: React.FC<{
+  onMapUploaded?: (metadata: MapMetadata) => void;
+}> = ({ onMapUploaded }) => {
   const { t } = useLanguage();
   const [isDragging, setIsDragging] = useState(false);
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [mapName, setMapName] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [mapType, setMapType] = useState<'sprint' | 'forest'>('forest');
+  const [mapScale, setMapScale] = useState('10000');
+  const [customScale, setCustomScale] = useState('');
+  const [useCustomScale, setUseCustomScale] = useState(false);
+  
+  // Define available scales based on map type
+  const sprintScales = ['4000', '3000'];
+  const forestScales = ['7500', '10000', '15000'];
   
   // Handle drag events
   const handleDragEnter = (e: React.DragEvent) => {
@@ -82,8 +102,31 @@ const MapUploader: React.FC = () => {
       return;
     }
     
+    const scale = useCustomScale ? customScale : mapScale;
+    
+    if (!scale) {
+      toast({
+        title: t('error'),
+        description: t('please.select.scale'),
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create metadata object
+    const metadata: MapMetadata = {
+      name: mapName,
+      file: mapFile,
+      type: mapType,
+      scale: useCustomScale ? customScale : mapScale,
+    };
+    
     // Here we would typically upload to a server
-    console.log('Uploading map:', { file: mapFile, name: mapName });
+    console.log('Uploading map:', metadata);
+    
+    if (onMapUploaded) {
+      onMapUploaded(metadata);
+    }
     
     toast({
       title: t('success'),
@@ -91,16 +134,18 @@ const MapUploader: React.FC = () => {
     });
     
     // Reset form
-    setMapFile(null);
-    setMapName('');
-    setPreviewUrl(null);
+    resetForm();
   };
   
   // Reset the form
-  const handleReset = () => {
+  const resetForm = () => {
     setMapFile(null);
     setMapName('');
     setPreviewUrl(null);
+    setMapType('forest');
+    setMapScale('10000');
+    setCustomScale('');
+    setUseCustomScale(false);
   };
   
   return (
@@ -147,20 +192,94 @@ const MapUploader: React.FC = () => {
               variant="destructive"
               size="icon"
               className="absolute top-2 right-2"
-              onClick={handleReset}
+              onClick={resetForm}
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="map-name">{t('map.name')}</Label>
-            <Input 
-              id="map-name"
-              value={mapName}
-              onChange={(e) => setMapName(e.target.value)}
-              placeholder={t('enter.map.name')}
-            />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="map-name">{t('map.name')}</Label>
+              <Input 
+                id="map-name"
+                value={mapName}
+                onChange={(e) => setMapName(e.target.value)}
+                placeholder={t('enter.map.name')}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{t('map.type')}</Label>
+              <RadioGroup 
+                value={mapType} 
+                onValueChange={(value: 'sprint' | 'forest') => {
+                  setMapType(value);
+                  // Reset scale when changing map type
+                  if (value === 'sprint') {
+                    setMapScale(sprintScales[0]);
+                  } else {
+                    setMapScale(forestScales[1]); // Default to 1:10000 for forest
+                  }
+                  setUseCustomScale(false);
+                }}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="sprint" id="sprint" />
+                  <Label htmlFor="sprint">{t('sprint')}</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="forest" id="forest" />
+                  <Label htmlFor="forest">{t('forest')}</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{t('map.scale')}</Label>
+              <div className="space-y-2">
+                {!useCustomScale ? (
+                  <Select 
+                    value={mapScale}
+                    onValueChange={setMapScale}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('select.scale')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(mapType === 'sprint' ? sprintScales : forestScales).map(scale => (
+                        <SelectItem key={scale} value={scale}>
+                          1:{parseInt(scale).toLocaleString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center">
+                    <span className="mr-2">1:</span>
+                    <Input 
+                      type="text"
+                      value={customScale}
+                      onChange={(e) => setCustomScale(e.target.value)}
+                      placeholder="Enter custom scale"
+                      className="flex-1"
+                    />
+                  </div>
+                )}
+                
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="custom-scale" 
+                    checked={useCustomScale}
+                    onChange={(e) => setUseCustomScale(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="custom-scale" className="text-sm">{t('use.custom.scale')}</Label>
+                </div>
+              </div>
+            </div>
           </div>
           
           <Button 

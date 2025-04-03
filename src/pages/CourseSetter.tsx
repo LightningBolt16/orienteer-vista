@@ -1,7 +1,7 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { PlusCircle, Map as MapIcon, Circle, Flag, Save, Trash2, Download, Layers, FileText, Settings } from 'lucide-react';
+import { PlusCircle, Map as MapIcon, Circle, Flag, Save, Trash2, Download, Layers, FileText, Settings, Printer } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Input } from '../components/ui/input';
@@ -18,22 +18,42 @@ import {
 } from '../components/ui/tooltip';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { toast } from '../components/ui/use-toast';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import MapEditor from '../components/MapEditor';
-import MapUploader from '../components/MapUploader';
+import MapUploader, { MapMetadata } from '../components/MapUploader';
 import CourseList from '../components/CourseList';
 import ControlProperties from '../components/ControlProperties';
+import PrintSettingsDialog, { PrintSettings } from '../components/PrintSettingsDialog';
 
-// Temporary sample maps for demo
+// Sample maps for demo - this would come from an API in production
 const sampleMaps = [
-  { id: 'map1', name: 'Forest Map', imageUrl: '/routes/forest/candidate_1.png' },
-  { id: 'map2', name: 'Urban Map', imageUrl: '/routes/urban/candidate_1.png' },
-  { id: 'map3', name: 'Default Map', imageUrl: '/routes/default/candidate_1.png' },
+  { 
+    id: 'map1', 
+    name: 'Forest Map', 
+    imageUrl: '/routes/forest/candidate_1.png',
+    type: 'forest',
+    scale: '10000'
+  },
+  { 
+    id: 'map2', 
+    name: 'Urban Map', 
+    imageUrl: '/routes/urban/candidate_1.png',
+    type: 'sprint',
+    scale: '4000'
+  },
+  { 
+    id: 'map3', 
+    name: 'Default Map', 
+    imageUrl: '/routes/default/candidate_1.png',
+    type: 'forest',
+    scale: '15000'
+  },
 ];
 
 // Type definitions
 interface Control {
   id: string;
-  type: 'start' | 'control' | 'finish';
+  type: 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
   x: number;
   y: number;
   number?: number;
@@ -55,6 +75,8 @@ interface Event {
   id: string;
   name: string;
   mapId: string;
+  mapScale: string;
+  mapType: 'sprint' | 'forest';
   date: string;
   courses: Course[];
   location?: string;
@@ -73,6 +95,30 @@ const CourseSetter: React.FC = () => {
   const [selectedControl, setSelectedControl] = useState<Control | null>(null);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [allControls, setAllControls] = useState<Control[]>([]);
+  
+  // Update all controls when any course changes
+  useEffect(() => {
+    if (currentEvent) {
+      // Collect all controls from all courses
+      const controls: Control[] = [];
+      currentEvent.courses.forEach(course => {
+        course.controls.forEach(control => {
+          // Check if control already exists at same position
+          const existing = controls.find(c => 
+            Math.abs(c.x - control.x) < 0.5 && 
+            Math.abs(c.y - control.y) < 0.5 && 
+            c.type === control.type
+          );
+          
+          if (!existing) {
+            controls.push(control);
+          }
+        });
+      });
+      setAllControls(controls);
+    }
+  }, [currentEvent]);
   
   // Function to create a new event
   const handleCreateEvent = () => {
@@ -85,15 +131,42 @@ const CourseSetter: React.FC = () => {
       return;
     }
     
+    const selectedMap = sampleMaps.find(map => map.id === selectedMapId);
+    
+    if (!selectedMap) {
+      toast({
+        title: t('error'),
+        description: t('map.not.found'),
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const newEvent: Event = {
       id: `event-${Date.now()}`,
       name: eventName,
       mapId: selectedMapId,
+      mapScale: selectedMap.scale,
+      mapType: selectedMap.type as 'sprint' | 'forest',
       date: eventDate || new Date().toISOString().split('T')[0],
       courses: []
     };
     
+    // Create default "All Controls" course
+    const allControlsCourse: Course = {
+      id: `course-all-controls`,
+      name: 'All Controls',
+      controls: [],
+      description: 'Course with all control points',
+      length: 0,
+      climb: 0,
+      scale: selectedMap.scale
+    };
+    
+    newEvent.courses.push(allControlsCourse);
+    
     setCurrentEvent(newEvent);
+    setCurrentCourse(allControlsCourse);
     setIsEditing(true);
     
     toast({
@@ -102,18 +175,46 @@ const CourseSetter: React.FC = () => {
     });
   };
   
+  // Handle upload of a new map
+  const handleMapUploaded = (metadata: MapMetadata) => {
+    // In a real implementation, this would save the file to backend storage
+    // For now, we'll simulate adding it to our sampleMaps
+    const newMapId = `map-${Date.now()}`;
+    
+    const newMap = {
+      id: newMapId,
+      name: metadata.name,
+      imageUrl: URL.createObjectURL(metadata.file), // This URL will be temporary for demo purposes
+      type: metadata.type,
+      scale: metadata.scale
+    };
+    
+    // In reality, you'd save this to your database
+    console.log('New map added:', newMap);
+    
+    // For demo, we'll pretend it's saved
+    toast({
+      title: t('success'),
+      description: t('map.uploaded.successfully'),
+    });
+    
+    // Select the new map
+    setSelectedMapId(newMapId);
+    setActiveTab('new-event');
+  };
+  
   // Function to add a new course to the current event
   const handleAddCourse = () => {
     if (!currentEvent) return;
     
     const newCourse: Course = {
       id: `course-${Date.now()}`,
-      name: `Course ${currentEvent.courses.length + 1}`,
+      name: `Course ${currentEvent.courses.filter(c => c.id !== 'course-all-controls').length + 1}`,
       controls: [],
       description: '',
       length: 0,
       climb: 0,
-      scale: '1:10000'
+      scale: currentEvent.mapScale
     };
     
     setCurrentEvent({
@@ -126,29 +227,50 @@ const CourseSetter: React.FC = () => {
   
   // Function to handle adding a control on the map
   const handleAddControl = (newControl: Control) => {
-    if (!currentCourse) return;
+    if (!currentCourse || !currentEvent) return;
     
     const updatedControls = [...currentCourse.controls, newControl];
     const updatedCourse = { ...currentCourse, controls: updatedControls };
     
+    // Update current course
     setCurrentCourse(updatedCourse);
     
     // Also update the course in the current event
-    if (currentEvent) {
-      const updatedCourses = currentEvent.courses.map(course => 
-        course.id === currentCourse.id ? updatedCourse : course
-      );
-      
-      setCurrentEvent({
-        ...currentEvent,
-        courses: updatedCourses
-      });
-    }
+    const updatedCourses = currentEvent.courses.map(course => 
+      course.id === currentCourse.id ? updatedCourse : course
+    );
+    
+    // Add to all-controls course if not already there
+    let allControlsUpdated = false;
+    const finalCourses = updatedCourses.map(course => {
+      if (course.id === 'course-all-controls') {
+        // Check if control already exists at similar position
+        const existingSimilar = course.controls.some(c => 
+          Math.abs(c.x - newControl.x) < 0.5 && 
+          Math.abs(c.y - newControl.y) < 0.5 && 
+          c.type === newControl.type
+        );
+        
+        if (!existingSimilar) {
+          allControlsUpdated = true;
+          return {
+            ...course,
+            controls: [...course.controls, newControl]
+          };
+        }
+      }
+      return course;
+    });
+    
+    setCurrentEvent({
+      ...currentEvent,
+      courses: finalCourses
+    });
   };
   
   // Function to update control position (for drag and drop)
   const handleUpdateControlPosition = (controlId: string, x: number, y: number) => {
-    if (!currentCourse) return;
+    if (!currentCourse || !currentEvent) return;
     
     const updatedControls = currentCourse.controls.map(control => 
       control.id === controlId ? { ...control, x, y } : control
@@ -157,22 +279,34 @@ const CourseSetter: React.FC = () => {
     const updatedCourse = { ...currentCourse, controls: updatedControls };
     setCurrentCourse(updatedCourse);
     
-    // Also update the course in the current event
-    if (currentEvent) {
-      const updatedCourses = currentEvent.courses.map(course => 
-        course.id === currentCourse.id ? updatedCourse : course
-      );
-      
-      setCurrentEvent({
-        ...currentEvent,
-        courses: updatedCourses
-      });
-    }
+    // Also update the course in the current event and all-controls course if needed
+    const updatedCourses = currentEvent.courses.map(course => {
+      if (course.id === currentCourse.id) {
+        return updatedCourse;
+      } else if (course.id === 'course-all-controls') {
+        // Update position in all-controls course if it exists there
+        const controlInAllControls = course.controls.find(c => c.id === controlId);
+        if (controlInAllControls) {
+          return {
+            ...course,
+            controls: course.controls.map(c => 
+              c.id === controlId ? { ...c, x, y } : c
+            )
+          };
+        }
+      }
+      return course;
+    });
+    
+    setCurrentEvent({
+      ...currentEvent,
+      courses: updatedCourses
+    });
   };
   
   // Function to delete a control
   const handleDeleteControl = (controlId: string) => {
-    if (!currentCourse) return;
+    if (!currentCourse || !currentEvent) return;
     
     const updatedControls = currentCourse.controls.filter(control => control.id !== controlId);
     
@@ -188,16 +322,19 @@ const CourseSetter: React.FC = () => {
     setCurrentCourse(updatedCourse);
     
     // Also update the course in the current event
-    if (currentEvent) {
-      const updatedCourses = currentEvent.courses.map(course => 
-        course.id === currentCourse.id ? updatedCourse : course
-      );
-      
-      setCurrentEvent({
-        ...currentEvent,
-        courses: updatedCourses
-      });
-    }
+    const updatedCourses = currentEvent.courses.map(course => {
+      if (course.id === currentCourse.id) {
+        return updatedCourse;
+      }
+      return course;
+    });
+    
+    // Don't automatically delete from all-controls to avoid affecting other courses
+    
+    setCurrentEvent({
+      ...currentEvent,
+      courses: updatedCourses
+    });
     
     setSelectedControl(null);
     
@@ -209,7 +346,7 @@ const CourseSetter: React.FC = () => {
   
   // Function to update control properties
   const handleUpdateControlProperties = (controlId: string, updates: Partial<Control>) => {
-    if (!currentCourse) return;
+    if (!currentCourse || !currentEvent) return;
     
     const updatedControls = currentCourse.controls.map(control => 
       control.id === controlId ? { ...control, ...updates } : control
@@ -219,16 +356,27 @@ const CourseSetter: React.FC = () => {
     setCurrentCourse(updatedCourse);
     
     // Also update the course in the current event
-    if (currentEvent) {
-      const updatedCourses = currentEvent.courses.map(course => 
-        course.id === currentCourse.id ? updatedCourse : course
-      );
-      
-      setCurrentEvent({
-        ...currentEvent,
-        courses: updatedCourses
-      });
-    }
+    const updatedCourses = currentEvent.courses.map(course => 
+      course.id === currentCourse.id ? updatedCourse : course
+    );
+    
+    // Check if this control exists in all-controls and update if needed
+    const updatedAllCourses = updatedCourses.map(course => {
+      if (course.id === 'course-all-controls') {
+        return {
+          ...course,
+          controls: course.controls.map(c => 
+            c.id === controlId ? { ...c, ...updates } : c
+          )
+        };
+      }
+      return course;
+    });
+    
+    setCurrentEvent({
+      ...currentEvent,
+      courses: updatedAllCourses
+    });
     
     // Update selected control if it's the one being edited
     if (selectedControl && selectedControl.id === controlId) {
@@ -275,6 +423,38 @@ const CourseSetter: React.FC = () => {
     setSelectedControl(control);
   };
   
+  // Function to handle print settings
+  const handlePrint = (settings: PrintSettings) => {
+    if (!currentCourse || !currentEvent) return;
+    
+    console.log('Print settings:', settings);
+    console.log('Course to print:', currentCourse);
+    
+    // In a real implementation, this would generate a PDF or print dialog
+    toast({
+      title: t('success'),
+      description: t('preparing.print'),
+    });
+  };
+  
+  // Function to update course details
+  const handleUpdateCourse = (courseId: string, updates: Partial<Course>) => {
+    if (!currentEvent) return;
+    
+    const updatedCourses = currentEvent.courses.map(course => 
+      course.id === courseId ? { ...course, ...updates } : course
+    );
+    
+    setCurrentEvent({
+      ...currentEvent,
+      courses: updatedCourses
+    });
+    
+    if (currentCourse?.id === courseId) {
+      setCurrentCourse({ ...currentCourse, ...updates });
+    }
+  };
+  
   // Render the editor when an event is being created/edited
   if (isEditing && currentEvent) {
     const selectedMap = sampleMaps.find(map => map.id === currentEvent.mapId);
@@ -304,6 +484,14 @@ const CourseSetter: React.FC = () => {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              
+              {currentCourse && viewMode === 'preview' && (
+                <PrintSettingsDialog 
+                  courseName={currentCourse.name}
+                  courseScale={currentCourse.scale || currentEvent.mapScale}
+                  onPrint={handlePrint}
+                />
+              )}
               
               <TooltipProvider>
                 <Tooltip>
@@ -378,17 +566,8 @@ const CourseSetter: React.FC = () => {
                       <Label>{t('course.name')}</Label>
                       <Input 
                         value={currentCourse.name} 
-                        onChange={(e) => {
-                          const updated = { ...currentCourse, name: e.target.value };
-                          setCurrentCourse(updated);
-                          const updatedCourses = currentEvent.courses.map(course => 
-                            course.id === currentCourse.id ? updated : course
-                          );
-                          setCurrentEvent({
-                            ...currentEvent,
-                            courses: updatedCourses
-                          });
-                        }}
+                        onChange={(e) => handleUpdateCourse(currentCourse.id, { name: e.target.value })}
+                        disabled={currentCourse.id === 'course-all-controls'}
                       />
                     </div>
                     
@@ -398,17 +577,8 @@ const CourseSetter: React.FC = () => {
                         type="number"
                         step="0.1"
                         value={currentCourse.length || ''} 
-                        onChange={(e) => {
-                          const updated = { ...currentCourse, length: parseFloat(e.target.value) || 0 };
-                          setCurrentCourse(updated);
-                          const updatedCourses = currentEvent.courses.map(course => 
-                            course.id === currentCourse.id ? updated : course
-                          );
-                          setCurrentEvent({
-                            ...currentEvent,
-                            courses: updatedCourses
-                          });
-                        }}
+                        onChange={(e) => handleUpdateCourse(currentCourse.id, { length: parseFloat(e.target.value) || 0 })}
+                        disabled={currentCourse.id === 'course-all-controls'}
                       />
                     </div>
                     
@@ -417,63 +587,63 @@ const CourseSetter: React.FC = () => {
                       <Input 
                         type="number"
                         value={currentCourse.climb || ''} 
-                        onChange={(e) => {
-                          const updated = { ...currentCourse, climb: parseInt(e.target.value) || 0 };
-                          setCurrentCourse(updated);
-                          const updatedCourses = currentEvent.courses.map(course => 
-                            course.id === currentCourse.id ? updated : course
-                          );
-                          setCurrentEvent({
-                            ...currentEvent,
-                            courses: updatedCourses
-                          });
-                        }}
+                        onChange={(e) => handleUpdateCourse(currentCourse.id, { climb: parseInt(e.target.value) || 0 })}
+                        disabled={currentCourse.id === 'course-all-controls'}
                       />
                     </div>
                     
                     <div>
                       <Label>{t('course.scale')}</Label>
                       <Select 
-                        value={currentCourse.scale || '1:10000'}
-                        onValueChange={(value) => {
-                          const updated = { ...currentCourse, scale: value };
-                          setCurrentCourse(updated);
-                          const updatedCourses = currentEvent.courses.map(course => 
-                            course.id === currentCourse.id ? updated : course
-                          );
-                          setCurrentEvent({
-                            ...currentEvent,
-                            courses: updatedCourses
-                          });
-                        }}
+                        value={currentCourse.scale || currentEvent.mapScale}
+                        onValueChange={(value) => handleUpdateCourse(currentCourse.id, { scale: value })}
+                        disabled={currentCourse.id === 'course-all-controls'}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder={t('select.scale')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1:10000">1:10,000</SelectItem>
-                          <SelectItem value="1:15000">1:15,000</SelectItem>
-                          <SelectItem value="1:7500">1:7,500</SelectItem>
-                          <SelectItem value="1:5000">1:5,000</SelectItem>
+                          {currentEvent.mapType === 'sprint' ? (
+                            <>
+                              <SelectItem value="4000">1:4,000</SelectItem>
+                              <SelectItem value="3000">1:3,000</SelectItem>
+                            </>
+                          ) : (
+                            <>
+                              <SelectItem value="15000">1:15,000</SelectItem>
+                              <SelectItem value="10000">1:10,000</SelectItem>
+                              <SelectItem value="7500">1:7,500</SelectItem>
+                            </>
+                          )}
+                          <SelectItem value="5000">1:5,000</SelectItem>
+                          <SelectItem value="custom">Custom...</SelectItem>
                         </SelectContent>
                       </Select>
+                      
+                      {currentCourse.scale === 'custom' && (
+                        <div className="mt-2 flex items-center">
+                          <span className="mr-2">1:</span>
+                          <Input
+                            type="text"
+                            placeholder="Custom scale"
+                            onChange={(e) => {
+                              // Handle custom scale input
+                              const value = e.target.value.trim();
+                              if (value && !isNaN(parseInt(value))) {
+                                handleUpdateCourse(currentCourse.id, { scale: value });
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                     
                     <div>
                       <Label>{t('course.description')}</Label>
                       <Textarea 
                         value={currentCourse.description} 
-                        onChange={(e) => {
-                          const updated = { ...currentCourse, description: e.target.value };
-                          setCurrentCourse(updated);
-                          const updatedCourses = currentEvent.courses.map(course => 
-                            course.id === currentCourse.id ? updated : course
-                          );
-                          setCurrentEvent({
-                            ...currentEvent,
-                            courses: updatedCourses
-                          });
-                        }}
+                        onChange={(e) => handleUpdateCourse(currentCourse.id, { description: e.target.value })}
+                        disabled={currentCourse.id === 'course-all-controls'}
                       />
                     </div>
                   </div>
@@ -491,6 +661,8 @@ const CourseSetter: React.FC = () => {
                   onUpdateControl={handleUpdateControlPosition}
                   onSelectControl={handleControlSelect}
                   viewMode={viewMode}
+                  allControls={allControls} // For snapping
+                  snapDistance={2} // 2% snap distance
                 />
               )}
             </div>
@@ -517,7 +689,7 @@ const CourseSetter: React.FC = () => {
                     className="h-6 w-6 p-0" 
                     onClick={() => setShowLayerPanel(false)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
                 <div className="space-y-2">
@@ -587,7 +759,7 @@ const CourseSetter: React.FC = () => {
                   <SelectContent>
                     {sampleMaps.map(map => (
                       <SelectItem key={map.id} value={map.id}>
-                        {map.name}
+                        {map.name} ({map.type === 'sprint' ? 'Sprint' : 'Forest'}, 1:{parseInt(map.scale).toLocaleString()})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -614,10 +786,6 @@ const CourseSetter: React.FC = () => {
             <CardContent>
               <div className="flex justify-between mb-4">
                 <h3 className="text-lg font-semibold">{t('available.maps')}</h3>
-                <Button>
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  {t('upload.map')}
-                </Button>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -631,19 +799,24 @@ const CourseSetter: React.FC = () => {
                       />
                     </div>
                     <CardContent className="p-4">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-medium">{map.name}</h4>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedMapId(map.id);
-                            setActiveTab('new-event');
-                          }}
-                        >
-                          <MapIcon className="h-4 w-4 mr-2" />
-                          {t('use')}
-                        </Button>
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium">{map.name}</h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedMapId(map.id);
+                              setActiveTab('new-event');
+                            }}
+                          >
+                            <MapIcon className="h-4 w-4 mr-2" />
+                            {t('use')}
+                          </Button>
+                        </div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {map.type === 'sprint' ? 'Sprint' : 'Forest'} • 1:{parseInt(map.scale).toLocaleString()}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -651,7 +824,7 @@ const CourseSetter: React.FC = () => {
               </div>
               
               <div className="mt-6">
-                <MapUploader />
+                <MapUploader onMapUploaded={handleMapUploaded} />
               </div>
             </CardContent>
           </Card>
