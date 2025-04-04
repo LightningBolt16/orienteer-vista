@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader } from '../ui/card';
@@ -10,7 +9,7 @@ import EditorHeader from './EditorHeader';
 import CourseEditor from './CourseEditor';
 import ControlProperties from '../ControlProperties';
 import LayersPanel from './LayersPanel';
-import { ChevronLeft, ChevronRight, Fullscreen, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '../ui/button';
 
 // Define a control type compatible with MapEditor
@@ -115,6 +114,19 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  // Helper function to transform EventControl to Control (MapEditor compatible)
+  const transformToMapControl = (control: EventControl): Control => {
+    // Only keep supported types and convert others to 'control'
+    const supportedType = control.type === 'start' || control.type === 'control' || control.type === 'finish'
+      ? control.type
+      : 'control';
+    
+    return {
+      ...control,
+      type: supportedType
+    };
+  };
   
   return (
     <Card className={`mt-8 h-full overflow-hidden ${isFullScreen ? 'fixed inset-0 z-50 mt-0 rounded-none' : ''}`}>
@@ -184,12 +196,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
           {selectedMap && currentCourse && (
             <MapEditor 
               mapUrl={selectedMap.imageUrl}
-              controls={currentCourse.controls.map(control => ({
-                ...control,
-                type: control.type === 'start' || control.type === 'control' || control.type === 'finish' 
-                  ? control.type 
-                  : 'control' // Convert any unsupported types to 'control'
-              }))}
+              controls={currentCourse.controls.map(transformToMapControl)}
               onAddControl={(control: Control) => {
                 // Convert the Control type to EventControl type for the hook
                 const eventControl: EventControl = {
@@ -211,12 +218,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
                   }
               }
               viewMode={isAllControlsCourse ? 'preview' : viewMode}
-              allControls={allControls.map(control => ({
-                ...control,
-                type: control.type === 'start' || control.type === 'control' || control.type === 'finish'
-                  ? control.type
-                  : 'control' // Convert any unsupported types to 'control'
-              }))}
+              allControls={allControls.map(transformToMapControl)}
               snapDistance={2}
               courseScale={currentCourse.scale || currentEvent.mapScale}
               printSettings={currentPrintSettings}
@@ -232,11 +234,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
         {viewMode === 'edit' && selectedControl && !isAllControlsCourse && (
           <div className="w-64 border-l p-4">
             <ControlProperties 
-              control={selectedControl.type === 'start' || 
-                      selectedControl.type === 'control' || 
-                      selectedControl.type === 'finish' 
-                ? selectedControl 
-                : {...selectedControl, type: 'control'}} // Convert any unsupported types to 'control'
+              control={transformToMapControl(selectedControl)}
               onUpdateControl={(updates) => onUpdateControlProperties(selectedControl.id, updates)}
               onDeleteControl={() => onDeleteControl(selectedControl.id)}
             />
