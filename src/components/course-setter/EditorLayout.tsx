@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader } from '../ui/card';
 import { PrintSettings } from '../PrintSettingsDialog';
-import { Event, Course, Control, MapInfo } from '../../hooks/useEventState';
+import { Event, Course, Control as EventControl, MapInfo } from '../../hooks/useEventState';
 import { usePrintSettings } from '../../hooks/usePrintSettings';
 import MapEditor from '../MapEditor';
 import EditorHeader from './EditorHeader';
@@ -11,19 +11,30 @@ import CourseEditor from './CourseEditor';
 import ControlProperties from '../ControlProperties';
 import LayersPanel from './LayersPanel';
 
+// Define a control type compatible with MapEditor
+interface Control {
+  id: string;
+  type: 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
+  x: number;
+  y: number;
+  number?: number;
+  code?: string;
+  description?: string;
+}
+
 interface EditorLayoutProps {
   currentEvent: Event;
   currentCourse: Course | null;
-  selectedControl: Control | null;
-  allControls: Control[];
+  selectedControl: EventControl | null;
+  allControls: EventControl[];
   sampleMaps: MapInfo[];
   onSelectCourse: (courseId: string) => void;
   onUpdateCourse: (courseId: string, updates: Partial<Course>) => void;
   onAddCourse: () => void;
-  onAddControl: (control: Control) => void;
+  onAddControl: (control: EventControl) => void;
   onUpdateControlPosition: (id: string, x: number, y: number) => void;
-  onSelectControl: (control: Control) => void;
-  onUpdateControlProperties: (id: string, updates: Partial<Control>) => void;
+  onSelectControl: (control: EventControl) => void;
+  onUpdateControlProperties: (id: string, updates: Partial<EventControl>) => void;
   onDeleteControl: (id: string) => void;
   onExportCourse: () => void;
   onSaveEvent: () => void;
@@ -63,7 +74,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
   const selectedMap = sampleMaps.find(map => map.id === currentEvent.mapId);
   
   if (!selectedMap) {
-    return <div>{t('error.map.not.found')}</div>;
+    return <div>{t('errorMapNotFound')}</div>;
   }
 
   // Check if we're viewing the "All Controls" course

@@ -90,7 +90,7 @@ const Header: React.FC = () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Map className="h-5 w-5" />
-                  <span>{t('route.game')}</span>
+                  <span>{t('routeGame')}</span>
                 </Link>
                 
                 <button 
@@ -124,7 +124,7 @@ const Header: React.FC = () => {
               }`}
             >
               <Map className="h-4 w-4" />
-              <span>{t('route.game')}</span>
+              <span>{t('routeGame')}</span>
             </Link>
             
             <NavigationMenu>
@@ -136,7 +136,7 @@ const Header: React.FC = () => {
                     }`}
                   >
                     <PenTool className="h-4 w-4 mr-1" />
-                    <span>{t('course.setter')}</span>
+                    <span>{t('courseSetter')}</span>
                   </NavigationMenuTrigger>
                   <NavigationMenuContent className="min-w-[8rem]">
                     <div className="grid gap-2 p-2">
@@ -148,7 +148,7 @@ const Header: React.FC = () => {
                           }`}
                         >
                           <PenTool className="h-4 w-4" />
-                          <span>{t('course.setter')}</span>
+                          <span>{t('courseSetter')}</span>
                         </Link>
                       </NavigationMenuLink>
                       <NavigationMenuLink asChild>
@@ -159,7 +159,7 @@ const Header: React.FC = () => {
                           }`}
                         >
                           <FolderOpen className="h-4 w-4" />
-                          <span>{t('my.files')}</span>
+                          <span>{t('myMaps')}</span>
                         </Link>
                       </NavigationMenuLink>
                     </div>

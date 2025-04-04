@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { CardTitle, CardDescription } from '../ui/card';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { FileText, Settings, Layers, Download, Save } from 'lucide-react';
+import { FileText, Settings, Layers, Download, Save, Printer } from 'lucide-react';
 import PrintSettingsDialog from '../PrintSettingsDialog';
 import { Event, Course } from '../../hooks/useEventState';
 
@@ -45,7 +45,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
     <div className="flex flex-row items-center justify-between p-4 bg-card">
       <div>
         <CardTitle>{currentEvent.name}</CardTitle>
-        <CardDescription>{t('event.date')}: {currentEvent.date}</CardDescription>
+        <CardDescription>{t('eventDate')}: {currentEvent.date}</CardDescription>
       </div>
       <div className="flex gap-2">
         <TooltipProvider>
@@ -60,7 +60,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              {viewMode === 'edit' ? t('preview.mode') : t('edit.mode')}
+              {viewMode === 'edit' ? t('previewMode') : t('editMode')}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -85,7 +85,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              {t('toggle.layers')}
+              {t('toggleLayers')}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -103,6 +103,23 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
             </TooltipTrigger>
             <TooltipContent>
               {t('export')}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={onOpenPrintDialog}
+              >
+                <Printer className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t('print')}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

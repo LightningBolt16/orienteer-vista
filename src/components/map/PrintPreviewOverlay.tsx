@@ -31,7 +31,7 @@ const PrintPreviewOverlay: React.FC<PrintPreviewOverlayProps> = ({
         }}
       >
         <div className="absolute top-0 left-0 -mt-6 -ml-6 bg-white px-2 py-1 rounded text-xs">
-          {t('print.area')} ({printSettings.paperSize.toUpperCase()})
+          {t('printArea')} ({printSettings.paperSize.toUpperCase()})
         </div>
       </div>
     </div>

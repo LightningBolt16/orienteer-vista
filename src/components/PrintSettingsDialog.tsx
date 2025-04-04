@@ -93,24 +93,23 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
     <Dialog open={externalOpen !== undefined ? externalOpen : open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('print.settings')}</DialogTitle>
+          <DialogTitle>{t('printSettings')}</DialogTitle>
           <DialogDescription>
-            {t('configure.print.settings.for')}: {courseName}
+            {t('configurePrintSettingsFor')}: {courseName}
           </DialogDescription>
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-3 items-center gap-4">
             <Label htmlFor="paper-size" className="text-right">
-              {t('paper.size')}
+              {t('paperSize')}
             </Label>
             <Select
               value={settings.paperSize}
               onValueChange={(val) => handleSettingsChange('paperSize', val)}
-              className="col-span-2"
             >
-              <SelectTrigger id="paper-size">
-                <SelectValue placeholder={t('select.paper.size')} />
+              <SelectTrigger id="paper-size" className="col-span-2">
+                <SelectValue placeholder={t('selectPaperSize')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="a4">A4</SelectItem>
@@ -142,14 +141,13 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
           
           <div className="grid grid-cols-3 items-center gap-4">
             <Label htmlFor="scale" className="text-right">
-              {t('map.scale')}
+              {t('mapScale')}
             </Label>
             <Select
               value={settings.scale}
               onValueChange={(val) => handleSettingsChange('scale', val)}
-              className="col-span-2"
             >
-              <SelectTrigger id="scale">
+              <SelectTrigger id="scale" className="col-span-2">
                 <SelectValue placeholder="1:10000" />
               </SelectTrigger>
               <SelectContent>
@@ -189,7 +187,7 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
                   checked={settings.showControlDescriptions}
                   onChange={(e) => handleSettingsChange('showControlDescriptions', e.target.checked)}
                 />
-                <Label htmlFor="show-descriptions">{t('control.descriptions')}</Label>
+                <Label htmlFor="show-descriptions">{t('controlDescriptions')}</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <input
@@ -198,7 +196,7 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
                   checked={settings.showCourseDetails}
                   onChange={(e) => handleSettingsChange('showCourseDetails', e.target.checked)}
                 />
-                <Label htmlFor="show-details">{t('course.details')}</Label>
+                <Label htmlFor="show-details">{t('courseDetails')}</Label>
               </div>
             </div>
           </div>

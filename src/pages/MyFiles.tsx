@@ -14,17 +14,17 @@ const MyFiles: React.FC = () => {
   return (
     <div className="pb-20 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mt-8 mb-4">
-        <h1 className="text-2xl font-bold">{t('my.purple.pen.projects')}</h1>
+        <h1 className="text-2xl font-bold">{t('myPurplePenProjects')}</h1>
         <Button onClick={() => navigate('/course-setter')}>
           <Plus className="h-4 w-4 mr-2" />
-          {t('new.project')}
+          {t('newProject')}
         </Button>
       </div>
       
       <Card>
         <CardHeader>
-          <CardTitle>{t('previous.projects')}</CardTitle>
-          <CardDescription>{t('view.manage.projects')}</CardDescription>
+          <CardTitle>{t('previousProjects')}</CardTitle>
+          <CardDescription>{t('viewManageProjects')}</CardDescription>
         </CardHeader>
         <CardContent>
           <ProjectsView />

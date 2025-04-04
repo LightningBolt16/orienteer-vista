@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   MousePointer, Move, ZoomIn, ZoomOut, 
   ChevronDown, ChevronUp, LineChart, Circle, Flag, 
-  XCircle, TriangleAlert, Fence, Map, Printer
+  XCircle, TriangleAlert, Fence, Map
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { 
@@ -37,34 +37,34 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   
   // Basic tools that are always shown
   const basicTools = [
-    { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointer.tool'), shortcut: 'P' },
-    { id: 'move', icon: <Move size={18} />, label: t('move.map'), shortcut: 'M' },
-    { id: 'control', icon: <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-purple-600"></div>, label: t('add.control'), shortcut: 'C' },
+    { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointerTool'), shortcut: 'P' },
+    { id: 'move', icon: <Move size={18} />, label: t('moveMap'), shortcut: 'M' },
+    { id: 'control', icon: <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-purple-600"></div>, label: t('addControl'), shortcut: 'C' },
     { id: 'start', icon: <div className="flex items-center justify-center">
       <svg width="20" height="20" viewBox="0 0 28 28">
         <polygon points="14,0 28,28 0,28" fill="none" stroke="#D946EF" strokeWidth="2" />
       </svg>
-    </div>, label: t('add.start'), shortcut: 'S' },
+    </div>, label: t('addStart'), shortcut: 'S' },
     { id: 'finish', icon: <div className="flex items-center justify-center">
       <svg width="20" height="20" viewBox="0 0 28 28">
         <circle cx="14" cy="14" r="12" fill="none" stroke="#ef4444" strokeWidth="2" />
         <circle cx="14" cy="14" r="8" fill="none" stroke="#ef4444" strokeWidth="2" />
       </svg>
-    </div>, label: t('add.finish'), shortcut: 'F' }
+    </div>, label: t('addFinish'), shortcut: 'F' }
   ];
   
   // Advanced tools
   const advancedTools = [
-    { id: 'crossing-point', icon: <XCircle size={18} />, label: t('crossing.point') },
-    { id: 'uncrossable-boundary', icon: <Fence size={18} />, label: t('uncrossable.boundary') },
-    { id: 'out-of-bounds', icon: <LineChart size={18} />, label: t('out.of.bounds') },
-    { id: 'water-station', icon: <TriangleAlert size={18} />, label: t('water.station') }
+    { id: 'crossing-point', icon: <XCircle size={18} />, label: t('crossingPoint') },
+    { id: 'uncrossable-boundary', icon: <Fence size={18} />, label: t('uncrossableBoundary') },
+    { id: 'out-of-bounds', icon: <LineChart size={18} />, label: t('outOfBounds') },
+    { id: 'water-station', icon: <TriangleAlert size={18} />, label: t('waterStation') }
   ];
   
   // Zoom tools are separate
   const zoomTools = [
-    { id: 'zoom-in', icon: <ZoomIn size={18} />, label: t('zoom.in'), shortcut: '+' },
-    { id: 'zoom-out', icon: <ZoomOut size={18} />, label: t('zoom.out'), shortcut: '-' }
+    { id: 'zoom-in', icon: <ZoomIn size={18} />, label: t('zoomIn'), shortcut: '+' },
+    { id: 'zoom-out', icon: <ZoomOut size={18} />, label: t('zoomOut'), shortcut: '-' }
   ];
 
   // Add disabled prop to handle UI state for tools
@@ -101,7 +101,7 @@ const CourseTools: React.FC<CourseToolsProps> = ({
               size="sm" 
               className="flex items-center text-xs h-8 px-2"
             >
-              {t('advanced.tools')}
+              {t('advancedTools')}
               {showAdvancedTools 
                 ? <ChevronUp className="h-4 w-4 ml-1" /> 
                 : <ChevronDown className="h-4 w-4 ml-1" />}
@@ -120,18 +120,12 @@ const CourseTools: React.FC<CourseToolsProps> = ({
       
       <div className="w-px h-8 bg-gray-200"></div>
       
-      {/* Reset View and Print Buttons */}
+      {/* Reset View Button */}
       <div className="flex gap-1">
         <ActionButton
           icon={<Map className="h-4 w-4" />}
-          label={t('reset.view')}
+          label={t('resetView')}
           onClick={onResetView}
-        />
-        
-        <ActionButton
-          icon={<Printer className="h-4 w-4" />}
-          label={t('print')}
-          onClick={onPrint}
         />
       </div>
     </div>
