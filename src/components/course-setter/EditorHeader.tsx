@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { CardTitle, CardDescription } from '../ui/card';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { FileText, Settings, Layers, Download, Save, Printer } from 'lucide-react';
+import { FileText, Settings, Layers, Download, Save } from 'lucide-react';
 import PrintSettingsDialog from '../PrintSettingsDialog';
 import { Event, Course } from '../../hooks/useEventState';
 
@@ -72,23 +72,6 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
           onOpenChange={onPrintDialogOpenChange}
           onPrint={onPrint}
         />
-        
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={onOpenPrintDialog}
-              >
-                <Printer className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {t('print')}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
         
         <TooltipProvider>
           <Tooltip>

@@ -91,12 +91,6 @@ const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
 
   return (
     <Dialog open={externalOpen !== undefined ? externalOpen : open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="flex items-center gap-2">
-          <Printer className="h-4 w-4" />
-          {t('print')}
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('print.settings')}</DialogTitle>
