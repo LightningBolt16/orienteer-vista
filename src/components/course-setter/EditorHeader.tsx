@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { CardTitle, CardDescription } from '../ui/card';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { FileText, Settings, Layers, Download, Save, Printer, Fullscreen, Maximize2, Minimize2 } from 'lucide-react';
+import { FileText, Settings, Layers, Download, Save, Printer, Maximize2, Minimize2 } from 'lucide-react';
 import PrintSettingsDialog from '../PrintSettingsDialog';
 import { Event, Course } from '../../hooks/useEventState';
 
@@ -51,16 +51,18 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
         <CardTitle>{currentEvent.name}</CardTitle>
         <CardDescription>{t('eventDate')}: {currentEvent.date}</CardDescription>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap justify-end">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
-                variant="outline" 
-                size="icon"
+                variant={viewMode === 'edit' ? 'outline' : 'default'} 
+                size="sm"
                 onClick={() => onViewModeChange(viewMode === 'edit' ? 'preview' : 'edit')}
+                className="gap-1"
               >
                 {viewMode === 'edit' ? <FileText className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+                {viewMode === 'edit' ? t('previewMode') : t('editMode')}
               </Button>
             </TooltipTrigger>
             <TooltipContent>

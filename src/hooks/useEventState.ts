@@ -1,6 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from '../components/ui/use-toast';
+import { collectAllUniqueControls, updateAllControlsCourse } from './useEventCalculations';
 
 export interface Control {
   id: string;
@@ -42,55 +42,6 @@ export interface MapInfo {
   scale: string;
 }
 
-// Calculate distance between two control points
-const calculateDistance = (controlA: Control, controlB: Control): number => {
-  const dx = controlA.x - controlB.x;
-  const dy = controlA.y - controlB.y;
-  return Math.sqrt(dx * dx + dy * dy);
-};
-
-// Find the shortest path that visits all controls using nearest neighbor algorithm
-const findShortestPath = (controls: Control[]): Control[] => {
-  if (controls.length <= 1) return controls;
-
-  const visited = new Set<string>();
-  const path: Control[] = [];
-  
-  // Start with the top-left most control as a simple heuristic
-  let currentControl = controls.reduce((min, control) => 
-    control.x + control.y < min.x + min.y ? control : min, controls[0]);
-  
-  path.push(currentControl);
-  visited.add(currentControl.id);
-  
-  // Find the nearest unvisited control and add it to the path
-  while (visited.size < controls.length) {
-    let nearestControl: Control | null = null;
-    let minDistance = Infinity;
-    
-    for (const control of controls) {
-      if (!visited.has(control.id)) {
-        const distance = calculateDistance(currentControl, control);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestControl = control;
-        }
-      }
-    }
-    
-    if (nearestControl) {
-      path.push(nearestControl);
-      visited.add(nearestControl.id);
-      currentControl = nearestControl;
-    } else {
-      // All controls have been visited
-      break;
-    }
-  }
-  
-  return path;
-}
-
 export function useEventState() {
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
@@ -102,51 +53,19 @@ export function useEventState() {
   useEffect(() => {
     if (currentEvent) {
       // Collect all controls from all courses
-      const controls: Control[] = [];
-      currentEvent.courses.forEach(course => {
-        if (course.id === 'course-all-controls') return; // Skip all-controls course as it's derived
-        
-        course.controls.forEach(control => {
-          // Check if control already exists at same position
-          const existing = controls.find(c => 
-            Math.abs(c.x - control.x) < 0.5 && 
-            Math.abs(c.y - control.y) < 0.5 && 
-            c.type === control.type
-          );
-          
-          if (!existing) {
-            controls.push(control);
-          }
-        });
-      });
+      const controls = collectAllUniqueControls(currentEvent.courses);
       setAllControls(controls);
       
       // Update the all-controls course with the shortest path
       if (controls.length > 0) {
-        const allControlsCourseIndex = currentEvent.courses.findIndex(c => c.id === 'course-all-controls');
+        const updatedEvent = updateAllControlsCourse(currentEvent, controls);
+        setCurrentEvent(updatedEvent);
         
-        if (allControlsCourseIndex !== -1) {
-          // Get path optimized controls
-          const sortedControls = findShortestPath(controls);
-          
-          // Update the all-controls course with the optimized path
-          const updatedCourses = [...currentEvent.courses];
-          updatedCourses[allControlsCourseIndex] = {
-            ...updatedCourses[allControlsCourseIndex],
-            controls: sortedControls
-          };
-          
-          setCurrentEvent({
-            ...currentEvent,
-            courses: updatedCourses
-          });
-          
-          // Update current course if it's the all-controls course
-          if (currentCourse?.id === 'course-all-controls') {
-            setCurrentCourse({
-              ...currentCourse,
-              controls: sortedControls
-            });
+        // Update current course if it's the all-controls course
+        if (currentCourse?.id === 'course-all-controls') {
+          const updatedAllControlsCourse = updatedEvent.courses.find(c => c.id === 'course-all-controls');
+          if (updatedAllControlsCourse) {
+            setCurrentCourse(updatedAllControlsCourse);
           }
         }
       }

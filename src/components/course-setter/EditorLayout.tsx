@@ -153,21 +153,18 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
       </CardHeader>
       
       <div className="flex h-[calc(100%-4rem)]">
-        {/* Toggle button for course editor */}
+        {/* Left sidebar - Courses */}
         <div className="relative">
-          {isCourseEditorCollapsed && (
+          {isCourseEditorCollapsed ? (
             <Button
               variant="ghost"
               size="icon"
-              className="absolute left-2 top-2 z-10"
+              className="absolute left-2 top-2 z-10 bg-background shadow-sm"
               onClick={() => setIsCourseEditorCollapsed(false)}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-          )}
-          
-          {/* Left sidebar - Courses */}
-          {!isCourseEditorCollapsed && (
+          ) : (
             <div className="flex">
               <CourseEditor
                 currentCourse={currentCourse}
