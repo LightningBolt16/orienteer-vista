@@ -184,7 +184,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
         onMouseUp={handleCombinedMouseUp}
         onMouseLeave={handleCombinedMouseUp}
       >
-        {/* Print preview overlay */}
+        {/* Print preview overlay - now properly controlled by viewMode */}
         <PrintPreviewOverlay viewMode={viewMode} printSettings={printSettings} />
         
         <div 

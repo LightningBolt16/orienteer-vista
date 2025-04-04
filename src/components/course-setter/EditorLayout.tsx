@@ -154,18 +154,18 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
       
       <div className="flex h-[calc(100%-4rem)]">
         {/* Left sidebar - Courses */}
-        <div className="relative">
+        <div className="relative h-full">
           {isCourseEditorCollapsed ? (
             <Button
               variant="ghost"
               size="icon"
-              className="absolute left-2 top-2 z-10 bg-background shadow-sm"
+              className="absolute left-2 top-14 z-10 bg-background shadow-sm"
               onClick={() => setIsCourseEditorCollapsed(false)}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <div className="flex">
+            <div className="flex h-full">
               <CourseEditor
                 currentCourse={currentCourse}
                 courses={currentEvent.courses}
@@ -179,7 +179,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 self-start mt-2"
+                className="h-8 w-8 self-start mt-2 ml-1"
                 onClick={() => setIsCourseEditorCollapsed(true)}
               >
                 <ChevronLeft className="h-4 w-4" />

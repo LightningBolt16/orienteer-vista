@@ -57,12 +57,10 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
             <TooltipTrigger asChild>
               <Button 
                 variant={viewMode === 'edit' ? 'outline' : 'default'} 
-                size="sm"
+                size="icon"
                 onClick={() => onViewModeChange(viewMode === 'edit' ? 'preview' : 'edit')}
-                className="gap-1"
               >
                 {viewMode === 'edit' ? <FileText className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
-                {viewMode === 'edit' ? t('previewMode') : t('editMode')}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
