@@ -10,13 +10,13 @@ import EditorHeader from './EditorHeader';
 import CourseEditor from './CourseEditor';
 import ControlProperties from '../ControlProperties';
 import LayersPanel from './LayersPanel';
-import { ChevronLeft, ChevronRight, Fullscreen, FullscreenExit } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Fullscreen, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '../ui/button';
 
 // Define a control type compatible with MapEditor
 interface Control {
   id: string;
-  type: 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
+  type: 'start' | 'control' | 'finish';
   x: number;
   y: number;
   number?: number;
@@ -66,6 +66,8 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [isCourseEditorCollapsed, setIsCourseEditorCollapsed] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showConnections, setShowConnections] = useState(true);
+  const [showControlNumbers, setShowControlNumbers] = useState(true);
   
   const {
     printDialogOpen,
@@ -182,12 +184,39 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
           {selectedMap && currentCourse && (
             <MapEditor 
               mapUrl={selectedMap.imageUrl}
-              controls={currentCourse.controls || []}
-              onAddControl={onAddControl}
+              controls={currentCourse.controls.map(control => ({
+                ...control,
+                type: control.type === 'start' || control.type === 'control' || control.type === 'finish' 
+                  ? control.type 
+                  : 'control' // Convert any unsupported types to 'control'
+              }))}
+              onAddControl={(control: Control) => {
+                // Convert the Control type to EventControl type for the hook
+                const eventControl: EventControl = {
+                  ...control,
+                  type: control.type as EventControl['type']
+                };
+                onAddControl(eventControl);
+              }}
               onUpdateControl={isAllControlsCourse ? undefined : onUpdateControlPosition}
-              onSelectControl={isAllControlsCourse ? undefined : onSelectControl}
+              onSelectControl={isAllControlsCourse 
+                ? undefined 
+                : (control: Control) => {
+                    // Convert the Control type to EventControl type for the hook
+                    const eventControl: EventControl = {
+                      ...control,
+                      type: control.type as EventControl['type']
+                    };
+                    onSelectControl(eventControl);
+                  }
+              }
               viewMode={isAllControlsCourse ? 'preview' : viewMode}
-              allControls={allControls}
+              allControls={allControls.map(control => ({
+                ...control,
+                type: control.type === 'start' || control.type === 'control' || control.type === 'finish'
+                  ? control.type
+                  : 'control' // Convert any unsupported types to 'control'
+              }))}
               snapDistance={2}
               courseScale={currentCourse.scale || currentEvent.mapScale}
               printSettings={currentPrintSettings}
@@ -203,7 +232,11 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
         {viewMode === 'edit' && selectedControl && !isAllControlsCourse && (
           <div className="w-64 border-l p-4">
             <ControlProperties 
-              control={selectedControl}
+              control={selectedControl.type === 'start' || 
+                      selectedControl.type === 'control' || 
+                      selectedControl.type === 'finish' 
+                ? selectedControl 
+                : {...selectedControl, type: 'control'}} // Convert any unsupported types to 'control'
               onUpdateControl={(updates) => onUpdateControlProperties(selectedControl.id, updates)}
               onDeleteControl={() => onDeleteControl(selectedControl.id)}
             />
@@ -214,10 +247,10 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
         {showLayerPanel && (
           <LayersPanel 
             onClose={() => setShowLayerPanel(false)}
-            showConnections={true}
-            setShowConnections={() => {}}
-            showControlNumbers={true}
-            setShowControlNumbers={() => {}}
+            showConnections={showConnections}
+            setShowConnections={setShowConnections}
+            showControlNumbers={showControlNumbers}
+            setShowControlNumbers={setShowControlNumbers}
           />
         )}
       </div>

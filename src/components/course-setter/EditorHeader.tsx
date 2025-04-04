@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { CardTitle, CardDescription } from '../ui/card';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { FileText, Settings, Layers, Download, Save, Printer, Fullscreen, FullscreenExit } from 'lucide-react';
+import { FileText, Settings, Layers, Download, Save, Printer, Fullscreen, Maximize2, Minimize2 } from 'lucide-react';
 import PrintSettingsDialog from '../PrintSettingsDialog';
 import { Event, Course } from '../../hooks/useEventState';
 
@@ -137,7 +137,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                   size="icon"
                   onClick={onToggleFullscreen}
                 >
-                  {isFullScreen ? <FullscreenExit className="h-4 w-4" /> : <Fullscreen className="h-4 w-4" />}
+                  {isFullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
