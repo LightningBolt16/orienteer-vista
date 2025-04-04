@@ -7,9 +7,19 @@ import { X } from 'lucide-react';
 
 interface LayersPanelProps {
   onClose: () => void;
+  showConnections?: boolean;
+  setShowConnections?: (show: boolean) => void;
+  showControlNumbers?: boolean;
+  setShowControlNumbers?: (show: boolean) => void;
 }
 
-const LayersPanel: React.FC<LayersPanelProps> = ({ onClose }) => {
+const LayersPanel: React.FC<LayersPanelProps> = ({ 
+  onClose,
+  showConnections = true,
+  setShowConnections = () => {},
+  showControlNumbers = true,
+  setShowControlNumbers = () => {}
+}) => {
   const { t } = useLanguage();
   
   return (
@@ -35,8 +45,24 @@ const LayersPanel: React.FC<LayersPanelProps> = ({ onClose }) => {
           <Label htmlFor="layer-controls" className="text-sm">{t('controls')}</Label>
         </div>
         <div className="flex items-center">
-          <input type="checkbox" id="layer-connections" className="mr-2" defaultChecked />
+          <input 
+            type="checkbox" 
+            id="layer-connections" 
+            className="mr-2" 
+            checked={showConnections}
+            onChange={(e) => setShowConnections(e.target.checked)}
+          />
           <Label htmlFor="layer-connections" className="text-sm">{t('connections')}</Label>
+        </div>
+        <div className="flex items-center">
+          <input 
+            type="checkbox" 
+            id="layer-numbers" 
+            className="mr-2" 
+            checked={showControlNumbers}
+            onChange={(e) => setShowControlNumbers(e.target.checked)}
+          />
+          <Label htmlFor="layer-numbers" className="text-sm">{t('controlNumbers')}</Label>
         </div>
       </div>
     </div>

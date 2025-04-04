@@ -33,6 +33,7 @@ interface MapEditorProps {
   courseScale?: string; // Scale for print preview
   printSettings?: PrintSettings; // Current print settings
   onOpenPrintDialog: () => void;
+  hideDisplayOptions?: boolean; // New prop to hide display options
 }
 
 const MapEditor: React.FC<MapEditorProps> = ({ 
@@ -46,7 +47,8 @@ const MapEditor: React.FC<MapEditorProps> = ({
   snapDistance = 2, // Default snap distance in percentage
   courseScale = '10000',
   printSettings,
-  onOpenPrintDialog
+  onOpenPrintDialog,
+  hideDisplayOptions = false
 }) => {
   const { t } = useLanguage();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -156,14 +158,16 @@ const MapEditor: React.FC<MapEditorProps> = ({
           disabled={isToolbarDisabled}
         />
         
-        <MapDisplayOptions 
-          showConnections={showConnections}
-          setShowConnections={setShowConnections}
-          showControlNumbers={showControlNumbers}
-          setShowControlNumbers={setShowControlNumbers}
-          courseScale={courseScale}
-          viewMode={viewMode}
-        />
+        {!hideDisplayOptions && (
+          <MapDisplayOptions 
+            showConnections={showConnections}
+            setShowConnections={setShowConnections}
+            showControlNumbers={showControlNumbers}
+            setShowControlNumbers={setShowControlNumbers}
+            courseScale={courseScale}
+            viewMode={viewMode}
+          />
+        )}
       </div>
       
       {!mapLoaded && (

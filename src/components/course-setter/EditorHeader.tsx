@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { CardTitle, CardDescription } from '../ui/card';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { FileText, Settings, Layers, Download, Save, Printer } from 'lucide-react';
+import { FileText, Settings, Layers, Download, Save, Printer, Fullscreen, FullscreenExit } from 'lucide-react';
 import PrintSettingsDialog from '../PrintSettingsDialog';
 import { Event, Course } from '../../hooks/useEventState';
 
@@ -22,6 +22,8 @@ interface EditorHeaderProps {
   onOpenPrintDialog: () => void;
   onPrint: (settings: any) => void;
   onBack: () => void;
+  onToggleFullscreen?: () => void;
+  isFullScreen?: boolean;
 }
 
 const EditorHeader: React.FC<EditorHeaderProps> = ({
@@ -37,7 +39,9 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   onSaveEvent,
   onOpenPrintDialog,
   onPrint,
-  onBack
+  onBack,
+  onToggleFullscreen,
+  isFullScreen = false
 }) => {
   const { t } = useLanguage();
 
@@ -123,6 +127,25 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
+        {onToggleFullscreen && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={onToggleFullscreen}
+                >
+                  {isFullScreen ? <FullscreenExit className="h-4 w-4" /> : <Fullscreen className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isFullScreen ? t('exitFullscreen') : t('enterFullscreen')}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         
         <Button variant="outline" onClick={onBack}>
           {t('back')}

@@ -10,6 +10,8 @@ import EditorHeader from './EditorHeader';
 import CourseEditor from './CourseEditor';
 import ControlProperties from '../ControlProperties';
 import LayersPanel from './LayersPanel';
+import { ChevronLeft, ChevronRight, Fullscreen, FullscreenExit } from 'lucide-react';
+import { Button } from '../ui/button';
 
 // Define a control type compatible with MapEditor
 interface Control {
@@ -62,6 +64,8 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
   const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [showLayerPanel, setShowLayerPanel] = useState(false);
+  const [isCourseEditorCollapsed, setIsCourseEditorCollapsed] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   
   const {
     printDialogOpen,
@@ -79,9 +83,39 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
 
   // Check if we're viewing the "All Controls" course
   const isAllControlsCourse = currentCourse?.id === 'course-all-controls';
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullScreen(true);
+      }).catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          setIsFullScreen(false);
+        }).catch(err => {
+          console.error(`Error attempting to exit fullscreen: ${err.message}`);
+        });
+      }
+    }
+  };
+  
+  // Listen for fullscreen change events
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
   
   return (
-    <Card className="mt-8 h-full overflow-hidden">
+    <Card className={`mt-8 h-full overflow-hidden ${isFullScreen ? 'fixed inset-0 z-50 mt-0 rounded-none' : ''}`}>
       <CardHeader className="p-0">
         <EditorHeader
           currentEvent={currentEvent}
@@ -99,20 +133,49 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
           }
           onPrint={handlePrint}
           onBack={onBack}
+          onToggleFullscreen={toggleFullscreen}
+          isFullScreen={isFullScreen}
         />
       </CardHeader>
       
       <div className="flex h-[calc(100%-4rem)]">
-        {/* Left sidebar - Courses */}
-        <CourseEditor
-          currentCourse={currentCourse}
-          courses={currentEvent.courses}
-          mapType={currentEvent.mapType}
-          mapScale={currentEvent.mapScale}
-          onSelectCourse={onSelectCourse}
-          onUpdateCourse={onUpdateCourse}
-          onAddCourse={onAddCourse}
-        />
+        {/* Toggle button for course editor */}
+        <div className="relative">
+          {isCourseEditorCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute left-2 top-2 z-10"
+              onClick={() => setIsCourseEditorCollapsed(false)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+          
+          {/* Left sidebar - Courses */}
+          {!isCourseEditorCollapsed && (
+            <div className="flex">
+              <CourseEditor
+                currentCourse={currentCourse}
+                courses={currentEvent.courses}
+                mapType={currentEvent.mapType}
+                mapScale={currentEvent.mapScale}
+                onSelectCourse={onSelectCourse}
+                onUpdateCourse={onUpdateCourse}
+                onAddCourse={onAddCourse}
+              />
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 self-start mt-2"
+                onClick={() => setIsCourseEditorCollapsed(true)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
         
         {/* Main content - Map Editor */}
         <div className="flex-1 h-full overflow-hidden relative">
@@ -131,6 +194,7 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
               onOpenPrintDialog={() => 
                 handleOpenPrintDialog(currentCourse.scale || currentEvent.mapScale)
               }
+              hideDisplayOptions={true}
             />
           )}
         </div>
@@ -148,7 +212,13 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
         
         {/* Layers panel */}
         {showLayerPanel && (
-          <LayersPanel onClose={() => setShowLayerPanel(false)} />
+          <LayersPanel 
+            onClose={() => setShowLayerPanel(false)}
+            showConnections={true}
+            setShowConnections={() => {}}
+            showControlNumbers={true}
+            setShowControlNumbers={() => {}}
+          />
         )}
       </div>
     </Card>
