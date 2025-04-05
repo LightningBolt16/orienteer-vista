@@ -6,12 +6,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { MapInfo } from '../../hooks/useEventState';
+import { MapInfo, Event } from '../../hooks/useEventState';
 import { toast } from '../ui/use-toast';
 
 interface EventSetupFormProps {
   sampleMaps: MapInfo[];
-  onCreateEvent: (name: string, mapId: string, mapScale: string, mapType: 'sprint' | 'forest', date: string) => void;
+  onCreateEvent: (eventData: Omit<Event, 'id' | 'courses'>) => void;
 }
 
 const EventSetupForm: React.FC<EventSetupFormProps> = ({ sampleMaps, onCreateEvent }) => {
@@ -41,13 +41,15 @@ const EventSetupForm: React.FC<EventSetupFormProps> = ({ sampleMaps, onCreateEve
       return;
     }
     
-    onCreateEvent(
-      eventName, 
-      selectedMapId, 
-      selectedMap.scale, 
-      selectedMap.type as 'sprint' | 'forest',
-      eventDate
-    );
+    onCreateEvent({
+      name: eventName,
+      date: eventDate,
+      location: '',  // Default empty location
+      organizer: '',  // Default empty organizer
+      mapId: selectedMapId,
+      mapScale: selectedMap.scale,
+      mapType: selectedMap.type as 'sprint' | 'forest'
+    });
   };
 
   return (
