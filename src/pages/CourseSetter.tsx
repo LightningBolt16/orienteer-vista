@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from '../components/ui/use-toast';
-import { useEventState, MapInfo } from '../hooks/useEventState';
+// Updated to import from default export
+import useEventState, { MapInfo } from '../hooks/useEventState';
 import EventSetupForm from '../components/course-setter/EventSetupForm';
 import MapsList from '../components/course-setter/MapsList';
 import EditorLayout from '../components/course-setter/EditorLayout';

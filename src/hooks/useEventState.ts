@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { toast } from '../components/ui/use-toast';
 import { updateAllControlsCourse, collectAllUniqueControls } from './useEventCalculations';
@@ -47,7 +47,8 @@ export interface MapInfo {
   scale: string;
 }
 
-const useEventState = () => {
+// Changed from default to named export (to match how we import in CourseSetter.tsx)
+export const useEventState = () => {
   const { t } = useLanguage();
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [currentCourseId, setCurrentCourseId] = useState<string | null>(null);
@@ -387,7 +388,7 @@ const useEventState = () => {
   }, [currentEvent, t]);
 
   // Whenever the current event changes, update the all-controls list
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentEvent) {
       const controls = collectAllUniqueControls(currentEvent.courses);
       setAllControls(controls);
@@ -418,4 +419,5 @@ const useEventState = () => {
   };
 };
 
+// Add this default export to maintain compatibility with both import styles
 export default useEventState;
