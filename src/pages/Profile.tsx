@@ -1,23 +1,49 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { User, Edit2, Save, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 
 const Profile: React.FC = () => {
-  const { user, setUser, getUserRank } = useUser();
+  const { user, setUser, getUserRank, loading } = useUser();
   const [isEditing, setIsEditing] = useState(false);
-  const [userName, setUserName] = useState(user?.name || '');
+  const [userName, setUserName] = useState('');
   const { t } = useLanguage();
+  const navigate = useNavigate();
+
+  // Update userName when user data loads
+  useEffect(() => {
+    if (user) {
+      setUserName(user.name || '');
+    }
+  }, [user]);
+
+  // Redirect to auth page if not logged in and not a guest
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-24">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orienteering"></div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   const handleSave = () => {
     if (!user) return;
     
     if (userName.trim() === '') {
       toast({
-        title: t('invalid.name'),
-        description: t('name.empty'),
+        title: t('invalidName'),
+        description: t('nameEmpty'),
         variant: "destructive"
       });
       return;
@@ -31,12 +57,10 @@ const Profile: React.FC = () => {
     setIsEditing(false);
     
     toast({
-      title: t('profile.updated'),
-      description: t('profile.update.success')
+      title: t('profileUpdated'),
+      description: t('profileUpdateSuccess')
     });
   };
-
-  if (!user) return <div>Loading...</div>;
 
   // Get user stats
   const totalAttempts = user.attempts?.total || 0;
@@ -87,7 +111,7 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
               )}
-              <p className="text-muted-foreground mt-1">{t('orienteering.enthusiast')}</p>
+              <p className="text-muted-foreground mt-1">{t('orienteeringEnthusiast')}</p>
             </div>
             
             {totalAttempts > 0 && (
@@ -100,7 +124,7 @@ const Profile: React.FC = () => {
         
         {/* Stats Section */}
         <div className="mt-10 border-t border-muted pt-8">
-          <h2 className="text-xl font-semibold mb-6">{t('your.statistics')}</h2>
+          <h2 className="text-xl font-semibold mb-6">{t('yourStatistics')}</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-secondary/50">
@@ -108,12 +132,12 @@ const Profile: React.FC = () => {
                 {avgResponseTime}
                 <span className="text-sm ml-1">ms</span>
               </div>
-              <div className="text-sm text-muted-foreground">{t('avg.response.time')}</div>
+              <div className="text-sm text-muted-foreground">{t('avgResponseTime')}</div>
             </div>
             
             <div className="p-4 rounded-lg bg-secondary/50">
               <div className="text-3xl font-bold text-orienteering">{totalAttempts}</div>
-              <div className="text-sm text-muted-foreground">{t('total.attempts')}</div>
+              <div className="text-sm text-muted-foreground">{t('totalAttempts')}</div>
             </div>
             
             <div className="p-4 rounded-lg bg-secondary/50">
@@ -129,7 +153,7 @@ const Profile: React.FC = () => {
               <CheckCircle className="h-10 w-10 text-green-500 mr-4" />
               <div>
                 <div className="text-lg font-medium">{correctAttempts}</div>
-                <div className="text-sm text-muted-foreground">{t('correct.choices')}</div>
+                <div className="text-sm text-muted-foreground">{t('correctChoices')}</div>
               </div>
             </div>
             
@@ -137,7 +161,7 @@ const Profile: React.FC = () => {
               <XCircle className="h-10 w-10 text-red-500 mr-4" />
               <div>
                 <div className="text-lg font-medium">{incorrectAttempts}</div>
-                <div className="text-sm text-muted-foreground">{t('incorrect.choices')}</div>
+                <div className="text-sm text-muted-foreground">{t('incorrectChoices')}</div>
               </div>
             </div>
           </div>

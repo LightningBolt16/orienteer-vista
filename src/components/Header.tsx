@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, Menu, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
@@ -13,11 +13,20 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 
 const Header: React.FC = () => {
   const location = useLocation();
-  const { user, getUserRank } = useUser();
+  const navigate = useNavigate();
+  const { user, getUserRank, signOut } = useUser();
   const { language, setLanguage, t } = useLanguage();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,12 +52,19 @@ const Header: React.FC = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
   // Helper for path checking with proper types
   const isCurrentPath = (path: string): boolean => {
     return location.pathname === path;
   };
 
   const isCourseSetter = isCurrentPath('/course-setter') || isCurrentPath('/my-files');
+
+  const isAuthenticated = user && user.id !== '1';
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 px-6 py-4 transition-all duration-300 ${
@@ -112,6 +128,28 @@ const Header: React.FC = () => {
                   <User className="h-5 w-5" />
                   <span>{t('profile')}</span>
                 </Link>
+
+                {isAuthenticated ? (
+                  <button 
+                    onClick={() => {
+                      handleSignOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="p-3 rounded-md flex items-center space-x-2 text-red-500"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>{t('signOut')}</span>
+                  </button>
+                ) : (
+                  <Link 
+                    to="/auth"
+                    className="p-3 rounded-md flex items-center space-x-2 text-orienteering"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <LogIn className="h-5 w-5" />
+                    <span>{t('signIn')}</span>
+                  </Link>
+                )}
               </div>
             )}
           </>
@@ -183,11 +221,37 @@ const Header: React.FC = () => {
                   {t('rank')} {getUserRank()}
                 </Link>
               )}
-              <Link to="/profile" className="transition-all-300 hover:brightness-110">
-                <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
-                  <User className="h-5 w-5 text-orienteering" />
-                </div>
-              </Link>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="transition-all-300 hover:brightness-110">
+                    <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+                      <User className="h-5 w-5 text-orienteering" />
+                    </div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>{isAuthenticated ? user.name : t('guest')}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile">{t('profile')}</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {isAuthenticated ? (
+                    <DropdownMenuItem onClick={handleSignOut} className="text-red-500">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      {t('signOut')}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem asChild>
+                      <Link to="/auth" className="text-orienteering">
+                        <LogIn className="h-4 w-4 mr-2" />
+                        {t('signIn')}
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </nav>
         )}

@@ -12,6 +12,7 @@ import MyFiles from "./pages/MyFiles";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProjectManager from "./pages/ProjectManager";
+import AuthPage from "./pages/AuthPage";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 
@@ -25,17 +26,16 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/route-game" element={<RouteGame />} />
-                <Route path="/course-setter" element={<CourseSetter />} />
-                <Route path="/my-files" element={<MyFiles />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/projects" element={<ProjectManager />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
+            <Routes>
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/" element={<Layout><Index /></Layout>} />
+              <Route path="/route-game" element={<Layout><RouteGame /></Layout>} />
+              <Route path="/course-setter" element={<Layout><CourseSetter /></Layout>} />
+              <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />
+              <Route path="/profile" element={<Layout><Profile /></Layout>} />
+              <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
+              <Route path="*" element={<Layout><NotFound /></Layout>} />
+            </Routes>
           </BrowserRouter>
         </UserProvider>
       </LanguageProvider>
