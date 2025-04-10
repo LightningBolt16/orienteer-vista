@@ -10,8 +10,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string || 'pla
 
 // Check if Supabase credentials exist
 const hasSupabaseCredentials = supabaseUrl !== 'https://placeholder.supabase.co' && 
-                               supabaseAnonKey !== 'placeholder-key' &&
-                               supabaseUrl && supabaseAnonKey;
+                              supabaseAnonKey !== 'placeholder-key' &&
+                              supabaseUrl && supabaseAnonKey;
 
 let supabase;
 try {
