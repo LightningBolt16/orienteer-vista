@@ -11,6 +11,7 @@ import CourseSetter from "./pages/CourseSetter";
 import MyFiles from "./pages/MyFiles";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import ProjectManager from "./pages/ProjectManager";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 
@@ -31,6 +32,7 @@ const App = () => (
                 <Route path="/course-setter" element={<CourseSetter />} />
                 <Route path="/my-files" element={<MyFiles />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/projects" element={<ProjectManager />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>
