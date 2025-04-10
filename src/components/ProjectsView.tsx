@@ -97,7 +97,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ showShared = false }) => {
                       <TableCell>{project.date}</TableCell>
                       <TableCell>{project.courses}</TableCell>
                       {showShared && 'sharedBy' in project && (
-                        <TableCell>{project.sharedBy}</TableCell>
+                        <TableCell>{project.sharedBy as React.ReactNode}</TableCell>
                       )}
                     </TableRow>
                   ))
@@ -140,7 +140,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ showShared = false }) => {
                       <TableCell>{map.projectCount}</TableCell>
                       <TableCell>{map.lastUsed}</TableCell>
                       {showShared && 'sharedBy' in map && (
-                        <TableCell>{map.sharedBy}</TableCell>
+                        <TableCell>{map.sharedBy as React.ReactNode}</TableCell>
                       )}
                     </TableRow>
                   ))
