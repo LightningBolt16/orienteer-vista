@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { 
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { Share2, Calendar, FilterIcon, Plus, Edit3 } from 'lucide-react';
@@ -16,6 +16,7 @@ import useProjectSharing from '../hooks/useProjectSharing';
 import ProjectShareDialog from '../components/sharing/ProjectShareDialog';
 import ProjectSharingList from '../components/sharing/ProjectSharingList';
 import ProjectCalendar from '../components/calendar/ProjectCalendar';
+import MapSharedList from '../components/sharing/MapSharedList';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -25,8 +26,8 @@ const ProjectManager: React.FC = () => {
   const { t } = useLanguage();
   const {
     projects,
-    filteredCategory,
-    setFilteredCategory,
+    selectedCategories,
+    setSelectedCategories,
     createProject,
     shareProject,
     updatePermission,
@@ -38,6 +39,7 @@ const ProjectManager: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [mapSectionOpen, setMapSectionOpen] = useState(false);
   
   // Form state for creating a new project
   const [newProjectName, setNewProjectName] = useState('');
@@ -74,6 +76,25 @@ const ProjectManager: React.FC = () => {
     setCreateDialogOpen(false);
   };
   
+  const toggleCategory = (category: ProjectCategory | 'all') => {
+    if (category === 'all') {
+      // If 'all' is selected, toggle between all categories selected or none
+      if (selectedCategories.length === 4) { // 4 is the number of actual categories
+        setSelectedCategories([]);
+      } else {
+        setSelectedCategories(['training', 'club', 'national', 'other']);
+      }
+    } else {
+      setSelectedCategories(prev => {
+        if (prev.includes(category)) {
+          return prev.filter(c => c !== category);
+        } else {
+          return [...prev, category];
+        }
+      });
+    }
+  };
+  
   const renderCategoryBadge = (category: ProjectCategory) => {
     const styles = {
       training: 'bg-blue-100 text-blue-800',
@@ -108,27 +129,50 @@ const ProjectManager: React.FC = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <FilterIcon className="h-4 w-4 mr-2" />
-                {filteredCategory === 'all' ? t('allCategories') : t(filteredCategory)}
+                {selectedCategories.length === 0 
+                  ? t('noCategories')
+                  : selectedCategories.length === 4
+                  ? t('allCategories')
+                  : t('selectedCategories', { count: selectedCategories.length })}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilteredCategory('all')}>
+              <DropdownMenuCheckboxItem 
+                checked={selectedCategories.length === 4}
+                onCheckedChange={() => toggleCategory('all')}
+              >
                 {t('allCategories')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilteredCategory('training')}>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem 
+                checked={selectedCategories.includes('training')}
+                onCheckedChange={() => toggleCategory('training')}
+              >
                 {t('training')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilteredCategory('club')}>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem 
+                checked={selectedCategories.includes('club')}
+                onCheckedChange={() => toggleCategory('club')}
+              >
                 {t('club')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilteredCategory('national')}>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem 
+                checked={selectedCategories.includes('national')}
+                onCheckedChange={() => toggleCategory('national')}
+              >
                 {t('national')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilteredCategory('other')}>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem 
+                checked={selectedCategories.includes('other')}
+                onCheckedChange={() => toggleCategory('other')}
+              >
                 {t('other')}
-              </DropdownMenuItem>
+              </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          
+          <Button onClick={() => setMapSectionOpen(true)}>
+            Maps Shared With Me
+          </Button>
           
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -279,6 +323,22 @@ const ProjectManager: React.FC = () => {
           </Dialog>
         </>
       )}
+      
+      {/* Maps Shared With Me Dialog */}
+      <Dialog open={mapSectionOpen} onOpenChange={setMapSectionOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Maps Shared With Me</DialogTitle>
+            <DialogDescription>
+              Maps that have been shared with you by other users
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <MapSharedList />
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Create project dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

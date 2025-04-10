@@ -15,7 +15,7 @@ const CURRENT_USER = {
 export const useProjectSharing = () => {
   const { t } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filteredCategory, setFilteredCategory] = useState<ProjectCategory | 'all'>('all');
+  const [selectedCategories, setSelectedCategories] = useState<ProjectCategory[]>(['training', 'club', 'national', 'other']);
   
   // Load sample projects on mount (in a real app, this would come from an API/database)
   useEffect(() => {
@@ -77,13 +77,13 @@ export const useProjectSharing = () => {
     setProjects(sampleProjects);
   }, []);
   
-  // Filter projects by category
+  // Filter projects by selected categories
   const filteredProjects = useCallback(() => {
-    if (filteredCategory === 'all') {
-      return projects;
+    if (selectedCategories.length === 0) {
+      return [];
     }
-    return projects.filter(project => project.category === filteredCategory);
-  }, [projects, filteredCategory]);
+    return projects.filter(project => selectedCategories.includes(project.category));
+  }, [projects, selectedCategories]);
   
   // Create a new project
   const createProject = useCallback((projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'shares'>) => {
@@ -217,8 +217,8 @@ export const useProjectSharing = () => {
   
   return {
     projects: filteredProjects(),
-    filteredCategory,
-    setFilteredCategory,
+    selectedCategories,
+    setSelectedCategories,
     createProject,
     shareProject,
     updatePermission,
