@@ -1,15 +1,17 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import ProjectsView from '../components/ProjectsView';
 import { Plus, Calendar, Share2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { Toggle } from '../components/ui/toggle';
 
 const MyFiles: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [showShared, setShowShared] = useState(false);
   
   return (
     <div className="pb-20 max-w-4xl mx-auto">
@@ -29,11 +31,23 @@ const MyFiles: React.FC = () => {
       
       <Card>
         <CardHeader>
-          <CardTitle>{t('previousProjects')}</CardTitle>
-          <CardDescription>{t('viewManageProjects')}</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>{showShared ? t('sharedProjects') : t('previousProjects')}</CardTitle>
+              <CardDescription>{showShared ? t('projectsSharedWithYou') : t('viewManageProjects')}</CardDescription>
+            </div>
+            <Toggle 
+              pressed={showShared} 
+              onPressedChange={setShowShared}
+              aria-label="Toggle shared projects"
+              className="px-4"
+            >
+              {showShared ? t('sharedWithMe') : t('myProjects')}
+            </Toggle>
+          </div>
         </CardHeader>
         <CardContent>
-          <ProjectsView />
+          <ProjectsView showShared={showShared} />
           
           <div className="mt-6 border-t pt-4">
             <div className="flex justify-between items-center">

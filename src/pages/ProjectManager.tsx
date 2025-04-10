@@ -95,6 +95,7 @@ const ProjectManager: React.FC = () => {
     }
   };
   
+  // Fix: Remove the second parameter which was causing the TS error
   const renderCategoryBadge = (category: ProjectCategory) => {
     const styles = {
       training: 'bg-blue-100 text-blue-800',
