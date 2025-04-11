@@ -148,8 +148,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       save: 'Save',
       previewMode: 'Preview Mode',
       editMode: 'Edit Mode',
-      myMaps: 'My Maps',
-      resetView: 'Reset View',
       
       // Map Storage
       mapUploaded: 'Map uploaded successfully',
@@ -239,6 +237,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // New Event Page
       newEvent: 'New Event',
       myMaps: 'My Maps',
+      resetView: 'Reset View',
     },
     
     se: {
@@ -364,8 +363,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       save: 'Spara',
       previewMode: 'Förhandsvisning',
       editMode: 'Redigeringsläge',
-      myMaps: 'Mina Kartor',
-      resetView: 'Återställ vy',
       
       // Map Storage
       mapUploaded: 'Karta uppladdad',
@@ -455,6 +452,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // New Event Page
       newEvent: 'Nytt arrangemang',
       myMaps: 'Mina kartor',
+      resetView: 'Återställ vy',
     },
   };
 
