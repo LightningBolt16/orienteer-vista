@@ -116,6 +116,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       loadingMaps: 'Loading maps',
       noMapsAvailable: 'No maps available for your device',
       routeChoose: 'Choose Routes',
+      orienteers: 'Orienteers',
+      you: 'You',
       
       // Course Setter
       mapLibrary: 'Map Library',
@@ -190,8 +192,55 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // Development Info
       developmentMode: 'Development Mode Active',
       developmentModeInfo: 'User authentication is currently in development mode. Use the Supabase integration to enable real authentication',
-      orienteeringToolsPlatform: 'Orienteering tools platform'
+      orienteeringToolsPlatform: 'Orienteering tools platform',
+      
+      // Profile Page
+      yourStatistics: 'Your Statistics',
+      avgResponseTime: 'Average Response Time',
+      totalAttempts: 'Total Attempts',
+      correctChoices: 'Correct Choices',
+      incorrectChoices: 'Incorrect Choices',
+      orienteeringEnthusiast: 'Orienteering Enthusiast',
+      invalidName: 'Invalid Name',
+      nameEmpty: 'Name cannot be empty',
+      profileUpdated: 'Profile Updated',
+      profileUpdateSuccess: 'Your profile has been updated successfully',
+      welcomeTo: 'Welcome to',
+      authDescription: 'Sign in to your account or create a new one to track your progress',
+      signingIn: 'Signing In',
+      registering: 'Registering',
+      authDisclaimer: 'By signing in, you agree to our Terms of Service and Privacy Policy',
+      password: 'Password',
+      fullName: 'Full Name',
+      
+      // My Files Page
+      myPurplePenProjects: 'My Purple Pen Projects',
+      previousProjects: 'Previous Projects',
+      sharedProjects: 'Shared Projects',
+      projectsSharedWithYou: 'Projects shared with you',
+      viewManageProjects: 'View and manage your projects',
+      collaborativeTools: 'Collaborative Tools',
+      viewAll: 'View All',
+      collaborateWithOthers: 'Collaborate with others on course setting projects',
+      projectSharing: 'Project Sharing',
+      shareCourseSettings: 'Share your course settings with others',
+      manageSharing: 'Manage Sharing',
+      trackDeadlines: 'Track project deadlines',
+      viewCalendar: 'View Calendar',
+      sharedWithMe: 'Shared with Me',
+      myProjects: 'My Projects',
+      
+      // Coming Soon
+      comingSoon: 'Coming Soon',
+      designCourses: 'Design your own orienteering courses, share them with friends, and compete for the best times',
+      getNotified: 'Get Notified',
+      courseSettingTitle: 'Course Setting',
+      
+      // New Event Page
+      newEvent: 'New Event',
+      myMaps: 'My Maps',
     },
+    
     se: {
       // Navigation & Common Elements
       routeGame: 'Vägvalsträning',
@@ -283,6 +332,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       loadingMaps: 'Laddar kartor',
       noMapsAvailable: 'Inga kartor tillgängliga för din enhet',
       routeChoose: 'Välj Vägval',
+      orienteers: 'Orienterare',
+      you: 'Du',
       
       // Course Setter
       mapLibrary: 'Kartbibliotek',
@@ -290,15 +341,15 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       newCourse: 'Ny bana',
       maps: 'Kartor',
       courses: 'Banor',
-      createEvent: 'Skapa tävling',
-      eventDate: 'Tävlingsdatum',
+      createEvent: 'Skapa arrangemang',
+      eventDate: 'Arrangemangsdatum',
       selectMapFirst: 'Välj en karta först',
-      enterEventName: 'Ange tävlingsnamn',
+      enterEventName: 'Ange arrangemangsnamn',
       mapScale: 'Kartskala',
       mapType: 'Karttyp',
       sprintMap: 'Sprintkarta',
       forestMap: 'Skogskarta',
-      eventName: 'Tävlingsnamn',
+      eventName: 'Arrangemangsnamn',
       createCourse: 'Skapa bana',
       courseName: 'Bannamn',
       controls: 'Kontroller',
@@ -357,7 +408,53 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // Development Info
       developmentMode: 'Utvecklingsläge aktivt',
       developmentModeInfo: 'Användarautentisering är för närvarande i utvecklingsläge. Använd Supabase-integrationen för att aktivera äkta autentisering',
-      orienteeringToolsPlatform: 'Plattform för orienteringsverktyg'
+      orienteeringToolsPlatform: 'Plattform för orienteringsverktyg',
+      
+      // Profile Page
+      yourStatistics: 'Din statistik',
+      avgResponseTime: 'Genomsnittlig svarstid',
+      totalAttempts: 'Totalt antal försök',
+      correctChoices: 'Korrekta val',
+      incorrectChoices: 'Felaktiga val',
+      orienteeringEnthusiast: 'Orienteringsentusiast',
+      invalidName: 'Ogiltigt namn',
+      nameEmpty: 'Namnet får inte vara tomt',
+      profileUpdated: 'Profil uppdaterad',
+      profileUpdateSuccess: 'Din profil har uppdaterats',
+      welcomeTo: 'Välkommen till',
+      authDescription: 'Logga in på ditt konto eller skapa ett nytt för att spåra dina framsteg',
+      signingIn: 'Loggar in',
+      registering: 'Registrerar',
+      authDisclaimer: 'Genom att logga in godkänner du våra användarvillkor och sekretesspolicy',
+      password: 'Lösenord',
+      fullName: 'Fullständigt namn',
+      
+      // My Files Page
+      myPurplePenProjects: 'Mina Purple Pen-projekt',
+      previousProjects: 'Tidigare projekt',
+      sharedProjects: 'Delade projekt',
+      projectsSharedWithYou: 'Projekt som delats med dig',
+      viewManageProjects: 'Se och hantera dina projekt',
+      collaborativeTools: 'Samarbetsverktyg',
+      viewAll: 'Visa alla',
+      collaborateWithOthers: 'Samarbeta med andra på banläggningsprojekt',
+      projectSharing: 'Projektdelning',
+      shareCourseSettings: 'Dela dina banläggningsinställningar med andra',
+      manageSharing: 'Hantera delning',
+      trackDeadlines: 'Spåra projektdeadlines',
+      viewCalendar: 'Visa kalender',
+      sharedWithMe: 'Delat med mig',
+      myProjects: 'Mina projekt',
+      
+      // Coming Soon
+      comingSoon: 'Kommer snart',
+      designCourses: 'Designa egna orienteringsbanor, dela dem med vänner och tävla om bästa tiderna',
+      getNotified: 'Få meddelande',
+      courseSettingTitle: 'Banläggning',
+      
+      // New Event Page
+      newEvent: 'Nytt arrangemang',
+      myMaps: 'Mina kartor',
     },
   };
 

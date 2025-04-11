@@ -62,7 +62,7 @@ const CourseSetter: React.FC = () => {
     // For demo, we'll pretend it's saved
     toast({
       title: t('success'),
-      description: t('map.uploaded.successfully'),
+      description: t('mapUploaded'),
     });
     
     // Select the new map
@@ -101,8 +101,8 @@ const CourseSetter: React.FC = () => {
     <div className="pb-20 max-w-4xl mx-auto overflow-x-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="new-event">{t('new.event')}</TabsTrigger>
-          <TabsTrigger value="my-maps">{t('my.maps')}</TabsTrigger>
+          <TabsTrigger value="new-event">{t('newEvent')}</TabsTrigger>
+          <TabsTrigger value="my-maps">{t('myMaps')}</TabsTrigger>
         </TabsList>
         
         <TabsContent value="new-event" className="mt-6">
