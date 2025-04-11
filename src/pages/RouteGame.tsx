@@ -34,7 +34,7 @@ const RouteGame: React.FC = () => {
         if (maps.length === 0) {
           toast({
             title: t('error'),
-            description: t('no.maps.available'),
+            description: t('noMapsAvailable'),
             variant: "destructive"
           });
           setIsLoading(false);
@@ -61,7 +61,7 @@ const RouteGame: React.FC = () => {
         console.error('Failed to load maps:', error);
         toast({
           title: t('error'),
-          description: t('error.loading.maps'),
+          description: t('errorLoadingPage'),
           variant: "destructive"
         });
       }
@@ -86,7 +86,7 @@ const RouteGame: React.FC = () => {
         if (data.length === 0) {
           toast({
             title: t('error'),
-            description: t('error.loading.routes'),
+            description: t('errorLoadingPage'),
             variant: "destructive"
           });
           return;
@@ -99,7 +99,7 @@ const RouteGame: React.FC = () => {
         console.error('Failed to load route data:', error);
         toast({
           title: t('error'),
-          description: t('error.loading.routes'),
+          description: t('errorLoadingPage'),
           variant: "destructive"
         });
       })
@@ -119,14 +119,14 @@ const RouteGame: React.FC = () => {
       <section className="max-w-4xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>{t('select.map')}</CardTitle>
-            <CardDescription>{t('select.map.description')}</CardDescription>
+            <CardTitle>{t('selectMap')}</CardTitle>
+            <CardDescription>{t('selectMapDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
             {filteredMaps.length > 0 ? (
               <Select value={selectedMapId} onValueChange={setSelectedMapId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={t('select.map.placeholder')} />
+                  <SelectValue placeholder={t('selectMapPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredMaps.map(map => (
@@ -141,8 +141,8 @@ const RouteGame: React.FC = () => {
                 <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
                 <span>
                   {isLoading ? 
-                    t('loading.maps') : 
-                    t('no.maps.available')}
+                    t('loadingMaps') : 
+                    t('noMapsAvailable')}
                 </span>
               </div>
             )}
@@ -180,7 +180,7 @@ const RouteGame: React.FC = () => {
           onClick={() => setShowLeaderboard(!showLeaderboard)}
           className="bg-orienteering hover:bg-orienteering/90"
         >
-          {showLeaderboard ? t('route.choose') : t('leaderboard')}
+          {showLeaderboard ? t('routeChoose') : t('leaderboard')}
         </Button>
       </div>
       

@@ -91,6 +91,9 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       verifyEmailDescription: 'Please check your email to verify your account',
       signOutError: 'Sign Out Error',
       signInRequired: 'Sign in required',
+      profile: 'Profile',
+      guest: 'Guest',
+      signOut: 'Sign Out',
       
       // Route Game
       excellent: 'Excellent',
@@ -107,6 +110,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       speed: 'Speed',
       leaderboard: 'Leaderboard',
       rank: 'Rank',
+      selectMap: 'Select Map',
+      selectMapDescription: 'Choose a map to practice route choices on',
+      selectMapPlaceholder: 'Select a map for route choices',
+      loadingMaps: 'Loading maps',
+      noMapsAvailable: 'No maps available for your device',
+      routeChoose: 'Choose Routes',
       
       // Course Setter
       mapLibrary: 'Map Library',
@@ -137,11 +146,27 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       save: 'Save',
       previewMode: 'Preview Mode',
       editMode: 'Edit Mode',
+      myMaps: 'My Maps',
+      resetView: 'Reset View',
       
       // Map Storage
       mapUploaded: 'Map uploaded successfully',
       mapDeleted: 'Map deleted successfully',
       success: 'Success',
+      
+      // Course Tools
+      pointerTool: 'Pointer Tool',
+      moveMap: 'Move Map',
+      addControl: 'Add Control',
+      addStart: 'Add Start',
+      addFinish: 'Add Finish',
+      crossingPoint: 'Crossing Point',
+      uncrossableBoundary: 'Uncrossable Boundary',
+      outOfBounds: 'Out of Bounds',
+      waterStation: 'Water Station',
+      zoomIn: 'Zoom In',
+      zoomOut: 'Zoom Out',
+      advancedTools: 'Advanced Tools',
       
       // Index Page
       improvementText: 'Improve your route choice skills, create courses, and analyze your performance with our orienteering tools',
@@ -154,9 +179,10 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       loadingPage: 'Loading Page',
       errorLoadingPage: 'Error Loading Page',
       reloadPage: 'Reload Page',
+      version: 'Version 1.0.0',
       
       // Configuration
-      configurationRequired: 'Configuration required',
+      configurationRequired: 'Configuration Required',
       supabaseConnectionMessage: 'Please connect to Supabase using the Lovable integration to enable user authentication',
       learnMore: 'Learn more',
       environmentVariables: 'Check your environment variables and Supabase connection',
@@ -164,12 +190,11 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // Development Info
       developmentMode: 'Development Mode Active',
       developmentModeInfo: 'User authentication is currently in development mode. Use the Supabase integration to enable real authentication',
-      version: 'Version 1.0.0 - Development Build',
       orienteeringToolsPlatform: 'Orienteering tools platform'
     },
     se: {
       // Navigation & Common Elements
-      routeGame: 'Ruttvalsträning',
+      routeGame: 'Vägvalsträning',
       courseSetter: 'Banläggare',
       signIn: 'Logga In',
       register: 'Registrera',
@@ -233,14 +258,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       verifyEmailDescription: 'Vänligen kontrollera din e-post för att verifiera ditt konto',
       signOutError: 'Utloggningsfel',
       signInRequired: 'Inloggning krävs',
+      profile: 'Profil',
+      guest: 'Gäst',
+      signOut: 'Logga Ut',
       
       // Route Game
       excellent: 'Utmärkt',
       good: 'Bra',
       correct: 'Korrekt',
       wrong: 'Fel',
-      routeChoiceGame: 'Ruttvalsträning',
-      pickFastestRoute: 'Välj den snabbaste rutten',
+      routeChoiceGame: 'Vägvalsträning',
+      pickFastestRoute: 'Välj den snabbaste vägen',
       howToPlay: 'Hur man spelar',
       routeChoiceExplanation: 'Titta på orienteringskartan och välj den kortaste vägen mellan två kontroller',
       useArrowKeys: 'Använd piltangenterna eller tryck på sidorna av skärmen för att välja',
@@ -248,7 +276,13 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       accuracy: 'Träffsäkerhet',
       speed: 'Hastighet',
       leaderboard: 'Topplista',
-      rank: 'Rank',
+      rank: 'Plats',
+      selectMap: 'Välj Karta',
+      selectMapDescription: 'Välj en karta att träna vägval på',
+      selectMapPlaceholder: 'Välj en karta för vägval',
+      loadingMaps: 'Laddar kartor',
+      noMapsAvailable: 'Inga kartor tillgängliga för din enhet',
+      routeChoose: 'Välj Vägval',
       
       // Course Setter
       mapLibrary: 'Kartbibliotek',
@@ -279,23 +313,40 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       save: 'Spara',
       previewMode: 'Förhandsvisning',
       editMode: 'Redigeringsläge',
+      myMaps: 'Mina Kartor',
+      resetView: 'Återställ vy',
       
       // Map Storage
       mapUploaded: 'Karta uppladdad',
       mapDeleted: 'Karta raderad',
       success: 'Klart',
       
+      // Course Tools
+      pointerTool: 'Pekarverktyg',
+      moveMap: 'Flytta Karta',
+      addControl: 'Lägg till kontroll',
+      addStart: 'Lägg till start',
+      addFinish: 'Lägg till mål',
+      crossingPoint: 'Passagepunkt',
+      uncrossableBoundary: 'Opasserbar gräns',
+      outOfBounds: 'Förbjudet område',
+      waterStation: 'Vätskekontroll',
+      zoomIn: 'Zooma in',
+      zoomOut: 'Zooma ut',
+      advancedTools: 'Avancerade verktyg',
+      
       // Index Page
-      improvementText: 'Förbättra dina ruttval, skapa banor och analysera din prestation med våra orienteringsverktyg',
-      routeChoiceChampions: 'Ruttvälsmästare',
-      competeWithOthers: 'Tävla med andra orienterare världen över. Se vem som gör de bästa ruttvalen på kortast tid',
+      improvementText: 'Förbättra dina vägval, skapa banor och analysera din prestation med våra orienteringsverktyg',
+      routeChoiceChampions: 'Vägvalsmästare',
+      competeWithOthers: 'Tävla med andra orienterare världen över. Se vem som gör de bästa vägvalen på kortast tid',
       joinCompetition: 'Delta i tävlingen',
       createCourses: 'Skapa och designa dina egna banor',
-      testImproveSkills: 'Testa och förbättra dina ruttvalsförmågor',
+      testImproveSkills: 'Testa och förbättra dina vägvalsförmågor',
       orienteeringTools: 'Orienteringsverktyg för alla',
       loadingPage: 'Laddar sida',
       errorLoadingPage: 'Fel vid laddning av sidan',
       reloadPage: 'Ladda om sidan',
+      version: 'Version 1.0.0',
       
       // Configuration
       configurationRequired: 'Konfiguration krävs',
@@ -306,7 +357,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       // Development Info
       developmentMode: 'Utvecklingsläge aktivt',
       developmentModeInfo: 'Användarautentisering är för närvarande i utvecklingsläge. Använd Supabase-integrationen för att aktivera äkta autentisering',
-      version: 'Version 1.0.0 - Utvecklingsbygge',
       orienteeringToolsPlatform: 'Plattform för orienteringsverktyg'
     },
   };
