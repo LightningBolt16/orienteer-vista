@@ -1,60 +1,21 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
+import { supabase } from '../integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
 
-// Initialize Supabase client with fallback for development environment
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string || 'placeholder-key';
-
-// Check if Supabase credentials exist
-const hasSupabaseCredentials = supabaseUrl !== 'https://placeholder.supabase.co' && 
-                              supabaseAnonKey !== 'placeholder-key' &&
-                              supabaseUrl && supabaseAnonKey;
-
-let supabase;
-try {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} catch (error) {
-  console.error('Error initializing Supabase client:', error);
-  // Create a mock client for development
-  supabase = {
-    auth: {
-      getSession: async () => ({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ data: null, subscription: { unsubscribe: () => {} } }),
-      signInWithPassword: async () => ({ error: { message: 'Development mode: Supabase not configured' } }),
-      signUp: async () => ({ error: { message: 'Development mode: Supabase not configured' } }),
-      signOut: async () => ({ error: null })
-    },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: async () => ({ data: null, error: null })
-        }),
-        order: () => ({
-          order: () => ({
-            limit: async () => ({ data: [], error: null })
-          })
-        })
-      }),
-      insert: async () => ({ error: null }),
-      upsert: async () => ({ error: null })
-    })
-  };
-}
-
-type User = {
+type UserProfile = {
   id: string;
   name: string;
   accuracy: number;
   speed: number;
-  profileImage?: string;
   attempts?: {
     total: number;
     correct: number;
     timeSum: number;
   };
+  profileImage?: string;
 };
 
 type LeaderboardEntry = {
@@ -66,10 +27,11 @@ type LeaderboardEntry = {
 };
 
 interface UserContextType {
-  user: User | null;
+  user: UserProfile | null;
+  session: Session | null;
   leaderboard: LeaderboardEntry[];
   updatePerformance: (isCorrect: boolean, responseTime: number) => void;
-  setUser: (user: User) => void;
+  setUser: (user: UserProfile) => void;
   getUserRank: () => number;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
@@ -80,232 +42,114 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUserState] = useState<User | null>(null);
+  const [user, setUserState] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
 
-  // Fetch user and leaderboard data on mount
+  // Set up authentication state listener and check for existing session
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        // If Supabase isn't configured, use local fallback
-        if (!hasSupabaseCredentials) {
-          console.warn('No Supabase credentials found. Using local fallback data.');
-          setUserState({
-            id: '1',
-            name: 'Guest',
-            accuracy: 0,
-            speed: 0,
-            attempts: {
-              total: 0,
-              correct: 0,
-              timeSum: 0
-            }
-          });
-          
-          setLeaderboard([
-            { id: '2', name: 'Alice', accuracy: 92, speed: 850 },
-            { id: '3', name: 'Bob', accuracy: 88, speed: 920 },
-            { id: '4', name: 'Charlie', accuracy: 85, speed: 950 },
-            { id: '5', name: 'Diana', accuracy: 80, speed: 1050 },
-            { id: '6', name: 'Evan', accuracy: 78, speed: 1200 }
-          ]);
-          
-          setLoading(false);
-          return;
-        }
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        // Only synchronous state updates here
+        setSession(newSession);
         
-        // Check for authenticated session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Error fetching session:', sessionError);
-          setLoading(false);
-          return;
-        }
-        
-        if (session?.user) {
-          // User is authenticated, fetch their profile
-          const { data: profile, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Error fetching user profile:', profileError);
-            setLoading(false);
-            return;
-          }
-          
-          // If profile exists, use it, otherwise create default
-          if (profile) {
-            setUserState({
-              id: session.user.id,
-              name: profile.name || 'User',
-              accuracy: profile.accuracy || 0,
-              speed: profile.speed || 0,
-              attempts: profile.attempts || {
-                total: 0,
-                correct: 0,
-                timeSum: 0
-              }
-            });
-          } else {
-            // Create default profile for new user
-            const defaultUser = {
-              id: session.user.id,
-              name: session.user.email?.split('@')[0] || 'User',
-              accuracy: 0,
-              speed: 0,
-              attempts: {
-                total: 0,
-                correct: 0,
-                timeSum: 0
-              }
-            };
-            
-            setUserState(defaultUser);
-            
-            // Create profile in Supabase
-            const { error: insertError } = await supabase
-              .from('user_profiles')
-              .insert([{
-                id: session.user.id,
-                name: defaultUser.name,
-                accuracy: 0,
-                speed: 0,
-                attempts: {
-                  total: 0,
-                  correct: 0,
-                  timeSum: 0
-                }
-              }]);
-              
-            if (insertError) {
-              console.error('Error creating user profile:', insertError);
-            }
-          }
+        // Defer fetching user profile with setTimeout to prevent recursion
+        if (newSession?.user) {
+          setTimeout(() => {
+            fetchUserProfile(newSession.user.id);
+          }, 0);
         } else {
-          // Use default guest profile if not authenticated
-          setUserState({
-            id: '1',
-            name: 'Guest',
-            accuracy: 0,
-            speed: 0,
-            attempts: {
-              total: 0,
-              correct: 0,
-              timeSum: 0
-            }
-          });
+          setUserState(null);
         }
-        
-        // Fetch leaderboard data
-        const { data: leaderboardData, error: leaderboardError } = await supabase
-          .from('user_profiles')
-          .select('id, name, accuracy, speed')
-          .order('accuracy', { ascending: false })
-          .order('speed', { ascending: true })
-          .limit(10);
-          
-        if (leaderboardError) {
-          console.error('Error fetching leaderboard:', leaderboardError);
-        } else if (leaderboardData.length > 0) {
-          // Add rank to each entry
-          const rankedLeaderboard = leaderboardData.map((entry, index) => ({
-            ...entry,
-            rank: index + 1
-          }));
-          
-          setLeaderboard(rankedLeaderboard);
-        } else {
-          // Default leaderboard if none exists
-          setLeaderboard([
-            { id: '2', name: 'Alice', accuracy: 92, speed: 850 },
-            { id: '3', name: 'Bob', accuracy: 88, speed: 920 },
-            { id: '4', name: 'Charlie', accuracy: 85, speed: 950 },
-            { id: '5', name: 'Diana', accuracy: 80, speed: 1050 },
-            { id: '6', name: 'Evan', accuracy: 78, speed: 1200 }
-          ]);
-        }
-      } catch (error) {
-        console.error('Error in fetchInitialData:', error);
-        // Fallback to guest user if anything fails
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      
+      if (currentSession?.user) {
+        fetchUserProfile(currentSession.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Also fetch the leaderboard on mount
+    fetchLeaderboard();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Fetch user profile from Supabase
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
         setUserState({
-          id: '1',
-          name: 'Guest',
-          accuracy: 0,
-          speed: 0,
-          attempts: {
+          id: userId,
+          name: data.name || 'User',
+          accuracy: data.accuracy || 0,
+          speed: data.speed || 0,
+          attempts: data.attempts || {
             total: 0,
             correct: 0,
             timeSum: 0
           }
         });
-        
-        setLeaderboard([
-          { id: '2', name: 'Alice', accuracy: 92, speed: 850 },
-          { id: '3', name: 'Bob', accuracy: 88, speed: 920 },
-          { id: '4', name: 'Charlie', accuracy: 85, speed: 950 },
-          { id: '5', name: 'Diana', accuracy: 80, speed: 1050 },
-          { id: '6', name: 'Evan', accuracy: 78, speed: 1200 }
-        ]);
       }
       
       setLoading(false);
-    };
-    
-    fetchInitialData();
-    
-    // Set up auth state listener only if Supabase is configured
-    let authListener = { subscription: null };
-    
-    if (hasSupabaseCredentials) {
-      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          // Refresh user data
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (profile) {
-            setUserState({
-              id: session.user.id,
-              name: profile.name,
-              accuracy: profile.accuracy,
-              speed: profile.speed,
-              attempts: profile.attempts
-            });
-          }
-        } else if (event === 'SIGNED_OUT') {
-          // Reset to guest user
-          setUserState({
-            id: '1',
-            name: 'Guest',
-            accuracy: 0,
-            speed: 0,
-            attempts: {
-              total: 0,
-              correct: 0,
-              timeSum: 0
-            }
-          });
-        }
-      });
-      
-      authListener = data;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      setLoading(false);
     }
-    
-    return () => {
-      if (authListener && authListener.subscription) {
-        authListener.subscription.unsubscribe();
+  };
+
+  // Fetch leaderboard data
+  const fetchLeaderboard = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, name, accuracy, speed')
+        .order('accuracy', { ascending: false })
+        .order('speed', { ascending: true })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching leaderboard:', error);
+        return;
       }
-    };
-  }, []);
+
+      if (data.length > 0) {
+        // Add rank to each entry
+        const rankedLeaderboard = data.map((entry, index) => ({
+          ...entry,
+          rank: index + 1
+        }));
+        
+        setLeaderboard(rankedLeaderboard);
+      }
+    } catch (error) {
+      console.error('Error in fetchLeaderboard:', error);
+    }
+  };
 
   // Calculate user rank based on accuracy and speed
   const getUserRank = (): number => {
@@ -315,7 +159,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fullLeaderboard = [...leaderboard];
     
     // Only add the user if they're not already in the leaderboard
-    if (!fullLeaderboard.some(entry => entry.id === user.id) && user.id !== '1') {
+    if (!fullLeaderboard.some(entry => entry.id === user.id)) {
       fullLeaderboard.push({
         id: user.id,
         name: user.name,
@@ -342,43 +186,21 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return userEntry?.rank || 0;
   };
 
-  useEffect(() => {
-    if (user && user.id !== '1' && hasSupabaseCredentials) { // Don't update for guest user
-      const updateUserProfile = async () => {
-        try {
-          const { error } = await supabase
-            .from('user_profiles')
-            .upsert({
-              id: user.id,
-              name: user.name,
-              accuracy: user.accuracy,
-              speed: user.speed,
-              attempts: user.attempts
-            });
-            
-          if (error) {
-            console.error('Error updating user profile:', error);
-          }
-        } catch (error) {
-          console.error('Error in updateUserProfile:', error);
-        }
-      };
-      
-      updateUserProfile();
-    }
-  }, [user]);
-
+  // Update user performance
   const updatePerformance = async (isCorrect: boolean, responseTime: number) => {
-    if (user) {
+    if (!user || !session) {
+      console.warn('Cannot update performance: No authenticated user');
+      return;
+    }
+    
+    try {
       const attempts = user.attempts || { total: 0, correct: 0, timeSum: 0 };
       const newTotal = attempts.total + 1;
       const newCorrect = attempts.correct + (isCorrect ? 1 : 0);
       const newTimeSum = attempts.timeSum + (isCorrect ? responseTime : 0);
       
-      // Calculate new accuracy (percentage of correct answers)
+      // Calculate new accuracy and speed
       const newAccuracy = newTotal > 0 ? Math.round((newCorrect / newTotal) * 100) : 0;
-      
-      // Calculate new speed (average response time in ms for correct answers only)
       const newSpeed = newCorrect > 0 ? Math.round(newTimeSum / newCorrect) : 0;
       
       const updatedUser = {
@@ -394,70 +216,58 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUserState(updatedUser);
       
-      // If user is authenticated, update their profile in Supabase
-      if (user.id !== '1' && hasSupabaseCredentials) {
-        try {
-          const { error } = await supabase
-            .from('user_profiles')
-            .upsert({
-              id: user.id,
-              accuracy: newAccuracy,
-              speed: newSpeed,
-              attempts: {
-                total: newTotal,
-                correct: newCorrect,
-                timeSum: newTimeSum
-              }
-            });
-            
-          if (error) {
-            console.error('Error updating performance data:', error);
-          }
-        } catch (error) {
-          console.error('Error in updatePerformance:', error);
-        }
+      // Update profile in database
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          accuracy: newAccuracy,
+          speed: newSpeed,
+          attempts: {
+            total: newTotal,
+            correct: newCorrect,
+            timeSum: newTimeSum
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+        
+      if (error) {
+        console.error('Error updating performance data:', error);
       }
+    } catch (error) {
+      console.error('Error in updatePerformance:', error);
     }
   };
 
-  const setUser = async (updatedUser: User) => {
-    setUserState(updatedUser);
+  // Update user profile
+  const setUser = async (updatedUser: UserProfile) => {
+    if (!session) {
+      console.warn('Cannot update user: No authenticated session');
+      return;
+    }
     
-    // Update profile in Supabase if authenticated
-    if (updatedUser.id !== '1' && hasSupabaseCredentials) {
-      try {
-        const { error } = await supabase
-          .from('user_profiles')
-          .upsert({
-            id: updatedUser.id,
-            name: updatedUser.name,
-            accuracy: updatedUser.accuracy,
-            speed: updatedUser.speed,
-            attempts: updatedUser.attempts
-          });
-          
-        if (error) {
-          console.error('Error updating user profile:', error);
-        }
-      } catch (error) {
-        console.error('Error in setUser:', error);
+    try {
+      setUserState(updatedUser);
+      
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          name: updatedUser.name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', updatedUser.id);
+        
+      if (error) {
+        console.error('Error updating user profile:', error);
       }
+    } catch (error) {
+      console.error('Error in setUser:', error);
     }
   };
 
   // Authentication methods
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    
-    if (!hasSupabaseCredentials) {
-      toast({
-        title: t('signInError'),
-        description: 'Supabase credentials not configured. Please check your environment variables.',
-        variant: 'destructive'
-      });
-      setLoading(false);
-      throw new Error('Supabase not configured');
-    }
     
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -475,8 +285,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      setLoading(false);
-    } catch (error) {
+      // Session will be updated by the onAuthStateChange listener
+      // which will trigger fetchUserProfile
+    } catch (error: any) {
       setLoading(false);
       toast({
         title: t('signInError'),
@@ -489,16 +300,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, name: string) => {
     setLoading(true);
-    
-    if (!hasSupabaseCredentials) {
-      toast({
-        title: t('signUpError'),
-        description: 'Supabase credentials not configured. Please check your environment variables.',
-        variant: 'destructive'
-      });
-      setLoading(false);
-      throw new Error('Supabase not configured');
-    }
     
     try {
       const { error } = await supabase.auth.signUp({
@@ -527,7 +328,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: t('verifyEmail'),
         description: t('verifyEmailDescription')
       });
-    } catch (error) {
+    } catch (error: any) {
       setLoading(false);
       toast({
         title: t('signUpError'),
@@ -541,23 +342,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setLoading(true);
     
-    if (!hasSupabaseCredentials) {
-      // Just reset to guest user
-      setUserState({
-        id: '1',
-        name: 'Guest',
-        accuracy: 0,
-        speed: 0,
-        attempts: {
-          total: 0,
-          correct: 0,
-          timeSum: 0
-        }
-      });
-      setLoading(false);
-      return;
-    }
-    
     try {
       const { error } = await supabase.auth.signOut();
       
@@ -570,8 +354,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
       
+      // Session will be updated by the onAuthStateChange listener
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       setLoading(false);
       console.error('Error in signOut:', error);
       toast({
@@ -586,6 +371,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <UserContext.Provider 
       value={{ 
         user, 
+        session,
         leaderboard, 
         updatePerformance, 
         setUser, 

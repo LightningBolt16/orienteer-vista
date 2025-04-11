@@ -9,7 +9,146 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      maps: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_url: string
+          id: string
+          is_public: boolean | null
+          name: string
+          owner_id: string
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_url: string
+          id?: string
+          is_public?: boolean | null
+          name: string
+          owner_id: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_url?: string
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          owner_id?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      project_shares: {
+        Row: {
+          date_added: string
+          id: string
+          permission: string
+          project_id: string
+          user_email: string
+          user_name: string | null
+        }
+        Insert: {
+          date_added?: string
+          id?: string
+          permission: string
+          project_id: string
+          user_email: string
+          user_name?: string | null
+        }
+        Update: {
+          date_added?: string
+          id?: string
+          permission?: string
+          project_id?: string
+          user_email?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_shares_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          primary_assignee: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          primary_assignee?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          primary_assignee?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          accuracy: number | null
+          attempts: Json | null
+          created_at: string
+          id: string
+          name: string | null
+          speed: number | null
+          updated_at: string
+        }
+        Insert: {
+          accuracy?: number | null
+          attempts?: Json | null
+          created_at?: string
+          id: string
+          name?: string | null
+          speed?: number | null
+          updated_at?: string
+        }
+        Update: {
+          accuracy?: number | null
+          attempts?: Json | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          speed?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
