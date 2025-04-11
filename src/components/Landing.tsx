@@ -12,11 +12,11 @@ const Landing: React.FC = () => {
   
   const showEnvWarning = () => {
     toast({
-      title: "Configuration required",
-      description: "Please connect to Supabase using the Lovable integration to enable user authentication.",
+      title: t('configurationRequired'),
+      description: t('supabaseConnectionMessage'),
       action: (
-        <Button variant="outline" onClick={() => toast({ description: "Check your environment variables and Supabase connection." })}>
-          Learn more
+        <Button variant="outline" onClick={() => toast({ description: t('environmentVariables') })}>
+          {t('learnMore')}
         </Button>
       ),
     });
@@ -31,16 +31,16 @@ const Landing: React.FC = () => {
           </div>
           <CardTitle className="text-3xl font-bold">OL.se</CardTitle>
           <CardDescription className="text-lg">
-            Orienteering tools platform
+            {t('orienteeringToolsPlatform')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-amber-50 text-amber-800 p-4 rounded-md flex items-start gap-3">
             <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
             <div>
-              <h3 className="font-medium mb-1">Development Mode Active</h3>
+              <h3 className="font-medium mb-1">{t('developmentMode')}</h3>
               <p className="text-sm">
-                User authentication is currently in development mode. Use the Supabase integration to enable real authentication.
+                {t('developmentModeInfo')}
               </p>
             </div>
           </div>
@@ -63,7 +63,7 @@ const Landing: React.FC = () => {
         </CardContent>
         <CardFooter className="flex justify-center border-t pt-4">
           <p className="text-sm text-muted-foreground">
-            Version 1.0.0 - Development Build
+            {t('version')}
           </p>
         </CardFooter>
       </Card>

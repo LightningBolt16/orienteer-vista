@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface LanguageContextType {
@@ -25,6 +26,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
   const translations: { [key: string]: { [key: string]: string } } = {
     en: {
+      // Navigation & Common Elements
       routeGame: 'Route Game',
       courseSetter: 'Course Setter',
       signIn: 'Sign In',
@@ -78,17 +80,96 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       noDescription: 'No description',
       projectShared: 'Project shared',
       projectSharedWith: 'Project shared with',
+      
+      // Authentication
       error: 'Error',
       emailRequired: 'Email is required',
       invalidEmail: 'Invalid email address',
       signInError: 'Sign In Error',
       signUpError: 'Sign Up Error',
       verifyEmail: 'Verify Email',
-      verifyEmailDescription: 'Please check your email to verify your account.',
+      verifyEmailDescription: 'Please check your email to verify your account',
       signOutError: 'Sign Out Error',
+      signInRequired: 'Sign in required',
+      
+      // Route Game
+      excellent: 'Excellent',
+      good: 'Good',
+      correct: 'Correct',
+      wrong: 'Wrong',
+      routeChoiceGame: 'Route Choice Game',
+      pickFastestRoute: 'Pick the fastest route',
+      howToPlay: 'How to Play',
+      routeChoiceExplanation: 'Look at the orienteering map and select the shortest route between two control points',
+      useArrowKeys: 'Use arrow keys or touch the sides of the screen to select',
+      yourPerformance: 'Your Performance',
+      accuracy: 'Accuracy',
+      speed: 'Speed',
+      leaderboard: 'Leaderboard',
+      rank: 'Rank',
+      
+      // Course Setter
+      mapLibrary: 'Map Library',
+      uploadMap: 'Upload Map',
+      newCourse: 'New Course',
+      maps: 'Maps',
+      courses: 'Courses',
+      createEvent: 'Create Event',
+      eventDate: 'Event Date',
+      selectMapFirst: 'Select a map first',
+      enterEventName: 'Enter event name',
+      mapScale: 'Map Scale',
+      mapType: 'Map Type',
+      sprintMap: 'Sprint Map',
+      forestMap: 'Forest Map',
+      eventName: 'Event Name',
+      createCourse: 'Create Course',
+      courseName: 'Course Name',
+      controls: 'Controls',
+      controlFeatures: 'Control Features',
+      printSettings: 'Print Settings',
+      toggleLayers: 'Toggle Layers',
+      export: 'Export',
+      print: 'Print',
+      enterFullscreen: 'Enter Fullscreen',
+      exitFullscreen: 'Exit Fullscreen',
+      back: 'Back',
+      save: 'Save',
+      previewMode: 'Preview Mode',
+      editMode: 'Edit Mode',
+      
+      // Map Storage
+      mapUploaded: 'Map uploaded successfully',
+      mapDeleted: 'Map deleted successfully',
+      success: 'Success',
+      
+      // Index Page
+      improvementText: 'Improve your route choice skills, create courses, and analyze your performance with our orienteering tools',
+      routeChoiceChampions: 'Route Choice Champions',
+      competeWithOthers: 'Compete with other orienteers worldwide. See who makes the best route choices in the shortest time',
+      joinCompetition: 'Join the competition',
+      createCourses: 'Create and design your own courses',
+      testImproveSkills: 'Test and improve your route choice skills',
+      orienteeringTools: 'Orienteering Tools for Everyone',
+      loadingPage: 'Loading Page',
+      errorLoadingPage: 'Error Loading Page',
+      reloadPage: 'Reload Page',
+      
+      // Configuration
+      configurationRequired: 'Configuration required',
+      supabaseConnectionMessage: 'Please connect to Supabase using the Lovable integration to enable user authentication',
+      learnMore: 'Learn more',
+      environmentVariables: 'Check your environment variables and Supabase connection',
+      
+      // Development Info
+      developmentMode: 'Development Mode Active',
+      developmentModeInfo: 'User authentication is currently in development mode. Use the Supabase integration to enable real authentication',
+      version: 'Version 1.0.0 - Development Build',
+      orienteeringToolsPlatform: 'Orienteering tools platform'
     },
     se: {
-      routeGame: 'Rutt Spel',
+      // Navigation & Common Elements
+      routeGame: 'Ruttvalsträning',
       courseSetter: 'Banläggare',
       signIn: 'Logga In',
       register: 'Registrera',
@@ -141,14 +222,92 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       noDescription: 'Ingen beskrivning',
       projectShared: 'Projekt delat',
       projectSharedWith: 'Projekt delat med',
+      
+      // Authentication
       error: 'Fel',
       emailRequired: 'E-post krävs',
       invalidEmail: 'Ogiltig e-postadress',
       signInError: 'Inloggningsfel',
       signUpError: 'Registreringsfel',
       verifyEmail: 'Verifiera E-post',
-      verifyEmailDescription: 'Vänligen kontrollera din e-post för att verifiera ditt konto.',
+      verifyEmailDescription: 'Vänligen kontrollera din e-post för att verifiera ditt konto',
       signOutError: 'Utloggningsfel',
+      signInRequired: 'Inloggning krävs',
+      
+      // Route Game
+      excellent: 'Utmärkt',
+      good: 'Bra',
+      correct: 'Korrekt',
+      wrong: 'Fel',
+      routeChoiceGame: 'Ruttvalsträning',
+      pickFastestRoute: 'Välj den snabbaste rutten',
+      howToPlay: 'Hur man spelar',
+      routeChoiceExplanation: 'Titta på orienteringskartan och välj den kortaste vägen mellan två kontroller',
+      useArrowKeys: 'Använd piltangenterna eller tryck på sidorna av skärmen för att välja',
+      yourPerformance: 'Din prestation',
+      accuracy: 'Träffsäkerhet',
+      speed: 'Hastighet',
+      leaderboard: 'Topplista',
+      rank: 'Rank',
+      
+      // Course Setter
+      mapLibrary: 'Kartbibliotek',
+      uploadMap: 'Ladda upp karta',
+      newCourse: 'Ny bana',
+      maps: 'Kartor',
+      courses: 'Banor',
+      createEvent: 'Skapa tävling',
+      eventDate: 'Tävlingsdatum',
+      selectMapFirst: 'Välj en karta först',
+      enterEventName: 'Ange tävlingsnamn',
+      mapScale: 'Kartskala',
+      mapType: 'Karttyp',
+      sprintMap: 'Sprintkarta',
+      forestMap: 'Skogskarta',
+      eventName: 'Tävlingsnamn',
+      createCourse: 'Skapa bana',
+      courseName: 'Bannamn',
+      controls: 'Kontroller',
+      controlFeatures: 'Kontrolldetaljer',
+      printSettings: 'Utskriftsinställningar',
+      toggleLayers: 'Växla lager',
+      export: 'Exportera',
+      print: 'Skriv ut',
+      enterFullscreen: 'Fullskärm',
+      exitFullscreen: 'Avsluta fullskärm',
+      back: 'Tillbaka',
+      save: 'Spara',
+      previewMode: 'Förhandsvisning',
+      editMode: 'Redigeringsläge',
+      
+      // Map Storage
+      mapUploaded: 'Karta uppladdad',
+      mapDeleted: 'Karta raderad',
+      success: 'Klart',
+      
+      // Index Page
+      improvementText: 'Förbättra dina ruttval, skapa banor och analysera din prestation med våra orienteringsverktyg',
+      routeChoiceChampions: 'Ruttvälsmästare',
+      competeWithOthers: 'Tävla med andra orienterare världen över. Se vem som gör de bästa ruttvalen på kortast tid',
+      joinCompetition: 'Delta i tävlingen',
+      createCourses: 'Skapa och designa dina egna banor',
+      testImproveSkills: 'Testa och förbättra dina ruttvalsförmågor',
+      orienteeringTools: 'Orienteringsverktyg för alla',
+      loadingPage: 'Laddar sida',
+      errorLoadingPage: 'Fel vid laddning av sidan',
+      reloadPage: 'Ladda om sidan',
+      
+      // Configuration
+      configurationRequired: 'Konfiguration krävs',
+      supabaseConnectionMessage: 'Anslut till Supabase med Lovable-integrationen för att aktivera användarautentisering',
+      learnMore: 'Läs mer',
+      environmentVariables: 'Kontrollera dina miljövariabler och Supabase-anslutning',
+      
+      // Development Info
+      developmentMode: 'Utvecklingsläge aktivt',
+      developmentModeInfo: 'Användarautentisering är för närvarande i utvecklingsläge. Använd Supabase-integrationen för att aktivera äkta autentisering',
+      version: 'Version 1.0.0 - Utvecklingsbygge',
+      orienteeringToolsPlatform: 'Plattform för orienteringsverktyg'
     },
   };
 
