@@ -4,6 +4,10 @@ import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { Database } from '../integrations/supabase/types';
+
+type Tables = Database['public']['Tables'];
+type UserProfileRow = Tables['user_profiles']['Row'];
 
 type UserProfile = {
   id: string;
@@ -107,7 +111,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.name || 'User',
           accuracy: data.accuracy || 0,
           speed: data.speed || 0,
-          attempts: data.attempts || {
+          attempts: data.attempts as { total: number; correct: number; timeSum: number } || {
             total: 0,
             correct: 0,
             timeSum: 0
@@ -137,7 +141,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         // Add rank to each entry
         const rankedLeaderboard = data.map((entry, index) => ({
           ...entry,

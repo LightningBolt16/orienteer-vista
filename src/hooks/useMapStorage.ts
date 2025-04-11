@@ -5,6 +5,7 @@ import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { v4 as uuidv4 } from 'uuid';
+import { Database } from '../integrations/supabase/types';
 
 export interface MapUploadData {
   name: string;
@@ -15,19 +16,11 @@ export interface MapUploadData {
   isPublic?: boolean;
 }
 
-export interface Map {
-  id: string;
-  name: string;
-  description: string | null;
-  file_url: string;
-  thumbnail_url: string | null;
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-  is_public: boolean;
+type Tables = Database['public']['Tables'];
+export type Map = Tables['maps']['Row'] & {
   type?: 'sprint' | 'forest';
   scale?: string;
-}
+};
 
 export const useMapStorage = () => {
   const [uploading, setUploading] = useState(false);
@@ -183,17 +176,19 @@ export const useMapStorage = () => {
       }
       
       // Extract file path from URL
-      const fileUrl = mapData.file_url;
-      const filePath = fileUrl.split('maps/')[1];
+      if (mapData) {
+        const fileUrl = mapData.file_url;
+        const filePath = fileUrl.split('maps/')[1];
       
-      if (filePath) {
-        // Delete from storage
-        const { error: storageError } = await supabase.storage
-          .from('maps')
-          .remove([filePath]);
-          
-        if (storageError) {
-          console.error('Error deleting file from storage:', storageError);
+        if (filePath) {
+          // Delete from storage
+          const { error: storageError } = await supabase.storage
+            .from('maps')
+            .remove([filePath]);
+            
+          if (storageError) {
+            console.error('Error deleting file from storage:', storageError);
+          }
         }
       }
       
