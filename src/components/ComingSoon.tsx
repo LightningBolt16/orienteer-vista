@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Clock, Flag, Map } from 'lucide-react';
+import { Clock, Flag, Map, CreditCard } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { Button } from './ui/button';
+import { Link } from 'react-router-dom';
 
 const ComingSoon: React.FC = () => {
   const { t } = useLanguage();
@@ -25,11 +26,20 @@ const ComingSoon: React.FC = () => {
         {t('designCourses')}
       </p>
       
-      <div className="relative mt-4">
-        <div className="absolute inset-0 bg-gradient-radial from-orienteering/20 to-transparent rounded-full animate-pulse-scale"></div>
-        <Button className="relative px-4 py-2 rounded-full border border-orienteering/30 text-orienteering hover:bg-orienteering/10 transition-all duration-300">
-          {t('getNotified')}
-        </Button>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-radial from-orienteering/20 to-transparent rounded-full animate-pulse-scale"></div>
+          <Button className="relative px-4 py-2 rounded-full border border-orienteering/30 text-orienteering hover:bg-orienteering/10 transition-all duration-300">
+            {t('getNotified')}
+          </Button>
+        </div>
+        
+        <Link to="/subscription">
+          <Button variant="outline" className="flex items-center">
+            <CreditCard className="h-4 w-4 mr-2" />
+            {t('subscription')}
+          </Button>
+        </Link>
       </div>
     </div>
   );

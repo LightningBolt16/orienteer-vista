@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn } from 'lucide-react';
+import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
@@ -109,16 +108,16 @@ const Header: React.FC = () => {
                   <span>{t('routeGame')}</span>
                 </Link>
                 
-                <button 
-                  onClick={() => {
-                    toggleLanguage();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="p-3 rounded-md flex items-center space-x-2"
+                <Link 
+                  to="/subscription" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/subscription') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
                 >
-                  <Globe className="h-5 w-5" />
-                  <span>{language === 'sv' ? 'EN' : 'SV'}</span>
-                </button>
+                  <CreditCard className="h-5 w-5" />
+                  <span>{t('subscription')}</span>
+                </Link>
                 
                 <Link 
                   to="/profile"
@@ -205,14 +204,16 @@ const Header: React.FC = () => {
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
-            
-            <button 
-              onClick={toggleLanguage}
-              className="text-sm font-medium nav-link flex items-center space-x-1"
+
+            <Link 
+              to="/subscription" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/subscription') ? 'text-orienteering' : 'text-foreground'
+              }`}
             >
-              <Globe className="h-4 w-4" />
-              <span>{language === 'sv' ? 'EN' : 'SV'}</span>
-            </button>
+              <CreditCard className="h-4 w-4 mr-1" />
+              <span>{t('subscription')}</span>
+            </Link>
             
             <div className="flex items-center space-x-2 ml-4">
               {user?.attempts?.total !== undefined && user.attempts.total > 0 && (

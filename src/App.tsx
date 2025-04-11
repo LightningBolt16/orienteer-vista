@@ -14,6 +14,7 @@ import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import ProjectManager from "./pages/ProjectManager";
 import AuthPage from "./pages/AuthPage";
+import Subscription from "./pages/Subscription";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
                 <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />
                 <Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
+                <Route path="/subscription" element={<Layout><Subscription /></Layout>} />
                 <Route path="*" element={<Layout><NotFound /></Layout>} />
               </Routes>
             </BrowserRouter>
