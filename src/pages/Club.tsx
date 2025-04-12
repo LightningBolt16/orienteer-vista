@@ -1,597 +1,336 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Club, ClubMember, ClubRequest, ClubRole } from '../types/club';
-import { getClubById, getClubMembers, getClubRequests, updateClubName, updateClubLogo, handleClubRequest, updateMemberRole } from '../helpers/supabaseQueries';
+import Layout from '../components/Layout';
+import { Club, ClubMember, ClubRole } from '../types/club';
+import { getClubById, getClubMembers, updateMemberRole } from '../helpers/supabaseQueries';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
-import { v4 as uuidv4 } from 'uuid';
-import { toast } from '../components/ui/use-toast';
-import { supabase } from '../integrations/supabase/client';
-import { 
-  Building2, Users, Award, Edit2, Save, UserPlus, 
-  UserMinus, ShieldAlert, MoreHorizontal, LogOut, Camera,
-  Check, X, Clock, ArrowLeft
-} from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
-import { 
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
-  DropdownMenuTrigger, DropdownMenuSeparator 
-} from '../components/ui/dropdown-menu';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { Badge } from '../components/ui/badge';
+import { Skeleton } from '../components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import { toast } from '../components/ui/use-toast';
+import { Users, Settings, ChevronLeft, MoreHorizontal, UserPlus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Separator } from '../components/ui/separator';
-import { Input } from '../components/ui/input';
-import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogTrigger 
-} from '../components/ui/dialog';
 
-const ClubPage: React.FC = () => {
+const ClubDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user, leaveClub } = useUser();
-  const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useUser();
+  const { t } = useLanguage();
   
   const [club, setClub] = useState<Club | null>(null);
   const [members, setMembers] = useState<ClubMember[]>([]);
-  const [requests, setRequests] = useState<ClubRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-  const [clubName, setClubName] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState('members');
   
   useEffect(() => {
-    if (id) {
-      fetchClubData();
-    }
-  }, [id]);
-  
-  const fetchClubData = async () => {
     if (!id) return;
     
-    setLoading(true);
-    
-    try {
-      // Fetch club details
-      const clubData = await getClubById(id);
-      if (clubData) {
-        setClub(clubData);
-        setClubName(clubData.name);
-      }
-      
-      // Fetch club members
-      const membersData = await getClubMembers(id);
-      setMembers(membersData);
-      
-      // Fetch join requests
-      const requestsData = await getClubRequests(id);
-      setRequests(requestsData);
-    } catch (error) {
-      console.error('Error fetching club data:', error);
-      toast({
-        title: t('error'),
-        description: t('errorFetchingClubData'),
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleSaveName = async () => {
-    if (!id || !clubName.trim()) return;
-    
-    try {
-      const success = await updateClubName(id, clubName);
-      
-      if (success) {
-        setClub(prev => prev ? { ...prev, name: clubName } : null);
-        setEditMode(false);
-        
-        toast({
-          title: t('success'),
-          description: t('clubNameUpdated')
-        });
-      } else {
-        throw new Error('Failed to update club name');
-      }
-    } catch (error) {
-      console.error('Error updating club name:', error);
-      toast({
-        title: t('error'),
-        description: t('errorUpdatingClubName'),
-        variant: 'destructive'
-      });
-    }
-  };
-  
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !id) return;
-    
-    // Validate file size and type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      toast({
-        title: t('invalidFileType'),
-        description: t('logoTypeLimit'),
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast({
-        title: t('fileTooLarge'),
-        description: t('logoSizeLimit'),
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    setIsUploading(true);
-    
-    try {
-      // Upload file to storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `club_logos/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('profile_images')
-        .upload(filePath, file);
-        
-      if (uploadError) throw uploadError;
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile_images')
-        .getPublicUrl(filePath);
-        
-      // Update club logo
-      const success = await updateClubLogo(id, publicUrl);
-      
-      if (success) {
-        setClub(prev => prev ? { ...prev, logo_url: publicUrl } : null);
-        
-        toast({
-          title: t('success'),
-          description: t('logoUpdated')
-        });
-      } else {
-        throw new Error('Failed to update club logo');
-      }
-    } catch (error) {
-      console.error('Error updating club logo:', error);
-      toast({
-        title: t('error'),
-        description: t('errorUpdatingLogo'),
-        variant: 'destructive'
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-  
-  const handleLeaveClub = async () => {
-    if (!user) return;
-    
-    try {
-      const success = await leaveClub();
-      
-      if (success) {
-        navigate('/clubs');
-      }
-    } catch (error) {
-      console.error('Error leaving club:', error);
-    }
-  };
-  
-  const handleRequestAction = async (requestId: string, userId: string, action: 'approve' | 'reject') => {
-    if (!id) return;
-    
-    try {
-      const success = await handleClubRequest(requestId, userId, id, action);
-      
-      if (success) {
-        // Update UI
-        setRequests(prev => prev.filter(req => req.id !== requestId));
-        
-        if (action === 'approve') {
-          // Refresh members list
+    const fetchClubData = async () => {
+      setLoading(true);
+      try {
+        const clubData = await getClubById(id);
+        if (clubData) {
+          setClub(clubData);
+          
+          // Fetch members
           const membersData = await getClubMembers(id);
           setMembers(membersData);
-          
-          toast({
-            title: t('success'),
-            description: t('memberAdded')
-          });
         } else {
           toast({
-            title: t('success'),
-            description: t('requestRejected')
+            title: t('error'),
+            description: t('clubNotFound'),
+            variant: 'destructive',
           });
+          navigate('/clubs');
         }
+      } catch (error) {
+        console.error('Error fetching club data:', error);
+        toast({
+          title: t('error'),
+          description: t('errorFetchingClubData'),
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error handling request:', error);
-      toast({
-        title: t('error'),
-        description: t('errorHandlingRequest'),
-        variant: 'destructive'
-      });
-    }
+    };
+    
+    fetchClubData();
+  }, [id, navigate, t]);
+
+  const isAdmin = () => {
+    if (!user || !members.length) return false;
+    const currentMember = members.find(member => member.id === user.id);
+    return currentMember?.club_role === 'admin';
   };
   
-  const handleChangeRole = async (userId: string, newRole: ClubRole) => {
+  const handleRoleUpdate = async (memberId: string, newRole: ClubRole) => {
     if (!id) return;
     
     try {
-      const success = await updateMemberRole(userId, id, newRole);
-      
+      const success = await updateMemberRole(memberId, id, newRole);
       if (success) {
-        // Update UI
-        setMembers(prev => 
-          prev.map(member => 
-            member.id === userId 
-              ? { ...member, club_role: newRole } 
-              : member
+        // Update local state
+        setMembers(prevMembers => 
+          prevMembers.map(member => 
+            member.id === memberId ? { ...member, club_role: newRole } : member
           )
         );
         
         toast({
           title: t('success'),
-          description: t('roleUpdated')
+          description: t('roleUpdated'),
+        });
+      } else {
+        toast({
+          title: t('error'),
+          description: t('roleUpdateFailed'),
+          variant: 'destructive',
         });
       }
     } catch (error) {
       console.error('Error updating role:', error);
       toast({
         title: t('error'),
-        description: t('errorUpdatingRole'),
-        variant: 'destructive'
+        description: t('roleUpdateFailed'),
+        variant: 'destructive',
       });
     }
   };
-  
-  const isAdmin = user?.clubRole === 'admin';
-  const isManager = user?.clubRole === 'manager' || isAdmin;
-  
+
+  // Render loading state
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-24">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orienteering"></div>
-      </div>
+      <Layout>
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-full max-w-sm" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </Layout>
     );
   }
-  
+
+  // Render not found state
   if (!club) {
     return (
-      <div className="max-w-4xl mx-auto py-12">
-        <div className="glass-card p-8 text-center">
-          <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h1 className="text-2xl font-bold mb-2">{t('clubNotFound')}</h1>
-          <p className="text-muted-foreground mb-6">{t('clubNotFoundDesc')}</p>
-          <Button onClick={() => navigate('/clubs')}>
-            {t('backToClubs')}
-          </Button>
+      <Layout>
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold mb-4">{t('clubNotFound')}</h1>
+          <Button onClick={() => navigate('/clubs')}>{t('backToClubs')}</Button>
         </div>
-      </div>
+      </Layout>
     );
   }
-  
+
   return (
-    <div className="max-w-6xl mx-auto py-12 animate-fade-in">
-      <div className="flex items-center gap-2 mb-6">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => navigate('/clubs')}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          {t('backToClubs')}
-        </Button>
-      </div>
-      
-      <div className="glass-card p-8 mb-8">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Club Logo */}
-          <div className="relative">
-            <div 
-              className="w-32 h-32 relative rounded-lg overflow-hidden bg-muted cursor-pointer group"
-              onClick={() => isManager ? document.getElementById('club-logo-input')?.click() : null}
+    <Layout>
+      <div className="space-y-6">
+        {/* Header with club info */}
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/clubs')}
+              className="rounded-full"
             >
-              {isUploading ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <div className="animate-spin h-8 w-8 border-4 border-t-transparent border-white rounded-full"></div>
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={club.logo_url} alt={club.name} />
+                <AvatarFallback className="bg-orienteering/10 text-orienteering">
+                  {club.name.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div>
+                <h1 className="text-2xl font-bold">{club.name}</h1>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Users className="h-4 w-4" />
+                  <span>{club.member_count} {t('members')}</span>
                 </div>
-              ) : (
-                <>
-                  {club.logo_url ? (
-                    <img 
-                      src={club.logo_url} 
-                      alt={club.name} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Building2 className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                  )}
-                  
-                  {isManager && (
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera className="h-6 w-6 text-white" />
-                    </div>
-                  )}
-                </>
-              )}
+              </div>
             </div>
-            <input 
-              type="file"
-              id="club-logo-input"
-              className="hidden"
-              accept="image/png,image/jpeg,image/gif"
-              onChange={handleFileChange}
-            />
           </div>
           
-          {/* Club Info */}
-          <div className="flex-grow">
-            <div className="flex items-center justify-between">
-              <div className="flex-grow">
-                {editMode ? (
-                  <div className="flex items-center">
-                    <Input
-                      value={clubName}
-                      onChange={(e) => setClubName(e.target.value)}
-                      className="text-2xl font-bold mr-2"
-                    />
-                    <Button 
-                      size="sm" 
-                      onClick={handleSaveName} 
-                      disabled={!clubName.trim()}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {t('save')}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center">
-                    <h1 className="text-2xl font-bold">{club.name}</h1>
-                    {isManager && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setEditMode(true)}
-                        className="ml-2"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex items-center text-sm text-muted-foreground mt-1">
-                  <Users className="h-4 w-4 mr-1" />
-                  <span>
-                    {members.length} {t('members')}
-                  </span>
-                </div>
-              </div>
-              
-              {user?.clubId === id && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleLeaveClub} className="text-red-500">
-                      <LogOut className="h-4 w-4 mr-2" />
-                      {t('leaveClub')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-            
-            {/* Club members preview */}
-            {members.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-sm font-medium mb-3">{t('topMembers')}</h3>
-                <div className="flex -space-x-2">
-                  {members.slice(0, 5).map(member => (
-                    <Avatar key={member.id} className="border-2 border-background">
-                      {member.profile_image ? (
-                        <AvatarImage src={member.profile_image} alt={member.name} />
-                      ) : (
-                        <AvatarFallback>
-                          {member.name.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                  ))}
-                  {members.length > 5 && (
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border-2 border-background text-sm">
-                      +{members.length - 5}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      <Tabs defaultValue="members">
-        <TabsList className="mb-4">
-          <TabsTrigger value="members">
-            <Users className="h-4 w-4 mr-2" />
-            {t('members')}
-          </TabsTrigger>
-          {isManager && (
-            <TabsTrigger value="requests" className="relative">
-              <UserPlus className="h-4 w-4 mr-2" />
-              {t('joinRequests')}
-              {requests.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center">
-                  {requests.length}
-                </span>
-              )}
-            </TabsTrigger>
+          {isAdmin() && (
+            <Button 
+              variant="outline" 
+              onClick={() => setActiveTab('settings')}
+              className="flex items-center gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              {t('manageClub')}
+            </Button>
           )}
-        </TabsList>
+        </div>
         
-        <TabsContent value="members">
-          <div className="glass-card p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {members.map(member => (
-                <div key={member.id} className="p-4 border rounded-lg flex items-center">
-                  <Avatar className="h-12 w-12 mr-4">
-                    {member.profile_image ? (
-                      <AvatarImage src={member.profile_image} alt={member.name} />
-                    ) : (
-                      <AvatarFallback>
-                        {member.name.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  
-                  <div className="flex-grow">
-                    <div className="flex items-center">
-                      <span className="font-medium">{member.name}</span>
-                      <div className="ml-2 text-xs bg-secondary py-0.5 px-2 rounded-full">
-                        {t(member.club_role)}
-                      </div>
-                    </div>
-                    
-                    {member.role && (
-                      <div className="text-sm text-muted-foreground">
-                        {t(member.role)}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {isAdmin && member.id !== user?.id && (
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <ShieldAlert className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>{t('changeRole')}</DialogTitle>
-                          <DialogDescription>
-                            {t('changeRoleDesc', { name: member.name })}
-                          </DialogDescription>
-                        </DialogHeader>
-                        
-                        <div className="grid grid-cols-2 gap-4 py-4">
-                          <Button 
-                            variant="outline" 
-                            className={member.club_role === 'member' ? 'border-orienteering ring-2 ring-orienteering/20' : ''}
-                            onClick={() => handleChangeRole(member.id, 'member')}
-                          >
-                            {t('member')}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            className={member.club_role === 'trainer' ? 'border-orienteering ring-2 ring-orienteering/20' : ''}
-                            onClick={() => handleChangeRole(member.id, 'trainer')}
-                          >
-                            {t('trainer')}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            className={member.club_role === 'manager' ? 'border-orienteering ring-2 ring-orienteering/20' : ''}
-                            onClick={() => handleChangeRole(member.id, 'manager')}
-                          >
-                            {t('manager')}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            className={member.club_role === 'admin' ? 'border-orienteering ring-2 ring-orienteering/20' : ''}
-                            onClick={() => handleChangeRole(member.id, 'admin')}
-                          >
-                            {t('admin')}
-                          </Button>
-                        </div>
-                        
-                        <DialogFooter>
-                          <DialogTrigger asChild>
-                            <Button variant="outline">{t('close')}</Button>
-                          </DialogTrigger>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              ))}
-            </div>
-            
-            {members.length === 0 && (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">{t('noMembers')}</h3>
-                <p className="text-muted-foreground">{t('noMembersDesc')}</p>
-              </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="members" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              {t('members')}
+            </TabsTrigger>
+            {isAdmin() && (
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                {t('settings')}
+              </TabsTrigger>
             )}
-          </div>
-        </TabsContent>
-        
-        {isManager && (
-          <TabsContent value="requests">
-            <div className="glass-card p-6">
-              {requests.length > 0 ? (
-                <div className="space-y-4">
-                  {requests.map(request => (
-                    <div key={request.id} className="p-4 border rounded-lg flex items-center">
-                      <div className="flex-grow">
-                        <div className="font-medium">{request.user_name}</div>
-                        <div className="text-sm text-muted-foreground flex items-center mt-1">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {new Date(request.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          onClick={() => handleRequestAction(request.id, request.user_id, 'approve')}
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          {t('approve')}
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleRequestAction(request.id, request.user_id, 'reject')}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          {t('reject')}
-                        </Button>
+          </TabsList>
+          
+          <TabsContent value="members" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('clubMembers')}</CardTitle>
+                <CardDescription>
+                  {t('clubMembersDescription')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('name')}</TableHead>
+                        <TableHead>{t('role')}</TableHead>
+                        <TableHead>{t('level')}</TableHead>
+                        <TableHead>{t('stats')}</TableHead>
+                        {isAdmin() && <TableHead className="text-right">{t('actions')}</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {members.map(member => (
+                        <TableRow key={member.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={member.profile_image} alt={member.name} />
+                                <AvatarFallback className="bg-secondary text-secondary-foreground">
+                                  {member.name.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              {member.name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={member.club_role === 'admin' ? 'default' : 'outline'}>
+                              {member.club_role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {member.role}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-muted-foreground">
+                              <div>
+                                {t('accuracy')}: {member.accuracy || 0}%
+                              </div>
+                              <div>
+                                {t('speed')}: {member.speed || 0}s
+                              </div>
+                            </div>
+                          </TableCell>
+                          {isAdmin() && (
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>{t('changeRole')}</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleRoleUpdate(member.id, 'member')}
+                                    disabled={member.club_role === 'member'}
+                                  >
+                                    {t('member')}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleRoleUpdate(member.id, 'trainer')}
+                                    disabled={member.club_role === 'trainer'}
+                                  >
+                                    {t('trainer')}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleRoleUpdate(member.id, 'manager')}
+                                    disabled={member.club_role === 'manager'}
+                                  >
+                                    {t('manager')}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleRoleUpdate(member.id, 'admin')}
+                                    disabled={member.club_role === 'admin'}
+                                  >
+                                    {t('admin')}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {isAdmin() && (
+            <TabsContent value="settings" className="mt-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t('addMember')}</CardTitle>
+                    <CardDescription>
+                      {t('addMemberDescription')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg border-muted">
+                      <div className="text-center">
+                        <UserPlus className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-2 text-sm font-semibold">{t('inviteUsers')}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t('adminMustAddUsers')}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <UserPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">{t('noJoinRequests')}</h3>
-                  <p className="text-muted-foreground">{t('noJoinRequestsDesc')}</p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        )}
-      </Tabs>
-    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <div className="w-full flex justify-center">
+                      <Button 
+                        onClick={() => {
+                          toast({
+                            title: "Not implemented",
+                            description: "This feature is coming soon!",
+                          });
+                        }}
+                      >
+                        {t('addNewMember')}
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
+    </Layout>
   );
 };
 
-export default ClubPage;
+export default ClubDetailsPage;

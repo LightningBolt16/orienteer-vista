@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
@@ -7,11 +8,11 @@ import { supabase } from './integrations/supabase/client';
 import './App.css';
 
 // Lazy-loaded components
-const HomePage = lazy(() => import('./pages/Home'));
+const HomePage = lazy(() => import('./pages/Index'));
 const Profile = lazy(() => import('./pages/Profile'));
-const Auth = lazy(() => import('./pages/Auth'));
+const Auth = lazy(() => import('./pages/AuthPage'));
 const ClubsPage = lazy(() => import('./pages/Clubs'));
-const ClubDetailsPage = lazy(() => import('./pages/ClubDetails'));
+const ClubDetailsPage = lazy(() => import('./pages/Club'));
 const NotFoundPage = lazy(() => import('./pages/NotFound'));
 
 // Initialize Supabase Storage bucket for profile images on app startup
