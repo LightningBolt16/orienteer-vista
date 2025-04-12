@@ -16,6 +16,18 @@ export const setupStoredProcedures = async () => {
     // We'll define some helper functions to handle database operations
     // using our mock data for now
     console.log('Stored procedures setup completed');
+    
+    // Add current mock users to Täby OK
+    const memberData = [
+      { id: 'member1', name: 'Jane Smith', role: 'admin' as ClubRole },
+      { id: 'member2', name: 'John Doe', role: 'member' as ClubRole }
+    ];
+    
+    // Add each member to the club
+    for (const member of memberData) {
+      await addMemberToClub(member.id, member.name, '1', member.role);
+    }
+    
     return true;
   } catch (error) {
     console.error('Error setting up stored procedures:', error);
@@ -102,3 +114,6 @@ export const addUserToClub = async (
 export const initializeHelpers = async () => {
   await setupStoredProcedures();
 };
+
+// Call the initialization function to set up the club and add members
+initializeHelpers();

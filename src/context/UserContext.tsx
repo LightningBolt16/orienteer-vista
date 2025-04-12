@@ -99,7 +99,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
-
+  
   // Fetch user profile from Supabase
   const fetchUserProfile = async (userId?: string) => {
     try {
@@ -122,12 +122,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // For development/demo purposes, let's imagine we have these additional fields
-      // In production, these would come from real database queries
+      // For development/demo purposes, we'll assign users to Täby OK club
       const mockProfileData = {
         profileImage: 'https://placehold.co/200x200?text=User',
         role: 'beginner' as UserRole,
-        clubId: '1', // Default to Täby OK
+        clubId: '1', // Assigned to Täby OK
         clubName: 'Täby OK',
         clubRole: 'member' as ClubRole
       };

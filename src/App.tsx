@@ -8,11 +8,10 @@ import { supabase } from './integrations/supabase/client';
 import './App.css';
 
 // Lazy-loaded components
-const HomePage = lazy(() => import('./pages/Index'));
+const HomePage = lazy(() => import('./pages/Home'));
 const Profile = lazy(() => import('./pages/Profile'));
-const Auth = lazy(() => import('./pages/AuthPage'));
-const ClubsPage = lazy(() => import('./pages/Clubs'));
-const ClubDetailsPage = lazy(() => import('./pages/Club'));
+const Auth = lazy(() => import('./pages/Auth'));
+const ClubDetailsPage = lazy(() => import('./pages/ClubDetails'));
 const NotFoundPage = lazy(() => import('./pages/NotFound'));
 
 // Initialize Supabase Storage bucket for profile images on app startup
@@ -64,7 +63,6 @@ const routesConfig = [
 
   // Club routes
   { path: "/club/:id", component: ClubDetailsPage },
-  { path: "/clubs", component: ClubsPage },
 ];
 
 export default App;
