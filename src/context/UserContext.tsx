@@ -7,7 +7,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { Database } from '../integrations/supabase/types';
 import { v4 as uuidv4 } from 'uuid';
 import { Club, UserRole, ClubRole } from '../types/club';
-import { createClub, leaveClub, createClubRequest } from '../helpers/supabaseQueries';
+import { getClubsWithMemberCount, leaveClub } from '../helpers/supabaseQueries';
 
 type Tables = Database['public']['Tables'];
 type UserProfileRow = Tables['user_profiles']['Row'];
@@ -51,9 +51,7 @@ interface UserContextType {
   loading: boolean;
   fetchUserProfile: () => Promise<void>;
   fetchClubs: () => Promise<Club[]>;
-  joinClub: (clubId: string) => Promise<boolean>;
   leaveClub: () => Promise<boolean>;
-  createClub: (name: string, logoFile?: File) => Promise<string | null>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -130,18 +128,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const mockProfileData = {
         profileImage: 'https://placehold.co/200x200?text=User',
         role: 'beginner' as UserRole,
-        clubId: null,
-        clubName: null,
-        clubRole: null
+        clubId: '1', // Default to Täby OK
+        clubName: 'Täby OK',
+        clubRole: 'member' as ClubRole
       };
-
-      // Simulate having a user in a club for development/demo
-      const simulateClubMembership = false; // Set to true to test club features
-      if (simulateClubMembership) {
-        mockProfileData.clubId = '1';
-        mockProfileData.clubName = 'Orienteering Masters';
-        mockProfileData.clubRole = 'member' as ClubRole;
-      }
 
       if (data) {
         const userProfile: UserProfile = {
@@ -159,7 +149,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: mockProfileData.role,
           clubId: mockProfileData.clubId,
           clubName: mockProfileData.clubName,
-          clubRole: mockProfileData.clubRole as ClubRole | undefined
+          clubRole: mockProfileData.clubRole
         };
         
         setUserState(userProfile);
@@ -319,44 +309,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchClubs = async (): Promise<Club[]> => {
     try {
       // Import from helpers to use our mock data
-      const { getClubsWithMemberCount } = await import('../helpers/supabaseQueries');
       return await getClubsWithMemberCount();
     } catch (error) {
       console.error('Error in fetchClubs:', error);
       return [];
-    }
-  };
-
-  // Join a club
-  const joinClub = async (clubId: string): Promise<boolean> => {
-    if (!user || !session) {
-      toast({
-        title: t('error'),
-        description: t('mustBeSignedIn'),
-        variant: 'destructive'
-      });
-      return false;
-    }
-    
-    try {
-      const success = await createClubRequest(user.id, clubId);
-      
-      if (success) {
-        toast({
-          title: t('requestSent'),
-          description: t('clubJoinRequested')
-        });
-      }
-      
-      return success;
-    } catch (error: any) {
-      console.error('Error requesting to join club:', error);
-      toast({
-        title: t('error'),
-        description: error.message || t('errorJoiningClub'),
-        variant: 'destructive'
-      });
-      return false;
     }
   };
 
@@ -393,71 +349,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: 'destructive'
       });
       return false;
-    }
-  };
-
-  // Create a new club
-  const createNewClub = async (name: string, logoFile?: File): Promise<string | null> => {
-    if (!user || !session) {
-      toast({
-        title: t('error'),
-        description: t('mustBeSignedIn'),
-        variant: 'destructive'
-      });
-      return null;
-    }
-    
-    try {
-      let logoUrl = null;
-      
-      // Upload logo if provided
-      if (logoFile) {
-        const fileExt = logoFile.name.split('.').pop();
-        const fileName = `${uuidv4()}.${fileExt}`;
-        const filePath = `club_logos/${fileName}`;
-        
-        const { error: uploadError, data: fileData } = await supabase.storage
-          .from('profile_images')
-          .upload(filePath, logoFile);
-          
-        if (uploadError) throw uploadError;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile_images')
-          .getPublicUrl(filePath);
-          
-        logoUrl = publicUrl;
-      }
-      
-      // Create the club using our helper function
-      const clubId = await createClub(name, logoUrl, user.id);
-      
-      if (!clubId) {
-        throw new Error('Failed to create club');
-      }
-      
-      // Update local state
-      setUserState({
-        ...user,
-        clubId: clubId,
-        clubName: name,
-        clubRole: 'admin'
-      });
-      
-      toast({
-        title: t('success'),
-        description: t('clubCreated')
-      });
-      
-      return clubId;
-    } catch (error: any) {
-      console.error('Error creating club:', error);
-      toast({
-        title: t('error'),
-        description: error.message || t('errorCreatingClub'),
-        variant: 'destructive'
-      });
-      return null;
     }
   };
 
@@ -578,9 +469,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         fetchUserProfile,
         fetchClubs,
-        joinClub,
-        leaveClub: leaveCurrentClub,
-        createClub: createNewClub
+        leaveClub: leaveCurrentClub
       }}
     >
       {children}

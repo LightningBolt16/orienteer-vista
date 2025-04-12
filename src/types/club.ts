@@ -24,9 +24,4 @@ export interface ClubMember {
   speed?: number;
 }
 
-export interface ClubRequest {
-  id: string;
-  user_id: string;
-  user_name: string;
-  created_at: string;
-}
+// Removed ClubRequest interface since users won't be requesting to join clubs

@@ -105,6 +105,15 @@ const Profile: React.FC = () => {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
+      // First, make sure the bucket exists and create it if it doesn't
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.find(bucket => bucket.name === 'profile_images')) {
+        await supabase.storage.createBucket('profile_images', {
+          public: true,
+          fileSizeLimit: 5 * 1024 * 1024 // 5MB
+        });
+      }
+
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('profile_images')
@@ -167,26 +176,13 @@ const Profile: React.FC = () => {
   const getRoleText = () => {
     switch (user.role) {
       case 'elite':
-        return t('roleElite');
+        return 'Elite';
       case 'accurate':
-        return t('roleAccurate');
+        return 'Accurate';
       case 'fast':
-        return t('roleFast');
+        return 'Fast';
       default:
-        return t('roleBeginner');
-    }
-  };
-
-  const getRoleDescription = () => {
-    switch (user.role) {
-      case 'elite':
-        return t('roleEliteDesc');
-      case 'accurate':
-        return t('roleAccurateDesc');
-      case 'fast':
-        return t('roleFastDesc');
-      default:
-        return t('roleBeginnerDesc');
+        return 'Beginner';
     }
   };
 
@@ -282,8 +278,6 @@ const Profile: React.FC = () => {
                   </Link>
                 )}
               </div>
-              
-              <p className="text-muted-foreground mt-2">{getRoleDescription()}</p>
             </div>
             
             {totalAttempts > 0 && (
@@ -345,19 +339,8 @@ const Profile: React.FC = () => {
             <div className="flex flex-col items-center justify-center p-6 border border-dashed border-border rounded-lg">
               <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-center mb-4">{t('notInClub')}</p>
-              <div className="flex flex-wrap gap-3 justify-center">
-                <Link 
-                  to="/clubs" 
-                  className="px-4 py-2 bg-orienteering text-white rounded-md hover:bg-orienteering/90 transition-colors"
-                >
-                  {t('joinClub')}
-                </Link>
-                <Link 
-                  to="/clubs/new" 
-                  className="px-4 py-2 bg-secondary rounded-md hover:bg-secondary/80 transition-colors"
-                >
-                  {t('createClub')}
-                </Link>
+              <div className="text-center text-muted-foreground">
+                <p>{t('contactAdmin')}</p>
               </div>
             </div>
           </div>

@@ -3,28 +3,21 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Building2, Plus, Search, User, CheckCircle } from 'lucide-react';
-import { Button } from '../components/ui/button';
+import { Building2, Search, User, CheckCircle } from 'lucide-react';
 import { Input } from '../components/ui/input';
-import { toast } from '../components/ui/use-toast';
 import { Club } from '../types/club';
-import { getUserPendingRequests } from '../helpers/supabaseQueries';
 
 const ClubsPage: React.FC = () => {
-  const { user, joinClub, fetchClubs } = useUser();
+  const { user, fetchClubs } = useUser();
   const { t } = useLanguage();
   const navigate = useNavigate();
   
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [pendingRequests, setPendingRequests] = useState<string[]>([]);
   
   useEffect(() => {
     fetchClubsData();
-    if (user) {
-      fetchUserPendingRequests();
-    }
   }, [user]);
   
   const fetchClubsData = async () => {
@@ -36,48 +29,8 @@ const ClubsPage: React.FC = () => {
       setClubs(clubsData);
     } catch (error) {
       console.error('Error fetching clubs:', error);
-      toast({
-        title: t('error'),
-        description: t('errorFetchingClubs'),
-        variant: 'destructive'
-      });
     } finally {
       setLoading(false);
-    }
-  };
-  
-  const fetchUserPendingRequests = async () => {
-    if (!user) return;
-    
-    try {
-      // Fetch user's pending requests
-      const requests = await getUserPendingRequests(user.id);
-      if (requests && requests.length > 0) {
-        setPendingRequests(requests.map(r => r.club_id));
-      }
-    } catch (error) {
-      console.error('Error fetching pending requests:', error);
-    }
-  };
-  
-  const handleJoinClub = async (clubId: string) => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    
-    if (user.clubId) {
-      toast({
-        title: t('alreadyInClub'),
-        description: t('leaveCurrentClubFirst'),
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    const success = await joinClub(clubId);
-    if (success) {
-      setPendingRequests([...pendingRequests, clubId]);
     }
   };
   
@@ -99,21 +52,14 @@ const ClubsPage: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-2xl font-bold">{t('allClubs')}</h1>
           
-          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t('searchClubs')}
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <Button onClick={() => navigate('/clubs/new')} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              <span>{t('createClub')}</span>
-            </Button>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={t('searchClubs')}
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
         
@@ -121,10 +67,7 @@ const ClubsPage: React.FC = () => {
           <div className="text-center py-12">
             <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">{t('noClubsFound')}</h2>
-            <p className="text-muted-foreground mb-6">{t('noClubsFoundDesc')}</p>
-            <Button onClick={() => navigate('/clubs/new')}>
-              {t('createYourClub')}
-            </Button>
+            <p className="text-muted-foreground">{t('noClubsFoundDesc')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -136,7 +79,7 @@ const ClubsPage: React.FC = () => {
                       <img 
                         src={club.logo_url} 
                         alt={club.name} 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-2"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -165,21 +108,13 @@ const ClubsPage: React.FC = () => {
                   
                   <div className="mt-auto">
                     {user?.clubId === club.id ? (
-                      <Button disabled className="w-full">
+                      <div className="w-full px-4 py-2 bg-orienteering/10 text-orienteering rounded-md text-center">
                         {t('yourClub')}
-                      </Button>
-                    ) : pendingRequests.includes(club.id) ? (
-                      <Button disabled variant="outline" className="w-full">
-                        {t('pendingRequest')}
-                      </Button>
+                      </div>
                     ) : (
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => handleJoinClub(club.id)}
-                      >
-                        {t('requestToJoin')}
-                      </Button>
+                      <div className="w-full px-4 py-2 bg-muted text-muted-foreground rounded-md text-center">
+                        {t('contactAdminToJoin')}
+                      </div>
                     )}
                   </div>
                 </div>
