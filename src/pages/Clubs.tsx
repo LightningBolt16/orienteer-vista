@@ -1,16 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
-import { supabase } from '../integrations/supabase/client';
 import { Link, useNavigate } from 'react-router-dom';
-import { Building2, Plus, Search, User, CheckCircle, Trophy, Award, Zap } from 'lucide-react';
+import { Building2, Plus, Search, User, CheckCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from '../components/ui/use-toast';
 import { Club } from '../types/club';
+import { getUserPendingRequests } from '../helpers/supabaseQueries';
 
 const ClubsPage: React.FC = () => {
-  const { user, joinClub } = useUser();
+  const { user, joinClub, fetchClubs } = useUser();
   const { t } = useLanguage();
   const navigate = useNavigate();
   
@@ -20,22 +21,19 @@ const ClubsPage: React.FC = () => {
   const [pendingRequests, setPendingRequests] = useState<string[]>([]);
   
   useEffect(() => {
-    fetchClubs();
+    fetchClubsData();
     if (user) {
       fetchUserPendingRequests();
     }
   }, [user]);
   
-  const fetchClubs = async () => {
+  const fetchClubsData = async () => {
     try {
       setLoading(true);
       
-      // Use a stored procedure to fetch clubs with member count
-      const { data, error } = await supabase.rpc('get_clubs_with_member_count');
-        
-      if (error) throw error;
-      
-      setClubs(data as Club[]);
+      // Fetch clubs with member count
+      const clubsData = await fetchClubs();
+      setClubs(clubsData);
     } catch (error) {
       console.error('Error fetching clubs:', error);
       toast({
@@ -52,15 +50,10 @@ const ClubsPage: React.FC = () => {
     if (!user) return;
     
     try {
-      // Use a stored procedure to get user's pending requests
-      const { data, error } = await supabase.rpc('get_user_pending_requests', {
-        p_user_id: user.id
-      });
-        
-      if (error) throw error;
-      
-      if (data) {
-        setPendingRequests(data.map((req: any) => req.club_id));
+      // Fetch user's pending requests
+      const requests = await getUserPendingRequests(user.id);
+      if (requests && requests.length > 0) {
+        setPendingRequests(requests.map(r => r.club_id));
       }
     } catch (error) {
       console.error('Error fetching pending requests:', error);

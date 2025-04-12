@@ -1,15 +1,26 @@
 
 import { supabase } from '../integrations/supabase/client';
 import { Club, ClubMember, ClubRequest, ClubRole } from '../types/club';
+import {
+  getMockClubById,
+  getMockClubMembers,
+  getMockClubRequests,
+  getMockClubs,
+  getMockUserPendingRequests,
+  createMockClubRequest,
+  updateMockClubName,
+  updateMockClubLogo,
+  leaveMockClub,
+  handleMockClubRequest,
+  updateMockMemberRole,
+  createMockClub
+} from './mockClubData';
 
 // Create or replace stored procedures in Supabase for our club functionality
 export const setupStoredProcedures = async () => {
   try {
     // We'll define some helper functions to handle database operations
-    // without needing to modify the types.ts file
-    
-    // These functions can be called directly from our components
-    // to bypass the TypeScript type issues
+    // using our mock data for now
     console.log('Stored procedures setup completed');
     return true;
   } catch (error) {
@@ -21,14 +32,8 @@ export const setupStoredProcedures = async () => {
 // Function to get a club by ID
 export const getClubById = async (clubId: string): Promise<Club | null> => {
   try {
-    const { data, error } = await supabase
-      .from('clubs')
-      .select('*')
-      .eq('id', clubId)
-      .single();
-      
-    if (error) throw error;
-    return data as unknown as Club;
+    // Use mock data instead of real database query
+    return await getMockClubById(clubId);
   } catch (error) {
     console.error('Error fetching club:', error);
     return null;
@@ -38,13 +43,8 @@ export const getClubById = async (clubId: string): Promise<Club | null> => {
 // Function to get club members
 export const getClubMembers = async (clubId: string): Promise<ClubMember[]> => {
   try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('id, name, profile_image, club_role, role, accuracy, speed')
-      .eq('club_id', clubId);
-      
-    if (error) throw error;
-    return data as unknown as ClubMember[];
+    // Use mock data instead of real database query
+    return await getMockClubMembers(clubId);
   } catch (error) {
     console.error('Error fetching club members:', error);
     return [];
@@ -54,27 +54,8 @@ export const getClubMembers = async (clubId: string): Promise<ClubMember[]> => {
 // Function to get club join requests
 export const getClubRequests = async (clubId: string): Promise<ClubRequest[]> => {
   try {
-    const { data, error } = await supabase
-      .from('club_requests')
-      .select(`
-        id,
-        user_id,
-        created_at,
-        users:user_id (
-          name
-        )
-      `)
-      .eq('club_id', clubId)
-      .eq('status', 'pending');
-      
-    if (error) throw error;
-    
-    return data.map(req => ({
-      id: req.id,
-      user_id: req.user_id,
-      user_name: req.users?.name || 'Unknown User',
-      created_at: req.created_at
-    })) as ClubRequest[];
+    // Use mock data instead of real database query
+    return await getMockClubRequests(clubId);
   } catch (error) {
     console.error('Error fetching join requests:', error);
     return [];
@@ -84,29 +65,8 @@ export const getClubRequests = async (clubId: string): Promise<ClubRequest[]> =>
 // Function to get clubs with member count
 export const getClubsWithMemberCount = async (): Promise<Club[]> => {
   try {
-    const { data: clubs, error: clubsError } = await supabase
-      .from('clubs')
-      .select('*')
-      .order('name');
-      
-    if (clubsError) throw clubsError;
-    
-    // Get member counts for each club
-    const clubsWithCount = await Promise.all(
-      clubs.map(async (club) => {
-        const { count, error } = await supabase
-          .from('user_profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('club_id', club.id);
-          
-        return {
-          ...club,
-          member_count: count || 0
-        };
-      })
-    );
-    
-    return clubsWithCount as unknown as Club[];
+    // Use mock data instead of real database query
+    return await getMockClubs();
   } catch (error) {
     console.error('Error fetching clubs with member count:', error);
     return [];
@@ -116,14 +76,8 @@ export const getClubsWithMemberCount = async (): Promise<Club[]> => {
 // Function to get user's pending club requests
 export const getUserPendingRequests = async (userId: string): Promise<{club_id: string}[]> => {
   try {
-    const { data, error } = await supabase
-      .from('club_requests')
-      .select('club_id')
-      .eq('user_id', userId)
-      .eq('status', 'pending');
-      
-    if (error) throw error;
-    return data;
+    // Use mock data instead of real database query
+    return await getMockUserPendingRequests();
   } catch (error) {
     console.error('Error fetching pending requests:', error);
     return [];
@@ -133,22 +87,8 @@ export const getUserPendingRequests = async (userId: string): Promise<{club_id: 
 // Function to create a club request
 export const createClubRequest = async (userId: string, clubId: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('club_requests')
-      .insert({
-        user_id: userId,
-        club_id: clubId
-      });
-      
-    if (error) {
-      if (error.code === '23505') {
-        // Request already exists
-        return true;
-      }
-      throw error;
-    }
-    
-    return true;
+    // Use mock data instead of real database query
+    return await createMockClubRequest(userId, clubId);
   } catch (error) {
     console.error('Error creating club request:', error);
     return false;
@@ -158,13 +98,8 @@ export const createClubRequest = async (userId: string, clubId: string): Promise
 // Function to update a club's name
 export const updateClubName = async (clubId: string, name: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('clubs')
-      .update({ name })
-      .eq('id', clubId);
-      
-    if (error) throw error;
-    return true;
+    // Use mock data instead of real database query
+    return await updateMockClubName(clubId, name);
   } catch (error) {
     console.error('Error updating club name:', error);
     return false;
@@ -174,13 +109,8 @@ export const updateClubName = async (clubId: string, name: string): Promise<bool
 // Function to update a club's logo
 export const updateClubLogo = async (clubId: string, logoUrl: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('clubs')
-      .update({ logo_url: logoUrl })
-      .eq('id', clubId);
-      
-    if (error) throw error;
-    return true;
+    // Use mock data instead of real database query
+    return await updateMockClubLogo(clubId, logoUrl);
   } catch (error) {
     console.error('Error updating club logo:', error);
     return false;
@@ -190,16 +120,8 @@ export const updateClubLogo = async (clubId: string, logoUrl: string): Promise<b
 // Function to leave a club
 export const leaveClub = async (userId: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({
-        club_id: null,
-        club_role: null
-      })
-      .eq('id', userId);
-      
-    if (error) throw error;
-    return true;
+    // Use mock data instead of real database query
+    return await leaveMockClub(userId);
   } catch (error) {
     console.error('Error leaving club:', error);
     return false;
@@ -214,28 +136,8 @@ export const handleClubRequest = async (
   action: 'approve' | 'reject'
 ): Promise<boolean> => {
   try {
-    if (action === 'approve') {
-      // Update user profile to add them to the club
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({
-          club_id: clubId,
-          club_role: 'member'
-        })
-        .eq('id', userId);
-        
-      if (updateError) throw updateError;
-    }
-    
-    // Delete the request regardless of action
-    const { error } = await supabase
-      .from('club_requests')
-      .delete()
-      .eq('id', requestId);
-      
-    if (error) throw error;
-    
-    return true;
+    // Use mock data instead of real database query
+    return await handleMockClubRequest(requestId, userId, clubId, action);
   } catch (error) {
     console.error('Error handling club request:', error);
     return false;
@@ -249,19 +151,26 @@ export const updateMemberRole = async (
   role: ClubRole
 ): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({
-        club_role: role
-      })
-      .eq('id', userId)
-      .eq('club_id', clubId);
-      
-    if (error) throw error;
-    return true;
+    // Use mock data instead of real database query
+    return await updateMockMemberRole(userId, clubId, role);
   } catch (error) {
     console.error('Error updating member role:', error);
     return false;
+  }
+};
+
+// Function to create a club
+export const createClub = async (
+  name: string,
+  logoUrl?: string,
+  ownerId?: string
+): Promise<string | null> => {
+  try {
+    // Use mock data instead of real database query
+    return await createMockClub(name, logoUrl, ownerId);
+  } catch (error) {
+    console.error('Error creating club:', error);
+    return null;
   }
 };
 

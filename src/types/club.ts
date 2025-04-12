@@ -9,6 +9,7 @@ export interface Club {
   name: string;
   logo_url?: string;
   is_subscribed: boolean;
+  member_count?: number;
   created_at?: string;
   updated_at?: string;
 }
