@@ -7,6 +7,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { toast } from '@/components/ui/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Feature comparison type
 interface PlanFeature {
@@ -20,6 +23,7 @@ interface PlanFeature {
 const Subscription: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const handleSubscribe = (planType: string) => {
     // This would connect to a payment processor in a real implementation
@@ -33,7 +37,7 @@ const Subscription: React.FC = () => {
   const features: PlanFeature[] = [
     {
       title: "Route Choice Game",
-      free: "Up to 100 selections",
+      free: "100 plays per day",
       personal: "Unlimited",
       club: "Unlimited for all members",
       icon: <Trophy className="h-5 w-5 text-orange-500" />
@@ -84,67 +88,234 @@ const Subscription: React.FC = () => {
         </p>
       </div>
       
-      {/* Feature comparison table */}
-      <div className="mb-16 overflow-hidden rounded-xl border bg-background shadow">
-        <div className="grid grid-cols-4 gap-0">
-          {/* Header row */}
-          <div className="p-6 border-r bg-muted/50">
-            <h3 className="text-lg font-semibold text-foreground">Features</h3>
+      {/* Feature comparison table - Desktop version */}
+      {!isMobile && (
+        <div className="mb-16 overflow-hidden rounded-xl border bg-background shadow">
+          <div className="grid grid-cols-4 gap-0">
+            {/* Header row */}
+            <div className="p-6 border-r bg-muted/50">
+              <h3 className="text-lg font-semibold text-foreground">Features</h3>
+            </div>
+            <div className="p-6 border-r text-center">
+              <h3 className="text-lg font-semibold">Free</h3>
+              <p className="text-sm text-muted-foreground">Getting Started</p>
+            </div>
+            <div className="p-6 border-r text-center bg-orienteering/5">
+              <h3 className="text-lg font-semibold">Personal</h3>
+              <p className="font-medium text-orienteering">{t('personalPlanPrice')}</p>
+            </div>
+            <div className="p-6 text-center">
+              <h3 className="text-lg font-semibold">Club</h3>
+              <p className="font-medium text-orienteering">{t('clubPlanPrice')}</p>
+            </div>
+            
+            {/* Feature rows */}
+            {features.map((feature, idx) => (
+              <React.Fragment key={idx}>
+                <div className={`flex items-center gap-3 p-6 border-t border-r ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
+                  {feature.icon}
+                  <span className="font-medium">{feature.title}</span>
+                </div>
+                {/* Free plan */}
+                <div className={`p-6 text-center border-t border-r ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
+                  {typeof feature.free === 'boolean' ? (
+                    feature.free ? 
+                      <Check className="mx-auto h-5 w-5 text-green-500" /> : 
+                      <X className="mx-auto h-5 w-5 text-red-500" />
+                  ) : (
+                    <span className="text-sm">{feature.free}</span>
+                  )}
+                </div>
+                {/* Personal plan */}
+                <div className={`p-6 text-center border-t border-r ${idx % 2 === 0 ? 'bg-muted/20 bg-orienteering/5' : 'bg-orienteering/5'}`}>
+                  {typeof feature.personal === 'boolean' ? (
+                    feature.personal ? 
+                      <Check className="mx-auto h-5 w-5 text-green-500" /> : 
+                      <X className="mx-auto h-5 w-5 text-red-500" />
+                  ) : (
+                    <span className="text-sm">{feature.personal}</span>
+                  )}
+                </div>
+                {/* Club plan */}
+                <div className={`p-6 text-center border-t ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
+                  {typeof feature.club === 'boolean' ? (
+                    feature.club ? 
+                      <Check className="mx-auto h-5 w-5 text-green-500" /> : 
+                      <X className="mx-auto h-5 w-5 text-red-500" />
+                  ) : (
+                    <span className="text-sm">{feature.club}</span>
+                  )}
+                </div>
+              </React.Fragment>
+            ))}
           </div>
-          <div className="p-6 border-r text-center">
-            <h3 className="text-lg font-semibold">Free</h3>
-            <p className="text-sm text-muted-foreground">Getting Started</p>
-          </div>
-          <div className="p-6 border-r text-center bg-orienteering/5">
-            <h3 className="text-lg font-semibold">Personal</h3>
-            <p className="font-medium text-orienteering">{t('personalPlanPrice')}</p>
-          </div>
-          <div className="p-6 text-center">
-            <h3 className="text-lg font-semibold">Club</h3>
-            <p className="font-medium text-orienteering">{t('clubPlanPrice')}</p>
-          </div>
-          
-          {/* Feature rows */}
-          {features.map((feature, idx) => (
-            <React.Fragment key={idx}>
-              <div className={`flex items-center gap-3 p-6 border-t border-r ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
-                {feature.icon}
-                <span className="font-medium">{feature.title}</span>
-              </div>
-              {/* Free plan */}
-              <div className={`p-6 text-center border-t border-r ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
-                {typeof feature.free === 'boolean' ? (
-                  feature.free ? 
-                    <Check className="mx-auto h-5 w-5 text-green-500" /> : 
-                    <X className="mx-auto h-5 w-5 text-red-500" />
-                ) : (
-                  <span className="text-sm">{feature.free}</span>
-                )}
-              </div>
-              {/* Personal plan */}
-              <div className={`p-6 text-center border-t border-r ${idx % 2 === 0 ? 'bg-muted/20 bg-orienteering/5' : 'bg-orienteering/5'}`}>
-                {typeof feature.personal === 'boolean' ? (
-                  feature.personal ? 
-                    <Check className="mx-auto h-5 w-5 text-green-500" /> : 
-                    <X className="mx-auto h-5 w-5 text-red-500" />
-                ) : (
-                  <span className="text-sm">{feature.personal}</span>
-                )}
-              </div>
-              {/* Club plan */}
-              <div className={`p-6 text-center border-t ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
-                {typeof feature.club === 'boolean' ? (
-                  feature.club ? 
-                    <Check className="mx-auto h-5 w-5 text-green-500" /> : 
-                    <X className="mx-auto h-5 w-5 text-red-500" />
-                ) : (
-                  <span className="text-sm">{feature.club}</span>
-                )}
-              </div>
-            </React.Fragment>
-          ))}
         </div>
-      </div>
+      )}
+
+      {/* Mobile Feature comparison */}
+      {isMobile && (
+        <div className="mb-16">
+          <Carousel className="w-full">
+            <CarouselContent>
+              {/* Free Plan Card */}
+              <CarouselItem className="basis-full">
+                <Card className="border-2 mb-4">
+                  <CardHeader className="text-center pb-2">
+                    <CardTitle>Free Plan</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Feature</TableHead>
+                          <TableHead>Included</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {features.map((feature, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="flex items-center gap-2">
+                              {feature.icon}
+                              {feature.title}
+                            </TableCell>
+                            <TableCell>
+                              {typeof feature.free === 'boolean' ? (
+                                feature.free ? 
+                                  <Check className="h-5 w-5 text-green-500" /> : 
+                                  <X className="h-5 w-5 text-red-500" />
+                              ) : (
+                                <span>{feature.free}</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      onClick={() => navigate('/route-game')} 
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Get Started
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </CarouselItem>
+              
+              {/* Personal Plan Card */}
+              <CarouselItem className="basis-full">
+                <Card className="border-2 border-orienteering/30 mb-4">
+                  <CardHeader className="text-center pb-2">
+                    <CardTitle>{t('personalPlan')}</CardTitle>
+                    <CardDescription className="text-lg font-semibold text-orienteering">
+                      {t('personalPlanPrice')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Feature</TableHead>
+                          <TableHead>Included</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {features.map((feature, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="flex items-center gap-2">
+                              {feature.icon}
+                              {feature.title}
+                            </TableCell>
+                            <TableCell>
+                              {typeof feature.personal === 'boolean' ? (
+                                feature.personal ? 
+                                  <Check className="h-5 w-5 text-green-500" /> : 
+                                  <X className="h-5 w-5 text-red-500" />
+                              ) : (
+                                <span>{feature.personal}</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      onClick={() => handleSubscribe('personal')} 
+                      className="w-full bg-orienteering hover:bg-orienteering/90"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      {t('subscribe')}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </CarouselItem>
+              
+              {/* Club Plan Card */}
+              <CarouselItem className="basis-full">
+                <Card className="border-2 border-orienteering mb-4">
+                  <CardHeader className="text-center pb-2 bg-orienteering/5">
+                    <div className="flex justify-between items-center">
+                      <CardTitle>{t('clubPlan')}</CardTitle>
+                      <span className="bg-orienteering text-white text-xs font-semibold px-2.5 py-1 rounded">
+                        Popular
+                      </span>
+                    </div>
+                    <CardDescription className="text-lg font-semibold text-orienteering">
+                      {t('clubPlanPrice')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Feature</TableHead>
+                          <TableHead>Included</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {features.map((feature, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="flex items-center gap-2">
+                              {feature.icon}
+                              {feature.title}
+                            </TableCell>
+                            <TableCell>
+                              {typeof feature.club === 'boolean' ? (
+                                feature.club ? 
+                                  <Check className="h-5 w-5 text-green-500" /> : 
+                                  <X className="h-5 w-5 text-red-500" />
+                              ) : (
+                                <span>{feature.club}</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      onClick={() => handleSubscribe('club')} 
+                      className="w-full bg-orienteering hover:bg-orienteering/90"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      {t('subscribe')}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </CarouselItem>
+            </CarouselContent>
+            <div className="flex justify-center mt-4">
+              <CarouselPrevious className="relative static translate-y-0 left-0 mr-2" />
+              <CarouselNext className="relative static translate-y-0 right-0" />
+            </div>
+          </Carousel>
+        </div>
+      )}
       
       <div className="grid md:grid-cols-3 gap-8">
         {/* Free Plan */}
@@ -161,7 +332,7 @@ const Subscription: React.FC = () => {
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Access to route choice game (100 selections)</span>
+                <span>Access to route choice game (100 plays per day)</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
@@ -198,7 +369,7 @@ const Subscription: React.FC = () => {
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Unlimited route choice selections</span>
+                <span>Unlimited route choice plays</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
