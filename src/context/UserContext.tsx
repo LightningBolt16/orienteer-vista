@@ -128,7 +128,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // For development/demo purposes, let's imagine we have these additional fields
       // In production, these would come from real database queries
       const mockProfileData = {
-        profileImage: data.profile_image || 'https://placehold.co/200x200?text=User',
+        profileImage: 'https://placehold.co/200x200?text=User',
         role: 'beginner' as UserRole,
         clubId: null,
         clubName: null,
@@ -144,7 +144,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
-        setUserState({
+        const userProfile: UserProfile = {
           id: uid,
           name: data.name || 'User',
           accuracy: data.accuracy || 0,
@@ -160,7 +160,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           clubId: mockProfileData.clubId,
           clubName: mockProfileData.clubName,
           clubRole: mockProfileData.clubRole as ClubRole | undefined
-        });
+        };
+        
+        setUserState(userProfile);
       }
       
       setLoading(false);
@@ -175,7 +177,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, name, accuracy, speed, role')
+        .select('id, name, accuracy, speed')
         .order('accuracy', { ascending: false })
         .order('speed', { ascending: true })
         .limit(10);
