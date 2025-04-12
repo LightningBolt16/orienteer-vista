@@ -15,6 +15,9 @@ import NotFound from "./pages/NotFound";
 import ProjectManager from "./pages/ProjectManager";
 import AuthPage from "./pages/AuthPage";
 import Subscription from "./pages/Subscription";
+import Club from "./pages/Club";
+import Clubs from "./pages/Clubs";
+import CreateClub from "./pages/CreateClub";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 
@@ -46,6 +49,9 @@ const App: React.FC = () => {
                 <Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
                 <Route path="/subscription" element={<Layout><Subscription /></Layout>} />
+                <Route path="/clubs" element={<Layout><Clubs /></Layout>} />
+                <Route path="/clubs/new" element={<Layout><CreateClub /></Layout>} />
+                <Route path="/club/:id" element={<Layout><Club /></Layout>} />
                 <Route path="*" element={<Layout><NotFound /></Layout>} />
               </Routes>
             </BrowserRouter>

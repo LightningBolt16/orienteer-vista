@@ -20,6 +20,10 @@ type UserProfile = {
     timeSum: number;
   };
   profileImage?: string;
+  role?: 'beginner' | 'accurate' | 'fast' | 'elite';
+  clubId?: string;
+  clubName?: string;
+  clubRole?: 'member' | 'trainer' | 'manager' | 'admin';
 };
 
 type LeaderboardEntry = {
@@ -27,7 +31,15 @@ type LeaderboardEntry = {
   name: string;
   accuracy: number;
   speed: number;
+  role?: string;
   rank?: number;
+};
+
+type Club = {
+  id: string;
+  name: string;
+  logo_url?: string;
+  is_subscribed: boolean;
 };
 
 interface UserContextType {
@@ -41,6 +53,11 @@ interface UserContextType {
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
+  fetchUserProfile: () => Promise<void>;
+  fetchClubs: () => Promise<Club[]>;
+  joinClub: (clubId: string) => Promise<boolean>;
+  leaveClub: () => Promise<boolean>;
+  createClub: (name: string, logoFile?: File) => Promise<string | null>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -91,12 +108,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Fetch user profile from Supabase
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId?: string) => {
     try {
+      const uid = userId || session?.user?.id;
+      if (!uid) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch user profile with club information
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
+        .select(`
+          *,
+          clubs:club_id (
+            id,
+            name,
+            logo_url,
+            is_subscribed
+          )
+        `)
+        .eq('id', uid)
         .single();
 
       if (error) {
@@ -107,7 +139,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data) {
         setUserState({
-          id: userId,
+          id: uid,
           name: data.name || 'User',
           accuracy: data.accuracy || 0,
           speed: data.speed || 0,
@@ -115,7 +147,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             total: 0,
             correct: 0,
             timeSum: 0
-          }
+          },
+          profileImage: data.profile_image || undefined,
+          role: data.role || 'beginner',
+          clubId: data.club_id || undefined,
+          clubName: data.clubs?.name,
+          clubRole: data.club_role || 'member'
         });
       }
       
@@ -131,7 +168,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, name, accuracy, speed')
+        .select('id, name, accuracy, speed, role')
         .order('accuracy', { ascending: false })
         .order('speed', { ascending: true })
         .limit(10);
@@ -257,6 +294,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('user_profiles')
         .update({
           name: updatedUser.name,
+          profile_image: updatedUser.profileImage,
           updated_at: new Date().toISOString()
         })
         .eq('id', updatedUser.id);
@@ -266,6 +304,201 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error in setUser:', error);
+    }
+  };
+
+  // Fetch available clubs
+  const fetchClubs = async (): Promise<Club[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('clubs')
+        .select('*')
+        .order('name');
+        
+      if (error) {
+        console.error('Error fetching clubs:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in fetchClubs:', error);
+      return [];
+    }
+  };
+
+  // Join a club
+  const joinClub = async (clubId: string): Promise<boolean> => {
+    if (!user || !session) {
+      toast({
+        title: t('error'),
+        description: t('mustBeSignedIn'),
+        variant: 'destructive'
+      });
+      return false;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('club_requests')
+        .insert({
+          user_id: user.id,
+          club_id: clubId
+        });
+        
+      if (error) {
+        if (error.code === '23505') {
+          toast({
+            title: t('requestExists'),
+            description: t('alreadyRequestedJoin')
+          });
+          return true;
+        }
+        
+        throw error;
+      }
+      
+      toast({
+        title: t('requestSent'),
+        description: t('clubJoinRequested')
+      });
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error requesting to join club:', error);
+      toast({
+        title: t('error'),
+        description: error.message || t('errorJoiningClub'),
+        variant: 'destructive'
+      });
+      return false;
+    }
+  };
+
+  // Leave current club
+  const leaveClub = async (): Promise<boolean> => {
+    if (!user || !session || !user.clubId) {
+      return false;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          club_id: null,
+          club_role: null
+        })
+        .eq('id', user.id);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setUserState({
+        ...user,
+        clubId: undefined,
+        clubName: undefined,
+        clubRole: undefined
+      });
+      
+      toast({
+        title: t('success'),
+        description: t('leftClub')
+      });
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error leaving club:', error);
+      toast({
+        title: t('error'),
+        description: error.message || t('errorLeavingClub'),
+        variant: 'destructive'
+      });
+      return false;
+    }
+  };
+
+  // Create a new club
+  const createClub = async (name: string, logoFile?: File): Promise<string | null> => {
+    if (!user || !session) {
+      toast({
+        title: t('error'),
+        description: t('mustBeSignedIn'),
+        variant: 'destructive'
+      });
+      return null;
+    }
+    
+    try {
+      let logoUrl = null;
+      
+      // Upload logo if provided
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${uuidv4()}.${fileExt}`;
+        const filePath = `club_logos/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('profile_images')
+          .upload(filePath, logoFile);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('profile_images')
+          .getPublicUrl(filePath);
+          
+        logoUrl = publicUrl;
+      }
+      
+      // Create club record
+      const { data: clubData, error: clubError } = await supabase
+        .from('clubs')
+        .insert({
+          name,
+          logo_url: logoUrl
+        })
+        .select()
+        .single();
+        
+      if (clubError) throw clubError;
+      
+      if (!clubData) {
+        throw new Error('Failed to create club');
+      }
+      
+      // Add creator as admin of the club
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({
+          club_id: clubData.id,
+          club_role: 'admin'
+        })
+        .eq('id', user.id);
+        
+      if (updateError) throw updateError;
+      
+      // Update local state
+      setUserState({
+        ...user,
+        clubId: clubData.id,
+        clubName: clubData.name,
+        clubRole: 'admin'
+      });
+      
+      toast({
+        title: t('success'),
+        description: t('clubCreated')
+      });
+      
+      return clubData.id;
+    } catch (error: any) {
+      console.error('Error creating club:', error);
+      toast({
+        title: t('error'),
+        description: error.message || t('errorCreatingClub'),
+        variant: 'destructive'
+      });
+      return null;
     }
   };
 
@@ -383,7 +616,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signUp,
         signOut,
-        loading
+        loading,
+        fetchUserProfile,
+        fetchClubs,
+        joinClub,
+        leaveClub,
+        createClub
       }}
     >
       {children}

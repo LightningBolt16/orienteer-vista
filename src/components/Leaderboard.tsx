@@ -1,12 +1,25 @@
 
 import React from 'react';
-import { Trophy, Users, Zap, Target } from 'lucide-react';
+import { Trophy, Users, Zap, Target, Award } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 
 const Leaderboard: React.FC = () => {
   const { leaderboard, user } = useUser();
   const { t } = useLanguage();
+
+  const getRoleIcon = (role?: string) => {
+    switch (role) {
+      case 'elite':
+        return <Trophy className="h-4 w-4 text-yellow-500" />;
+      case 'accurate':
+        return <Award className="h-4 w-4 text-blue-500" />;
+      case 'fast':
+        return <Zap className="h-4 w-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="glass-card p-6 animate-fade-in">
@@ -38,6 +51,11 @@ const Leaderboard: React.FC = () => {
             <div className="flex-grow">
               <div className="flex items-center">
                 <span className="font-medium">{entry.name}</span>
+                {entry.role && (
+                  <span className="ml-2">
+                    {getRoleIcon(entry.role)}
+                  </span>
+                )}
                 {entry.id === user?.id && (
                   <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
                     {t('you')}
