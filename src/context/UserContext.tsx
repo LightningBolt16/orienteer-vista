@@ -5,6 +5,8 @@ import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Database } from '../integrations/supabase/types';
+import { v4 as uuidv4 } from 'uuid';
+import { Club, UserRole, ClubRole } from '../types/club';
 
 type Tables = Database['public']['Tables'];
 type UserProfileRow = Tables['user_profiles']['Row'];
@@ -20,10 +22,10 @@ type UserProfile = {
     timeSum: number;
   };
   profileImage?: string;
-  role?: 'beginner' | 'accurate' | 'fast' | 'elite';
+  role?: UserRole;
   clubId?: string;
   clubName?: string;
-  clubRole?: 'member' | 'trainer' | 'manager' | 'admin';
+  clubRole?: ClubRole;
 };
 
 type LeaderboardEntry = {
@@ -33,13 +35,6 @@ type LeaderboardEntry = {
   speed: number;
   role?: string;
   rank?: number;
-};
-
-type Club = {
-  id: string;
-  name: string;
-  logo_url?: string;
-  is_subscribed: boolean;
 };
 
 interface UserContextType {
@@ -116,18 +111,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Fetch user profile with club information
+      // Fetch user profile directly
       const { data, error } = await supabase
         .from('user_profiles')
-        .select(`
-          *,
-          clubs:club_id (
-            id,
-            name,
-            logo_url,
-            is_subscribed
-          )
-        `)
+        .select('*')
         .eq('id', uid)
         .single();
 
@@ -135,6 +122,20 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Error fetching user profile:', error);
         setLoading(false);
         return;
+      }
+
+      // If user profile exists, also fetch their club info if they have a club_id
+      let clubName;
+      if (data && data.club_id) {
+        const { data: clubData, error: clubError } = await supabase
+          .from('clubs')
+          .select('name')
+          .eq('id', data.club_id)
+          .single();
+          
+        if (!clubError && clubData) {
+          clubName = clubData.name;
+        }
       }
 
       if (data) {
@@ -149,10 +150,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             timeSum: 0
           },
           profileImage: data.profile_image || undefined,
-          role: data.role || 'beginner',
+          role: data.role as UserRole || 'beginner',
           clubId: data.club_id || undefined,
-          clubName: data.clubs?.name,
-          clubRole: data.club_role || 'member'
+          clubName: clubName,
+          clubRole: data.club_role as ClubRole || 'member'
         });
       }
       
@@ -310,6 +311,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch available clubs
   const fetchClubs = async (): Promise<Club[]> => {
     try {
+      // Use a raw query to get around the type constraints
       const { data, error } = await supabase
         .from('clubs')
         .select('*')
@@ -320,7 +322,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [];
       }
       
-      return data || [];
+      return data as unknown as Club[] || [];
     } catch (error) {
       console.error('Error in fetchClubs:', error);
       return [];
@@ -339,13 +341,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     try {
-      const { error } = await supabase
-        .from('club_requests')
-        .insert({
-          user_id: user.id,
-          club_id: clubId
-        });
-        
+      // Use a raw query approach
+      const { error } = await supabase.rpc('insert_club_request', {
+        p_user_id: user.id,
+        p_club_id: clubId
+      });
+      
       if (error) {
         if (error.code === '23505') {
           toast({
@@ -450,32 +451,31 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logoUrl = publicUrl;
       }
       
-      // Create club record
-      const { data: clubData, error: clubError } = await supabase
-        .from('clubs')
-        .insert({
-          name,
-          logo_url: logoUrl
-        })
-        .select()
-        .single();
+      // Use a stored procedure to create the club and update user
+      const { data, error } = await supabase.rpc('create_club_and_set_admin', {
+        p_name: name,
+        p_logo_url: logoUrl,
+        p_user_id: user.id
+      });
         
-      if (clubError) throw clubError;
+      if (error) throw error;
       
-      if (!clubData) {
+      if (!data) {
         throw new Error('Failed to create club');
       }
       
-      // Add creator as admin of the club
-      const { error: updateError } = await supabase
-        .from('user_profiles')
-        .update({
-          club_id: clubData.id,
-          club_role: 'admin'
-        })
-        .eq('id', user.id);
+      // Fetch the club to get its ID
+      const { data: clubData, error: clubError } = await supabase
+        .from('clubs')
+        .select('id, name')
+        .eq('name', name)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
         
-      if (updateError) throw updateError;
+      if (clubError || !clubData) {
+        throw new Error('Failed to retrieve club data');
+      }
       
       // Update local state
       setUserState({

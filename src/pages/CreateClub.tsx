@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from '../components/ui/use-toast';
+import { v4 as uuidv4 } from 'uuid';
 
 const CreateClubPage: React.FC = () => {
   const { user, createClub } = useUser();

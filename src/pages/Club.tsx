@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../integrations/supabase/client';
 import { useLanguage } from '../context/LanguageContext';
 import { toast } from '../components/ui/use-toast';
+import { v4 as uuidv4 } from 'uuid';
 import { 
   Building2, 
   Users, 
@@ -39,24 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
-import { v4 as uuidv4 } from 'uuid';
-
-type ClubMember = {
-  id: string;
-  name: string;
-  profile_image?: string;
-  club_role: 'member' | 'trainer' | 'manager' | 'admin';
-  role?: 'beginner' | 'accurate' | 'fast' | 'elite';
-  accuracy?: number;
-  speed?: number;
-};
-
-type ClubRequest = {
-  id: string;
-  user_id: string;
-  user_name: string;
-  created_at: string;
-};
+import { ClubMember, ClubRequest, ClubRole } from '../types/club';
 
 const ClubPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -103,11 +86,10 @@ const ClubPage: React.FC = () => {
   const fetchClubDetails = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('clubs')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Use a direct query to fetch club details
+      const { data, error } = await supabase.rpc('get_club_by_id', {
+        p_club_id: id
+      });
         
       if (error) throw error;
       
@@ -130,10 +112,10 @@ const ClubPage: React.FC = () => {
 
   const fetchClubMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, name, profile_image, club_role, role, accuracy, speed')
-        .eq('club_id', id);
+      // Use a stored procedure to get club members
+      const { data, error } = await supabase.rpc('get_club_members', {
+        p_club_id: id
+      });
         
       if (error) throw error;
       
@@ -147,29 +129,15 @@ const ClubPage: React.FC = () => {
 
   const fetchJoinRequests = async () => {
     try {
-      const { data, error } = await supabase
-        .from('club_requests')
-        .select(`
-          id,
-          user_id,
-          created_at,
-          users:user_id (
-            name
-          )
-        `)
-        .eq('club_id', id)
-        .eq('status', 'pending');
+      // Use a stored procedure to get pending requests
+      const { data, error } = await supabase.rpc('get_club_requests', {
+        p_club_id: id
+      });
         
       if (error) throw error;
       
       if (data) {
-        const formattedRequests = data.map(req => ({
-          id: req.id,
-          user_id: req.user_id,
-          user_name: req.users?.name || 'Unknown User',
-          created_at: req.created_at
-        }));
-        setRequests(formattedRequests);
+        setRequests(data as ClubRequest[]);
       }
     } catch (error) {
       console.error('Error fetching join requests:', error);
@@ -180,12 +148,11 @@ const ClubPage: React.FC = () => {
     if (!club || !isAdmin) return;
     
     try {
-      const { error } = await supabase
-        .from('clubs')
-        .update({
-          name: clubName
-        })
-        .eq('id', club.id);
+      // Use a stored procedure to update club
+      const { error } = await supabase.rpc('update_club_name', {
+        p_club_id: club.id,
+        p_name: clubName
+      });
         
       if (error) throw error;
       
@@ -230,13 +197,12 @@ const ClubPage: React.FC = () => {
       const { data: { publicUrl } } = supabase.storage
         .from('profile_images')
         .getPublicUrl(filePath);
-        
-      const { error } = await supabase
-        .from('clubs')
-        .update({
-          logo_url: publicUrl
-        })
-        .eq('id', club.id);
+      
+      // Use stored procedure to update club logo  
+      const { error } = await supabase.rpc('update_club_logo', {
+        p_club_id: club.id,
+        p_logo_url: publicUrl
+      });
         
       if (error) throw error;
       
@@ -265,13 +231,10 @@ const ClubPage: React.FC = () => {
     if (!user || user.clubId !== id) return;
     
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({
-          club_id: null,
-          club_role: null
-        })
-        .eq('id', user.id);
+      // Use stored procedure to leave club
+      const { error } = await supabase.rpc('leave_club', {
+        p_user_id: user.id
+      });
         
       if (error) throw error;
       
@@ -294,24 +257,13 @@ const ClubPage: React.FC = () => {
 
   const handleRequestAction = async (requestId: string, userId: string, action: 'approve' | 'reject') => {
     try {
-      if (action === 'approve') {
-        // Update user profile to add them to the club
-        const { error: updateError } = await supabase
-          .from('user_profiles')
-          .update({
-            club_id: id,
-            club_role: 'member'
-          })
-          .eq('id', userId);
-          
-        if (updateError) throw updateError;
-      }
-      
-      // Delete the request regardless of action
-      const { error } = await supabase
-        .from('club_requests')
-        .delete()
-        .eq('id', requestId);
+      // Use stored procedure to handle request
+      const { error } = await supabase.rpc('handle_club_request', {
+        p_request_id: requestId,
+        p_user_id: userId,
+        p_club_id: id,
+        p_action: action
+      });
         
       if (error) throw error;
       
@@ -337,17 +289,16 @@ const ClubPage: React.FC = () => {
     }
   };
 
-  const handleUpdateMemberRole = async (memberId: string, newRole: 'member' | 'trainer' | 'manager' | 'admin') => {
+  const handleUpdateMemberRole = async (memberId: string, newRole: ClubRole) => {
     if (!isAdmin) return;
     
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({
-          club_role: newRole
-        })
-        .eq('id', memberId)
-        .eq('club_id', id);
+      // Use stored procedure to update member role
+      const { error } = await supabase.rpc('update_member_role', {
+        p_user_id: memberId,
+        p_club_id: id,
+        p_role: newRole
+      });
         
       if (error) throw error;
       

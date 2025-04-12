@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +20,7 @@ import Clubs from "./pages/Clubs";
 import CreateClub from "./pages/CreateClub";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
+import { initializeHelpers } from "./helpers/supabaseQueries";
 
 // Initialize QueryClient with default settings
 const queryClient = new QueryClient({
@@ -32,6 +33,11 @@ const queryClient = new QueryClient({
 });
 
 const App: React.FC = () => {
+  useEffect(() => {
+    // Initialize helper functions for database operations
+    initializeHelpers();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
