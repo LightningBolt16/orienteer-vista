@@ -4,6 +4,7 @@ import { Trophy, Users, Zap, Target } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { supabase } from '../integrations/supabase/client';
 
 const Leaderboard: React.FC = () => {
   const { leaderboard, user } = useUser();
@@ -37,9 +38,16 @@ const Leaderboard: React.FC = () => {
             </div>
             
             <Avatar className="h-8 w-8 mr-3">
-              <AvatarFallback className="bg-secondary text-xs">
-                {entry.name?.charAt(0).toUpperCase() || '?'}
-              </AvatarFallback>
+              {entry.profileImage ? (
+                <AvatarImage 
+                  src={entry.profileImage} 
+                  alt={entry.name || 'User avatar'} 
+                />
+              ) : (
+                <AvatarFallback className="bg-secondary text-xs">
+                  {entry.name?.charAt(0).toUpperCase() || '?'}
+                </AvatarFallback>
+              )}
             </Avatar>
             
             <div className="flex-grow">

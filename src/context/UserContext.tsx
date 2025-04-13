@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
@@ -28,6 +27,7 @@ type LeaderboardEntry = {
   accuracy: number;
   speed: number;
   rank?: number;
+  profileImage?: string;
 };
 
 interface UserContextType {
@@ -132,7 +132,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, name, accuracy, speed')
+        .select('id, name, accuracy, speed, profile_image')
         .order('accuracy', { ascending: false })
         .order('speed', { ascending: true })
         .limit(10);
@@ -143,12 +143,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data && data.length > 0) {
-        // Add rank to each entry
+        // Add rank to each entry and map profile_image to profileImage
         const rankedLeaderboard = data.map((entry, index) => ({
-          ...entry,
-          rank: index + 1
+          id: entry.id,
+          name: entry.name || 'User',
+          accuracy: entry.accuracy || 0,
+          speed: entry.speed || 0,
+          rank: index + 1,
+          profileImage: entry.profile_image
         }));
-        
+      
         setLeaderboard(rankedLeaderboard);
       }
     } catch (error) {
@@ -169,7 +173,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: user.id,
         name: user.name,
         accuracy: user.accuracy,
-        speed: user.speed
+        speed: user.speed,
+        profileImage: user.profileImage
       });
     }
     
