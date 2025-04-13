@@ -1,76 +1,58 @@
 
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { LanguageProvider } from './context/LanguageContext';
-import { UserProvider } from './context/UserContext';
-import { Toaster } from './components/ui/toaster';
-import { supabase } from './integrations/supabase/client';
-import AppLayout from './components/AppLayout';
-import './App.css';
+import React from "react";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./components/Layout";
+import Index from "./pages/Index";
+import RouteGame from "./pages/RouteGame";
+import CourseSetter from "./pages/CourseSetter";
+import MyFiles from "./pages/MyFiles";
+import Profile from "./pages/Profile";
+import NotFound from "./pages/NotFound";
+import ProjectManager from "./pages/ProjectManager";
+import AuthPage from "./pages/AuthPage";
+import Subscription from "./pages/Subscription";
+import { LanguageProvider } from "./context/LanguageContext";
+import { UserProvider } from "./context/UserContext";
 
-// Lazy-loaded components
-const HomePage = lazy(() => import('./pages/Home'));
-const Profile = lazy(() => import('./pages/Profile'));
-const Auth = lazy(() => import('./pages/Auth'));
-const ClubsPage = lazy(() => import('./pages/Clubs'));
-const ClubDetailsPage = lazy(() => import('./pages/Club'));
-const NotFoundPage = lazy(() => import('./pages/NotFound'));
-
-// Initialize Supabase Storage bucket for profile images on app startup
-const initializeStorage = async () => {
-  try {
-    // First check if bucket exists
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('Error checking for bucket:', listError);
-      return;
-    }
-    
-    const bucketExists = buckets?.some(bucket => bucket.name === 'profile_images');
-    
-    if (!bucketExists) {
-      console.log('Creating profile_images bucket...');
-      const { error: createError } = await supabase.storage.createBucket('profile_images', {
-        public: true,
-        fileSizeLimit: 5 * 1024 * 1024 // 5MB
-      });
-      
-      if (createError) {
-        console.error('Error creating bucket:', createError);
-      } else {
-        console.log('profile_images bucket created successfully');
-      }
-    } else {
-      console.log('profile_images bucket already exists');
-    }
-  } catch (error) {
-    console.error('Unexpected error during storage initialization:', error);
-  }
-};
-
-// Initialize the app
-initializeStorage();
+// Initialize QueryClient with default settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App: React.FC = () => {
   return (
-    <LanguageProvider>
-      <UserProvider>
-        <Router>
-          <Suspense fallback={<div className="flex justify-center items-center py-24"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orienteering"></div></div>}>
-            <Routes>
-              <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
-              <Route path="/clubs" element={<AppLayout><ClubsPage /></AppLayout>} />
-              <Route path="/club/:id" element={<AppLayout><ClubDetailsPage /></AppLayout>} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-          <Toaster />
-        </Router>
-      </UserProvider>
-    </LanguageProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <LanguageProvider>
+          <UserProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<AuthPage />} />
+                <Route path="/" element={<Layout><Index /></Layout>} />
+                <Route path="/route-game" element={<Layout><RouteGame /></Layout>} />
+                <Route path="/course-setter" element={<Layout><CourseSetter /></Layout>} />
+                <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />
+                <Route path="/profile" element={<Layout><Profile /></Layout>} />
+                <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
+                <Route path="/subscription" element={<Layout><Subscription /></Layout>} />
+                <Route path="*" element={<Layout><NotFound /></Layout>} />
+              </Routes>
+            </BrowserRouter>
+          </UserProvider>
+        </LanguageProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 

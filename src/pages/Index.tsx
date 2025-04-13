@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Map, PenTool, Trophy, ArrowRight, Star } from 'lucide-react';
+import { Map, PenTool, Trophy, ArrowRight } from 'lucide-react';
 import Leaderboard from '../components/Leaderboard';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
@@ -45,7 +45,7 @@ const Index: React.FC = () => {
   }
 
   return (
-    <div className="animate-fade-in pb-12 container mx-auto">
+    <div className="animate-fade-in pb-12">
       {/* Hero Section */}
       <div className="glass-card mb-12 p-8 md:p-12 rounded-3xl">
         <div className="text-center md:text-left max-w-3xl mx-auto md:mx-0">
@@ -73,7 +73,7 @@ const Index: React.FC = () => {
       </div>
 
       {/* Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
         <Link 
           to="/route-game" 
           className="glass-card p-6 rounded-xl hover:shadow-lg transition-all hover:scale-[1.01] hover:bg-white/90 cursor-pointer"
@@ -104,24 +104,6 @@ const Index: React.FC = () => {
               <h3 className="text-xl font-medium mb-1">{t('courseSetter')}</h3>
               <p className="text-muted-foreground">
                 {t('createCourses')}
-              </p>
-            </div>
-            <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground" />
-          </div>
-        </Link>
-        
-        <Link 
-          to="/clubs" 
-          className="glass-card p-6 rounded-xl hover:shadow-lg transition-all hover:scale-[1.01] hover:bg-white/90 cursor-pointer"
-        >
-          <div className="flex items-center">
-            <div className="w-14 h-14 rounded-full bg-orienteering/10 flex items-center justify-center mr-4">
-              <Star className="h-6 w-6 text-orienteering" />
-            </div>
-            <div>
-              <h3 className="text-xl font-medium mb-1">{t('clubs')}</h3>
-              <p className="text-muted-foreground">
-                {t('joinOrganization')}
               </p>
             </div>
             <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground" />

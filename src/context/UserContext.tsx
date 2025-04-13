@@ -1,12 +1,10 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Database } from '../integrations/supabase/types';
-import { v4 as uuidv4 } from 'uuid';
-import { Club, UserRole, ClubRole } from '../types/club';
-import { getClubsWithMemberCount, leaveClub } from '../helpers/supabaseQueries';
 
 type Tables = Database['public']['Tables'];
 type UserProfileRow = Tables['user_profiles']['Row'];
@@ -22,10 +20,6 @@ type UserProfile = {
     timeSum: number;
   };
   profileImage?: string;
-  role?: UserRole;
-  clubId?: string;
-  clubName?: string;
-  clubRole?: ClubRole;
 };
 
 type LeaderboardEntry = {
@@ -33,7 +27,6 @@ type LeaderboardEntry = {
   name: string;
   accuracy: number;
   speed: number;
-  role?: string;
   rank?: number;
 };
 
@@ -48,9 +41,6 @@ interface UserContextType {
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
-  fetchUserProfile: () => Promise<void>;
-  fetchClubs: () => Promise<Club[]>;
-  leaveClub: () => Promise<boolean>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -99,21 +89,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
-  
-  // Fetch user profile from Supabase
-  const fetchUserProfile = async (userId?: string) => {
-    try {
-      const uid = userId || session?.user?.id;
-      if (!uid) {
-        setLoading(false);
-        return;
-      }
 
-      // Fetch user profile directly
+  // Fetch user profile from Supabase
+  const fetchUserProfile = async (userId: string) => {
+    try {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', uid)
+        .eq('id', userId)
         .single();
 
       if (error) {
@@ -123,9 +106,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
-        // Create user profile with available data
-        const userProfile: UserProfile = {
-          id: uid,
+        setUserState({
+          id: userId,
           name: data.name || 'User',
           accuracy: data.accuracy || 0,
           speed: data.speed || 0,
@@ -133,13 +115,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             total: 0,
             correct: 0,
             timeSum: 0
-          },
-          // Don't rely on profile_image or role as they don't exist in the schema
-          profileImage: undefined,
-          role: 'beginner' // Default role
-        };
-        
-        setUserState(userProfile);
+          }
+        });
       }
       
       setLoading(false);
@@ -292,53 +269,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Fetch available clubs
-  const fetchClubs = async (): Promise<Club[]> => {
-    try {
-      // Import from helpers to use our mock data
-      return await getClubsWithMemberCount();
-    } catch (error) {
-      console.error('Error in fetchClubs:', error);
-      return [];
-    }
-  };
-
-  // Leave current club
-  const leaveCurrentClub = async (): Promise<boolean> => {
-    if (!user || !session || !user.clubId) {
-      return false;
-    }
-    
-    try {
-      const success = await leaveClub(user.id);
-      
-      if (success) {
-        // Update local state
-        setUserState({
-          ...user,
-          clubId: undefined,
-          clubName: undefined,
-          clubRole: undefined
-        });
-        
-        toast({
-          title: t('success'),
-          description: t('leftClub')
-        });
-      }
-      
-      return success;
-    } catch (error: any) {
-      console.error('Error leaving club:', error);
-      toast({
-        title: t('error'),
-        description: error.message || t('errorLeavingClub'),
-        variant: 'destructive'
-      });
-      return false;
-    }
-  };
-
   // Authentication methods
   const signIn = async (email: string, password: string) => {
     setLoading(true);
@@ -441,68 +371,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const handleProfileImageClick = async (file: File) => {
-    if (!user || !session) return;
-    
-    try {
-      // Create bucket if it doesn't exist
-      await ensureStorageBucketExists('profile_images');
-      
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-      
-      // Upload the file
-      const { error: uploadError } = await supabase.storage
-        .from('profile_images')
-        .upload(filePath, file);
-        
-      if (uploadError) throw uploadError;
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile_images')
-        .getPublicUrl(filePath);
-        
-      // Update user with new profile image
-      setUserState({
-        ...user,
-        profileImage: publicUrl
-      });
-      
-      return publicUrl;
-    } catch (error: any) {
-      console.error('Error uploading profile image:', error);
-      throw error;
-    }
-  };
-  
-  // Helper to ensure storage bucket exists
-  const ensureStorageBucketExists = async (bucketName: string) => {
-    try {
-      // Check if bucket exists
-      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-      
-      if (listError) throw listError;
-      
-      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-      
-      if (!bucketExists) {
-        // Create bucket if it doesn't exist
-        const { error: createError } = await supabase.storage.createBucket(bucketName, {
-          public: true,
-          fileSizeLimit: 5 * 1024 * 1024 // 5MB
-        });
-        
-        if (createError) throw createError;
-      }
-    } catch (error) {
-      console.error(`Error ensuring bucket ${bucketName} exists:`, error);
-      throw error;
-    }
-  };
-
   return (
     <UserContext.Provider 
       value={{ 
@@ -515,10 +383,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signUp,
         signOut,
-        loading,
-        fetchUserProfile,
-        fetchClubs,
-        leaveClub: leaveCurrentClub
+        loading
       }}
     >
       {children}

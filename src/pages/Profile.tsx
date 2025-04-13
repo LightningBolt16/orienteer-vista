@@ -1,22 +1,15 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Camera, Building2, Award, Zap, Trophy } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
-import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
-import { Separator } from '../components/ui/separator';
-import { supabase } from '../integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
-import { Link } from 'react-router-dom';
 
 const Profile: React.FC = () => {
-  const { user, setUser, getUserRank, loading, fetchUserProfile } = useUser();
+  const { user, setUser, getUserRank, loading } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [userName, setUserName] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -69,95 +62,6 @@ const Profile: React.FC = () => {
     });
   };
 
-  const handleProfileImageClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-
-    // Validate file type and size
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      toast({
-        title: t('invalidFileType'),
-        description: t('pleaseSelectImage'),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast({
-        title: t('fileTooLarge'),
-        description: t('imageSizeLimit'),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      // Create a unique file path
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      // First, make sure the bucket exists
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === 'profile_images');
-      
-      if (!bucketExists) {
-        // Create the bucket if it doesn't exist
-        const { error: createBucketError } = await supabase.storage.createBucket('profile_images', {
-          public: true,
-          fileSizeLimit: 5 * 1024 * 1024 // 5MB
-        });
-        
-        if (createBucketError) {
-          throw createBucketError;
-        }
-      }
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('profile_images')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile_images')
-        .getPublicUrl(filePath);
-
-      // Update user profile with new image URL
-      await setUser({
-        ...user,
-        profileImage: publicUrl
-      });
-
-      toast({
-        title: t('success'),
-        description: t('profileImageUpdated')
-      });
-      
-      // Refresh user profile to get the updated data
-      await fetchUserProfile();
-    } catch (error: any) {
-      console.error('Error uploading profile image:', error);
-      toast({
-        title: t('error'),
-        description: error.message || t('errorUploadingImage'),
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   // Get user stats
   const totalAttempts = user.attempts?.total || 0;
   const correctAttempts = user.attempts?.correct || 0;
@@ -166,71 +70,15 @@ const Profile: React.FC = () => {
   const accuracy = user.accuracy || 0;
   const rank = getUserRank();
 
-  // Role display
-  const getRoleIcon = () => {
-    switch (user.role) {
-      case 'elite':
-        return <Trophy className="h-5 w-5 text-yellow-500" />;
-      case 'accurate':
-        return <Award className="h-5 w-5 text-blue-500" />;
-      case 'fast':
-        return <Zap className="h-5 w-5 text-red-500" />;
-      default:
-        return <User className="h-5 w-5 text-gray-500" />;
-    }
-  };
-
-  const getRoleText = () => {
-    switch (user.role) {
-      case 'elite':
-        return 'Elite';
-      case 'accurate':
-        return 'Accurate';
-      case 'fast':
-        return 'Fast';
-      default:
-        return 'Beginner';
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto py-12 animate-fade-in">
       <div className="glass-card p-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
           {/* Profile Image */}
-          <div className="shrink-0 relative">
-            <div 
-              className="w-32 h-32 relative rounded-full overflow-hidden bg-muted cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={handleProfileImageClick}
-            >
-              {isUploading ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <div className="animate-spin h-8 w-8 border-4 border-t-transparent border-white rounded-full"></div>
-                </div>
-              ) : (
-                <>
-                  <Avatar className="h-32 w-32">
-                    {user.profileImage ? (
-                      <AvatarImage src={user.profileImage} alt={user.name || 'User'} />
-                    ) : (
-                      <AvatarFallback className="bg-muted flex items-center justify-center">
-                        <User className="h-16 w-16 text-muted-foreground" />
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="absolute bottom-0 right-0 bg-orienteering rounded-full p-2 shadow-md">
-                    <Camera className="h-4 w-4 text-white" />
-                  </div>
-                </>
-              )}
+          <div className="shrink-0">
+            <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center">
+              <User className="h-16 w-16 text-muted-foreground" />
             </div>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleFileChange}
-            />
           </div>
           
           {/* Profile Info */}
@@ -263,41 +111,12 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
               )}
-              
-              <div className="flex flex-col md:flex-row items-center gap-2 mt-2">
-                <div className="flex items-center px-3 py-1 rounded-full bg-secondary/50">
-                  {user.role === 'elite' ? (
-                    <Trophy className="h-5 w-5 text-yellow-500 mr-1" />
-                  ) : user.role === 'accurate' ? (
-                    <Award className="h-5 w-5 text-blue-500 mr-1" />
-                  ) : user.role === 'fast' ? (
-                    <Zap className="h-5 w-5 text-red-500 mr-1" />
-                  ) : (
-                    <User className="h-5 w-5 text-gray-500 mr-1" />
-                  )}
-                  <span className="ml-1 font-medium">{user.role || 'Beginner'}</span>
-                </div>
-                
-                {user.clubId && (
-                  <Link 
-                    to={`/club/${user.clubId}`} 
-                    className="flex items-center px-3 py-1 rounded-full bg-secondary/50 hover:bg-secondary transition-colors"
-                  >
-                    <Building2 className="h-4 w-4 mr-1" />
-                    <span>{user.clubName || t('yourClub')}</span>
-                    {user.clubRole && user.clubRole !== 'member' && (
-                      <span className="ml-1 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
-                        {user.clubRole}
-                      </span>
-                    )}
-                  </Link>
-                )}
-              </div>
+              <p className="text-muted-foreground mt-1">{t('orienteeringEnthusiast')}</p>
             </div>
             
-            {user.attempts && user.attempts.total > 0 && (
+            {totalAttempts > 0 && (
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
-                <span className="font-semibold">{t('rank')} {getUserRank()}</span>
+                <span className="font-semibold">{t('rank')} {rank}</span>
               </div>
             )}
           </div>
@@ -347,19 +166,6 @@ const Profile: React.FC = () => {
             </div>
           </div>
         </div>
-        
-        {!user.clubId && (
-          <div className="mt-10 border-t border-muted pt-8">
-            <h2 className="text-xl font-semibold mb-6">{t('clubMembership')}</h2>
-            <div className="flex flex-col items-center justify-center p-6 border border-dashed border-border rounded-lg">
-              <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-center mb-4">{t('notInClub')}</p>
-              <div className="text-center text-muted-foreground">
-                <p>{t('contactAdmin')}</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
