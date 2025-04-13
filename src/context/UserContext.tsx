@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
@@ -123,7 +124,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
-        // Don't automatically add users to a club - admin will do this manually
+        // Fix: Don't try to access profile_image or role as they don't exist in the user_profiles table
         const userProfile: UserProfile = {
           id: uid,
           name: data.name || 'User',
@@ -134,9 +135,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             correct: 0,
             timeSum: 0
           },
-          profileImage: data.profile_image || undefined,
-          role: data.role as UserRole || 'beginner'
-          // Club data will be fetched separately if needed
+          // Don't rely on profile_image or role from database as they don't exist in the schema
+          profileImage: undefined,
+          role: 'beginner' // Default role
         };
         
         setUserState(userProfile);
