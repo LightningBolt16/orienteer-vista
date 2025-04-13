@@ -105,13 +105,20 @@ const Profile: React.FC = () => {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
-      // First, make sure the bucket exists and create it if it doesn't
+      // First, make sure the bucket exists
       const { data: buckets } = await supabase.storage.listBuckets();
-      if (!buckets?.find(bucket => bucket.name === 'profile_images')) {
-        await supabase.storage.createBucket('profile_images', {
+      const bucketExists = buckets?.some(bucket => bucket.name === 'profile_images');
+      
+      if (!bucketExists) {
+        // Create the bucket if it doesn't exist
+        const { error: createBucketError } = await supabase.storage.createBucket('profile_images', {
           public: true,
           fileSizeLimit: 5 * 1024 * 1024 // 5MB
         });
+        
+        if (createBucketError) {
+          throw createBucketError;
+        }
       }
 
       // Upload to Supabase Storage
@@ -259,8 +266,16 @@ const Profile: React.FC = () => {
               
               <div className="flex flex-col md:flex-row items-center gap-2 mt-2">
                 <div className="flex items-center px-3 py-1 rounded-full bg-secondary/50">
-                  {getRoleIcon()}
-                  <span className="ml-1 font-medium">{getRoleText()}</span>
+                  {user.role === 'elite' ? (
+                    <Trophy className="h-5 w-5 text-yellow-500 mr-1" />
+                  ) : user.role === 'accurate' ? (
+                    <Award className="h-5 w-5 text-blue-500 mr-1" />
+                  ) : user.role === 'fast' ? (
+                    <Zap className="h-5 w-5 text-red-500 mr-1" />
+                  ) : (
+                    <User className="h-5 w-5 text-gray-500 mr-1" />
+                  )}
+                  <span className="ml-1 font-medium">{user.role || 'Beginner'}</span>
                 </div>
                 
                 {user.clubId && (
@@ -280,9 +295,9 @@ const Profile: React.FC = () => {
               </div>
             </div>
             
-            {totalAttempts > 0 && (
+            {user.attempts && user.attempts.total > 0 && (
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
-                <span className="font-semibold">{t('rank')} {rank}</span>
+                <span className="font-semibold">{t('rank')} {getUserRank()}</span>
               </div>
             )}
           </div>

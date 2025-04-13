@@ -59,21 +59,11 @@ const App: React.FC = () => {
         <Router>
           <Suspense fallback={<div className="flex justify-center items-center py-24"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orienteering"></div></div>}>
             <Routes>
-              {routesConfig.map((route, index) => (
-                <Route
-                  key={index}
-                  path={route.path}
-                  element={
-                    route.layout ? (
-                      <AppLayout>
-                        <route.component />
-                      </AppLayout>
-                    ) : (
-                      <route.component />
-                    )
-                  }
-                />
-              ))}
+              <Route path="/" element={<AppLayout><HomePage /></AppLayout>} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
+              <Route path="/clubs" element={<AppLayout><ClubsPage /></AppLayout>} />
+              <Route path="/club/:id" element={<AppLayout><ClubDetailsPage /></AppLayout>} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
@@ -83,18 +73,5 @@ const App: React.FC = () => {
     </LanguageProvider>
   );
 };
-
-const routesConfig = [
-  // Public routes
-  { path: "/", component: HomePage, layout: true },
-  { path: "/auth", component: Auth, layout: false },
-
-  // User routes
-  { path: "/profile", component: Profile, layout: true },
-  
-  // Club routes
-  { path: "/clubs", component: ClubsPage, layout: true },
-  { path: "/club/:id", component: ClubDetailsPage, layout: true },
-];
 
 export default App;

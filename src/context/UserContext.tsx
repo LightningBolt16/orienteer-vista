@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
@@ -124,7 +123,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
-        // Fix: Don't try to access profile_image or role as they don't exist in the user_profiles table
+        // Create user profile with available data
         const userProfile: UserProfile = {
           id: uid,
           name: data.name || 'User',
@@ -135,7 +134,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             correct: 0,
             timeSum: 0
           },
-          // Don't rely on profile_image or role from database as they don't exist in the schema
+          // Don't rely on profile_image or role as they don't exist in the schema
           profileImage: undefined,
           role: 'beginner' // Default role
         };
@@ -439,6 +438,68 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: error.message || 'An unexpected error occurred',
         variant: 'destructive'
       });
+    }
+  };
+
+  const handleProfileImageClick = async (file: File) => {
+    if (!user || !session) return;
+    
+    try {
+      // Create bucket if it doesn't exist
+      await ensureStorageBucketExists('profile_images');
+      
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+      
+      // Upload the file
+      const { error: uploadError } = await supabase.storage
+        .from('profile_images')
+        .upload(filePath, file);
+        
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile_images')
+        .getPublicUrl(filePath);
+        
+      // Update user with new profile image
+      setUserState({
+        ...user,
+        profileImage: publicUrl
+      });
+      
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Error uploading profile image:', error);
+      throw error;
+    }
+  };
+  
+  // Helper to ensure storage bucket exists
+  const ensureStorageBucketExists = async (bucketName: string) => {
+    try {
+      // Check if bucket exists
+      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+      
+      if (listError) throw listError;
+      
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      
+      if (!bucketExists) {
+        // Create bucket if it doesn't exist
+        const { error: createError } = await supabase.storage.createBucket(bucketName, {
+          public: true,
+          fileSizeLimit: 5 * 1024 * 1024 // 5MB
+        });
+        
+        if (createError) throw createError;
+      }
+    } catch (error) {
+      console.error(`Error ensuring bucket ${bucketName} exists:`, error);
+      throw error;
     }
   };
 
