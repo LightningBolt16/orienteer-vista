@@ -111,6 +111,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.name || 'User',
           accuracy: data.accuracy || 0,
           speed: data.speed || 0,
+          profileImage: data.profile_image || undefined,
           attempts: data.attempts as { total: number; correct: number; timeSum: number } || {
             total: 0,
             correct: 0,
@@ -253,12 +254,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setUserState(updatedUser);
       
+      const updateData: any = {
+        name: updatedUser.name,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Only update profile_image if it's present in the updated user
+      if (updatedUser.profileImage !== undefined) {
+        updateData.profile_image = updatedUser.profileImage;
+      }
+      
       const { error } = await supabase
         .from('user_profiles')
-        .update({
-          name: updatedUser.name,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', updatedUser.id);
         
       if (error) {

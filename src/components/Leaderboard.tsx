@@ -3,6 +3,7 @@ import React from 'react';
 import { Trophy, Users, Zap, Target } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const Leaderboard: React.FC = () => {
   const { leaderboard, user } = useUser();
@@ -34,6 +35,12 @@ const Leaderboard: React.FC = () => {
             }`}>
               {index + 1}
             </div>
+            
+            <Avatar className="h-8 w-8 mr-3">
+              <AvatarFallback className="bg-secondary text-xs">
+                {entry.name?.charAt(0).toUpperCase() || '?'}
+              </AvatarFallback>
+            </Avatar>
             
             <div className="flex-grow">
               <div className="flex items-center">

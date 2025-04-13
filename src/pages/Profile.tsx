@@ -1,15 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
+import { supabase } from '../integrations/supabase/client';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const Profile: React.FC = () => {
   const { user, setUser, getUserRank, loading } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [userName, setUserName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -19,6 +23,39 @@ const Profile: React.FC = () => {
       setUserName(user.name || '');
     }
   }, [user]);
+
+  // Create the avatar bucket if it doesn't exist yet
+  useEffect(() => {
+    const createBucketIfNotExists = async () => {
+      try {
+        // Check if the bucket exists
+        const { data: buckets, error: getBucketsError } = await supabase.storage.listBuckets();
+        
+        if (getBucketsError) {
+          console.error('Error checking buckets:', getBucketsError);
+          return;
+        }
+        
+        const avatarBucketExists = buckets.some(bucket => bucket.name === 'avatars');
+        
+        if (!avatarBucketExists) {
+          // Create the avatar bucket
+          const { error: createBucketError } = await supabase.storage.createBucket('avatars', {
+            public: true,
+            fileSizeLimit: 1024 * 1024 * 2 // 2MB limit
+          });
+          
+          if (createBucketError) {
+            console.error('Error creating avatar bucket:', createBucketError);
+          }
+        }
+      } catch (error) {
+        console.error('Error in createBucketIfNotExists:', error);
+      }
+    };
+    
+    createBucketIfNotExists();
+  }, []);
 
   // Redirect to auth page if not logged in and not a guest
   useEffect(() => {
@@ -62,6 +99,88 @@ const Profile: React.FC = () => {
     });
   };
 
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    const fileExt = file.name.split('.').pop();
+    const allowedTypes = ['jpg', 'jpeg', 'png', 'gif'];
+    if (!allowedTypes.includes(fileExt?.toLowerCase() || '')) {
+      toast({
+        title: t('invalidFileType'),
+        description: t('allowedFileTypes') + allowedTypes.join(', '),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: t('fileTooLarge'),
+        description: t('maxFileSize'),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Create unique file name
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update user profile with avatar URL
+      await supabase
+        .from('user_profiles')
+        .update({ profile_image: publicUrl })
+        .eq('id', user.id);
+
+      // Update local user state
+      setUser({
+        ...user,
+        profileImage: publicUrl
+      });
+
+      toast({
+        title: t('success'),
+        description: t('profileImageUpdated'),
+      });
+
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: t('error'),
+        description: error.message || t('uploadFailed'),
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Get user stats
   const totalAttempts = user.attempts?.total || 0;
   const correctAttempts = user.attempts?.correct || 0;
@@ -74,11 +193,40 @@ const Profile: React.FC = () => {
     <div className="max-w-4xl mx-auto py-12 animate-fade-in">
       <div className="glass-card p-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-          {/* Profile Image */}
-          <div className="shrink-0">
-            <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center">
-              <User className="h-16 w-16 text-muted-foreground" />
+          {/* Profile Image with Upload */}
+          <div className="shrink-0 relative">
+            <div 
+              className="w-32 h-32 rounded-full bg-muted flex items-center justify-center overflow-hidden cursor-pointer group"
+              onClick={handleImageClick}
+            >
+              {user.profileImage ? (
+                <Avatar className="w-full h-full">
+                  <AvatarImage src={user.profileImage} alt={user.name} className="object-cover" />
+                  <AvatarFallback>
+                    <User className="h-16 w-16 text-muted-foreground" />
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <User className="h-16 w-16 text-muted-foreground" />
+              )}
+              
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Upload className="h-8 w-8 text-white" />
+              </div>
             </div>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/png, image/jpeg, image/gif" 
+              onChange={handleImageUpload} 
+              disabled={uploading}
+            />
+            {uploading && (
+              <div className="absolute top-0 left-0 right-0 bottom-0 rounded-full bg-black/30 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            )}
           </div>
           
           {/* Profile Info */}
