@@ -122,16 +122,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // For development/demo purposes, we'll assign users to Täby OK club
-      const mockProfileData = {
-        profileImage: 'https://placehold.co/200x200?text=User',
-        role: 'beginner' as UserRole,
-        clubId: '1', // Assigned to Täby OK
-        clubName: 'Täby OK',
-        clubRole: 'member' as ClubRole
-      };
-
       if (data) {
+        // Don't automatically add users to a club - admin will do this manually
         const userProfile: UserProfile = {
           id: uid,
           name: data.name || 'User',
@@ -142,12 +134,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             correct: 0,
             timeSum: 0
           },
-          // Add mock data for development
-          profileImage: mockProfileData.profileImage,
-          role: mockProfileData.role,
-          clubId: mockProfileData.clubId,
-          clubName: mockProfileData.clubName,
-          clubRole: mockProfileData.clubRole
+          profileImage: data.profile_image || undefined,
+          role: data.role as UserRole || 'beginner'
+          // Club data will be fetched separately if needed
         };
         
         setUserState(userProfile);

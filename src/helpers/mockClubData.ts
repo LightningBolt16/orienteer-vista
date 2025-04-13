@@ -9,7 +9,7 @@ const mockClubs: Club[] = [
     name: 'Täby OK',
     logo_url: '/lovable-uploads/72c7a51b-361f-4cac-b3a7-32223a5cfa7f.png',
     is_subscribed: true,
-    member_count: 24,
+    member_count: 2,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
@@ -19,8 +19,8 @@ const mockMembers: Record<string, ClubMember[]> = {
   '1': [
     {
       id: 'member1',
-      name: 'Jane Smith',
-      profile_image: 'https://placehold.co/200x200?text=JS',
+      name: 'Elias Ljungdell',
+      profile_image: 'https://placehold.co/200x200?text=EL',
       club_role: 'admin',
       role: 'elite',
       accuracy: 95,
@@ -28,9 +28,9 @@ const mockMembers: Record<string, ClubMember[]> = {
     },
     {
       id: 'member2',
-      name: 'John Doe',
-      profile_image: 'https://placehold.co/200x200?text=JD',
-      club_role: 'member',
+      name: 'Hugo S',
+      profile_image: 'https://placehold.co/200x200?text=HS',
+      club_role: 'admin',
       role: 'accurate',
       accuracy: 98,
       speed: 180

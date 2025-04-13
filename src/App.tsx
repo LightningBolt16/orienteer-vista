@@ -5,24 +5,47 @@ import { LanguageProvider } from './context/LanguageContext';
 import { UserProvider } from './context/UserContext';
 import { Toaster } from './components/ui/toaster';
 import { supabase } from './integrations/supabase/client';
+import AppLayout from './components/AppLayout';
 import './App.css';
 
 // Lazy-loaded components
 const HomePage = lazy(() => import('./pages/Home'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Auth = lazy(() => import('./pages/Auth'));
-const ClubDetailsPage = lazy(() => import('./pages/ClubDetails'));
+const ClubsPage = lazy(() => import('./pages/Clubs'));
+const ClubDetailsPage = lazy(() => import('./pages/Club'));
 const NotFoundPage = lazy(() => import('./pages/NotFound'));
 
 // Initialize Supabase Storage bucket for profile images on app startup
 const initializeStorage = async () => {
-  const { data: buckets } = await supabase.storage.listBuckets();
-  
-  if (!buckets?.find(bucket => bucket.name === 'profile_images')) {
-    await supabase.storage.createBucket('profile_images', {
-      public: true,
-      fileSizeLimit: 5 * 1024 * 1024 // 5MB
-    });
+  try {
+    // First check if bucket exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Error checking for bucket:', listError);
+      return;
+    }
+    
+    const bucketExists = buckets?.some(bucket => bucket.name === 'profile_images');
+    
+    if (!bucketExists) {
+      console.log('Creating profile_images bucket...');
+      const { error: createError } = await supabase.storage.createBucket('profile_images', {
+        public: true,
+        fileSizeLimit: 5 * 1024 * 1024 // 5MB
+      });
+      
+      if (createError) {
+        console.error('Error creating bucket:', createError);
+      } else {
+        console.log('profile_images bucket created successfully');
+      }
+    } else {
+      console.log('profile_images bucket already exists');
+    }
+  } catch (error) {
+    console.error('Unexpected error during storage initialization:', error);
   }
 };
 
@@ -40,7 +63,15 @@ const App: React.FC = () => {
                 <Route
                   key={index}
                   path={route.path}
-                  element={<route.component />}
+                  element={
+                    route.layout ? (
+                      <AppLayout>
+                        <route.component />
+                      </AppLayout>
+                    ) : (
+                      <route.component />
+                    )
+                  }
                 />
               ))}
               <Route path="*" element={<NotFoundPage />} />
@@ -55,14 +86,15 @@ const App: React.FC = () => {
 
 const routesConfig = [
   // Public routes
-  { path: "/", component: HomePage },
-  { path: "/auth", component: Auth },
+  { path: "/", component: HomePage, layout: true },
+  { path: "/auth", component: Auth, layout: false },
 
   // User routes
-  { path: "/profile", component: Profile },
-
+  { path: "/profile", component: Profile, layout: true },
+  
   // Club routes
-  { path: "/club/:id", component: ClubDetailsPage },
+  { path: "/clubs", component: ClubsPage, layout: true },
+  { path: "/club/:id", component: ClubDetailsPage, layout: true },
 ];
 
 export default App;
