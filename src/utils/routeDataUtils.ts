@@ -1,4 +1,3 @@
-
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -28,10 +27,26 @@ const capitalizeMapName = (folderName: string): string => {
 // Function to generate map sources based on available maps
 export const getAvailableMaps = async (): Promise<MapSource[]> => {
   try {
-    // In a production environment, this would be a server-side function
-    // For now, we'll hardcode the available maps based on the folder structure
-    
+    // Define map sources including the Rotondella map
     const mapSources: MapSource[] = [
+      {
+        id: 'rotondella-landscape',
+        name: 'Rotondella (Landscape)',
+        aspect: '16:9',
+        csvPath: '/maps/Rotondella.csv',
+        imagePathPrefix: '/maps/16_9/candidate_',
+        mapImagePath: '/maps/Rotondella.png',
+        description: 'Rotondella orienteering map for route choice training'
+      },
+      {
+        id: 'rotondella-portrait',
+        name: 'Rotondella (Portrait)',
+        aspect: '9:16',
+        csvPath: '/maps/Rotondella.csv',
+        imagePathPrefix: '/maps/9_16/candidate_',
+        mapImagePath: '/maps/Rotondella.png',
+        description: 'Rotondella orienteering map for mobile devices'
+      },
       {
         id: 'default-landscape',
         name: 'Default (Landscape)',
@@ -135,6 +150,7 @@ export const getRouteData = (): RouteData[] => {
 // Fetch route data from a specific map source
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
+    console.log('Fetching route data from:', mapSource.csvPath);
     const response = await fetch(mapSource.csvPath);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
@@ -144,6 +160,8 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
     // Parse CSV
     const lines = csvText.split('\n');
     const header = lines[0].split(',');
+    
+    console.log('CSV header:', header);
     
     const data = lines.slice(1)
       .filter(line => line.trim() !== '') // Skip empty lines
@@ -164,19 +182,26 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
         
         const candidateIndex = parseInt(values[0]);
         if (isNaN(candidateIndex)) {
+          console.warn('Invalid candidate index:', values[0]);
           return null; // Skip invalid data
         }
+        
+        const mainRouteLength = parseFloat(values[3]) || 0;
+        const altRouteLength = parseFloat(values[4]) || 0;
+        
+        console.log(`Parsed route data: ${candidateIndex}, ${shortestSide}, ${colorValue}, ${mainRouteLength}, ${altRouteLength}`);
         
         return {
           candidateIndex,
           shortestSide,
           shortestColor: colorValue,
-          mainRouteLength: parseFloat(values[3]) || 0,
-          altRouteLength: parseFloat(values[4]) || 0
+          mainRouteLength,
+          altRouteLength
         };
       })
       .filter(item => item !== null) as RouteData[];
       
+    console.log(`Loaded ${data.length} routes for map ${mapSource.name}`);
     return data.sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex
   } catch (error) {
     console.error('Error fetching or parsing CSV:', error);
@@ -188,4 +213,3 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
 export const getImageUrl = (mapSource: MapSource, candidateIndex: number, isMobile: boolean): string => {
   return `${mapSource.imagePathPrefix}${candidateIndex}.png`;
 };
-

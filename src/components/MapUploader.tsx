@@ -8,19 +8,17 @@ import { toast } from './ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { useMapStorage, MapUploadData } from '../hooks/useMapStorage';
+import { useUser } from '../context/UserContext';
 
-export interface MapMetadata {
-  name: string;
-  file: File;
-  type: 'sprint' | 'forest';
-  scale: string;
-  customScale?: string;
+interface MapUploaderProps {
+  onMapUploaded?: (metadata: MapUploadData) => void;
 }
 
-const MapUploader: React.FC<{
-  onMapUploaded?: (metadata: MapMetadata) => void;
-}> = ({ onMapUploaded }) => {
+const MapUploader: React.FC<MapUploaderProps> = ({ onMapUploaded }) => {
   const { t } = useLanguage();
+  const { user } = useUser();
+  const { uploadMap, uploading } = useMapStorage();
   const [isDragging, setIsDragging] = useState(false);
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [mapName, setMapName] = useState('');
@@ -92,7 +90,16 @@ const MapUploader: React.FC<{
   };
   
   // Handle upload
-  const handleUpload = () => {
+  const handleUpload = async () => {
+    if (!user) {
+      toast({
+        title: t('error'),
+        description: t('signInRequired'),
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!mapFile || !mapName) {
       toast({
         title: t('error'),
@@ -114,24 +121,20 @@ const MapUploader: React.FC<{
     }
     
     // Create metadata object
-    const metadata: MapMetadata = {
+    const metadata: MapUploadData = {
       name: mapName,
       file: mapFile,
       type: mapType,
       scale: useCustomScale ? customScale : mapScale,
+      isPublic: false
     };
     
-    // Here we would typically upload to a server
-    console.log('Uploading map:', metadata);
+    // Upload the map using our hook
+    const result = await uploadMap(metadata);
     
-    if (onMapUploaded) {
+    if (result && onMapUploaded) {
       onMapUploaded(metadata);
     }
-    
-    toast({
-      title: t('success'),
-      description: t('map.uploaded'),
-    });
     
     // Reset form
     resetForm();
@@ -285,9 +288,19 @@ const MapUploader: React.FC<{
           <Button 
             className="w-full" 
             onClick={handleUpload}
+            disabled={uploading}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            {t('upload.map')}
+            {uploading ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                {t('uploading')}
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                {t('upload.map')}
+              </>
+            )}
           </Button>
         </div>
       )}

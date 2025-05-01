@@ -134,6 +134,8 @@ const MapEditor: React.FC<MapEditorProps> = ({
   
   // Special tool actions handler
   const handleToolAction = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (viewMode === 'preview') return;
+    
     if (selectedTool === 'zoom-in') {
       mapInteractions.handleZoom('in');
       return;
@@ -190,7 +192,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
         <div 
           ref={canvasRef}
           className="relative cursor-crosshair h-full"
-          onClick={handleToolAction}
+          onClick={viewMode === 'preview' ? undefined : handleToolAction}
           style={{
             transform: `scale(${mapInteractions.zoomLevel}) translate(${mapInteractions.mapPosition.x}px, ${mapInteractions.mapPosition.y}px)`,
             transformOrigin: 'center',

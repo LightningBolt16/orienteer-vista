@@ -41,6 +41,7 @@ export const useMapStorage = () => {
       const { data, error } = await supabase
         .from('maps')
         .select('*')
+        .eq('owner_id', session.user.id)
         .order('created_at', { ascending: false });
         
       if (error) {
@@ -88,6 +89,8 @@ export const useMapStorage = () => {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `${session.user.id}/${fileName}`;
       
+      console.log('Uploading map to:', filePath);
+      
       // Upload file to storage
       const { error: uploadError, data: fileData } = await supabase.storage
         .from('maps')
@@ -105,18 +108,22 @@ export const useMapStorage = () => {
         .from('maps')
         .getPublicUrl(filePath);
         
+      // Prepare metadata
+      const metadata = {
+        type: mapData.type,
+        scale: mapData.scale
+      };
+      
       // Create database entry
       const { error: dbError, data: mapRecord } = await supabase
         .from('maps')
         .insert({
           name: mapData.name,
-          description: mapData.description || null,
+          description: JSON.stringify(metadata),
           file_url: publicUrl,
           thumbnail_url: null, // We could generate thumbnails in the future
           owner_id: session.user.id,
           is_public: mapData.isPublic || false,
-          // Store type and scale as metadata in the description for now
-          // In a real app, we would add these as columns to the maps table
         })
         .select()
         .single();

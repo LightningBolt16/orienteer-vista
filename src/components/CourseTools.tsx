@@ -67,7 +67,6 @@ const CourseTools: React.FC<CourseToolsProps> = ({
     { id: 'zoom-out', icon: <ZoomOut size={18} />, label: t('zoomOut'), shortcut: '-' }
   ];
 
-  // Add disabled prop to handle UI state for tools
   useEffect(() => {
     if (disabled && selectedTool !== 'pointer') {
       onToolChange('pointer');
@@ -75,12 +74,13 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   }, [disabled, selectedTool, onToolChange]);
   
   return (
-    <div className={`bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 flex gap-2 items-center w-full ${disabled ? 'opacity-70 pointer-events-none' : ''}`}>
+    <div className={`bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-2 flex gap-2 items-center w-full ${disabled ? 'opacity-70' : ''}`}>
       {/* Basic Tools */}
       <ToolGroup
         tools={basicTools}
         selectedTool={selectedTool}
-        onValueChange={onToolChange}
+        onValueChange={disabled ? () => {} : onToolChange}
+        disabled={disabled}
       />
       
       <div className="w-px h-8 bg-gray-200"></div>
@@ -89,17 +89,19 @@ const CourseTools: React.FC<CourseToolsProps> = ({
       <ToolGroup
         tools={zoomTools}
         selectedTool={selectedTool}
-        onValueChange={onToolChange}
+        onValueChange={disabled ? () => {} : onToolChange}
+        disabled={disabled}
       />
       
       {/* Advanced Tools Dropdown */}
-      <Collapsible open={showAdvancedTools} onOpenChange={setShowAdvancedTools}>
+      <Collapsible open={showAdvancedTools} onOpenChange={!disabled ? setShowAdvancedTools : undefined}>
         <div className="flex items-center">
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
               size="sm" 
               className="flex items-center text-xs h-8 px-2"
+              disabled={disabled}
             >
               {t('advancedTools')}
               {showAdvancedTools 
@@ -112,7 +114,8 @@ const CourseTools: React.FC<CourseToolsProps> = ({
             <ToolGroup
               tools={advancedTools}
               selectedTool={selectedTool}
-              onValueChange={onToolChange}
+              onValueChange={disabled ? () => {} : onToolChange}
+              disabled={disabled}
             />
           </CollapsibleContent>
         </div>
@@ -126,6 +129,7 @@ const CourseTools: React.FC<CourseToolsProps> = ({
           icon={<Map className="h-4 w-4" />}
           label={t('resetView')}
           onClick={onResetView}
+          disabled={disabled}
         />
       </div>
     </div>
