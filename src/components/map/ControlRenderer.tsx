@@ -43,8 +43,8 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
     };
   };
 
-  // Using a consistent color for all controls
-  const CONTROL_COLOR = "#9b87f5"; // Using primary purple
+  // Using orienteering red color for all controls
+  const CONTROL_COLOR = "#ea384c";
 
   // Render special controls based on type with standardized sizes
   const renderControlShape = () => {
@@ -76,7 +76,7 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
               />
             </svg>
             {showControlNumbers && control.number !== undefined && (
-              <div className="absolute -top-3 -right-3 bg-white text-purple-600 rounded-full h-5 w-5 flex items-center justify-center text-xs font-bold">
+              <div className="absolute -top-3 -right-3 bg-white text-red-600 rounded-full h-5 w-5 flex items-center justify-center text-xs font-bold">
                 {control.number}
               </div>
             )}

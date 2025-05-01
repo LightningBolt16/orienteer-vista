@@ -24,20 +24,27 @@ const CourseTools: React.FC<CourseToolsProps> = ({
 }) => {
   const { t } = useLanguage();
   
+  // Orienteering red color
+  const ORIENTEERING_COLOR = "#ea384c"; 
+  
   // Basic tools that are always shown - simplified
   const basicTools = [
     { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointerTool'), shortcut: 'P' },
     { id: 'move', icon: <Move size={18} />, label: t('moveMap'), shortcut: 'M' },
-    { id: 'control', icon: <div className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-purple-600"></div>, label: t('addControl'), shortcut: 'C' },
+    { id: 'control', icon: <div className="flex items-center justify-center w-6 h-6">
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" fill="none" stroke={ORIENTEERING_COLOR} strokeWidth="2" />
+      </svg>
+    </div>, label: t('addControl'), shortcut: 'C' },
     { id: 'start', icon: <div className="flex items-center justify-center">
       <svg width="24" height="24" viewBox="0 0 24 24">
-        <polygon points="12,0 24,24 0,24" fill="none" stroke="#9b87f5" strokeWidth="2" />
+        <polygon points="12,0 24,24 0,24" fill="none" stroke={ORIENTEERING_COLOR} strokeWidth="2" />
       </svg>
     </div>, label: t('addStart'), shortcut: 'S' },
     { id: 'finish', icon: <div className="flex items-center justify-center">
       <svg width="24" height="24" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="#9b87f5" strokeWidth="2" />
-        <circle cx="12" cy="12" r="6" fill="none" stroke="#9b87f5" strokeWidth="2" />
+        <circle cx="12" cy="12" r="10" fill="none" stroke={ORIENTEERING_COLOR} strokeWidth="2" />
+        <circle cx="12" cy="12" r="6" fill="none" stroke={ORIENTEERING_COLOR} strokeWidth="2" />
       </svg>
     </div>, label: t('addFinish'), shortcut: 'F' }
   ];
