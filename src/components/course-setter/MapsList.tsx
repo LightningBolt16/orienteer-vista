@@ -50,14 +50,30 @@ const MapsList: React.FC<MapsListProps> = ({
           return;
         }
         
-        // Transform data to match MapInfo format
-        const transformedMaps: MapInfo[] = data.map(map => ({
-          id: map.id,
-          name: map.name,
-          imageUrl: map.file_url,
-          type: map.type || 'forest',
-          scale: map.scale || '10000'
-        }));
+        // Transform data to match MapInfo format and parse metadata from description
+        const transformedMaps: MapInfo[] = data.map(map => {
+          // Try to parse the description as JSON to extract type and scale
+          let mapType = 'forest';
+          let mapScale = '10000';
+          
+          try {
+            if (map.description) {
+              const metadata = JSON.parse(map.description);
+              if (metadata.type) mapType = metadata.type;
+              if (metadata.scale) mapScale = metadata.scale;
+            }
+          } catch (e) {
+            console.error('Error parsing map metadata:', e);
+          }
+          
+          return {
+            id: map.id,
+            name: map.name,
+            imageUrl: map.file_url,
+            type: mapType,
+            scale: mapScale
+          };
+        });
         
         setUserMaps(transformedMaps);
       } catch (error: any) {

@@ -29,6 +29,28 @@ export const useMapStorage = () => {
   const { t } = useLanguage();
   const { user, session } = useUser();
 
+  // Helper function to extract map metadata from description
+  const parseMapMetadata = (map: Tables['maps']['Row']): Map => {
+    let mapType: 'sprint' | 'forest' = 'forest';
+    let mapScale = '10000';
+    
+    try {
+      if (map.description) {
+        const metadata = JSON.parse(map.description);
+        if (metadata.type) mapType = metadata.type;
+        if (metadata.scale) mapScale = metadata.scale;
+      }
+    } catch (e) {
+      console.error('Error parsing map metadata:', e);
+    }
+    
+    return {
+      ...map,
+      type: mapType,
+      scale: mapScale
+    };
+  };
+
   // Fetch user's maps
   const fetchMaps = async () => {
     if (!session) {
@@ -41,23 +63,17 @@ export const useMapStorage = () => {
       const { data, error } = await supabase
         .from('maps')
         .select('*')
-        .eq('owner_id', session.user.id)
+        .eq('owner_id', session?.user.id)
         .order('created_at', { ascending: false });
         
       if (error) {
-        console.error('Error fetching maps:', error);
-        toast({
-          title: t('error'),
-          description: error.message,
-          variant: 'destructive'
-        });
-        setLoading(false);
-        return [];
+        throw error;
       }
       
-      setMaps(data || []);
+      const mapsWithMetadata = (data || []).map(parseMapMetadata);
+      setMaps(mapsWithMetadata);
       setLoading(false);
-      return data || [];
+      return mapsWithMetadata;
     } catch (error: any) {
       console.error('Error in fetchMaps:', error);
       toast({
@@ -108,7 +124,7 @@ export const useMapStorage = () => {
         .from('maps')
         .getPublicUrl(filePath);
         
-      // Prepare metadata
+      // Prepare metadata as JSON string
       const metadata = {
         type: mapData.type,
         scale: mapData.scale
@@ -119,9 +135,9 @@ export const useMapStorage = () => {
         .from('maps')
         .insert({
           name: mapData.name,
-          description: JSON.stringify(metadata),
+          description: JSON.stringify(metadata), // Store metadata as JSON string
           file_url: publicUrl,
-          thumbnail_url: null, // We could generate thumbnails in the future
+          thumbnail_url: null,
           owner_id: session.user.id,
           is_public: mapData.isPublic || false,
         })
@@ -141,7 +157,7 @@ export const useMapStorage = () => {
       await fetchMaps();
       
       setUploading(false);
-      return mapRecord;
+      return parseMapMetadata(mapRecord);
     } catch (error: any) {
       console.error('Error uploading map:', error);
       toast({

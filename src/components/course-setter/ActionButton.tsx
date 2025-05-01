@@ -10,13 +10,15 @@ interface ActionButtonProps {
   label: string;
   onClick: () => void;
   className?: string;
+  disabled?: boolean; // Add the disabled prop
 }
 
 const ActionButton: React.FC<ActionButtonProps> = ({
   icon,
   label,
   onClick,
-  className = ''
+  className = '',
+  disabled = false // Add default value
 }) => {
   return (
     <TooltipProvider>
@@ -27,6 +29,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
             size="icon"
             className={`h-8 w-8 ${className}`}
             onClick={onClick}
+            disabled={disabled}
           >
             {icon}
           </Button>
