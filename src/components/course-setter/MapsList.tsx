@@ -53,13 +53,17 @@ const MapsList: React.FC<MapsListProps> = ({
         // Transform data to match MapInfo format and parse metadata from description
         const transformedMaps: MapInfo[] = data.map(map => {
           // Try to parse the description as JSON to extract type and scale
-          let mapType = 'forest';
+          // Default to 'forest' type and '10000' scale
+          let mapType: 'forest' | 'sprint' = 'forest';
           let mapScale = '10000';
           
           try {
             if (map.description) {
               const metadata = JSON.parse(map.description);
-              if (metadata.type) mapType = metadata.type;
+              // Ensure mapType is one of the allowed values
+              if (metadata.type && (metadata.type === 'forest' || metadata.type === 'sprint')) {
+                mapType = metadata.type as 'forest' | 'sprint';
+              }
               if (metadata.scale) mapScale = metadata.scale;
             }
           } catch (e) {

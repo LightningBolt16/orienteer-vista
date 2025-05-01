@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from '../components/ui/use-toast';
@@ -37,7 +36,10 @@ export const useMapStorage = () => {
     try {
       if (map.description) {
         const metadata = JSON.parse(map.description);
-        if (metadata.type) mapType = metadata.type;
+        // Ensure mapType is one of the allowed values
+        if (metadata.type && (metadata.type === 'forest' || metadata.type === 'sprint')) {
+          mapType = metadata.type;
+        }
         if (metadata.scale) mapScale = metadata.scale;
       }
     } catch (e) {
