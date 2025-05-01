@@ -43,7 +43,7 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
     };
   };
 
-  // Standard colors
+  // Using a consistent color for all controls
   const CONTROL_COLOR = "#9b87f5"; // Using primary purple
 
   // Render special controls based on type with standardized sizes
@@ -65,7 +65,16 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
       case 'control':
         return (
           <div className="relative">
-            <div className="h-6 w-6 rounded-full border-2 border-purple-600"></div>
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <circle 
+                cx="12" 
+                cy="12" 
+                r="10" 
+                fill="none" 
+                stroke={CONTROL_COLOR} 
+                strokeWidth="2" 
+              />
+            </svg>
             {showControlNumbers && control.number !== undefined && (
               <div className="absolute -top-3 -right-3 bg-white text-purple-600 rounded-full h-5 w-5 flex items-center justify-center text-xs font-bold">
                 {control.number}

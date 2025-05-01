@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { MousePointer, Move, Circle, Flag } from 'lucide-react';
-import { Button } from './ui/button';
+import React, { useEffect } from 'react';
+import { MousePointer, Move, Circle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ToolGroup from './course-setter/ToolGroup';
 import ActionButton from './course-setter/ActionButton';
@@ -29,20 +28,21 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   const basicTools = [
     { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointerTool'), shortcut: 'P' },
     { id: 'move', icon: <Move size={18} />, label: t('moveMap'), shortcut: 'M' },
-    { id: 'control', icon: <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-purple-600"></div>, label: t('addControl'), shortcut: 'C' },
+    { id: 'control', icon: <div className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-purple-600"></div>, label: t('addControl'), shortcut: 'C' },
     { id: 'start', icon: <div className="flex items-center justify-center">
-      <svg width="20" height="20" viewBox="0 0 28 28">
-        <polygon points="14,0 28,28 0,28" fill="none" stroke="#D946EF" strokeWidth="2" />
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <polygon points="12,0 24,24 0,24" fill="none" stroke="#9b87f5" strokeWidth="2" />
       </svg>
     </div>, label: t('addStart'), shortcut: 'S' },
     { id: 'finish', icon: <div className="flex items-center justify-center">
-      <svg width="20" height="20" viewBox="0 0 28 28">
-        <circle cx="14" cy="14" r="12" fill="none" stroke="#ef4444" strokeWidth="2" />
-        <circle cx="14" cy="14" r="8" fill="none" stroke="#ef4444" strokeWidth="2" />
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="#9b87f5" strokeWidth="2" />
+        <circle cx="12" cy="12" r="6" fill="none" stroke="#9b87f5" strokeWidth="2" />
       </svg>
     </div>, label: t('addFinish'), shortcut: 'F' }
   ];
   
+  // Ensure we don't change selected tool to a disabled one
   useEffect(() => {
     if (disabled && selectedTool !== 'pointer') {
       onToolChange('pointer');
