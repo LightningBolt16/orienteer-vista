@@ -1,21 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  MousePointer, Move, ZoomIn, ZoomOut, 
-  ChevronDown, ChevronUp, LineChart, Circle, Flag, 
-  XCircle, TriangleAlert, Fence, Map
-} from 'lucide-react';
+import { MousePointer, Move, Circle, Flag } from 'lucide-react';
 import { Button } from './ui/button';
-import { 
-  Collapsible, CollapsibleContent, CollapsibleTrigger 
-} from './ui/collapsible';
 import { useLanguage } from '../context/LanguageContext';
 import ToolGroup from './course-setter/ToolGroup';
 import ActionButton from './course-setter/ActionButton';
 
-export type CourseTool = 
-  'pointer' | 'move' | 'start' | 'control' | 'finish' | 'zoom-in' | 'zoom-out' | 
-  'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station' | 'advanced';
+export type CourseTool = 'pointer' | 'move' | 'start' | 'control' | 'finish';
 
 interface CourseToolsProps {
   selectedTool: CourseTool;
@@ -33,9 +24,8 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   disabled = false
 }) => {
   const { t } = useLanguage();
-  const [showAdvancedTools, setShowAdvancedTools] = useState(false);
   
-  // Basic tools that are always shown
+  // Basic tools that are always shown - simplified
   const basicTools = [
     { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointerTool'), shortcut: 'P' },
     { id: 'move', icon: <Move size={18} />, label: t('moveMap'), shortcut: 'M' },
@@ -53,20 +43,6 @@ const CourseTools: React.FC<CourseToolsProps> = ({
     </div>, label: t('addFinish'), shortcut: 'F' }
   ];
   
-  // Advanced tools
-  const advancedTools = [
-    { id: 'crossing-point', icon: <XCircle size={18} />, label: t('crossingPoint') },
-    { id: 'uncrossable-boundary', icon: <Fence size={18} />, label: t('uncrossableBoundary') },
-    { id: 'out-of-bounds', icon: <LineChart size={18} />, label: t('outOfBounds') },
-    { id: 'water-station', icon: <TriangleAlert size={18} />, label: t('waterStation') }
-  ];
-  
-  // Zoom tools are separate
-  const zoomTools = [
-    { id: 'zoom-in', icon: <ZoomIn size={18} />, label: t('zoomIn'), shortcut: '+' },
-    { id: 'zoom-out', icon: <ZoomOut size={18} />, label: t('zoomOut'), shortcut: '-' }
-  ];
-
   useEffect(() => {
     if (disabled && selectedTool !== 'pointer') {
       onToolChange('pointer');
@@ -85,48 +61,10 @@ const CourseTools: React.FC<CourseToolsProps> = ({
       
       <div className="w-px h-8 bg-gray-200"></div>
       
-      {/* Zoom Tools */}
-      <ToolGroup
-        tools={zoomTools}
-        selectedTool={selectedTool}
-        onValueChange={disabled ? () => {} : onToolChange}
-        disabled={disabled}
-      />
-      
-      {/* Advanced Tools Dropdown */}
-      <Collapsible open={showAdvancedTools} onOpenChange={!disabled ? setShowAdvancedTools : undefined}>
-        <div className="flex items-center">
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex items-center text-xs h-8 px-2"
-              disabled={disabled}
-            >
-              {t('advancedTools')}
-              {showAdvancedTools 
-                ? <ChevronUp className="h-4 w-4 ml-1" /> 
-                : <ChevronDown className="h-4 w-4 ml-1" />}
-            </Button>
-          </CollapsibleTrigger>
-          
-          <CollapsibleContent className="absolute top-full mt-1 left-0 bg-white shadow-md rounded-md p-2 z-10">
-            <ToolGroup
-              tools={advancedTools}
-              selectedTool={selectedTool}
-              onValueChange={disabled ? () => {} : onToolChange}
-              disabled={disabled}
-            />
-          </CollapsibleContent>
-        </div>
-      </Collapsible>
-      
-      <div className="w-px h-8 bg-gray-200"></div>
-      
       {/* Reset View Button */}
       <div className="flex gap-1">
         <ActionButton
-          icon={<Map className="h-4 w-4" />}
+          icon={<Circle className="h-4 w-4" />}
           label={t('resetView')}
           onClick={onResetView}
           disabled={disabled}

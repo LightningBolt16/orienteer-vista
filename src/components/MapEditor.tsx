@@ -100,6 +100,16 @@ const MapEditor: React.FC<MapEditorProps> = ({
     setSelectedTool(tool);
   };
 
+  // Add wheel zoom handler
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      mapInteractions.handleZoom('in');
+    } else {
+      mapInteractions.handleZoom('out');
+    }
+  };
+
   // Determine if the toolbar should be disabled
   const isToolbarDisabled = viewMode === 'preview';
   
@@ -124,27 +134,15 @@ const MapEditor: React.FC<MapEditorProps> = ({
       if (e.key === 'f') setSelectedTool('finish');
       if (e.key === 'p') setSelectedTool('pointer');
       if (e.key === 'm') setSelectedTool('move');
-      if (e.key === '+') mapInteractions.handleZoom('in');
-      if (e.key === '-') mapInteractions.handleZoom('out');
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, mapInteractions]);
+  }, [viewMode]);
   
   // Special tool actions handler
   const handleToolAction = (e: React.MouseEvent<HTMLDivElement>) => {
     if (viewMode === 'preview') return;
-    
-    if (selectedTool === 'zoom-in') {
-      mapInteractions.handleZoom('in');
-      return;
-    }
-    if (selectedTool === 'zoom-out') {
-      mapInteractions.handleZoom('out');
-      return;
-    }
-    
     controlInteractions.handleToolAction(e);
   };
   
@@ -185,6 +183,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
         onMouseMove={handleCombinedMouseMove}
         onMouseUp={handleCombinedMouseUp}
         onMouseLeave={handleCombinedMouseUp}
+        onWheel={handleWheel}
       >
         {/* Print preview overlay - now properly controlled by viewMode */}
         <PrintPreviewOverlay viewMode={viewMode} printSettings={printSettings} />
