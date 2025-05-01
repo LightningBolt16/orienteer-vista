@@ -42,9 +42,8 @@ const RouteGame: React.FC = () => {
         }
         
         // Filter maps based on device
-        const filteredMaps = maps.filter(map => 
-          isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
-        );
+        const aspectRatio = isMobile ? '9:16' : '16:9';
+        const filteredMaps = maps.filter(map => map.aspect === aspectRatio);
         
         // If no filtered maps available, switch to other aspect ratio
         if (filteredMaps.length === 0) {

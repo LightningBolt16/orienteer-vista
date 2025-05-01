@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
@@ -118,7 +119,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     return <div className="flex justify-center items-center h-64">Loading route data...</div>;
   }
   
-  // Mobile-specific image path using the map source
+  // Mobile-specific image path using the map source - explicitly use mobile format
   const currentImageUrl = getImageUrl(mapSource, currentRoute.candidateIndex, true);
   
   // Map color strings to actual color values for the side glow effect

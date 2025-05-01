@@ -1,73 +1,74 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from '../components/ui/use-toast';
-// Updated to import from default export
 import useEventState, { MapInfo } from '../hooks/useEventState';
 import EventSetupForm from '../components/course-setter/EventSetupForm';
 import MapsList from '../components/course-setter/MapsList';
 import EditorLayout from '../components/course-setter/EditorLayout';
-
-// Sample maps for demo - this would come from an API in production
-const sampleMaps: MapInfo[] = [
-  { 
-    id: 'map1', 
-    name: 'Forest Map', 
-    imageUrl: '/routes/forest/candidate_1.png',
-    type: 'forest',
-    scale: '10000'
-  },
-  { 
-    id: 'map2', 
-    name: 'Urban Map', 
-    imageUrl: '/routes/urban/candidate_1.png',
-    type: 'sprint',
-    scale: '4000'
-  },
-  { 
-    id: 'map3', 
-    name: 'Default Map', 
-    imageUrl: '/routes/default/candidate_1.png',
-    type: 'forest',
-    scale: '15000'
-  },
-];
+import { useMapStorage } from '../hooks/useMapStorage';
+import { useUser } from '../context/UserContext';
 
 const CourseSetter: React.FC = () => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('new-event');
   const [selectedMapId, setSelectedMapId] = useState<string>('');
+  const { user } = useUser();
+  const { maps, loading: mapsLoading, fetchMaps } = useMapStorage();
+  const [userMaps, setUserMaps] = useState<MapInfo[]>([]);
   
   // Use the event state hook
   const eventState = useEventState();
   
-  // Handle upload of a new map
-  const handleMapUploaded = (metadata: any) => {
-    // In a real implementation, this would save the file to backend storage
-    // For now, we'll simulate adding it to our sampleMaps
-    const newMapId = `map-${Date.now()}`;
-    
-    const newMap = {
-      id: newMapId,
-      name: metadata.name,
-      imageUrl: URL.createObjectURL(metadata.file), // This URL will be temporary for demo purposes
-      type: metadata.type,
-      scale: metadata.scale
+  // Fetch user maps when component mounts or when user changes
+  useEffect(() => {
+    const loadUserMaps = async () => {
+      if (user) {
+        const fetchedMaps = await fetchMaps();
+        
+        // Convert maps to MapInfo format
+        const convertedMaps: MapInfo[] = fetchedMaps.map(map => ({
+          id: map.id,
+          name: map.name,
+          imageUrl: map.file_url,
+          type: map.type as 'forest' | 'sprint',
+          scale: map.scale || '10000'
+        }));
+        
+        setUserMaps(convertedMaps);
+      }
     };
     
-    // In reality, you'd save this to your database
-    console.log('New map added:', newMap);
-    
-    // For demo, we'll pretend it's saved
+    loadUserMaps();
+  }, [user, fetchMaps]);
+  
+  // Handle upload of a new map
+  const handleMapUploaded = async (metadata: any) => {
     toast({
       title: t('success'),
       description: t('mapUploaded'),
     });
     
-    // Select the new map
-    setSelectedMapId(newMapId);
-    setActiveTab('new-event');
+    // Refresh the maps list
+    const refreshedMaps = await fetchMaps();
+    
+    // Convert maps to MapInfo format
+    const convertedMaps: MapInfo[] = refreshedMaps.map(map => ({
+      id: map.id,
+      name: map.name,
+      imageUrl: map.file_url,
+      type: map.type as 'forest' | 'sprint',
+      scale: map.scale || '10000'
+    }));
+    
+    setUserMaps(convertedMaps);
+    
+    // Select the newly uploaded map if available
+    if (convertedMaps.length > 0) {
+      setSelectedMapId(convertedMaps[0].id);
+      setActiveTab('new-event');
+    }
   };
   
   // Render the editor when an event is being created/edited
@@ -79,7 +80,7 @@ const CourseSetter: React.FC = () => {
           currentCourse={eventState.currentCourse}
           selectedControl={eventState.selectedControl}
           allControls={eventState.allControls}
-          sampleMaps={sampleMaps}
+          sampleMaps={userMaps}
           onSelectCourse={eventState.selectCourse}
           onUpdateCourse={eventState.updateCourse}
           onAddCourse={eventState.addCourse}
@@ -107,14 +108,14 @@ const CourseSetter: React.FC = () => {
         
         <TabsContent value="new-event" className="mt-6">
           <EventSetupForm 
-            sampleMaps={sampleMaps}
+            sampleMaps={userMaps}
             onCreateEvent={eventState.createEvent}
           />
         </TabsContent>
         
         <TabsContent value="my-maps" className="mt-6">
           <MapsList 
-            sampleMaps={sampleMaps}
+            sampleMaps={[]} // We don't want to show sample maps
             onSelectMap={(mapId) => {
               setSelectedMapId(mapId);
               setActiveTab('new-event');

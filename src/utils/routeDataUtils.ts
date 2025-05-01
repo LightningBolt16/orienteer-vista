@@ -211,5 +211,18 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
 
 // Helper to get image URL based on map source and candidate index
 export const getImageUrl = (mapSource: MapSource, candidateIndex: number, isMobile: boolean): string => {
-  return `${mapSource.imagePathPrefix}${candidateIndex}.png`;
+  // Make sure to use the correct path format based on the device type
+  // For mobile devices, use the portrait format (9:16), for desktop use landscape (16:9)
+  let imagePathPrefix = mapSource.imagePathPrefix;
+  
+  // If the path contains an aspect ratio, make sure we're using the correct one for the device type
+  if (mapSource.id.includes('landscape') && isMobile) {
+    // Convert landscape path to portrait path for mobile
+    imagePathPrefix = imagePathPrefix.replace('16_9', '9_16');
+  } else if (mapSource.id.includes('portrait') && !isMobile) {
+    // Convert portrait path to landscape path for desktop
+    imagePathPrefix = imagePathPrefix.replace('9_16', '16_9');
+  }
+  
+  return `${imagePathPrefix}${candidateIndex}.png`;
 };

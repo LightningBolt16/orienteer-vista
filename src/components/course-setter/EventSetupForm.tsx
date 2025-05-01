@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { MapInfo, Event } from '../../hooks/useEventState';
 import { toast } from '../ui/use-toast';
+import { AlertCircle } from 'lucide-react';
 
 interface EventSetupFormProps {
   sampleMaps: MapInfo[];
@@ -81,21 +82,38 @@ const EventSetupForm: React.FC<EventSetupFormProps> = ({ sampleMaps, onCreateEve
         
         <div className="space-y-2">
           <Label htmlFor="map-selection">{t('select.map')} *</Label>
-          <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-            <SelectTrigger id="map-selection">
-              <SelectValue placeholder={t('select.map')} />
-            </SelectTrigger>
-            <SelectContent>
-              {sampleMaps.map(map => (
-                <SelectItem key={map.id} value={map.id}>
-                  {map.name} ({map.type === 'sprint' ? 'Sprint' : 'Forest'}, 1:{parseInt(map.scale).toLocaleString()})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {sampleMaps.length > 0 ? (
+            <Select value={selectedMapId} onValueChange={setSelectedMapId}>
+              <SelectTrigger id="map-selection">
+                <SelectValue placeholder={t('select.map')} />
+              </SelectTrigger>
+              <SelectContent>
+                {sampleMaps.map(map => (
+                  <SelectItem key={map.id} value={map.id}>
+                    {map.name} ({map.type === 'sprint' ? 'Sprint' : 'Forest'}, 1:{parseInt(map.scale).toLocaleString()})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
+              <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+              <span>{t('no.maps.available')}</span>
+            </div>
+          )}
         </div>
         
-        <Button className="w-full mt-4" onClick={handleCreateEvent}>
+        {sampleMaps.length === 0 && (
+          <div className="text-sm text-muted-foreground mt-2 p-4 border rounded-md">
+            {t('please.upload.map.first')}
+          </div>
+        )}
+        
+        <Button 
+          className="w-full mt-4" 
+          onClick={handleCreateEvent}
+          disabled={sampleMaps.length === 0}
+        >
           {t('create.event')}
         </Button>
         
