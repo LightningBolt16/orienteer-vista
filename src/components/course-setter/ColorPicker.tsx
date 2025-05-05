@@ -1,8 +1,7 @@
 
-import React from 'react';
-import { Input } from '../ui/input';
-import { Button } from '../ui/button';
+import React, { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { ORIENTEERING_RED } from '../../hooks/useCourseSettings';
 
 interface ColorPickerProps {
   color: string;
@@ -10,36 +9,55 @@ interface ColorPickerProps {
 }
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onColorChange }) => {
+  // Common colors for orienteering maps
+  const presetColors = [
+    ORIENTEERING_RED,  // Orienteering red
+    '#1aad19',         // Green
+    '#1f78b4',         // Blue
+    '#ff7f00',         // Orange
+    '#6a3d9a',         // Purple
+    '#000000',         // Black
+  ];
+
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button 
-          variant="outline" 
-          className="w-10 h-10 p-0 rounded-md border"
-          style={{ background: color }}
+        <button 
+          className="w-10 h-10 rounded border border-gray-300 flex items-center justify-center overflow-hidden"
+          type="button"
+          aria-label="Pick a color"
         >
-          <span className="sr-only">Pick a color</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64">
-        <div className="flex flex-col gap-4">
-          <Input
-            type="color"
-            value={color}
-            onChange={(e) => onColorChange(e.target.value)}
-            className="h-10 w-full"
+          <div
+            className="w-8 h-8 rounded"
+            style={{ backgroundColor: color }}
           />
-          <div className="grid grid-cols-8 gap-1">
-            {['#ea384c', '#000000', '#333333', '#666666', '#999999', '#0000FF', '#008000', '#800080'].map(
-              (predefinedColor) => (
-                <button
-                  key={predefinedColor}
-                  style={{ backgroundColor: predefinedColor }}
-                  className="h-6 w-6 rounded-md border border-gray-300"
-                  onClick={() => onColorChange(predefinedColor)}
-                />
-              )
-            )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3">
+        <div className="space-y-2">
+          <div className="grid grid-cols-6 gap-2">
+            {presetColors.map((presetColor) => (
+              <button
+                key={presetColor}
+                className={`w-8 h-8 rounded-full border ${
+                  color === presetColor ? 'ring-2 ring-primary' : 'border-gray-300'
+                }`}
+                style={{ backgroundColor: presetColor }}
+                onClick={() => onColorChange(presetColor)}
+                type="button"
+                aria-label={`Select color: ${presetColor}`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <label htmlFor="custom-color" className="text-xs">Custom:</label>
+            <input
+              id="custom-color"
+              type="color"
+              value={color}
+              onChange={(e) => onColorChange(e.target.value)}
+              className="h-8 w-16 p-0 border-0"
+            />
           </div>
         </div>
       </PopoverContent>

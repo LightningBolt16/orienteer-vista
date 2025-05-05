@@ -41,6 +41,11 @@ const CourseSettingsDialog: React.FC<CourseSettingsDialogProps> = ({
   const { t } = useLanguage();
   const [localSettings, setLocalSettings] = useState<CourseSettings>({...settings});
 
+  // Update local settings when the prop changes
+  React.useEffect(() => {
+    setLocalSettings({...settings});
+  }, [settings]);
+
   const handleSave = () => {
     onSettingsChange(localSettings);
     onOpenChange(false);

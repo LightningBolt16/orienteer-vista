@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { toast } from './ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
@@ -169,6 +170,11 @@ const MapEditor: React.FC<MapEditorProps> = ({
     setSelectedTool(tool);
   };
 
+  // Handle opening settings dialog
+  const handleOpenSettings = () => {
+    setSettingsDialogOpen(true);
+  };
+
   // Add wheel zoom handler
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -229,7 +235,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
         <CourseTools 
           selectedTool={selectedTool}
           onToolChange={handleToolChange}
-          onOpenSettings={() => setSettingsDialogOpen(true)}
+          onOpenSettings={handleOpenSettings}
           disabled={isToolbarDisabled}
           enabledTools={advancedTools}
           controlColor={settings.controlCircle.color}
