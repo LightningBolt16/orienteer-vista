@@ -289,7 +289,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
             draggable={false}
           />
           
-          {/* Draw connection lines between controls */}
+          {/* Draw connection lines between controls - excluding advanced tools */}
           <CourseConnections 
             sortedControls={sortedControls} 
             showConnections={showConnections}

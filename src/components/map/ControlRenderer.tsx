@@ -115,12 +115,20 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
           </div>
         );
       case 'crossing-point':
+        // Purple Pen style crossing point - X in a circle
         return (
           <div className="relative">
             <svg width={svgSize} height={svgSize} viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}>
               <circle cx={halfSvgSize} cy={halfSvgSize} r={halfSvgSize - CONTROL_THICKNESS} fill="none" stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS} />
-              <path 
-                d={`M${svgSize*0.3},${svgSize*0.3} L${svgSize*0.7},${svgSize*0.7} M${svgSize*0.3},${svgSize*0.7} L${svgSize*0.7},${svgSize*0.3}`} 
+              <line 
+                x1={svgSize*0.3} y1={svgSize*0.3} 
+                x2={svgSize*0.7} y2={svgSize*0.7} 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS} 
+              />
+              <line 
+                x1={svgSize*0.3} y1={svgSize*0.7} 
+                x2={svgSize*0.7} y2={svgSize*0.3} 
                 stroke={CONTROL_COLOR} 
                 strokeWidth={CONTROL_THICKNESS} 
               />
@@ -128,31 +136,68 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
           </div>
         );
       case 'uncrossable-boundary':
+        // Purple Pen style uncrossable boundary - line with dots at ends
         return (
           <div className="relative">
             <svg width={svgSize} height={svgSize} viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}>
-              <line x1="2" y1={halfSvgSize} x2={viewBoxSize-2} y2={halfSvgSize} stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS} />
+              <line 
+                x1="2" y1={halfSvgSize} 
+                x2={viewBoxSize-2} y2={halfSvgSize} 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS} 
+              />
               <circle cx="2" cy={halfSvgSize} r="2" fill={CONTROL_COLOR} />
               <circle cx={viewBoxSize-2} cy={halfSvgSize} r="2" fill={CONTROL_COLOR} />
             </svg>
           </div>
         );
       case 'out-of-bounds':
+        // Purple Pen style out-of-bounds - crossed square
         return (
           <div className="relative">
             <svg width={svgSize} height={svgSize} viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}>
-              <rect x="3" y="3" width={viewBoxSize-6} height={viewBoxSize-6} fill="none" stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS} />
-              <line x1="3" y1="3" x2={viewBoxSize-3} y2={viewBoxSize-3} stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS} />
-              <line x1="3" y1={viewBoxSize-3} x2={viewBoxSize-3} y2="3" stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS} />
+              <rect 
+                x="4" y="4" 
+                width={viewBoxSize-8} height={viewBoxSize-8} 
+                fill="none" 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS} 
+              />
+              <line 
+                x1="4" y1="4" 
+                x2={viewBoxSize-4} y2={viewBoxSize-4} 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS} 
+              />
+              <line 
+                x1="4" y1={viewBoxSize-4} 
+                x2={viewBoxSize-4} y2="4" 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS} 
+              />
             </svg>
           </div>
         );
       case 'water-station':
+        // Purple Pen style water station - triangle with cup symbol
         return (
           <div className="relative">
             <svg width={svgSize} height={svgSize} viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}>
-              <path d={`M${halfSvgSize},2 L${viewBoxSize-2},${viewBoxSize-2} L2,${viewBoxSize-2} Z`} fill="none" stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS} />
-              <circle cx={halfSvgSize} cy={halfSvgSize + (halfSvgSize * 0.2)} r={halfSvgSize * 0.4} fill="none" stroke={CONTROL_COLOR} strokeWidth={CONTROL_THICKNESS * 0.75} />
+              <path 
+                d={`M${halfSvgSize},4 L${viewBoxSize-4},${viewBoxSize-4} L4,${viewBoxSize-4} Z`} 
+                fill="none" 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS} 
+              />
+              <ellipse 
+                cx={halfSvgSize} 
+                cy={halfSvgSize + 2} 
+                rx={halfSvgSize/2} 
+                ry={halfSvgSize/4} 
+                fill="none" 
+                stroke={CONTROL_COLOR} 
+                strokeWidth={CONTROL_THICKNESS * 0.75} 
+              />
             </svg>
           </div>
         );

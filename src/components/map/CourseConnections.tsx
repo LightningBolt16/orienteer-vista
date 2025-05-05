@@ -26,15 +26,21 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
   viewMode, 
   printSettings,
   lineColor = "#ea384c",
-  lineThickness = 2
+  lineThickness = 1
 }) => {
   if (!showConnections || sortedControls.length < 2) return null;
   
-  // Generate line segments between controls
+  // Generate line segments between controls - only standard controls
   const lines = [];
-  for (let i = 0; i < sortedControls.length - 1; i++) {
-    const start = sortedControls[i];
-    const end = sortedControls[i + 1];
+  
+  // Filter to only include standard control types before drawing lines
+  const standardControls = sortedControls.filter(
+    c => c.type === 'control' || c.type === 'start' || c.type === 'finish'
+  );
+  
+  for (let i = 0; i < standardControls.length - 1; i++) {
+    const start = standardControls[i];
+    const end = standardControls[i + 1];
     
     // Skip finish to start connections
     if (start.type === 'finish' || end.type === 'start') continue;
@@ -63,11 +69,7 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
   return (
     <svg
       className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ 
-        filter: (viewMode === 'preview' && printSettings) 
-          ? 'none' 
-          : 'none'
-      }}
+      style={{ filter: 'none' }}
       preserveAspectRatio="none"
       viewBox="0 0 100 100"
     >

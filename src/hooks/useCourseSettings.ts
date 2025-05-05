@@ -55,7 +55,7 @@ const defaultSettings: CourseSettings = {
   },
   line: {
     color: ORIENTEERING_RED,
-    thickness: 2,
+    thickness: 1, // Reduced from 2 to match Purple Pen defaults
   },
   availableTools: [
     { id: 'crossing-point', type: 'crossing-point', enabled: false, shortcut: 'X' },

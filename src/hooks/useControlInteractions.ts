@@ -60,14 +60,21 @@ export function useControlInteractions({
     
     const controlType = selectedTool as Control['type'];
     
+    // For regular controls only (not advanced tools), auto-number them
+    let number = undefined;
+    let code = undefined;
+    if (controlType === 'control') {
+      number = controls.filter(c => c.type === 'control').length + 1;
+      code = `${number}`;
+    }
+    
     const newControl: Control = {
       id: `control-${Date.now()}`,
       type: controlType,
       x,
       y,
-      number: controlType === 'control' ? 
-        controls.filter(c => c.type === 'control').length + 1 : undefined,
-      code: controlType === 'control' ? `${controls.filter(c => c.type === 'control').length + 1}` : undefined
+      number,
+      code
     };
     
     onAddControl(newControl);
