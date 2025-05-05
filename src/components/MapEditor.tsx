@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { toast } from './ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
@@ -12,7 +11,7 @@ import PrintPreviewOverlay from './map/PrintPreviewOverlay';
 import MapDisplayOptions from './map/MapDisplayOptions';
 import CourseSettingsDialog from './course-setter/CourseSettingsDialog';
 import { useCourseSettings, ORIENTEERING_RED } from '../hooks/useCourseSettings';
-import { LineSlash, X, CircleSlash, Droplets } from 'lucide-react';
+import { Slash, X, CircleSlash, Droplets } from 'lucide-react';
 
 interface Control {
   id: string;

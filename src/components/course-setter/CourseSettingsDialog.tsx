@@ -18,11 +18,11 @@ import { ColorPicker } from './ColorPicker';
 import { useLanguage } from '../../context/LanguageContext';
 import { Tool, CourseSettings } from '../../hooks/useCourseSettings';
 import { 
-  CircleDashed, 
-  LineSlashIcon,
+  CircleDashed,
+  Slash,
   X as XIcon, 
   Droplets, 
-  CircleSlashIcon 
+  CircleSlash 
 } from 'lucide-react';
 
 interface CourseSettingsDialogProps {
@@ -308,8 +308,8 @@ const CourseSettingsDialog: React.FC<CourseSettingsDialogProps> = ({
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 flex items-center justify-center">
                       {tool.id === 'crossing-point' && <XIcon className="h-5 w-5" />}
-                      {tool.id === 'uncrossable-boundary' && <LineSlashIcon className="h-5 w-5" />}
-                      {tool.id === 'out-of-bounds' && <CircleSlashIcon className="h-5 w-5" />}
+                      {tool.id === 'uncrossable-boundary' && <Slash className="h-5 w-5" />}
+                      {tool.id === 'out-of-bounds' && <CircleSlash className="h-5 w-5" />}
                       {tool.id === 'water-station' && <Droplets className="h-5 w-5" />}
                     </div>
                     <Label htmlFor={`tool-${tool.id}`}>{t(`tool.${tool.id}`)}</Label>

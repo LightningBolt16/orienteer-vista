@@ -64,7 +64,7 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
     <svg
       className="absolute inset-0 w-full h-full pointer-events-none"
       style={{ 
-        filter: (viewMode === 'preview' && printSettings?.printArea) 
+        filter: (viewMode === 'preview' && printSettings) 
           ? 'none' 
           : 'none'
       }}

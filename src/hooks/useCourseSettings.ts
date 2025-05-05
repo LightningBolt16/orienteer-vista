@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import React from 'react';
 
 // Default orienteering red color
 export const ORIENTEERING_RED = "#ea384c";

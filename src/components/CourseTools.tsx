@@ -7,6 +7,13 @@ import ActionButton from './course-setter/ActionButton';
 
 export type CourseTool = 'pointer' | 'move' | 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
 
+interface ToolItem {
+  id: string;
+  icon: React.ReactNode;
+  label: string;
+  shortcut: string;
+}
+
 interface CourseToolsProps {
   selectedTool: CourseTool;
   onToolChange: (tool: CourseTool) => void;
@@ -15,7 +22,7 @@ interface CourseToolsProps {
   enabledTools?: Array<{
     id: string;
     type: string;
-    enabled?: boolean;
+    enabled: boolean;
     icon?: React.ReactNode;
     label?: string;
     shortcut?: string;
@@ -34,7 +41,7 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   const { t } = useLanguage();
   
   // Basic tools that are always shown - simplified
-  const basicTools = [
+  const basicTools: ToolItem[] = [
     { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointerTool'), shortcut: 'P' },
     { id: 'move', icon: <Move size={18} />, label: t('moveMap'), shortcut: 'M' },
     { id: 'control', icon: <div className="flex items-center justify-center w-6 h-6">
@@ -55,8 +62,18 @@ const CourseTools: React.FC<CourseToolsProps> = ({
     </div>, label: t('addFinish'), shortcut: 'F' }
   ];
 
+  // Convert enabled tools to the correct format
+  const formattedEnabledTools: ToolItem[] = enabledTools
+    .filter(tool => tool.enabled)
+    .map(tool => ({
+      id: tool.id,
+      icon: tool.icon || <div>?</div>,
+      label: tool.label || tool.id,
+      shortcut: tool.shortcut || ''
+    }));
+
   // Combine basic tools with enabled advanced tools
-  const allTools = [...basicTools, ...enabledTools];
+  const allTools: ToolItem[] = [...basicTools, ...formattedEnabledTools];
   
   // Ensure we don't change selected tool to a disabled one
   useEffect(() => {
