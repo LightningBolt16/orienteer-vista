@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import React from 'react';
 
-// Default orienteering purple color, changed from red
-export const ORIENTEERING_PURPLE = "#9b87f5";
+// Default orienteering color, changed from purple to bright pink
+export const ORIENTEERING_PURPLE = "#f20dff";
 
 export interface Tool {
   id: string;
@@ -55,7 +54,7 @@ const defaultSettings: CourseSettings = {
   },
   line: {
     color: ORIENTEERING_PURPLE,
-    thickness: 0.5, // Reduced to be much thinner
+    thickness: 0.5, // Thin line
   },
   availableTools: [
     { id: 'timed-start', type: 'timed-start', enabled: false, icon: null, label: 'Timed Start', shortcut: 'T' },

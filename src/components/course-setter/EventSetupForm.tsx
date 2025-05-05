@@ -1,125 +1,216 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { MapInfo } from '../../hooks/useEventState';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { MapInfo, Event } from '../../hooks/useEventState';
-import { toast } from '../ui/use-toast';
-import { AlertCircle } from 'lucide-react';
 
 interface EventSetupFormProps {
+  onCreateEvent: (data: any) => void;
   sampleMaps: MapInfo[];
-  onCreateEvent: (eventData: Omit<Event, 'id' | 'courses'>) => void;
+  preSelectedMapId?: string;
 }
 
-const EventSetupForm: React.FC<EventSetupFormProps> = ({ sampleMaps, onCreateEvent }) => {
+const EventSetupForm: React.FC<EventSetupFormProps> = ({ onCreateEvent, sampleMaps, preSelectedMapId }) => {
   const { t } = useLanguage();
-  const [eventName, setEventName] = useState('');
-  const [eventDate, setEventDate] = useState('');
-  const [selectedMapId, setSelectedMapId] = useState<string>('');
-
-  const handleCreateEvent = () => {
-    if (!selectedMapId || !eventName) {
-      toast({
-        title: t('error'),
-        description: t('please.fill.required.fields'),
-        variant: "destructive"
-      });
-      return;
+  const [selectedMapType, setSelectedMapType] = useState<'forest' | 'sprint'>('forest');
+  const [selectedMapScale, setSelectedMapScale] = useState<string>('10000');
+  
+  // Define form schema
+  const FormSchema = z.object({
+    eventName: z.string().min(3, { message: t('eventNameRequired') }),
+    mapId: z.string().min(1, { message: t('mapRequired') }),
+    mapType: z.enum(['forest', 'sprint']),
+    mapScale: z.string().min(1),
+  });
+  
+  // Initialize form with react-hook-form
+  const form = useForm<z.infer<typeof FormSchema>>({
+    resolver: zodResolver(FormSchema),
+    defaultValues: {
+      eventName: '',
+      mapId: preSelectedMapId || '',
+      mapType: 'forest',
+      mapScale: '10000',
+    },
+  });
+  
+  // Update form values when preSelectedMapId changes
+  useEffect(() => {
+    if (preSelectedMapId) {
+      form.setValue('mapId', preSelectedMapId);
+      
+      // Find the selected map to set its type and scale
+      const selectedMap = sampleMaps.find(map => map.id === preSelectedMapId);
+      if (selectedMap) {
+        form.setValue('mapType', selectedMap.type);
+        form.setValue('mapScale', selectedMap.scale);
+        setSelectedMapType(selectedMap.type);
+        setSelectedMapScale(selectedMap.scale);
+      }
     }
+  }, [preSelectedMapId, sampleMaps, form]);
+  
+  // Handle map selection
+  const handleMapChange = (mapId: string) => {
+    form.setValue('mapId', mapId);
     
-    const selectedMap = sampleMaps.find(map => map.id === selectedMapId);
-    
-    if (!selectedMap) {
-      toast({
-        title: t('error'),
-        description: t('map.not.found'),
-        variant: "destructive"
-      });
-      return;
+    // Find the selected map to set its type and scale
+    const selectedMap = sampleMaps.find(map => map.id === mapId);
+    if (selectedMap) {
+      form.setValue('mapType', selectedMap.type);
+      form.setValue('mapScale', selectedMap.scale);
+      setSelectedMapType(selectedMap.type);
+      setSelectedMapScale(selectedMap.scale);
     }
-    
-    onCreateEvent({
-      name: eventName,
-      date: eventDate,
-      location: '',  // Default empty location
-      organizer: '',  // Default empty organizer
-      mapId: selectedMapId,
-      mapScale: selectedMap.scale,
-      mapType: selectedMap.type as 'sprint' | 'forest'
-    });
   };
-
+  
+  // Handle form submission
+  const handleSubmit = (data: z.infer<typeof FormSchema>) => {
+    // Find the selected map to pass its details
+    const selectedMap = sampleMaps.find(map => map.id === data.mapId);
+    
+    if (selectedMap) {
+      onCreateEvent({
+        ...data,
+        mapUrl: selectedMap.imageUrl,
+        mapName: selectedMap.name,
+      });
+    }
+  };
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('create.new.event')}</CardTitle>
-        <CardDescription>{t('setup.orienteering.event')}</CardDescription>
+        <CardTitle>{t('newEvent')}</CardTitle>
+        <CardDescription>{t('createNewEvent')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="event-name">{t('event.name')} *</Label>
-          <Input 
-            id="event-name" 
-            placeholder={t('enter.event.name')} 
-            value={eventName}
-            onChange={(e) => setEventName(e.target.value)}
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="event-date">{t('event.date')}</Label>
-          <Input 
-            id="event-date" 
-            type="date"
-            value={eventDate}
-            onChange={(e) => setEventDate(e.target.value)}
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="map-selection">{t('select.map')} *</Label>
-          {sampleMaps.length > 0 ? (
-            <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-              <SelectTrigger id="map-selection">
-                <SelectValue placeholder={t('select.map')} />
-              </SelectTrigger>
-              <SelectContent>
-                {sampleMaps.map(map => (
-                  <SelectItem key={map.id} value={map.id}>
-                    {map.name} ({map.type === 'sprint' ? 'Sprint' : 'Forest'}, 1:{parseInt(map.scale).toLocaleString()})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
-              <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-              <span>{t('no.maps.available')}</span>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="eventName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('eventName')}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t('enterEventName')} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="mapId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('map')}</FormLabel>
+                  <Select 
+                    value={field.value} 
+                    onValueChange={(value) => handleMapChange(value)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('selectMap')} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {sampleMaps.length === 0 ? (
+                        <SelectItem value="no-maps" disabled>{t('noMapsAvailable')}</SelectItem>
+                      ) : (
+                        sampleMaps.map((map) => (
+                          <SelectItem key={map.id} value={map.id}>
+                            {map.name} ({map.type === 'forest' ? 'Forest' : 'Sprint'}, 1:{parseInt(map.scale).toLocaleString()})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="mapType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('mapType')}</FormLabel>
+                    <Select 
+                      value={field.value}
+                      onValueChange={(value: 'forest' | 'sprint') => {
+                        field.onChange(value);
+                        setSelectedMapType(value);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="forest">Forest</SelectItem>
+                        <SelectItem value="sprint">Sprint</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="mapScale"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('mapScale')}</FormLabel>
+                    <Select 
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedMapScale(value);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="4000">1:4,000</SelectItem>
+                        <SelectItem value="5000">1:5,000</SelectItem>
+                        <SelectItem value="7500">1:7,500</SelectItem>
+                        <SelectItem value="10000">1:10,000</SelectItem>
+                        <SelectItem value="15000">1:15,000</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-          )}
-        </div>
-        
-        {sampleMaps.length === 0 && (
-          <div className="text-sm text-muted-foreground mt-2 p-4 border rounded-md">
-            {t('please.upload.map.first')}
-          </div>
-        )}
-        
-        <Button 
-          className="w-full mt-4" 
-          onClick={handleCreateEvent}
-          disabled={sampleMaps.length === 0}
-        >
-          {t('create.event')}
-        </Button>
-        
-        <div className="text-sm text-muted-foreground mt-2">
-          * {t('required.fields')}
-        </div>
+            
+            <div className="flex justify-end">
+              <Button 
+                type="submit"
+                disabled={sampleMaps.length === 0}
+              >
+                {t('createEvent')}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );

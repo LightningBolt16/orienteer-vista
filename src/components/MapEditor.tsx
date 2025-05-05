@@ -12,7 +12,6 @@ import PrintPreviewOverlay from './map/PrintPreviewOverlay';
 import MapDisplayOptions from './map/MapDisplayOptions';
 import CourseSettingsDialog from './course-setter/CourseSettingsDialog';
 import { useCourseSettings, ORIENTEERING_PURPLE } from '../hooks/useCourseSettings';
-import { Flag, Circle, Square, Plus, X, Slash, Droplets } from 'lucide-react';
 
 interface Control {
   id: string;
@@ -90,95 +89,109 @@ const MapEditor: React.FC<MapEditorProps> = ({
   const advancedTools = getEnabledTools().map(tool => {
     // Add icons based on tool type
     let icon;
+    const toolColor = settings.controlCircle.color;
+    
     switch(tool.id) {
       case 'timed-start':
+        // Flag symbol for timed start
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <line x1={5} y1={6} x2={5} y2={18} stroke={settings.controlCircle.color} strokeWidth={2} />
-              <path d={`M5,6 L18,12 L5,18 Z`} fill={settings.controlCircle.color} />
+              <path d="M4,4 L4,20" stroke={toolColor} strokeWidth="2" />
+              <path d="M4,4 L20,12 L4,20" fill={toolColor} />
             </svg>
           </div>
         );
         break;
       case 'mandatory-crossing':
-      case 'optional-crossing':
+        // X symbol for mandatory crossing 
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <path d="M8 8L16 16M8 16L16 8" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'optional-crossing':
+        // X symbol inside circle for optional crossing point
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );
         break;
       case 'out-of-bounds':
+        // X in square for out of bounds
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <rect x="4" y="4" width="16" height="16" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="4" y1="4" x2="20" y2="20" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="4" y1="20" x2="20" y2="4" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <rect x="4" y="4" width="16" height="16" fill="none" stroke={toolColor} strokeWidth="2" />
+              <path d="M8,8 L16,16 M8,16 L16,8" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );
         break;
       case 'temporary-construction':
+        // Square for temporary construction
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <rect x="4" y="4" width="16" height="16" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <rect x="4" y="4" width="16" height="16" fill="none" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );
         break;
       case 'water-location':
+        // Cup symbol for water location
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M6,8 L6,16 C6,18 12,18 12,16 L12,8 Z" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="6" y1="10" x2="12" y2="10" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <path d="M8,6 L8,18 C8,20 16,20 16,18 L16,6 L8,6 Z" fill="none" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );
         break;
       case 'first-aid':
+        // Plus symbol for first aid
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <line x1="12" y1="4" x2="12" y2="20" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="4" y1="12" x2="20" y2="12" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <path d="M12,4 L12,20 M4,12 L20,12" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );
         break;
       case 'forbidden-route':
+        // X for forbidden route
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <line x1="4" y1="4" x2="20" y2="20" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="4" y1="20" x2="20" y2="4" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );
         break;
       case 'uncrossable-boundary':
+        // Line with dots for uncrossable boundary
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <line x1="3" y1="12" x2="21" y2="12" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <circle cx="3" cy="12" r="2" fill={settings.controlCircle.color} />
-              <circle cx="21" cy="12" r="2" fill={settings.controlCircle.color} />
+              <line x1="4" y1="12" x2="20" y2="12" stroke={toolColor} strokeWidth="2" />
+              <circle cx="4" cy="12" r="2" fill={toolColor} />
+              <circle cx="20" cy="12" r="2" fill={toolColor} />
             </svg>
           </div>
         );
         break;
       case 'registration-mark':
+        // Plus symbol for registration mark
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <line x1="12" y1="6" x2="12" y2="18" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="6" y1="12" x2="18" y2="12" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <path d="M12,4 L12,20 M4,12 L20,12" stroke={toolColor} strokeWidth="2" />
             </svg>
           </div>
         );

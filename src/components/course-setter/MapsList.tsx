@@ -9,6 +9,7 @@ import MapUploader from '../MapUploader';
 import { supabase } from '../../integrations/supabase/client';
 import { useUser } from '../../context/UserContext';
 import { toast } from '../ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface MapsListProps {
   sampleMaps: MapInfo[];
@@ -25,6 +26,7 @@ const MapsList: React.FC<MapsListProps> = ({
   const { user } = useUser();
   const [userMaps, setUserMaps] = useState<MapInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   // Fetch user's maps when component mounts
   useEffect(() => {
@@ -94,6 +96,13 @@ const MapsList: React.FC<MapsListProps> = ({
     fetchUserMaps();
   }, [user, t]);
 
+  // Handle map selection and navigate to new event tab
+  const handleUseMap = (mapId: string) => {
+    onSelectMap(mapId);
+    // Redirect to the new event tab
+    navigate('/course-setter', { state: { activeTab: 'new-event', selectedMapId: mapId } });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -134,7 +143,7 @@ const MapsList: React.FC<MapsListProps> = ({
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => onSelectMap(map.id)}
+                            onClick={() => handleUseMap(map.id)}
                           >
                             <MapIcon className="h-4 w-4 mr-2" />
                             {t('use')}

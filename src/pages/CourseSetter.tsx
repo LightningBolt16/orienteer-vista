@@ -9,11 +9,16 @@ import MapsList from '../components/course-setter/MapsList';
 import EditorLayout from '../components/course-setter/EditorLayout';
 import { useMapStorage } from '../hooks/useMapStorage';
 import { useUser } from '../context/UserContext';
+import { useLocation } from 'react-router-dom';
 
 const CourseSetter: React.FC = () => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState('new-event');
-  const [selectedMapId, setSelectedMapId] = useState<string>('');
+  const location = useLocation();
+  const state = location.state as { activeTab?: string; selectedMapId?: string } | null;
+  
+  const [activeTab, setActiveTab] = useState(state?.activeTab || 'new-event');
+  const [selectedMapId, setSelectedMapId] = useState<string>(state?.selectedMapId || '');
+  
   const { user } = useUser();
   const { maps, loading: mapsLoading, fetchMaps } = useMapStorage();
   const [userMaps, setUserMaps] = useState<MapInfo[]>([]);
@@ -110,6 +115,7 @@ const CourseSetter: React.FC = () => {
           <EventSetupForm 
             sampleMaps={userMaps}
             onCreateEvent={eventState.createEvent}
+            preSelectedMapId={selectedMapId}
           />
         </TabsContent>
         

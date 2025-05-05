@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { MousePointer, Move, Settings, Flag, Circle, Square, Plus, X, Slash } from 'lucide-react';
+import { MousePointer, Move, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ToolGroup from './course-setter/ToolGroup';
 import ActionButton from './course-setter/ActionButton';
@@ -40,7 +40,7 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   onOpenSettings,
   disabled = false,
   enabledTools = [],
-  controlColor = "#9b87f5" // Default orienteering purple color
+  controlColor = "#f20dff" // Default bright pink color
 }) => {
   const { t } = useLanguage();
   
