@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { ORIENTEERING_RED } from '../../hooks/useCourseSettings';
+import { ORIENTEERING_PURPLE } from '../../hooks/useCourseSettings';
 
 interface ColorPickerProps {
   color: string;
@@ -11,7 +11,7 @@ interface ColorPickerProps {
 export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onColorChange }) => {
   // Common colors for orienteering maps
   const presetColors = [
-    ORIENTEERING_RED,  // Orienteering red
+    ORIENTEERING_PURPLE,  // Orienteering purple
     '#1aad19',         // Green
     '#1f78b4',         // Blue
     '#ff7f00',         // Orange
