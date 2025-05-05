@@ -11,12 +11,12 @@ import CourseConnections from './map/CourseConnections';
 import PrintPreviewOverlay from './map/PrintPreviewOverlay';
 import MapDisplayOptions from './map/MapDisplayOptions';
 import CourseSettingsDialog from './course-setter/CourseSettingsDialog';
-import { useCourseSettings, ORIENTEERING_RED } from '../hooks/useCourseSettings';
-import { Slash, X, CircleSlash, Droplets } from 'lucide-react';
+import { useCourseSettings, ORIENTEERING_PURPLE } from '../hooks/useCourseSettings';
+import { Flag, Circle, Square, Plus, X, Slash, Droplets } from 'lucide-react';
 
 interface Control {
   id: string;
-  type: 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
+  type: string;
   x: number;
   y: number;
   number?: number;
@@ -91,12 +91,73 @@ const MapEditor: React.FC<MapEditorProps> = ({
     // Add icons based on tool type
     let icon;
     switch(tool.id) {
-      case 'crossing-point':
+      case 'timed-start':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <line x1={5} y1={6} x2={5} y2={18} stroke={settings.controlCircle.color} strokeWidth={2} />
+              <path d={`M5,6 L18,12 L5,18 Z`} fill={settings.controlCircle.color} />
+            </svg>
+          </div>
+        );
+        break;
+      case 'mandatory-crossing':
+      case 'optional-crossing':
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
               <path d="M8 8L16 16M8 16L16 8" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'out-of-bounds':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <rect x="4" y="4" width="16" height="16" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="4" y1="4" x2="20" y2="20" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="4" y1="20" x2="20" y2="4" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'temporary-construction':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <rect x="4" y="4" width="16" height="16" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'water-location':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <path d="M6,8 L6,16 C6,18 12,18 12,16 L12,8 Z" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="6" y1="10" x2="12" y2="10" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'first-aid':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <line x1="12" y1="4" x2="12" y2="20" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="4" y1="12" x2="20" y2="12" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'forbidden-route':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <line x1="4" y1="4" x2="20" y2="20" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="4" y1="20" x2="20" y2="4" stroke={settings.controlCircle.color} strokeWidth="2" />
             </svg>
           </div>
         );
@@ -112,23 +173,12 @@ const MapEditor: React.FC<MapEditorProps> = ({
           </div>
         );
         break;
-      case 'out-of-bounds':
+      case 'registration-mark':
         icon = (
           <div className="flex items-center justify-center w-6 h-6">
             <svg width="24" height="24" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="3" y1="3" x2="21" y2="21" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <line x1="3" y1="21" x2="21" y2="3" stroke={settings.controlCircle.color} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'water-station':
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M12 2L4 22H20L12 2Z" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
-              <circle cx="12" cy="14" r="4" fill="none" stroke={settings.controlCircle.color} strokeWidth="1.5" />
+              <line x1="12" y1="6" x2="12" y2="18" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="6" y1="12" x2="18" y2="12" stroke={settings.controlCircle.color} strokeWidth="2" />
             </svg>
           </div>
         );
@@ -140,7 +190,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
     return {
       ...tool,
       icon,
-      label: t(`tool.${tool.id}`),
+      label: t(`tool.${tool.id}`) || tool.label,
     };
   });
   
@@ -190,8 +240,10 @@ const MapEditor: React.FC<MapEditorProps> = ({
   
   // Get sorted controls for drawing connections
   const sortedControls = [...controls]
-    .filter(c => c.type === 'control' || c.type === 'start' || c.type === 'finish')
+    .filter(c => c.type === 'control' || c.type === 'start' || c.type === 'finish' || c.type === 'timed-start' || c.type === 'mandatory-crossing')
     .sort((a, b) => {
+      if (a.type === 'timed-start') return -1;
+      if (b.type === 'timed-start') return 1;
       if (a.type === 'start') return -1;
       if (b.type === 'start') return 1;
       if (a.type === 'finish') return 1;
@@ -204,11 +256,11 @@ const MapEditor: React.FC<MapEditorProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (viewMode === 'preview') return;
       
-      if (e.key === 'c') setSelectedTool('control');
-      if (e.key === 's') setSelectedTool('start');
-      if (e.key === 'f') setSelectedTool('finish');
-      if (e.key === 'p') setSelectedTool('pointer');
-      if (e.key === 'm') setSelectedTool('move');
+      if (e.key.toLowerCase() === 'c') setSelectedTool('control');
+      if (e.key.toLowerCase() === 's') setSelectedTool('start');
+      if (e.key.toLowerCase() === 'f') setSelectedTool('finish');
+      if (e.key.toLowerCase() === 'p') setSelectedTool('pointer');
+      if (e.key.toLowerCase() === 'm') setSelectedTool('move');
       
       // Also check for advanced tool shortcuts
       getEnabledTools().forEach(tool => {

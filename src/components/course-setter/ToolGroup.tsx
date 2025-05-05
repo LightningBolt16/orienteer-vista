@@ -31,10 +31,10 @@ const ToolGroup: React.FC<ToolGroupProps> = ({
       onValueChange={(value) => {
         if (!disabled && value) onValueChange(value as CourseTool);
       }}
-      className="flex gap-1"
+      className="flex flex-wrap gap-1"
     >
       {tools.map((tool) => (
-        <Tooltip key={tool.id}>
+        <Tooltip key={tool.id} delayDuration={300}>
           <TooltipTrigger asChild>
             <ToggleGroupItem 
               value={tool.id} 

@@ -4,7 +4,7 @@ import { toast } from '../components/ui/use-toast';
 
 interface Control {
   id: string;
-  type: 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
+  type: string;
   x: number;
   y: number;
   number?: number;
@@ -37,6 +37,16 @@ export function useControlInteractions({
 }: UseControlInteractionsProps) {
   const [draggedControlId, setDraggedControlId] = useState<string | null>(null);
 
+  // Define advanced tool types
+  const advancedToolTypes = [
+    'timed-start', 'mandatory-crossing', 'optional-crossing', 'out-of-bounds',
+    'temporary-construction', 'water-location', 'first-aid', 'forbidden-route',
+    'uncrossable-boundary', 'registration-mark'
+  ];
+  
+  // Check if selected tool is an advanced tool
+  const isAdvancedTool = advancedToolTypes.includes(selectedTool);
+
   // Handle map click to add a control with snapping
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!canvasRef.current || 
@@ -58,19 +68,17 @@ export function useControlInteractions({
       y = snapPoint.y;
     }
     
-    const controlType = selectedTool as Control['type'];
-    
     // For regular controls only (not advanced tools), auto-number them
     let number = undefined;
     let code = undefined;
-    if (controlType === 'control') {
+    if (selectedTool === 'control') {
       number = controls.filter(c => c.type === 'control').length + 1;
       code = `${number}`;
     }
     
     const newControl: Control = {
       id: `control-${Date.now()}`,
-      type: controlType,
+      type: selectedTool,
       x,
       y,
       number,

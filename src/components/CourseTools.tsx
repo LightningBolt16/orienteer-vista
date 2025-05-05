@@ -1,11 +1,15 @@
 
 import React, { useEffect } from 'react';
-import { MousePointer, Move, Settings } from 'lucide-react';
+import { MousePointer, Move, Settings, Flag, Circle, Square, Plus, X, Slash } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ToolGroup from './course-setter/ToolGroup';
 import ActionButton from './course-setter/ActionButton';
 
-export type CourseTool = 'pointer' | 'move' | 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
+export type CourseTool = 
+  'pointer' | 'move' | 'start' | 'control' | 'finish' | 
+  'timed-start' | 'mandatory-crossing' | 'optional-crossing' | 'out-of-bounds' | 
+  'temporary-construction' | 'water-location' | 'first-aid' | 'forbidden-route' | 
+  'uncrossable-boundary' | 'registration-mark';
 
 interface ToolItem {
   id: string;
@@ -23,8 +27,8 @@ interface CourseToolsProps {
     id: string;
     type: string;
     enabled: boolean;
-    icon?: React.ReactNode;
-    label?: string;
+    icon: React.ReactNode;
+    label: string;
     shortcut?: string;
   }>;
   controlColor?: string;
@@ -36,7 +40,7 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   onOpenSettings,
   disabled = false,
   enabledTools = [],
-  controlColor = "#ea384c" // Default orienteering red color
+  controlColor = "#9b87f5" // Default orienteering purple color
 }) => {
   const { t } = useLanguage();
   
@@ -67,8 +71,8 @@ const CourseTools: React.FC<CourseToolsProps> = ({
     .filter(tool => tool.enabled)
     .map(tool => ({
       id: tool.id,
-      icon: tool.icon || <div>?</div>,
-      label: tool.label || tool.id,
+      icon: tool.icon,
+      label: tool.label,
       shortcut: tool.shortcut || ''
     }));
 

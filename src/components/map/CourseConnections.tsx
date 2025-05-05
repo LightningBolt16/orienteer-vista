@@ -25,17 +25,18 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
   showConnections, 
   viewMode, 
   printSettings,
-  lineColor = "#ea384c",
-  lineThickness = 1
+  lineColor = "#9b87f5",
+  lineThickness = 0.5
 }) => {
   if (!showConnections || sortedControls.length < 2) return null;
   
-  // Generate line segments between controls - only standard controls
+  // Generate line segments between controls - only connect standard controls and timed start
   const lines = [];
   
   // Filter to only include standard control types before drawing lines
   const standardControls = sortedControls.filter(
-    c => c.type === 'control' || c.type === 'start' || c.type === 'finish'
+    c => c.type === 'control' || c.type === 'start' || c.type === 'finish' || c.type === 'timed-start' || 
+         c.type === 'mandatory-crossing'
   );
   
   for (let i = 0; i < standardControls.length - 1; i++) {
@@ -43,21 +44,29 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
     const end = standardControls[i + 1];
     
     // Skip finish to start connections
-    if (start.type === 'finish' || end.type === 'start') continue;
+    if (start.type === 'finish') continue;
     
-    const key = `line-${start.id}-${end.id}`;
+    // Only connect timed-start to start
+    if (start.type === 'timed-start' && end.type !== 'start') continue;
     
-    lines.push(
-      <line
-        key={key}
-        x1={`${start.x}%`}
-        y1={`${start.y}%`}
-        x2={`${end.x}%`}
-        y2={`${end.y}%`}
-        stroke={lineColor}
-        strokeWidth={lineThickness}
-      />
-    );
+    // Mandatory crossing points should connect with the controls before and after
+    if ((start.type === 'mandatory-crossing' || end.type === 'mandatory-crossing') ||
+        (start.type !== 'timed-start' && end.type !== 'timed-start') || 
+        (start.type === 'timed-start' && end.type === 'start')) {
+      const key = `line-${start.id}-${end.id}`;
+      
+      lines.push(
+        <line
+          key={key}
+          x1={`${start.x}%`}
+          y1={`${start.y}%`}
+          x2={`${end.x}%`}
+          y2={`${end.y}%`}
+          stroke={lineColor}
+          strokeWidth={lineThickness}
+        />
+      );
+    }
   }
   
   // Calculate the bounds for the SVG viewBox
