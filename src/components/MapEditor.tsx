@@ -10,6 +10,9 @@ import ControlRenderer from './map/ControlRenderer';
 import CourseConnections from './map/CourseConnections';
 import PrintPreviewOverlay from './map/PrintPreviewOverlay';
 import MapDisplayOptions from './map/MapDisplayOptions';
+import CourseSettingsDialog from './course-setter/CourseSettingsDialog';
+import { useCourseSettings, ORIENTEERING_RED } from '../hooks/useCourseSettings';
+import { LineSlash, X, CircleSlash, Droplets } from 'lucide-react';
 
 interface Control {
   id: string;
@@ -59,6 +62,15 @@ const MapEditor: React.FC<MapEditorProps> = ({
   const [showConnections, setShowConnections] = useState(true);
   const [showControlNumbers, setShowControlNumbers] = useState(true);
   
+  // Use our course settings hook
+  const { 
+    settings, 
+    saveSettings, 
+    getEnabledTools, 
+    settingsDialogOpen,
+    setSettingsDialogOpen
+  } = useCourseSettings();
+  
   // Custom hooks
   const mapInteractions = useMapInteractions({ viewMode });
   
@@ -72,6 +84,64 @@ const MapEditor: React.FC<MapEditorProps> = ({
     onAddControl,
     snapDistance,
     allControls
+  });
+  
+  // Get advanced tools that are enabled
+  const advancedTools = getEnabledTools().map(tool => {
+    // Add icons based on tool type
+    let icon;
+    switch(tool.id) {
+      case 'crossing-point':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <path d="M8 8L16 16M8 16L16 8" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'uncrossable-boundary':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <line x1="3" y1="12" x2="21" y2="12" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <circle cx="3" cy="12" r="2" fill={settings.controlCircle.color} />
+              <circle cx="21" cy="12" r="2" fill={settings.controlCircle.color} />
+            </svg>
+          </div>
+        );
+        break;
+      case 'out-of-bounds':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="3" y1="3" x2="21" y2="21" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <line x1="3" y1="21" x2="21" y2="3" stroke={settings.controlCircle.color} strokeWidth="2" />
+            </svg>
+          </div>
+        );
+        break;
+      case 'water-station':
+        icon = (
+          <div className="flex items-center justify-center w-6 h-6">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <path d="M12 2L4 22H20L12 2Z" fill="none" stroke={settings.controlCircle.color} strokeWidth="2" />
+              <circle cx="12" cy="14" r="4" fill="none" stroke={settings.controlCircle.color} strokeWidth="1.5" />
+            </svg>
+          </div>
+        );
+        break;
+      default:
+        icon = null;
+    }
+    
+    return {
+      ...tool,
+      icon,
+      label: t(`tool.${tool.id}`),
+    };
   });
   
   // Handle combined mouse move events from both hooks
@@ -134,11 +204,18 @@ const MapEditor: React.FC<MapEditorProps> = ({
       if (e.key === 'f') setSelectedTool('finish');
       if (e.key === 'p') setSelectedTool('pointer');
       if (e.key === 'm') setSelectedTool('move');
+      
+      // Also check for advanced tool shortcuts
+      getEnabledTools().forEach(tool => {
+        if (tool.shortcut && e.key.toLowerCase() === tool.shortcut.toLowerCase()) {
+          setSelectedTool(tool.id as CourseTool);
+        }
+      });
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode]);
+  }, [viewMode, getEnabledTools]);
   
   // Special tool actions handler
   const handleToolAction = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -153,9 +230,10 @@ const MapEditor: React.FC<MapEditorProps> = ({
         <CourseTools 
           selectedTool={selectedTool}
           onToolChange={handleToolChange}
-          onResetView={mapInteractions.resetView}
-          onPrint={onOpenPrintDialog}
+          onOpenSettings={() => setSettingsDialogOpen(true)}
           disabled={isToolbarDisabled}
+          enabledTools={advancedTools}
+          controlColor={settings.controlCircle.color}
         />
         
         {!hideDisplayOptions && (
@@ -212,6 +290,8 @@ const MapEditor: React.FC<MapEditorProps> = ({
             showConnections={showConnections}
             viewMode={viewMode}
             printSettings={printSettings}
+            lineColor={settings.line.color}
+            lineThickness={settings.line.thickness}
           />
           
           {/* Render controls on the map */}
@@ -225,10 +305,19 @@ const MapEditor: React.FC<MapEditorProps> = ({
               onMouseDown={controlInteractions.handleControlMouseDown}
               onClick={controlInteractions.handleControlClick}
               printSettings={printSettings}
+              settings={settings}
             />
           ))}
         </div>
       </div>
+      
+      {/* Course Settings Dialog */}
+      <CourseSettingsDialog
+        open={settingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+        settings={settings}
+        onSettingsChange={saveSettings}
+      />
     </div>
   );
 };

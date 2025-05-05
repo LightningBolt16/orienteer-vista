@@ -4,12 +4,11 @@ import { PrintSettings } from '../PrintSettingsDialog';
 
 interface Control {
   id: string;
-  type: 'start' | 'control' | 'finish' | 'crossing-point' | 'uncrossable-boundary' | 'out-of-bounds' | 'water-station';
+  type: string;
   x: number;
   y: number;
   number?: number;
   code?: string;
-  description?: string;
 }
 
 interface CourseConnectionsProps {
@@ -17,59 +16,62 @@ interface CourseConnectionsProps {
   showConnections: boolean;
   viewMode: 'edit' | 'preview';
   printSettings?: PrintSettings;
-  isAllControlsCourse?: boolean;
+  lineColor?: string;
+  lineThickness?: number;
 }
 
-const CourseConnections: React.FC<CourseConnectionsProps> = ({
-  sortedControls,
-  showConnections,
-  viewMode,
+const CourseConnections: React.FC<CourseConnectionsProps> = ({ 
+  sortedControls, 
+  showConnections, 
+  viewMode, 
   printSettings,
-  isAllControlsCourse = false
+  lineColor = "#ea384c",
+  lineThickness = 2
 }) => {
-  // Generate print preview styles for elements out of bounds
-  const getPrintPreviewStyles = () => {
-    if (!printSettings || viewMode !== 'preview') return {};
+  if (!showConnections || sortedControls.length < 2) return null;
+  
+  // Generate line segments between controls
+  const lines = [];
+  for (let i = 0; i < sortedControls.length - 1; i++) {
+    const start = sortedControls[i];
+    const end = sortedControls[i + 1];
     
-    // Calculate if we're showing a print preview with potential out-of-bounds elements
-    const isPrintable = true; // This would be calculated based on print settings
+    // Skip finish to start connections
+    if (start.type === 'finish' || end.type === 'start') continue;
     
-    return {
-      filter: isPrintable ? 'none' : 'grayscale(70%) opacity(0.7)',
-    };
-  };
-
-  if (!showConnections || sortedControls.length <= 1) {
-    return null;
+    const key = `line-${start.id}-${end.id}`;
+    
+    lines.push(
+      <line
+        key={key}
+        x1={`${start.x}%`}
+        y1={`${start.y}%`}
+        x2={`${end.x}%`}
+        y2={`${end.y}%`}
+        stroke={lineColor}
+        strokeWidth={lineThickness}
+      />
+    );
   }
-
-  // All controls course uses path smoothing and a different style
-  const connectionStyle = isAllControlsCourse
-    ? { stroke: "rgba(0, 128, 128, 0.5)", strokeWidth: 1.5, strokeDasharray: "5,5" }
-    : { stroke: "rgba(128, 0, 128, 0.7)", strokeWidth: 2, strokeDasharray: "none" };
-
+  
+  // Calculate the bounds for the SVG viewBox
+  const minX = Math.min(...sortedControls.map(c => c.x)) - 5;
+  const maxX = Math.max(...sortedControls.map(c => c.x)) + 5;
+  const minY = Math.min(...sortedControls.map(c => c.y)) - 5;
+  const maxY = Math.max(...sortedControls.map(c => c.y)) + 5;
+  
   return (
-    <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-      {sortedControls.map((control, index) => {
-        if (index === 0) return null; // Skip first control for lines
-        
-        const prevControl = sortedControls[index - 1];
-        const isDashed = control.type === 'finish' || isAllControlsCourse;
-        
-        return (
-          <line 
-            key={`line-${control.id}`}
-            x1={`${prevControl.x}%`}
-            y1={`${prevControl.y}%`}
-            x2={`${control.x}%`}
-            y2={`${control.y}%`}
-            stroke={connectionStyle.stroke}
-            strokeWidth={connectionStyle.strokeWidth}
-            strokeDasharray={isDashed ? "5,5" : "none"}
-            style={getPrintPreviewStyles()}
-          />
-        );
-      })}
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{ 
+        filter: (viewMode === 'preview' && printSettings?.printArea) 
+          ? 'none' 
+          : 'none'
+      }}
+      preserveAspectRatio="none"
+      viewBox="0 0 100 100"
+    >
+      {lines}
     </svg>
   );
 };
