@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -151,7 +152,7 @@ const CourseSetter: React.FC = () => {
             sampleMaps={[]} // We don't want to show sample maps
             onSelectMap={handleSelectMap}
             onMapUploaded={handleMapUploaded}
-            onUseMap={handleUseMap} // Add the new onUseMap handler
+            onUseMap={handleUseMap} // Pass the handler to the component
           />
         </TabsContent>
       </Tabs>

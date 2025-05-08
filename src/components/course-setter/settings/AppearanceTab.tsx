@@ -3,7 +3,7 @@ import React from 'react';
 import { Slider } from '../../ui/slider';
 import { Button } from '../../ui/button';
 import { Label } from '../../ui/label';
-import { ColorPicker } from '../ColorPicker';
+import ColorPicker from '../ColorPicker';
 import { CourseSettings } from '../../../hooks/useCourseSettings';
 import { Card, CardContent } from '../../ui/card';
 

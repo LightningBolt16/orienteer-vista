@@ -15,12 +15,14 @@ interface MapsListProps {
   sampleMaps: MapInfo[];
   onSelectMap: (mapId: string) => void;
   onMapUploaded: (metadata: any) => void;
+  onUseMap?: (mapId: string) => void; // Make onUseMap optional
 }
 
 const MapsList: React.FC<MapsListProps> = ({ 
   sampleMaps,
   onSelectMap,
-  onMapUploaded
+  onMapUploaded,
+  onUseMap
 }) => {
   const { t } = useLanguage();
   const { user } = useUser();
@@ -98,9 +100,13 @@ const MapsList: React.FC<MapsListProps> = ({
 
   // Handle map selection and navigate to new event tab
   const handleUseMap = (mapId: string) => {
-    onSelectMap(mapId);
-    // Redirect to the new event tab
-    navigate('/course-setter', { state: { activeTab: 'new-event', selectedMapId: mapId } });
+    if (onUseMap) {
+      onUseMap(mapId);
+    } else {
+      onSelectMap(mapId);
+      // Redirect to the new event tab
+      navigate('/course-setter', { state: { activeTab: 'new-event', selectedMapId: mapId } });
+    }
   };
 
   return (
