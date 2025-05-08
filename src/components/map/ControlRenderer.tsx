@@ -47,11 +47,14 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
     };
   };
 
+  // Check if this control is draggable (some special controls may not be)
+  const isDraggable = viewMode === 'edit' && selectedTool === 'pointer';
+  
   return (
     <div 
       key={control.id}
       className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
-        selectedTool === 'pointer' && viewMode === 'edit' ? 'cursor-move' : 'cursor-default'
+        isDraggable ? 'cursor-move' : 'cursor-default'
       }`}
       style={{ 
         left: `${control.x}%`, 

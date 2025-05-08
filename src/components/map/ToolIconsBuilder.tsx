@@ -1,6 +1,21 @@
 
 import React from 'react';
 import { Tool } from '../../hooks/useCourseSettings';
+import {
+  TimedStartControl,
+  MandatoryCrossingControl,
+  OptionalCrossingControl,
+  OutOfBoundsControl,
+  TemporaryConstructionControl,
+  WaterLocationControl,
+  FirstAidControl,
+  ForbiddenRouteControl,
+  UncrossableBoundaryControl,
+  RegistrationMarkControl,
+  StartControl,
+  ControlCircle,
+  FinishControl
+} from './control-shapes';
 
 interface ToolIconsBuilderProps {
   toolId: string;
@@ -8,101 +23,49 @@ interface ToolIconsBuilderProps {
 }
 
 const ToolIconsBuilder: React.FC<ToolIconsBuilderProps> = ({ toolId, toolColor }) => {
+  const iconSize = 24;
+  const strokeWidth = 2;
+
   switch(toolId) {
     case 'timed-start':
-      // Flag symbol for timed start
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M4,4 L4,20" stroke={toolColor} strokeWidth="2" />
-            <path d="M4,4 L20,12 L4,20" fill={toolColor} />
-          </svg>
-        </div>
-      );
+      return <TimedStartControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'mandatory-crossing':
-      // X symbol for mandatory crossing 
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <MandatoryCrossingControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'optional-crossing':
-      // X symbol inside circle for optional crossing point
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <OptionalCrossingControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'out-of-bounds':
-      // X in square for out of bounds
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <rect x="4" y="4" width="16" height="16" fill="none" stroke={toolColor} strokeWidth="2" />
-            <path d="M8,8 L16,16 M8,16 L16,8" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <OutOfBoundsControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'temporary-construction':
-      // Square for temporary construction
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <rect x="4" y="4" width="16" height="16" fill="none" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <TemporaryConstructionControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'water-location':
-      // Cup symbol for water location
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M8,6 L8,18 C8,20 16,20 16,18 L16,6 L8,6 Z" fill="none" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <WaterLocationControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'first-aid':
-      // Plus symbol for first aid
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M12,4 L12,20 M4,12 L20,12" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <FirstAidControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'forbidden-route':
-      // X for forbidden route
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <ForbiddenRouteControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'uncrossable-boundary':
-      // Line with dots for uncrossable boundary
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <line x1="4" y1="12" x2="20" y2="12" stroke={toolColor} strokeWidth="2" />
-            <circle cx="4" cy="12" r="2" fill={toolColor} />
-            <circle cx="20" cy="12" r="2" fill={toolColor} />
-          </svg>
-        </div>
-      );
+      return <UncrossableBoundaryControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     case 'registration-mark':
-      // Plus symbol for registration mark
-      return (
-        <div className="flex items-center justify-center w-6 h-6">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path d="M12,4 L12,20 M4,12 L20,12" stroke={toolColor} strokeWidth="2" />
-          </svg>
-        </div>
-      );
+      return <RegistrationMarkControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
+    case 'start':
+      return <StartControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
+    case 'control':
+      return <ControlCircle color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
+    case 'finish':
+      return <FinishControl color={toolColor} size={iconSize} thickness={strokeWidth} />;
+    
     default:
       return null;
   }

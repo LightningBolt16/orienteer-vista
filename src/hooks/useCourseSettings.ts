@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import React from 'react';
 
-// Default orienteering color, bright pink
+// Default orienteering color
 export const ORIENTEERING_PURPLE = "#f20dff";
 
 export interface Tool {
@@ -58,16 +58,16 @@ const defaultSettings: CourseSettings = {
     thickness: 0.5, // Thin line
   },
   availableTools: [
-    { id: 'timed-start', type: 'timed-start', enabled: false, icon: null, label: 'Timed Start', shortcut: 'T' },
-    { id: 'mandatory-crossing', type: 'mandatory-crossing', enabled: false, icon: null, label: 'Mandatory Crossing Point', shortcut: 'M' },
-    { id: 'optional-crossing', type: 'optional-crossing', enabled: false, icon: null, label: 'Optional Crossing Point', shortcut: 'O' },
-    { id: 'out-of-bounds', type: 'out-of-bounds', enabled: false, icon: null, label: 'Out Of Bounds Area', shortcut: 'B' },
-    { id: 'temporary-construction', type: 'temporary-construction', enabled: false, icon: null, label: 'Temporary Construction', shortcut: 'C' },
-    { id: 'water-location', type: 'water-location', enabled: false, icon: null, label: 'Water Location', shortcut: 'W' },
-    { id: 'first-aid', type: 'first-aid', enabled: false, icon: null, label: 'First Aid Location', shortcut: 'A' },
-    { id: 'forbidden-route', type: 'forbidden-route', enabled: false, icon: null, label: 'Forbidden Route Marking', shortcut: 'F' },
-    { id: 'uncrossable-boundary', type: 'uncrossable-boundary', enabled: false, icon: null, label: 'Uncrossable Boundary', shortcut: 'U' },
-    { id: 'registration-mark', type: 'registration-mark', enabled: false, icon: null, label: 'Registration Mark', shortcut: 'R' },
+    { id: 'timed-start', type: 'timed-start', enabled: true, icon: null, label: 'Timed Start', shortcut: 'T' },
+    { id: 'mandatory-crossing', type: 'mandatory-crossing', enabled: true, icon: null, label: 'Mandatory Crossing Point', shortcut: 'X' },
+    { id: 'optional-crossing', type: 'optional-crossing', enabled: true, icon: null, label: 'Optional Crossing Point', shortcut: 'O' },
+    { id: 'out-of-bounds', type: 'out-of-bounds', enabled: true, icon: null, label: 'Out Of Bounds Area', shortcut: 'B' },
+    { id: 'temporary-construction', type: 'temporary-construction', enabled: true, icon: null, label: 'Temporary Construction', shortcut: 'C' },
+    { id: 'water-location', type: 'water-location', enabled: true, icon: null, label: 'Water Location', shortcut: 'W' },
+    { id: 'first-aid', type: 'first-aid', enabled: true, icon: null, label: 'First Aid Location', shortcut: 'A' },
+    { id: 'forbidden-route', type: 'forbidden-route', enabled: true, icon: null, label: 'Forbidden Route Marking', shortcut: 'F' },
+    { id: 'uncrossable-boundary', type: 'uncrossable-boundary', enabled: true, icon: null, label: 'Uncrossable Boundary', shortcut: 'U' },
+    { id: 'registration-mark', type: 'registration-mark', enabled: true, icon: null, label: 'Registration Mark', shortcut: 'R' },
   ]
 };
 

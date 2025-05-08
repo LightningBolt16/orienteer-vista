@@ -138,8 +138,9 @@ const MapEditor: React.FC<MapEditorProps> = ({
   const isToolbarDisabled = viewMode === 'preview';
   
   // Get sorted controls for drawing connections
+  // Include both basic and advanced point types that should be connected
   const sortedControls = [...controls]
-    .filter(c => c.type === 'control' || c.type === 'start' || c.type === 'finish' || c.type === 'timed-start' || c.type === 'mandatory-crossing')
+    .filter(c => ['control', 'start', 'finish', 'timed-start', 'mandatory-crossing'].includes(c.type))
     .sort((a, b) => {
       if (a.type === 'timed-start') return -1;
       if (b.type === 'timed-start') return 1;
@@ -155,13 +156,14 @@ const MapEditor: React.FC<MapEditorProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (viewMode === 'preview') return;
       
+      // Check for basic tool shortcuts
       if (e.key.toLowerCase() === 'c') setSelectedTool('control');
       if (e.key.toLowerCase() === 's') setSelectedTool('start');
       if (e.key.toLowerCase() === 'f') setSelectedTool('finish');
       if (e.key.toLowerCase() === 'p') setSelectedTool('pointer');
       if (e.key.toLowerCase() === 'm') setSelectedTool('move');
       
-      // Also check for advanced tool shortcuts
+      // Check for advanced tool shortcuts
       getEnabledTools().forEach(tool => {
         if (tool.shortcut && e.key.toLowerCase() === tool.shortcut.toLowerCase()) {
           setSelectedTool(tool.id as CourseTool);
@@ -214,6 +216,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
         zoomLevel={mapInteractions.zoomLevel}
         mapPosition={mapInteractions.mapPosition}
         viewMode={viewMode}
+        selectedTool={selectedTool}
       >
         {/* Print preview overlay */}
         <PrintPreviewOverlay viewMode={viewMode} printSettings={printSettings} />

@@ -4,6 +4,7 @@ import { MousePointer, Move, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import ToolGroup from './course-setter/ToolGroup';
 import ActionButton from './course-setter/ActionButton';
+import { StartControl, ControlCircle, FinishControl } from './map/control-shapes';
 
 export type CourseTool = 
   'pointer' | 'move' | 'start' | 'control' | 'finish' | 
@@ -48,22 +49,9 @@ const CourseTools: React.FC<CourseToolsProps> = ({
   const basicTools: ToolItem[] = [
     { id: 'pointer', icon: <MousePointer size={18} />, label: t('pointerTool'), shortcut: 'P' },
     { id: 'move', icon: <Move size={18} />, label: t('moveMap'), shortcut: 'M' },
-    { id: 'control', icon: <div className="flex items-center justify-center w-6 h-6">
-      <svg width="24" height="24" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke={controlColor} strokeWidth="2" />
-      </svg>
-    </div>, label: t('addControl'), shortcut: 'C' },
-    { id: 'start', icon: <div className="flex items-center justify-center">
-      <svg width="24" height="24" viewBox="0 0 24 24">
-        <polygon points="12,2 22,22 2,22" fill="none" stroke={controlColor} strokeWidth="2" />
-      </svg>
-    </div>, label: t('addStart'), shortcut: 'S' },
-    { id: 'finish', icon: <div className="flex items-center justify-center">
-      <svg width="24" height="24" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke={controlColor} strokeWidth="2" />
-        <circle cx="12" cy="12" r="6" fill="none" stroke={controlColor} strokeWidth="2" />
-      </svg>
-    </div>, label: t('addFinish'), shortcut: 'F' }
+    { id: 'control', icon: <ControlCircle color={controlColor} />, label: t('addControl'), shortcut: 'C' },
+    { id: 'start', icon: <StartControl color={controlColor} />, label: t('addStart'), shortcut: 'S' },
+    { id: 'finish', icon: <FinishControl color={controlColor} />, label: t('addFinish'), shortcut: 'F' }
   ];
 
   // Convert enabled tools to the correct format

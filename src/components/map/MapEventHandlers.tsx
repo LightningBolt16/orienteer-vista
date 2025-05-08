@@ -12,6 +12,7 @@ interface MapEventHandlersProps {
   mapPosition: { x: number; y: number };
   children: React.ReactNode;
   viewMode: 'edit' | 'preview';
+  selectedTool?: string; // Added to help with cursor styles
 }
 
 const MapEventHandlers: React.FC<MapEventHandlersProps> = ({
@@ -24,8 +25,20 @@ const MapEventHandlers: React.FC<MapEventHandlersProps> = ({
   zoomLevel,
   mapPosition,
   children,
-  viewMode
+  viewMode,
+  selectedTool = 'pointer'
 }) => {
+  // Determine the appropriate cursor based on tool and view mode
+  const getCursorStyle = () => {
+    if (viewMode === 'preview') return 'cursor-default';
+    
+    switch (selectedTool) {
+      case 'pointer': return 'cursor-default';
+      case 'move': return 'cursor-move';
+      default: return 'cursor-crosshair';
+    }
+  };
+  
   return (
     <div 
       ref={mapRef}
@@ -37,7 +50,7 @@ const MapEventHandlers: React.FC<MapEventHandlersProps> = ({
       onWheel={handleWheel}
     >
       <div 
-        className="relative cursor-crosshair h-full"
+        className={`relative h-full ${getCursorStyle()}`}
         onClick={viewMode === 'preview' ? undefined : handleToolAction}
         style={{
           transform: `scale(${zoomLevel}) translate(${mapPosition.x}px, ${mapPosition.y}px)`,

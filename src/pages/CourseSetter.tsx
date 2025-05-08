@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -9,11 +8,12 @@ import MapsList from '../components/course-setter/MapsList';
 import EditorLayout from '../components/course-setter/EditorLayout';
 import { useMapStorage } from '../hooks/useMapStorage';
 import { useUser } from '../context/UserContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const CourseSetter: React.FC = () => {
   const { t } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const state = location.state as { activeTab?: string; selectedMapId?: string } | null;
   
   const [activeTab, setActiveTab] = useState(state?.activeTab || 'new-event');
@@ -82,6 +82,26 @@ const CourseSetter: React.FC = () => {
     // Auto-switch to the new event tab when a map is selected
     setActiveTab('new-event');
   };
+
+  // Handle "Use Map" action - select map and switch to new event tab
+  const handleUseMap = (mapId: string) => {
+    setSelectedMapId(mapId);
+    setActiveTab('new-event');
+    
+    // Use navigate to update URL and keep the state
+    navigate('/course-setter', { 
+      state: { activeTab: 'new-event', selectedMapId: mapId }
+    });
+    
+    // Show confirmation toast
+    const selectedMap = userMaps.find(map => map.id === mapId);
+    if (selectedMap) {
+      toast({
+        title: "Map selected",
+        description: `"${selectedMap.name}" is ready to use for a new course.`
+      });
+    }
+  };
   
   // Render the editor when an event is being created/edited
   if (eventState.isEditing && eventState.currentEvent) {
@@ -131,6 +151,7 @@ const CourseSetter: React.FC = () => {
             sampleMaps={[]} // We don't want to show sample maps
             onSelectMap={handleSelectMap}
             onMapUploaded={handleMapUploaded}
+            onUseMap={handleUseMap} // Add the new onUseMap handler
           />
         </TabsContent>
       </Tabs>

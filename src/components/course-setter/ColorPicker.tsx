@@ -8,19 +8,20 @@ interface ColorPickerProps {
   onColorChange: (color: string) => void;
 }
 
-export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onColorChange }) => {
+const ColorPicker: React.FC<ColorPickerProps> = ({ color, onColorChange }) => {
   const [localColor, setLocalColor] = useState(color || ORIENTEERING_PURPLE);
-  
-  // Pre-defined color options
-  const colorOptions = [
-    '#f20dff', // New default bright pink
-    '#ff0000', // Red
-    '#00ff00', // Green
-    '#0000ff', // Blue
-    '#ffff00', // Yellow
-    '#00ffff', // Cyan
-    '#ff00ff', // Magenta
-    '#000000', // Black
+
+  const predefinedColors = [
+    "#f20dff", // Bright pink (default)
+    "#ff0000", // Red
+    "#0000ff", // Blue
+    "#00ff00", // Green
+    "#ff00ff", // Magenta
+    "#ffff00", // Yellow
+    "#00ffff", // Cyan
+    "#ff8c00", // Dark Orange
+    "#800080", // Purple
+    "#000000", // Black
   ];
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,60 +30,51 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onColorChange }
     onColorChange(newColor);
   };
 
-  const handleColorOptionClick = (clr: string) => {
-    setLocalColor(clr);
-    onColorChange(clr);
+  const handlePredefinedColorClick = (newColor: string) => {
+    setLocalColor(newColor);
+    onColorChange(newColor);
   };
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center overflow-hidden"
+          className="w-8 h-8 rounded-md border border-gray-300 shadow-sm"
           style={{ backgroundColor: localColor }}
+          aria-label="Pick a color"
         />
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3">
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Select Color</span>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium">Pick a color</span>
+            <span className="text-xs text-muted-foreground">{localColor}</span>
           </div>
-          
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            {colorOptions.map((clr) => (
+
+          <input
+            type="color"
+            value={localColor}
+            onChange={handleColorChange}
+            className="w-full h-8 cursor-pointer"
+          />
+
+          <div className="grid grid-cols-5 gap-2 mt-3">
+            {predefinedColors.map((predefinedColor) => (
               <button
-                key={clr}
-                className={`w-8 h-8 rounded-full ${clr === localColor ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
-                style={{ backgroundColor: clr }}
-                onClick={() => handleColorOptionClick(clr)}
+                key={predefinedColor}
+                className={`w-8 h-8 rounded-md ${
+                  predefinedColor === localColor ? 'ring-2 ring-primary ring-offset-2' : 'border border-gray-300'
+                }`}
+                style={{ backgroundColor: predefinedColor }}
+                onClick={() => handlePredefinedColorClick(predefinedColor)}
+                aria-label={`Select color ${predefinedColor}`}
               />
             ))}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <input
-              type="color"
-              value={localColor}
-              onChange={handleColorChange}
-              className="w-8 h-8 p-0 border-0"
-            />
-            <input
-              type="text"
-              value={localColor}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val.match(/^#[0-9A-Fa-f]{0,6}$/)) {
-                  setLocalColor(val);
-                  if (val.length === 7) { // Only update if it's a valid hex color
-                    onColorChange(val);
-                  }
-                }
-              }}
-              className="flex-1 px-2 py-1 text-sm border rounded"
-            />
           </div>
         </div>
       </PopoverContent>
     </Popover>
   );
 };
+
+export default ColorPicker;

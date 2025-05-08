@@ -47,24 +47,24 @@ const CourseSettingsDialog: React.FC<CourseSettingsDialogProps> = ({
           <DialogTitle className="text-xl font-semibold text-center">Course Settings</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="tools">
+        <Tabs defaultValue="appearance" className="mt-4">
           <TabsList className="grid grid-cols-2 w-full mb-4">
-            <TabsTrigger value="tools">Advanced Tools</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <TabsTrigger value="tools">Advanced Tools</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="tools">
-            <ToolsTab 
-              localSettings={localSettings} 
-              setLocalSettings={setLocalSettings} 
-            />
-          </TabsContent>
           
           <TabsContent value="appearance">
             <AppearanceTab 
               localSettings={localSettings} 
               setLocalSettings={setLocalSettings} 
               originalSettings={settings}
+            />
+          </TabsContent>
+          
+          <TabsContent value="tools">
+            <ToolsTab 
+              localSettings={localSettings} 
+              setLocalSettings={setLocalSettings} 
             />
           </TabsContent>
         </Tabs>
