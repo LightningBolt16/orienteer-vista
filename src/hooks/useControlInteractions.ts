@@ -76,6 +76,19 @@ export function useControlInteractions({
       code = `${number}`;
     }
     
+    // Check if adding a start control when one already exists
+    if (selectedTool === 'start') {
+      const existingStart = controls.find(c => c.type === 'start');
+      if (existingStart) {
+        toast({
+          title: "Only one start allowed",
+          description: "A course can only have one start point. Delete the existing one first.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
     const newControl: Control = {
       id: `control-${Date.now()}`,
       type: selectedTool,
