@@ -9,54 +9,76 @@ interface ColorPickerProps {
 }
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({ color, onColorChange }) => {
-  // Common colors for orienteering maps
-  const presetColors = [
-    ORIENTEERING_PURPLE,  // Orienteering purple
-    '#1aad19',         // Green
-    '#1f78b4',         // Blue
-    '#ff7f00',         // Orange
-    '#6a3d9a',         // Purple
-    '#000000',         // Black
+  const [localColor, setLocalColor] = useState(color || ORIENTEERING_PURPLE);
+  
+  // Pre-defined color options
+  const colorOptions = [
+    '#f20dff', // New default bright pink
+    '#ff0000', // Red
+    '#00ff00', // Green
+    '#0000ff', // Blue
+    '#ffff00', // Yellow
+    '#00ffff', // Cyan
+    '#ff00ff', // Magenta
+    '#000000', // Black
   ];
+
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newColor = e.target.value;
+    setLocalColor(newColor);
+    onColorChange(newColor);
+  };
+
+  const handleColorOptionClick = (clr: string) => {
+    setLocalColor(clr);
+    onColorChange(clr);
+  };
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button 
-          className="w-10 h-10 rounded border border-gray-300 flex items-center justify-center overflow-hidden"
-          type="button"
-          aria-label="Pick a color"
-        >
-          <div
-            className="w-8 h-8 rounded"
-            style={{ backgroundColor: color }}
-          />
-        </button>
+        <button
+          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center overflow-hidden"
+          style={{ backgroundColor: localColor }}
+        />
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3">
         <div className="space-y-2">
-          <div className="grid grid-cols-6 gap-2">
-            {presetColors.map((presetColor) => (
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Select Color</span>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            {colorOptions.map((clr) => (
               <button
-                key={presetColor}
-                className={`w-8 h-8 rounded-full border ${
-                  color === presetColor ? 'ring-2 ring-primary' : 'border-gray-300'
-                }`}
-                style={{ backgroundColor: presetColor }}
-                onClick={() => onColorChange(presetColor)}
-                type="button"
-                aria-label={`Select color: ${presetColor}`}
+                key={clr}
+                className={`w-8 h-8 rounded-full ${clr === localColor ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
+                style={{ backgroundColor: clr }}
+                onClick={() => handleColorOptionClick(clr)}
               />
             ))}
           </div>
-          <div className="flex items-center justify-between pt-2">
-            <label htmlFor="custom-color" className="text-xs">Custom:</label>
+          
+          <div className="flex items-center space-x-2">
             <input
-              id="custom-color"
               type="color"
-              value={color}
-              onChange={(e) => onColorChange(e.target.value)}
-              className="h-8 w-16 p-0 border-0"
+              value={localColor}
+              onChange={handleColorChange}
+              className="w-8 h-8 p-0 border-0"
+            />
+            <input
+              type="text"
+              value={localColor}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.match(/^#[0-9A-Fa-f]{0,6}$/)) {
+                  setLocalColor(val);
+                  if (val.length === 7) { // Only update if it's a valid hex color
+                    onColorChange(val);
+                  }
+                }
+              }}
+              className="flex-1 px-2 py-1 text-sm border rounded"
             />
           </div>
         </div>

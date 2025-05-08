@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import React from 'react';
 
-// Default orienteering color, changed from purple to bright pink
+// Default orienteering color, bright pink
 export const ORIENTEERING_PURPLE = "#f20dff";
 
 export interface Tool {

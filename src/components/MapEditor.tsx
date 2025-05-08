@@ -11,7 +11,9 @@ import CourseConnections from './map/CourseConnections';
 import PrintPreviewOverlay from './map/PrintPreviewOverlay';
 import MapDisplayOptions from './map/MapDisplayOptions';
 import CourseSettingsDialog from './course-setter/CourseSettingsDialog';
-import { useCourseSettings, ORIENTEERING_PURPLE } from '../hooks/useCourseSettings';
+import { useCourseSettings } from '../hooks/useCourseSettings';
+import { buildToolIcons } from './map/ToolIconsBuilder';
+import MapEventHandlers from './map/MapEventHandlers';
 
 interface Control {
   id: string;
@@ -85,127 +87,11 @@ const MapEditor: React.FC<MapEditorProps> = ({
     allControls
   });
   
-  // Get advanced tools that are enabled
-  const advancedTools = getEnabledTools().map(tool => {
-    // Add icons based on tool type
-    let icon;
-    const toolColor = settings.controlCircle.color;
-    
-    switch(tool.id) {
-      case 'timed-start':
-        // Flag symbol for timed start
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M4,4 L4,20" stroke={toolColor} strokeWidth="2" />
-              <path d="M4,4 L20,12 L4,20" fill={toolColor} />
-            </svg>
-          </div>
-        );
-        break;
-      case 'mandatory-crossing':
-        // X symbol for mandatory crossing 
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'optional-crossing':
-        // X symbol inside circle for optional crossing point
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'out-of-bounds':
-        // X in square for out of bounds
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <rect x="4" y="4" width="16" height="16" fill="none" stroke={toolColor} strokeWidth="2" />
-              <path d="M8,8 L16,16 M8,16 L16,8" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'temporary-construction':
-        // Square for temporary construction
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <rect x="4" y="4" width="16" height="16" fill="none" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'water-location':
-        // Cup symbol for water location
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M8,6 L8,18 C8,20 16,20 16,18 L16,6 L8,6 Z" fill="none" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'first-aid':
-        // Plus symbol for first aid
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M12,4 L12,20 M4,12 L20,12" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'forbidden-route':
-        // X for forbidden route
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M6,6 L18,18 M6,18 L18,6" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      case 'uncrossable-boundary':
-        // Line with dots for uncrossable boundary
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <line x1="4" y1="12" x2="20" y2="12" stroke={toolColor} strokeWidth="2" />
-              <circle cx="4" cy="12" r="2" fill={toolColor} />
-              <circle cx="20" cy="12" r="2" fill={toolColor} />
-            </svg>
-          </div>
-        );
-        break;
-      case 'registration-mark':
-        // Plus symbol for registration mark
-        icon = (
-          <div className="flex items-center justify-center w-6 h-6">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <path d="M12,4 L12,20 M4,12 L20,12" stroke={toolColor} strokeWidth="2" />
-            </svg>
-          </div>
-        );
-        break;
-      default:
-        icon = null;
-    }
-    
-    return {
-      ...tool,
-      icon,
-      label: t(`tool.${tool.id}`) || tool.label,
-    };
-  });
+  // Get advanced tools that are enabled and add icons
+  const advancedTools = buildToolIcons(
+    getEnabledTools(), 
+    settings.controlCircle.color
+  );
   
   // Handle combined mouse move events from both hooks
   const handleCombinedMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -287,12 +173,6 @@ const MapEditor: React.FC<MapEditorProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, getEnabledTools]);
   
-  // Special tool actions handler
-  const handleToolAction = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (viewMode === 'preview') return;
-    controlInteractions.handleToolAction(e);
-  };
-  
   return (
     <div className="relative h-full overflow-hidden flex flex-col">
       {/* Horizontal toolbar at the top */}
@@ -324,62 +204,53 @@ const MapEditor: React.FC<MapEditorProps> = ({
         </div>
       )}
       
-      <div 
-        ref={mapContainerRef}
-        className="flex-1 overflow-hidden"
-        onMouseDown={mapInteractions.handleMapDragStart}
-        onMouseMove={handleCombinedMouseMove}
-        onMouseUp={handleCombinedMouseUp}
-        onMouseLeave={handleCombinedMouseUp}
-        onWheel={handleWheel}
+      <MapEventHandlers
+        handleMapDragStart={mapInteractions.handleMapDragStart}
+        handleCombinedMouseMove={handleCombinedMouseMove}
+        handleCombinedMouseUp={handleCombinedMouseUp}
+        handleWheel={handleWheel}
+        handleToolAction={controlInteractions.handleToolAction}
+        mapRef={mapContainerRef}
+        zoomLevel={mapInteractions.zoomLevel}
+        mapPosition={mapInteractions.mapPosition}
+        viewMode={viewMode}
       >
-        {/* Print preview overlay - now properly controlled by viewMode */}
+        {/* Print preview overlay */}
         <PrintPreviewOverlay viewMode={viewMode} printSettings={printSettings} />
         
-        <div 
-          ref={canvasRef}
-          className="relative cursor-crosshair h-full"
-          onClick={viewMode === 'preview' ? undefined : handleToolAction}
-          style={{
-            transform: `scale(${mapInteractions.zoomLevel}) translate(${mapInteractions.mapPosition.x}px, ${mapInteractions.mapPosition.y}px)`,
-            transformOrigin: 'center',
-            transition: 'transform 0.1s ease-out'
-          }}
-        >
-          <img 
-            src={mapUrl} 
-            alt="Orienteering Map" 
-            className="w-full h-full object-contain"
-            onLoad={handleImageLoad}
-            draggable={false}
-          />
-          
-          {/* Draw connection lines between controls - excluding advanced tools */}
-          <CourseConnections 
-            sortedControls={sortedControls} 
-            showConnections={showConnections}
+        <img 
+          src={mapUrl} 
+          alt="Orienteering Map" 
+          className="w-full h-full object-contain"
+          onLoad={handleImageLoad}
+          draggable={false}
+        />
+        
+        {/* Draw connection lines between controls */}
+        <CourseConnections 
+          sortedControls={sortedControls} 
+          showConnections={showConnections}
+          viewMode={viewMode}
+          printSettings={printSettings}
+          lineColor={settings.line.color}
+          lineThickness={settings.line.thickness}
+        />
+        
+        {/* Render controls on the map */}
+        {controls.map(control => (
+          <ControlRenderer
+            key={control.id}
+            control={control}
+            showControlNumbers={showControlNumbers}
+            selectedTool={selectedTool}
             viewMode={viewMode}
+            onMouseDown={controlInteractions.handleControlMouseDown}
+            onClick={controlInteractions.handleControlClick}
             printSettings={printSettings}
-            lineColor={settings.line.color}
-            lineThickness={settings.line.thickness}
+            settings={settings}
           />
-          
-          {/* Render controls on the map */}
-          {controls.map(control => (
-            <ControlRenderer
-              key={control.id}
-              control={control}
-              showControlNumbers={showControlNumbers}
-              selectedTool={selectedTool}
-              viewMode={viewMode}
-              onMouseDown={controlInteractions.handleControlMouseDown}
-              onClick={controlInteractions.handleControlClick}
-              printSettings={printSettings}
-              settings={settings}
-            />
-          ))}
-        </div>
-      </div>
+        ))}
+      </MapEventHandlers>
       
       {/* Course Settings Dialog */}
       <CourseSettingsDialog

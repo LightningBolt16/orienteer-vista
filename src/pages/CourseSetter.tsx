@@ -76,6 +76,13 @@ const CourseSetter: React.FC = () => {
     }
   };
   
+  // Handle selecting a map from the list
+  const handleSelectMap = (mapId: string) => {
+    setSelectedMapId(mapId);
+    // Auto-switch to the new event tab when a map is selected
+    setActiveTab('new-event');
+  };
+  
   // Render the editor when an event is being created/edited
   if (eventState.isEditing && eventState.currentEvent) {
     return (
@@ -122,10 +129,7 @@ const CourseSetter: React.FC = () => {
         <TabsContent value="my-maps" className="mt-6">
           <MapsList 
             sampleMaps={[]} // We don't want to show sample maps
-            onSelectMap={(mapId) => {
-              setSelectedMapId(mapId);
-              setActiveTab('new-event');
-            }}
+            onSelectMap={handleSelectMap}
             onMapUploaded={handleMapUploaded}
           />
         </TabsContent>
