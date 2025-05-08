@@ -23,6 +23,7 @@ interface ControlRendererProps {
   onClick: (e: React.MouseEvent<HTMLDivElement>, control: Control) => void;
   printSettings?: PrintSettings;
   settings?: CourseSettings;
+  nextControl?: Control | null; // Add prop for next control to calculate rotation
 }
 
 const ControlRenderer: React.FC<ControlRendererProps> = ({
@@ -33,7 +34,8 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
   onMouseDown,
   onClick,
   printSettings,
-  settings
+  settings,
+  nextControl
 }) => {
   // Generate print preview styles for elements out of bounds
   const getPrintPreviewStyles = () => {
@@ -45,6 +47,20 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
     return {
       filter: isPrintable ? 'none' : 'grayscale(70%) opacity(0.7)',
     };
+  };
+
+  // Calculate rotation angle for start control
+  const calculateRotationAngle = () => {
+    if (control.type === 'start' && nextControl) {
+      const dx = nextControl.x - control.x;
+      const dy = nextControl.y - control.y;
+      // Calculate angle in degrees, where 0 is pointing right
+      const angleRadians = Math.atan2(dy, dx);
+      const angleDegrees = (angleRadians * 180 / Math.PI);
+      // Adjust to make the triangle point toward the next control
+      return angleDegrees - 90; // Triangle points up by default, adjust accordingly
+    }
+    return 0;
   };
 
   // Check if this control is draggable (some special controls may not be)
@@ -69,6 +85,7 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
         settings={settings}
         showControlNumbers={showControlNumbers}
         number={control.number}
+        rotationAngle={calculateRotationAngle()}
       />
     </div>
   );

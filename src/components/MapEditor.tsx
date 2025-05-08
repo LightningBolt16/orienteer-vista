@@ -75,6 +75,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
   // Custom hooks
   const mapInteractions = useMapInteractions({ viewMode });
   
+  // Modify control interactions to enforce only one start point
   const controlInteractions = useControlInteractions({
     controls,
     onUpdateControl,
@@ -82,7 +83,21 @@ const MapEditor: React.FC<MapEditorProps> = ({
     selectedTool,
     viewMode,
     canvasRef,
-    onAddControl,
+    onAddControl: (control: Control) => {
+      // If trying to add a start control, check if one already exists
+      if (control.type === 'start') {
+        const existingStart = controls.find(c => c.type === 'start');
+        if (existingStart) {
+          toast({
+            title: "Only one start allowed",
+            description: "A course can only have one start point. Delete the existing one first.",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      onAddControl(control);
+    },
     snapDistance,
     allControls
   });
@@ -151,6 +166,15 @@ const MapEditor: React.FC<MapEditorProps> = ({
       return (a.number || 0) - (b.number || 0);
     });
   
+  // Find the next control after start for rotation
+  const findNextControlAfterStart = () => {
+    const startIndex = sortedControls.findIndex(c => c.type === 'start');
+    if (startIndex >= 0 && startIndex < sortedControls.length - 1) {
+      return sortedControls[startIndex + 1];
+    }
+    return null;
+  };
+
   // Handle keyboard shortcuts for tools
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -240,19 +264,25 @@ const MapEditor: React.FC<MapEditorProps> = ({
         />
         
         {/* Render controls on the map */}
-        {controls.map(control => (
-          <ControlRenderer
-            key={control.id}
-            control={control}
-            showControlNumbers={showControlNumbers}
-            selectedTool={selectedTool}
-            viewMode={viewMode}
-            onMouseDown={controlInteractions.handleControlMouseDown}
-            onClick={controlInteractions.handleControlClick}
-            printSettings={printSettings}
-            settings={settings}
-          />
-        ))}
+        {controls.map(control => {
+          // Determine if this control needs next control info (for start points)
+          const nextControl = control.type === 'start' ? findNextControlAfterStart() : null;
+          
+          return (
+            <ControlRenderer
+              key={control.id}
+              control={control}
+              showControlNumbers={showControlNumbers}
+              selectedTool={selectedTool}
+              viewMode={viewMode}
+              onMouseDown={controlInteractions.handleControlMouseDown}
+              onClick={controlInteractions.handleControlClick}
+              printSettings={printSettings}
+              settings={settings}
+              nextControl={nextControl}
+            />
+          );
+        })}
       </MapEventHandlers>
       
       {/* Course Settings Dialog */}

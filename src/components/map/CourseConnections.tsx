@@ -30,6 +30,24 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
 }) => {
   if (!showConnections || sortedControls.length < 2) return null;
   
+  // Calculate edge points for line connections
+  const getEdgePoints = (start: Control, end: Control, circleRadius = 12) => {
+    const radius = circleRadius / 100; // Convert to percentage units
+    
+    // Calculate angle between points
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const angle = Math.atan2(dy, dx);
+    
+    // Calculate edge points
+    const startX = start.x + Math.cos(angle) * radius;
+    const startY = start.y + Math.sin(angle) * radius;
+    const endX = end.x - Math.cos(angle) * radius;
+    const endY = end.y - Math.sin(angle) * radius;
+    
+    return { startX, startY, endX, endY };
+  };
+
   // Generate line segments between controls - only connect standard controls and timed start
   const lines = [];
   
@@ -55,13 +73,16 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
         (start.type === 'timed-start' && end.type === 'start')) {
       const key = `line-${start.id}-${end.id}`;
       
+      // Get edge points instead of center points
+      const { startX, startY, endX, endY } = getEdgePoints(start, end);
+      
       lines.push(
         <line
           key={key}
-          x1={`${start.x}%`}
-          y1={`${start.y}%`}
-          x2={`${end.x}%`}
-          y2={`${end.y}%`}
+          x1={`${startX}%`}
+          y1={`${startY}%`}
+          x2={`${endX}%`}
+          y2={`${endY}%`}
           stroke={lineColor}
           strokeWidth={lineThickness}
         />

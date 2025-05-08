@@ -163,6 +163,19 @@ export const useEventState = () => {
       return;
     }
     
+    // Check if adding a start control when one already exists
+    if (control.type === 'start') {
+      const currentCourse = currentEvent.courses.find(course => course.id === currentCourseId);
+      if (currentCourse && currentCourse.controls.some(c => c.type === 'start')) {
+        toast({
+          title: "Only one start allowed",
+          description: "A course can only have one start point. Delete the existing one first.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
     // Generate control number based on existing controls
     let controlNumber = 1;
     if (control.type === 'control') {

@@ -23,6 +23,7 @@ interface ControlShapeProps {
   settings?: CourseSettings;
   showControlNumbers?: boolean;
   number?: number;
+  rotationAngle?: number; // Added rotation angle for start triangle
 }
 
 const ControlShape: React.FC<ControlShapeProps> = ({ 
@@ -30,7 +31,8 @@ const ControlShape: React.FC<ControlShapeProps> = ({
   controlColor = "#f20dff",
   settings,
   showControlNumbers = false,
-  number
+  number,
+  rotationAngle = 0  // Default rotation angle
 }) => {
   // Using settings if provided, otherwise default values
   const CONTROL_COLOR = settings?.controlCircle.color || controlColor;
@@ -54,7 +56,8 @@ const ControlShape: React.FC<ControlShapeProps> = ({
         return <StartControl 
           color={settings?.start.color || CONTROL_COLOR} 
           size={settings?.start.size || CONTROL_DIAMETER} 
-          thickness={settings?.start.thickness || CONTROL_THICKNESS} 
+          thickness={settings?.start.thickness || CONTROL_THICKNESS}
+          rotationAngle={rotationAngle} // Pass rotation angle to start control
         />;
       
       case 'control':
