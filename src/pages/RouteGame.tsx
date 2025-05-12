@@ -112,6 +112,14 @@ const RouteGame: React.FC = () => {
     isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
   );
   
+  // Function to clean map names by removing orientation references
+  const cleanMapName = (name: string): string => {
+    return name
+      .replace(/\s*\(Landscape\)\s*$/i, '')
+      .replace(/\s*\(Portrait\)\s*$/i, '')
+      .trim();
+  };
+  
   return (
     <div className="pb-20 space-y-8">
       {/* Map Selection */}
@@ -130,7 +138,7 @@ const RouteGame: React.FC = () => {
                 <SelectContent>
                   {filteredMaps.map(map => (
                     <SelectItem key={map.id} value={map.id}>
-                      {map.name}
+                      {cleanMapName(map.name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
