@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -10,6 +11,9 @@ import { useMapStorage } from '../hooks/useMapStorage';
 import { useUser } from '../context/UserContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useIsMobile } from '../hooks/use-mobile';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { ExternalLink } from 'lucide-react';
 
 const CourseSetter: React.FC = () => {
   const { t } = useLanguage();
@@ -28,21 +32,58 @@ const CourseSetter: React.FC = () => {
   // Use the event state hook
   const eventState = useEventState();
 
-  // Redirect mobile users to home page
+  // Redirect mobile users with explanatory message
   useEffect(() => {
     if (isMobile) {
-      navigate('/');
       toast({
-        title: "Not available on mobile",
-        description: "The course setter is only available on desktop devices.",
+        title: "Desktop feature only",
+        description: "The course setter is only available on desktop devices. Try our route choice game instead!",
         variant: "destructive"
       });
     }
-  }, [isMobile, navigate]);
-
-  // If mobile, don't render the course setter content
+  }, [isMobile]);
+  
+  // If mobile, render a helpful message instead of the course setter content
   if (isMobile) {
-    return null;
+    return (
+      <div className="pb-20 px-4 max-w-md mx-auto mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Desktop Feature Only</CardTitle>
+            <CardDescription>
+              The course setter requires a larger screen for the map editor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p>
+              Our course setter tool is designed for desktop computers with larger screens
+              and precision mouse input for creating detailed orienteering courses.
+            </p>
+            
+            <p>
+              We recommend trying our route choice game which is fully optimized for mobile devices!
+            </p>
+            
+            <div className="flex flex-col space-y-2 mt-4">
+              <Button 
+                onClick={() => navigate('/route-game')}
+                className="bg-orienteering hover:bg-orienteering/90"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Go to Route Choice Game
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/')}
+              >
+                Return to Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
   
   // Fetch user maps when component mounts or when user changes
