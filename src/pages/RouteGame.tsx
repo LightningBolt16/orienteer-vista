@@ -41,7 +41,7 @@ const RouteGame: React.FC = () => {
           return;
         }
         
-        // Filter maps based on device
+        // Filter maps based on device - don't explicitly mention portrait/landscape
         const aspectRatio = isMobile ? '9:16' : '16:9';
         const filteredMaps = maps.filter(map => map.aspect === aspectRatio);
         
@@ -107,7 +107,7 @@ const RouteGame: React.FC = () => {
       });
   }, [selectedMapId, availableMaps, t]);
   
-  // Filtered map sources based on device
+  // Filter maps based on device without explicitly labeling them
   const filteredMaps = availableMaps.filter(map => 
     isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
   );

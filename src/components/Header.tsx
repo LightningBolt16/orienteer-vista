@@ -94,7 +94,7 @@ const Header: React.FC = () => {
               </button>
             </div>
             
-            {/* Mobile menu */}
+            {/* Mobile menu - Course Setter is removed from mobile view */}
             {mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 bg-background/95 backdrop-blur-sm shadow-lg p-4 flex flex-col space-y-4 animate-fade-in">
                 <Link 

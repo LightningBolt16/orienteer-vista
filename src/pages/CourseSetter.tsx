@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -10,11 +9,13 @@ import EditorLayout from '../components/course-setter/EditorLayout';
 import { useMapStorage } from '../hooks/useMapStorage';
 import { useUser } from '../context/UserContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useIsMobile } from '../hooks/use-mobile';
 
 const CourseSetter: React.FC = () => {
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const state = location.state as { activeTab?: string; selectedMapId?: string } | null;
   
   const [activeTab, setActiveTab] = useState(state?.activeTab || 'new-event');
@@ -26,6 +27,23 @@ const CourseSetter: React.FC = () => {
   
   // Use the event state hook
   const eventState = useEventState();
+
+  // Redirect mobile users to home page
+  useEffect(() => {
+    if (isMobile) {
+      navigate('/');
+      toast({
+        title: "Not available on mobile",
+        description: "The course setter is only available on desktop devices.",
+        variant: "destructive"
+      });
+    }
+  }, [isMobile, navigate]);
+
+  // If mobile, don't render the course setter content
+  if (isMobile) {
+    return null;
+  }
   
   // Fetch user maps when component mounts or when user changes
   useEffect(() => {
