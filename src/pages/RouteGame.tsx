@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
@@ -42,8 +41,9 @@ const RouteGame: React.FC = () => {
         }
         
         // Filter maps based on device - don't explicitly mention portrait/landscape
-        const aspectRatio = isMobile ? '9:16' : '16:9';
-        const filteredMaps = maps.filter(map => map.aspect === aspectRatio);
+        const filteredMaps = maps.filter(map => 
+          isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
+        );
         
         // If no filtered maps available, switch to other aspect ratio
         if (filteredMaps.length === 0) {

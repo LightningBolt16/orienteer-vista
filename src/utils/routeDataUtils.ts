@@ -27,11 +27,11 @@ const capitalizeMapName = (folderName: string): string => {
 // Function to generate map sources based on available maps
 export const getAvailableMaps = async (): Promise<MapSource[]> => {
   try {
-    // Define map sources including the Rotondella map
+    // Define map sources including only the Rotondella map
     const mapSources: MapSource[] = [
       {
         id: 'rotondella-landscape',
-        name: 'Rotondella (Landscape)',
+        name: 'Rotondella',
         aspect: '16:9',
         csvPath: '/maps/Rotondella.csv',
         imagePathPrefix: '/maps/16_9/candidate_',
@@ -40,66 +40,12 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
       },
       {
         id: 'rotondella-portrait',
-        name: 'Rotondella (Portrait)',
+        name: 'Rotondella',
         aspect: '9:16',
         csvPath: '/maps/Rotondella.csv',
         imagePathPrefix: '/maps/9_16/candidate_',
         mapImagePath: '/maps/Rotondella.png',
         description: 'Rotondella orienteering map for mobile devices'
-      },
-      {
-        id: 'default-landscape',
-        name: 'Default (Landscape)',
-        aspect: '16:9',
-        csvPath: '/maps/default/default.csv',
-        imagePathPrefix: '/maps/default/16_9/candidate_',
-        mapImagePath: '/maps/default/map.png',
-        description: 'The original orienteering map in landscape format'
-      },
-      {
-        id: 'default-portrait',
-        name: 'Default (Portrait)',
-        aspect: '9:16',
-        csvPath: '/maps/default/default.csv',
-        imagePathPrefix: '/maps/default/9_16/candidate_',
-        mapImagePath: '/maps/default/map.png',
-        description: 'The original orienteering map adapted for mobile devices'
-      },
-      {
-        id: 'forest-landscape',
-        name: 'Forest (Landscape)',
-        aspect: '16:9',
-        csvPath: '/maps/forest/forest.csv',
-        imagePathPrefix: '/maps/forest/16_9/candidate_',
-        mapImagePath: '/maps/forest/map.png',
-        description: 'A dense forest map with complex route choices'
-      },
-      {
-        id: 'forest-portrait',
-        name: 'Forest (Portrait)',
-        aspect: '9:16',
-        csvPath: '/maps/forest/forest.csv',
-        imagePathPrefix: '/maps/forest/9_16/candidate_',
-        mapImagePath: '/maps/forest/map.png',
-        description: 'A dense forest map with complex route choices for mobile'
-      },
-      {
-        id: 'urban-landscape',
-        name: 'Urban (Landscape)',
-        aspect: '16:9',
-        csvPath: '/maps/urban/urban.csv',
-        imagePathPrefix: '/maps/urban/16_9/candidate_',
-        mapImagePath: '/maps/urban/map.png',
-        description: 'An urban environment with buildings and streets'
-      },
-      {
-        id: 'urban-portrait',
-        name: 'Urban (Portrait)',
-        aspect: '9:16',
-        csvPath: '/maps/urban/urban.csv',
-        imagePathPrefix: '/maps/urban/9_16/candidate_',
-        mapImagePath: '/maps/urban/map.png',
-        description: 'An urban environment with buildings and streets for mobile'
       }
     ];
 
