@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import MapSelectionField from './form/MapSelectionField';
+import MapConfigFields from './form/MapConfigFields';
 
 interface EventSetupFormProps {
   onCreateEvent: (data: any) => void;
@@ -108,98 +109,19 @@ const EventSetupForm: React.FC<EventSetupFormProps> = ({ onCreateEvent, sampleMa
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="mapId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('map')}</FormLabel>
-                  <Select 
-                    value={field.value} 
-                    onValueChange={(value) => handleMapChange(value)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('selectMap')} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {sampleMaps.length === 0 ? (
-                        <SelectItem value="no-maps" disabled>{t('noMapsAvailable')}</SelectItem>
-                      ) : (
-                        sampleMaps.map((map) => (
-                          <SelectItem key={map.id} value={map.id}>
-                            {map.name} ({map.type === 'forest' ? 'Forest' : 'Sprint'}, 1:{parseInt(map.scale).toLocaleString()})
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <MapSelectionField 
+              form={form} 
+              sampleMaps={sampleMaps} 
+              onMapChange={handleMapChange} 
             />
             
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="mapType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('mapType')}</FormLabel>
-                    <Select 
-                      value={field.value}
-                      onValueChange={(value: 'forest' | 'sprint') => {
-                        field.onChange(value);
-                        setSelectedMapType(value);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="forest">Forest</SelectItem>
-                        <SelectItem value="sprint">Sprint</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="mapScale"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('mapScale')}</FormLabel>
-                    <Select 
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        setSelectedMapScale(value);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="4000">1:4,000</SelectItem>
-                        <SelectItem value="5000">1:5,000</SelectItem>
-                        <SelectItem value="7500">1:7,500</SelectItem>
-                        <SelectItem value="10000">1:10,000</SelectItem>
-                        <SelectItem value="15000">1:15,000</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <MapConfigFields 
+              form={form}
+              selectedMapType={selectedMapType}
+              selectedMapScale={selectedMapScale}
+              setSelectedMapType={setSelectedMapType}
+              setSelectedMapScale={setSelectedMapScale}
+            />
             
             <div className="flex justify-end">
               <Button 

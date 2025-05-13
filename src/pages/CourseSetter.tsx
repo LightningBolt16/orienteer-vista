@@ -1,20 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from '../components/ui/use-toast';
 import useEventState from '../hooks/useEventState';
 import { MapInfo } from '../types/event';
-import EventSetupForm from '../components/course-setter/EventSetupForm';
-import MapsList from '../components/course-setter/MapsList';
 import EditorLayout from '../components/course-setter/EditorLayout';
 import { useMapStorage } from '../hooks/useMapStorage';
 import { useUser } from '../context/UserContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useIsMobile } from '../hooks/use-mobile';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { ExternalLink } from 'lucide-react';
+import MobileMessage from '../components/course-setter/MobileMessage';
+import CourseSetterTabs from '../components/course-setter/CourseSetterTabs';
 
 const CourseSetter: React.FC = () => {
   const { t } = useLanguage();
@@ -46,45 +41,7 @@ const CourseSetter: React.FC = () => {
   
   // If mobile, render a helpful message instead of the course setter content
   if (isMobile) {
-    return (
-      <div className="pb-20 px-4 max-w-md mx-auto mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Desktop Feature Only</CardTitle>
-            <CardDescription>
-              The course setter requires a larger screen for the map editor.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>
-              Our course setter tool is designed for desktop computers with larger screens
-              and precision mouse input for creating detailed orienteering courses.
-            </p>
-            
-            <p>
-              We recommend trying our route choice game which is fully optimized for mobile devices!
-            </p>
-            
-            <div className="flex flex-col space-y-2 mt-4">
-              <Button 
-                onClick={() => navigate('/route-game')}
-                className="bg-orienteering hover:bg-orienteering/90"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Go to Route Choice Game
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/')}
-              >
-                Return to Home
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <MobileMessage />;
   }
   
   // Fetch user maps when component mounts or when user changes
@@ -193,29 +150,16 @@ const CourseSetter: React.FC = () => {
   // Render the initial setup screen when not editing
   return (
     <div className="pb-20 max-w-4xl mx-auto overflow-x-hidden">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="new-event">{t('newEvent')}</TabsTrigger>
-          <TabsTrigger value="my-maps">{t('myMaps')}</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="new-event" className="mt-6">
-          <EventSetupForm 
-            sampleMaps={userMaps}
-            onCreateEvent={eventState.createEvent}
-            preSelectedMapId={selectedMapId}
-          />
-        </TabsContent>
-        
-        <TabsContent value="my-maps" className="mt-6">
-          <MapsList 
-            sampleMaps={[]} // We don't want to show sample maps
-            onSelectMap={handleSelectMap}
-            onMapUploaded={handleMapUploaded}
-            onUseMap={handleUseMap} // Pass the handler to the component
-          />
-        </TabsContent>
-      </Tabs>
+      <CourseSetterTabs
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedMapId={selectedMapId}
+        userMaps={userMaps}
+        onCreateEvent={eventState.createEvent}
+        onMapUploaded={handleMapUploaded}
+        onSelectMap={handleSelectMap}
+        onUseMap={handleUseMap}
+      />
     </div>
   );
 };

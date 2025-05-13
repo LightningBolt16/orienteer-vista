@@ -5,24 +5,11 @@ import { Card, CardHeader } from '../ui/card';
 import { PrintSettings } from '../PrintSettingsDialog';
 import { Event, Course, Control as EventControl, MapInfo } from '../../types/event';
 import { usePrintSettings } from '../../hooks/usePrintSettings';
-import MapEditor from '../MapEditor';
 import EditorHeader from './EditorHeader';
-import CourseEditor from './CourseEditor';
-import ControlProperties from '../ControlProperties';
 import LayersPanel from './LayersPanel';
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
-import { Button } from '../ui/button';
-
-// Define a control type compatible with MapEditor
-interface Control {
-  id: string;
-  type: 'start' | 'control' | 'finish';
-  x: number;
-  y: number;
-  number?: number;
-  code?: string;
-  description?: string;
-}
+import CourseEditorPanel from './editor/CourseEditorPanel';
+import MapEditorSection from './editor/MapEditorSection';
+import ControlPropertiesPanel from './editor/ControlPropertiesPanel';
 
 interface EditorLayoutProps {
   currentEvent: Event;
@@ -116,19 +103,6 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
     };
   }, []);
 
-  // Helper function to transform EventControl to Control (MapEditor compatible)
-  const transformToMapControl = (control: EventControl): Control => {
-    // Only keep supported types and convert others to 'control'
-    const supportedType = control.type === 'start' || control.type === 'control' || control.type === 'finish'
-      ? control.type
-      : 'control';
-    
-    return {
-      ...control,
-      type: supportedType
-    };
-  };
-  
   return (
     <Card className={`mt-8 h-full overflow-hidden ${isFullScreen ? 'fixed inset-0 z-50 mt-0 rounded-none' : ''}`}>
       <CardHeader className="p-0">
@@ -156,88 +130,44 @@ const EditorLayout: React.FC<EditorLayoutProps> = ({
       <div className="flex h-[calc(100%-4rem)]">
         {/* Left sidebar - Courses */}
         <div className="relative h-full">
-          {isCourseEditorCollapsed ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute left-2 top-14 z-10 bg-background shadow-sm"
-              onClick={() => setIsCourseEditorCollapsed(false)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <div className="flex h-full">
-              <CourseEditor
-                currentCourse={currentCourse}
-                courses={currentEvent.courses}
-                mapType={currentEvent.mapType}
-                mapScale={currentEvent.mapScale}
-                onSelectCourse={onSelectCourse}
-                onUpdateCourse={onUpdateCourse}
-                onAddCourse={onAddCourse}
-              />
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 self-start mt-2 ml-1"
-                onClick={() => setIsCourseEditorCollapsed(true)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <CourseEditorPanel 
+            currentCourse={currentCourse}
+            courses={currentEvent.courses}
+            mapType={currentEvent.mapType}
+            mapScale={currentEvent.mapScale}
+            isCourseEditorCollapsed={isCourseEditorCollapsed}
+            onSelectCourse={onSelectCourse}
+            onUpdateCourse={onUpdateCourse}
+            onAddCourse={onAddCourse}
+            onToggleCourseEditorCollapsed={() => setIsCourseEditorCollapsed(false)}
+          />
         </div>
         
         {/* Main content - Map Editor */}
-        <div className="flex-1 h-full overflow-hidden relative">
-          {selectedMap && currentCourse && (
-            <MapEditor 
-              mapUrl={selectedMap.imageUrl}
-              controls={currentCourse.controls.map(transformToMapControl)}
-              onAddControl={(control: Control) => {
-                // Convert the Control type to EventControl type for the hook
-                const eventControl: EventControl = {
-                  ...control,
-                  type: control.type as EventControl['type']
-                };
-                onAddControl(eventControl);
-              }}
-              onUpdateControl={isAllControlsCourse ? undefined : onUpdateControlPosition}
-              onSelectControl={isAllControlsCourse 
-                ? undefined 
-                : (control: Control) => {
-                    // Convert the Control type to EventControl type for the hook
-                    const eventControl: EventControl = {
-                      ...control,
-                      type: control.type as EventControl['type']
-                    };
-                    onSelectControl(eventControl);
-                  }
-              }
-              viewMode={isAllControlsCourse ? 'preview' : viewMode}
-              allControls={allControls.map(transformToMapControl)}
-              snapDistance={2}
-              courseScale={currentCourse.scale || currentEvent.mapScale}
-              printSettings={currentPrintSettings}
-              onOpenPrintDialog={() => 
-                handleOpenPrintDialog(currentCourse.scale || currentEvent.mapScale)
-              }
-              hideDisplayOptions={true}
-            />
-          )}
-        </div>
+        <MapEditorSection 
+          selectedMap={selectedMap}
+          currentCourse={currentCourse!}
+          allControls={allControls}
+          selectedControl={selectedControl}
+          viewMode={viewMode}
+          isAllControlsCourse={isAllControlsCourse}
+          isCourseEditorCollapsed={isCourseEditorCollapsed}
+          onAddControl={onAddControl}
+          onUpdateControlPosition={onUpdateControlPosition}
+          onSelectControl={onSelectControl}
+          currentPrintSettings={currentPrintSettings}
+          handleOpenPrintDialog={handleOpenPrintDialog}
+          onToggleCourseEditorCollapsed={() => setIsCourseEditorCollapsed(false)}
+        />
         
         {/* Right sidebar - Control Properties */}
-        {viewMode === 'edit' && selectedControl && !isAllControlsCourse && (
-          <div className="w-64 border-l p-4">
-            <ControlProperties 
-              control={transformToMapControl(selectedControl)}
-              onUpdateControl={(updates) => onUpdateControlProperties(selectedControl.id, updates)}
-              onDeleteControl={() => onDeleteControl(selectedControl.id)}
-            />
-          </div>
-        )}
+        <ControlPropertiesPanel 
+          selectedControl={selectedControl}
+          viewMode={viewMode}
+          isAllControlsCourse={isAllControlsCourse}
+          onUpdateControlProperties={onUpdateControlProperties}
+          onDeleteControl={onDeleteControl}
+        />
         
         {/* Layers panel */}
         {showLayerPanel && (
