@@ -1,97 +1,89 @@
 
-import { Control, Course, Event } from './useEventState';
+import { Control, Course, Event } from '../types/event';
 
-// Calculate distance between two control points
-export const calculateDistance = (controlA: Control, controlB: Control): number => {
-  const dx = controlA.x - controlB.x;
-  const dy = controlA.y - controlB.y;
-  return Math.sqrt(dx * dx + dy * dy);
-};
+// Utility functions for event calculations
 
-// Find the shortest path that visits all controls using nearest neighbor algorithm
-export const findShortestPath = (controls: Control[]): Control[] => {
-  if (controls.length <= 1) return controls;
-
-  const visited = new Set<string>();
-  const path: Control[] = [];
-  
-  // Start with the top-left most control as a simple heuristic
-  let currentControl = controls.reduce((min, control) => 
-    control.x + control.y < min.x + min.y ? control : min, controls[0]);
-  
-  path.push(currentControl);
-  visited.add(currentControl.id);
-  
-  // Find the nearest unvisited control and add it to the path
-  while (visited.size < controls.length) {
-    let nearestControl: Control | null = null;
-    let minDistance = Infinity;
-    
-    for (const control of controls) {
-      if (!visited.has(control.id)) {
-        const distance = calculateDistance(currentControl, control);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestControl = control;
-        }
-      }
+// Update all-controls course in the event
+export function updateAllControlsCourse(event: Event, allControls: Control[]): Event {
+  const updatedCourses = event.courses.map(course => {
+    if (course.id === 'course-all-controls') {
+      return {
+        ...course,
+        controls: allControls
+      };
     }
-    
-    if (nearestControl) {
-      path.push(nearestControl);
-      visited.add(nearestControl.id);
-      currentControl = nearestControl;
-    } else {
-      // All controls have been visited
-      break;
-    }
-  }
-  
-  return path;
-}
-
-// Helper function to collect all unique controls from all courses
-export const collectAllUniqueControls = (courses: Course[]): Control[] => {
-  const controls: Control[] = [];
-  courses.forEach(course => {
-    if (course.id === 'course-all-controls') return; // Skip all-controls course as it's derived
-    
-    course.controls.forEach(control => {
-      // Check if control already exists at same position
-      const existing = controls.find(c => 
-        Math.abs(c.x - control.x) < 0.5 && 
-        Math.abs(c.y - control.y) < 0.5 && 
-        c.type === control.type
-      );
-      
-      if (!existing) {
-        controls.push(control);
-      }
-    });
+    return course;
   });
-  return controls;
-};
-
-// Helper function to update the all-controls course with the optimized path
-export const updateAllControlsCourse = (event: Event, allControls: Control[]): Event => {
-  if (allControls.length === 0) return event;
-  
-  const allControlsCourseIndex = event.courses.findIndex(c => c.id === 'course-all-controls');
-  
-  if (allControlsCourseIndex === -1) return event;
-  
-  // Get path optimized controls
-  const sortedControls = findShortestPath(allControls);
-  
-  // Update the all-controls course with the optimized path
-  const updatedCourses = [...event.courses];
-  updatedCourses[allControlsCourseIndex] = {
-    ...updatedCourses[allControlsCourseIndex],
-    controls: sortedControls
-  };
   
   return {
     ...event,
     courses: updatedCourses
   };
-};
+}
+
+// Collect all unique controls from all courses
+export function collectAllUniqueControls(courses: Course[]): Control[] {
+  // Skip the all-controls course itself
+  const regularCourses = courses.filter(course => course.id !== 'course-all-controls');
+  
+  // Collect all controls
+  const allControlsMap = new Map<string, Control>();
+  
+  regularCourses.forEach(course => {
+    course.controls.forEach(control => {
+      // Use control coordinates as a unique key to avoid duplicates
+      const key = `${control.x}-${control.y}-${control.type}`;
+      allControlsMap.set(key, control);
+    });
+  });
+  
+  // Convert map back to array
+  return Array.from(allControlsMap.values());
+}
+
+// Calculate the distance between two controls in km
+export function calculateDistanceBetweenControls(
+  control1: Control,
+  control2: Control,
+  scale: string
+): number {
+  const scaleValue = parseInt(scale, 10);
+  if (!scaleValue) return 0;
+  
+  // Calculate pixel distance
+  const pixelDistance = Math.sqrt(
+    Math.pow(control2.x - control1.x, 2) + Math.pow(control2.y - control1.y, 2)
+  );
+  
+  // Convert pixel distance to kilometers
+  // Assuming 1 km in real world = 1000 / scaleValue pixels on the map
+  return pixelDistance * scaleValue / 1000;
+}
+
+// Calculate the distance in km for a course
+export function calculateCourseDistance(course: Course, scale: string): number {
+  const controls = course.controls;
+  if (!controls || controls.length < 2) return 0;
+  
+  // Calculate the total distance by summing distances between consecutive controls
+  let totalDistance = 0;
+  const orderedControls = [...controls]
+    .filter(c => ['control', 'start', 'finish'].includes(c.type))
+    .sort((a, b) => {
+      if (a.type === 'start') return -1;
+      if (b.type === 'start') return 1;
+      if (a.type === 'finish') return 1;
+      if (b.type === 'finish') return -1;
+      return (a.number || 0) - (b.number || 0);
+    });
+  
+  for (let i = 0; i < orderedControls.length - 1; i++) {
+    totalDistance += calculateDistanceBetweenControls(
+      orderedControls[i],
+      orderedControls[i + 1],
+      scale
+    );
+  }
+  
+  return totalDistance;
+}
