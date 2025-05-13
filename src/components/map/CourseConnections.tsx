@@ -31,8 +31,21 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
   if (!showConnections || sortedControls.length < 2) return null;
   
   // Calculate edge points for line connections
-  const getEdgePoints = (start: Control, end: Control, circleRadius = 12) => {
-    const radius = circleRadius / 100; // Convert to percentage units
+  const getEdgePoints = (start: Control, end: Control) => {
+    // Determine control radius based on type (in percentage of map dimensions)
+    const getControlRadius = (control: Control): number => {
+      // Default radius is 0.3% of map dimensions
+      const defaultRadius = 0.3;
+      
+      // Adjust radius based on control type
+      if (control.type === 'start' || control.type === 'finish') {
+        return defaultRadius * 1.2; // Slightly larger for start/finish
+      }
+      return defaultRadius;
+    };
+    
+    const startRadius = getControlRadius(start);
+    const endRadius = getControlRadius(end);
     
     // Calculate angle between points
     const dx = end.x - start.x;
@@ -40,10 +53,10 @@ const CourseConnections: React.FC<CourseConnectionsProps> = ({
     const angle = Math.atan2(dy, dx);
     
     // Calculate edge points
-    const startX = start.x + Math.cos(angle) * radius;
-    const startY = start.y + Math.sin(angle) * radius;
-    const endX = end.x - Math.cos(angle) * radius;
-    const endY = end.y - Math.sin(angle) * radius;
+    const startX = start.x + Math.cos(angle) * startRadius;
+    const startY = start.y + Math.sin(angle) * startRadius;
+    const endX = end.x - Math.cos(angle) * endRadius;
+    const endY = end.y - Math.sin(angle) * endRadius;
     
     return { startX, startY, endX, endY };
   };

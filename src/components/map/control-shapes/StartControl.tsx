@@ -18,12 +18,16 @@ const StartControl: React.FC<StartControlProps> = ({
   // Calculate center point
   const centerX = size / 2;
   const centerY = size / 2;
+  
+  // Define triangle points for an equilateral triangle
+  // The triangle should point upward by default (before rotation)
+  const points = `${centerX},${size * 0.2} ${size * 0.2},${size * 0.8} ${size * 0.8},${size * 0.8}`;
 
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <g transform={`rotate(${rotationAngle} ${centerX} ${centerY})`}>
         <polygon 
-          points="12,2 22,22 2,22" 
+          points={points}
           fill="none" 
           stroke={color} 
           strokeWidth={thickness} 

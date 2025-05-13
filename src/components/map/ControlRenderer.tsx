@@ -54,11 +54,9 @@ const ControlRenderer: React.FC<ControlRendererProps> = ({
     if (control.type === 'start' && nextControl) {
       const dx = nextControl.x - control.x;
       const dy = nextControl.y - control.y;
-      // Calculate angle in degrees, where 0 is pointing right
-      const angleRadians = Math.atan2(dy, dx);
-      const angleDegrees = (angleRadians * 180 / Math.PI);
-      // Adjust to make the triangle point toward the next control
-      return angleDegrees - 90; // Triangle points up by default, adjust accordingly
+      // Calculate angle in degrees
+      const angleDegrees = Math.atan2(dy, dx) * 180 / Math.PI;
+      return angleDegrees;
     }
     return 0;
   };
