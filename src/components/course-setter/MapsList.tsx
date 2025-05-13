@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Map as MapIcon } from 'lucide-react';
-import { MapInfo } from '../../hooks/useEventState';
+import { MapInfo } from '../../types/event';
 import MapUploader from '../MapUploader';
 import { supabase } from '../../integrations/supabase/client';
 import { useUser } from '../../context/UserContext';

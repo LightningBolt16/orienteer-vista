@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader } from '../ui/card';
 import { PrintSettings } from '../PrintSettingsDialog';
-import { Event, Course, Control as EventControl, MapInfo } from '../../hooks/useEventState';
+import { Event, Course, Control as EventControl, MapInfo } from '../../types/event';
 import { usePrintSettings } from '../../hooks/usePrintSettings';
 import MapEditor from '../MapEditor';
 import EditorHeader from './EditorHeader';

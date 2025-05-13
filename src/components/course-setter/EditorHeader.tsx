@@ -6,7 +6,7 @@ import { CardTitle, CardDescription } from '../ui/card';
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { FileText, Settings, Layers, Download, Save, Printer, Maximize2, Minimize2 } from 'lucide-react';
 import PrintSettingsDialog from '../PrintSettingsDialog';
-import { Event, Course } from '../../hooks/useEventState';
+import { Event, Course } from '../../types/event';
 
 interface EditorHeaderProps {
   currentEvent: Event;

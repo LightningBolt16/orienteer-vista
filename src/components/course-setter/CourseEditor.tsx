@@ -8,7 +8,7 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ScrollArea } from '../ui/scroll-area';
 import CourseList from '../CourseList';
-import { Course } from '../../hooks/useEventState';
+import { Course } from '../../types/event';
 
 interface CourseEditorProps {
   currentCourse: Course | null;

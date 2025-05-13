@@ -1,5 +1,5 @@
 
-import { Control } from '../hooks/useEventState';
+import { Control } from '../types/event';
 
 /**
  * Utility functions for handling map operations

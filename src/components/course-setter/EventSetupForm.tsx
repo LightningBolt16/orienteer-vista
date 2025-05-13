@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { MapInfo } from '../../hooks/useEventState';
+import { MapInfo } from '../../types/event';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';

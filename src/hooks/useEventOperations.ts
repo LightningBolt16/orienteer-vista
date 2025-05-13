@@ -1,6 +1,6 @@
 
 import { toast } from '../components/ui/use-toast';
-import { Event, generateNewEventId } from '../types/event';
+import { Event, Course, generateNewEventId, generateNewCourseId } from '../types/event';
 import { useLanguage } from '../context/LanguageContext';
 import { getCourseDistanceInKm } from './useEventSelectors';
 
