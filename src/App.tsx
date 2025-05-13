@@ -32,11 +32,11 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <LanguageProvider>
-          <UserProvider>
-            <Toaster />
-            <Sonner />
+        <UserProvider>
+          <LanguageProvider>
             <BrowserRouter>
+              <Toaster />
+              <Sonner />
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/" element={<Layout><Index /></Layout>} />
@@ -49,8 +49,8 @@ const App: React.FC = () => {
                 <Route path="*" element={<Layout><NotFound /></Layout>} />
               </Routes>
             </BrowserRouter>
-          </UserProvider>
-        </LanguageProvider>
+          </LanguageProvider>
+        </UserProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
