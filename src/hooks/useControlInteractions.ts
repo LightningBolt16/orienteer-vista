@@ -51,8 +51,6 @@ export function useControlInteractions({
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!canvasRef.current || 
         selectedTool === 'pointer' || 
-        selectedTool === 'zoom-in' || 
-        selectedTool === 'zoom-out' ||
         selectedTool === 'move' ||
         viewMode === 'preview') return;
     

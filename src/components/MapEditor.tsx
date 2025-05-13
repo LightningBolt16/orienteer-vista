@@ -75,29 +75,15 @@ const MapEditor: React.FC<MapEditorProps> = ({
   // Custom hooks
   const mapInteractions = useMapInteractions({ viewMode });
   
-  // Modify control interactions to enforce only one start point
+  // Use the controlInteractions hook for control management
   const controlInteractions = useControlInteractions({
     controls,
     onUpdateControl,
     onSelectControl,
     selectedTool,
     viewMode,
-    canvasRef,
-    onAddControl: (control: Control) => {
-      // If trying to add a start control, check if one already exists
-      if (control.type === 'start') {
-        const existingStart = controls.find(c => c.type === 'start');
-        if (existingStart) {
-          toast({
-            title: "Only one start allowed",
-            description: "A course can only have one start point. Delete the existing one first.",
-            variant: "destructive"
-          });
-          return;
-        }
-      }
-      onAddControl(control);
-    },
+    canvasRef: mapContainerRef, // Use mapContainerRef for correct positioning
+    onAddControl,
     snapDistance,
     allControls
   });
@@ -199,6 +185,13 @@ const MapEditor: React.FC<MapEditorProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, getEnabledTools]);
   
+  // Handle tool action (map click to add control)
+  const handleToolAction = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (viewMode === 'edit' && selectedTool !== 'pointer' && selectedTool !== 'move') {
+      controlInteractions.handleToolAction(e);
+    }
+  };
+  
   return (
     <div className="relative h-full overflow-hidden flex flex-col">
       {/* Horizontal toolbar at the top */}
@@ -235,7 +228,7 @@ const MapEditor: React.FC<MapEditorProps> = ({
         handleCombinedMouseMove={handleCombinedMouseMove}
         handleCombinedMouseUp={handleCombinedMouseUp}
         handleWheel={handleWheel}
-        handleToolAction={controlInteractions.handleToolAction}
+        handleToolAction={handleToolAction}
         mapRef={mapContainerRef}
         zoomLevel={mapInteractions.zoomLevel}
         mapPosition={mapInteractions.mapPosition}

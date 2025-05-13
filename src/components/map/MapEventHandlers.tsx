@@ -39,11 +39,21 @@ const MapEventHandlers: React.FC<MapEventHandlersProps> = ({
     }
   };
   
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (viewMode === 'edit' && handleToolAction && selectedTool !== 'pointer' && selectedTool !== 'move') {
+      handleToolAction(e);
+    }
+  };
+  
   return (
     <div 
       ref={mapRef}
       className="flex-1 overflow-hidden"
-      onMouseDown={handleMapDragStart}
+      onMouseDown={(e) => {
+        if (selectedTool === 'move' || viewMode === 'preview') {
+          handleMapDragStart(e);
+        }
+      }}
       onMouseMove={handleCombinedMouseMove}
       onMouseUp={handleCombinedMouseUp}
       onMouseLeave={handleCombinedMouseUp}
@@ -51,7 +61,7 @@ const MapEventHandlers: React.FC<MapEventHandlersProps> = ({
     >
       <div 
         className={`relative h-full ${getCursorStyle()}`}
-        onClick={viewMode === 'preview' ? undefined : handleToolAction}
+        onClick={handleClick}
         style={{
           transform: `scale(${zoomLevel}) translate(${mapPosition.x}px, ${mapPosition.y}px)`,
           transformOrigin: 'center',
