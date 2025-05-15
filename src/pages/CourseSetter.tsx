@@ -28,18 +28,18 @@ const CourseSetter: React.FC = () => {
   // Use the event state hook
   const eventState = useEventState();
 
-  // Redirect mobile users with explanatory message
+  // Show notification for mobile users and redirect them back home
   useEffect(() => {
     if (isMobile) {
       toast({
-        title: "Desktop feature only",
-        description: "The course setter is only available on desktop devices. Try our route choice game instead!",
+        title: "Desktop Feature Only",
+        description: "The course setter requires a larger screen. Try our route choice game instead!",
         variant: "destructive"
       });
     }
   }, [isMobile]);
   
-  // If mobile, render a helpful message instead of the course setter content
+  // If mobile, render the mobile message component
   if (isMobile) {
     return <MobileMessage />;
   }
