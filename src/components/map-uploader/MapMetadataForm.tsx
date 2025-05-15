@@ -40,17 +40,17 @@ const MapMetadataForm: React.FC<MapMetadataFormProps> = ({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="map-name">{t('map.name')}</Label>
+        <Label htmlFor="map-name">{t('map.name') || "Map Name"}</Label>
         <Input 
           id="map-name"
           value={mapName}
           onChange={(e) => setMapName(e.target.value)}
-          placeholder={t('enter.map.name')}
+          placeholder={t('enter.map.name') || "Enter map name"}
         />
       </div>
       
       <div className="space-y-2">
-        <Label>{t('map.type')}</Label>
+        <Label>{t('map.type') || "Map Type"}</Label>
         <RadioGroup 
           value={mapType} 
           onValueChange={(value: 'sprint' | 'forest') => {
@@ -67,17 +67,17 @@ const MapMetadataForm: React.FC<MapMetadataFormProps> = ({
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="sprint" id="sprint" />
-            <Label htmlFor="sprint">{t('sprint')}</Label>
+            <Label htmlFor="sprint">{t('sprint') || "Sprint"}</Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="forest" id="forest" />
-            <Label htmlFor="forest">{t('forest')}</Label>
+            <Label htmlFor="forest">{t('forest') || "Forest"}</Label>
           </div>
         </RadioGroup>
       </div>
       
       <div className="space-y-2">
-        <Label>{t('map.scale')}</Label>
+        <Label>{t('map.scale') || "Map Scale"}</Label>
         <div className="space-y-2">
           {!useCustomScale ? (
             <Select 
@@ -85,7 +85,7 @@ const MapMetadataForm: React.FC<MapMetadataFormProps> = ({
               onValueChange={setMapScale}
             >
               <SelectTrigger>
-                <SelectValue placeholder={t('select.scale')} />
+                <SelectValue placeholder={t('select.scale') || "Select scale"} />
               </SelectTrigger>
               <SelectContent>
                 {(mapType === 'sprint' ? sprintScales : forestScales).map(scale => (
@@ -116,7 +116,7 @@ const MapMetadataForm: React.FC<MapMetadataFormProps> = ({
               onChange={(e) => setUseCustomScale(e.target.checked)}
               className="h-4 w-4"
             />
-            <Label htmlFor="custom-scale" className="text-sm">{t('use.custom.scale')}</Label>
+            <Label htmlFor="custom-scale" className="text-sm">{t('use.custom.scale') || "Use custom scale"}</Label>
           </div>
         </div>
       </div>

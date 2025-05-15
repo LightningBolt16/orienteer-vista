@@ -32,7 +32,7 @@ const MapDisplayOptions: React.FC<MapDisplayOptionsProps> = ({
           onChange={() => setShowConnections(!showConnections)}
         />
         <label htmlFor="show-connections" className="text-xs">
-          {t('show.connections')}
+          {t('show.connections') || "Show Connections"}
         </label>
       </div>
       
@@ -45,13 +45,13 @@ const MapDisplayOptions: React.FC<MapDisplayOptionsProps> = ({
           onChange={() => setShowControlNumbers(!showControlNumbers)}
         />
         <label htmlFor="show-numbers" className="text-xs">
-          {t('show.numbers')}
+          {t('show.numbers') || "Show Numbers"}
         </label>
       </div>
       
       {viewMode === 'preview' && (
         <div className="ml-auto text-xs text-muted-foreground">
-          {t('scale')}: 1:{parseInt(courseScale || '10000').toLocaleString()}
+          {t('scale') || "Scale"}: 1:{parseInt(courseScale || '10000').toLocaleString()}
         </div>
       )}
     </div>

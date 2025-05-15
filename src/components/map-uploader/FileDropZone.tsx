@@ -53,8 +53,8 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onFileSelected }) => {
     // Check if file is an image
     if (!file.type.startsWith('image/')) {
       toast({
-        title: t('error'),
-        description: t('please.upload.image'),
+        title: t('error') || "Error",
+        description: t('please.upload.image') || "Please upload an image file",
         variant: "destructive"
       });
       return;
@@ -74,14 +74,14 @@ const FileDropZone: React.FC<FileDropZoneProps> = ({ onFileSelected }) => {
       onDrop={handleDrop}
     >
       <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-      <p className="text-sm mb-2">{t('drag.drop.map')}</p>
-      <p className="text-xs text-muted-foreground mb-4">{t('supported.formats')}</p>
+      <p className="text-sm mb-2">{t('drag.drop.map') || "Drag and drop map here"}</p>
+      <p className="text-xs text-muted-foreground mb-4">{t('supported.formats') || "Supported formats: PNG, JPG, JPEG"}</p>
       
       <Button 
         variant="outline" 
         onClick={() => document.getElementById('map-file-input')?.click()}
       >
-        {t('select.file')}
+        {t('select.file') || "Select File"}
       </Button>
       <Input 
         id="map-file-input"

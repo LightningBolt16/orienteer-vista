@@ -12,11 +12,11 @@ const Landing: React.FC = () => {
   
   const showEnvWarning = () => {
     toast({
-      title: t('configurationRequired'),
-      description: t('supabaseConnectionMessage'),
+      title: t('configurationRequired') || "Configuration Required",
+      description: t('supabaseConnectionMessage') || "Supabase connection not configured",
       action: (
-        <Button variant="outline" onClick={() => toast({ description: t('environmentVariables') })}>
-          {t('learnMore')}
+        <Button variant="outline" onClick={() => toast({ description: t('environmentVariables') || "Environment variables needed" })}>
+          {t('learnMore') || "Learn More"}
         </Button>
       ),
     });
@@ -31,16 +31,16 @@ const Landing: React.FC = () => {
           </div>
           <CardTitle className="text-3xl font-bold">OL.se</CardTitle>
           <CardDescription className="text-lg">
-            {t('orienteeringToolsPlatform')}
+            {t('orienteeringToolsPlatform') || "Orienteering Tools Platform"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-amber-50 text-amber-800 p-4 rounded-md flex items-start gap-3">
             <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
             <div>
-              <h3 className="font-medium mb-1">{t('developmentMode')}</h3>
+              <h3 className="font-medium mb-1">{t('developmentMode') || "Development Mode"}</h3>
               <p className="text-sm">
-                {t('developmentModeInfo')}
+                {t('developmentModeInfo') || "This application is currently in development mode."}
               </p>
             </div>
           </div>
@@ -48,22 +48,22 @@ const Landing: React.FC = () => {
           <div className="grid grid-cols-1 gap-2">
             <Link to="/route-game" className="w-full">
               <Button variant="default" className="w-full">
-                {t('routeGame')}
+                {t('routeGame') || "Route Game"}
               </Button>
             </Link>
             <Link to="/course-setter" className="w-full">
               <Button variant="outline" className="w-full">
-                {t('courseSetter')}
+                {t('courseSetter') || "Course Setter"}
               </Button>
             </Link>
             <Button variant="outline" className="w-full" onClick={showEnvWarning}>
-              {t('signIn')} / {t('register')}
+              {t('signIn') || "Sign In"} / {t('register') || "Register"}
             </Button>
           </div>
         </CardContent>
         <CardFooter className="flex justify-center border-t pt-4">
           <p className="text-sm text-muted-foreground">
-            {t('version')}
+            {t('version') || "Version 0.1.0"}
           </p>
         </CardFooter>
       </Card>
