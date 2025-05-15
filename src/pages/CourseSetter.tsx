@@ -28,22 +28,6 @@ const CourseSetter: React.FC = () => {
   // Use the event state hook
   const eventState = useEventState();
 
-  // Show notification for mobile users and redirect them back home
-  useEffect(() => {
-    if (isMobile) {
-      toast({
-        title: "Desktop Feature Only",
-        description: "The course setter requires a larger screen. Try our route choice game instead!",
-        variant: "destructive"
-      });
-    }
-  }, [isMobile]);
-  
-  // If mobile, render the mobile message component
-  if (isMobile) {
-    return <MobileMessage />;
-  }
-  
   // Fetch user maps when component mounts or when user changes
   useEffect(() => {
     const loadUserMaps = async () => {
@@ -65,6 +49,11 @@ const CourseSetter: React.FC = () => {
     
     loadUserMaps();
   }, [user, fetchMaps]);
+  
+  // Display mobile message if on a mobile device
+  if (isMobile) {
+    return <MobileMessage />;
+  }
   
   // Handle upload of a new map
   const handleMapUploaded = async (metadata: any) => {
