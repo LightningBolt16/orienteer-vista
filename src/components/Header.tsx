@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
@@ -61,8 +62,6 @@ const Header: React.FC = () => {
     return location.pathname === path;
   };
 
-  const isCourseSetter = isCurrentPath('/course-setter') || isCurrentPath('/my-files');
-
   const isAuthenticated = user && user.id !== '1';
 
   return (
@@ -106,6 +105,28 @@ const Header: React.FC = () => {
                 >
                   <Map className="h-5 w-5" />
                   <span>{t('routeGame')}</span>
+                </Link>
+                
+                <Link 
+                  to="/course-setter" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/course-setter') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <PenTool className="h-5 w-5" />
+                  <span>{t('courseSetter')}</span>
+                </Link>
+                
+                <Link 
+                  to="/my-files" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/my-files') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <FolderOpen className="h-5 w-5" />
+                  <span>{t('myProjects')}</span>
                 </Link>
                 
                 <Link 
@@ -164,46 +185,25 @@ const Header: React.FC = () => {
               <span>{t('routeGame')}</span>
             </Link>
             
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger
-                    className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                      isCourseSetter ? 'text-orienteering' : 'text-foreground'
-                    }`}
-                  >
-                    <PenTool className="h-4 w-4 mr-1" />
-                    <span>{t('courseSetter')}</span>
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent className="min-w-[8rem]">
-                    <div className="grid gap-2 p-2">
-                      <NavigationMenuLink asChild>
-                        <Link 
-                          to="/course-setter" 
-                          className={`flex items-center space-x-2 p-2 rounded-md hover:bg-muted ${
-                            isCurrentPath('/course-setter') ? 'bg-muted' : ''
-                          }`}
-                        >
-                          <PenTool className="h-4 w-4" />
-                          <span>{t('courseSetter')}</span>
-                        </Link>
-                      </NavigationMenuLink>
-                      <NavigationMenuLink asChild>
-                        <Link 
-                          to="/my-files" 
-                          className={`flex items-center space-x-2 p-2 rounded-md hover:bg-muted ${
-                            isCurrentPath('/my-files') ? 'bg-muted' : ''
-                          }`}
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          <span>{t('myMaps')}</span>
-                        </Link>
-                      </NavigationMenuLink>
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
+            <Link 
+              to="/course-setter" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/course-setter') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <PenTool className="h-4 w-4 mr-1" />
+              <span>{t('courseSetter')}</span>
+            </Link>
+            
+            <Link 
+              to="/my-files" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/my-files') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <FolderOpen className="h-4 w-4 mr-1" />
+              <span>{t('myProjects')}</span>
+            </Link>
 
             <Link 
               to="/subscription" 

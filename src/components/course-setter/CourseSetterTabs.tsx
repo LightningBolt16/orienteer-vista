@@ -33,8 +33,8 @@ const CourseSetterTabs: React.FC<CourseSetterTabsProps> = ({
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
       <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="new-event">{t('newEvent')}</TabsTrigger>
-        <TabsTrigger value="my-maps">{t('myMaps')}</TabsTrigger>
+        <TabsTrigger value="new-event">New Event</TabsTrigger>
+        <TabsTrigger value="my-maps">My Maps</TabsTrigger>
       </TabsList>
       
       <TabsContent value="new-event" className="mt-6">

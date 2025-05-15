@@ -46,7 +46,7 @@ const MapsList: React.FC<MapsListProps> = ({
         if (error) {
           console.error('Error fetching maps:', error);
           toast({
-            title: t('error'),
+            title: 'Error',
             description: error.message,
             variant: 'destructive'
           });
@@ -87,7 +87,7 @@ const MapsList: React.FC<MapsListProps> = ({
       } catch (error: any) {
         console.error('Error fetching maps:', error);
         toast({
-          title: t('error'),
+          title: 'Error',
           description: error.message || 'Failed to fetch maps',
           variant: 'destructive'
         });
@@ -112,12 +112,12 @@ const MapsList: React.FC<MapsListProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('my.maps')}</CardTitle>
-        <CardDescription>{t('manage.your.maps')}</CardDescription>
+        <CardTitle>My Projects</CardTitle>
+        <CardDescription>Manage your maps and courses</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-between mb-4">
-          <h3 className="text-lg font-semibold">{t('available.maps')}</h3>
+          <h3 className="text-lg font-semibold">Available Maps</h3>
         </div>
         
         {loading ? (
@@ -128,8 +128,8 @@ const MapsList: React.FC<MapsListProps> = ({
           <>
             {userMaps.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
-                <p>{t('no.maps.available')}</p>
-                <p className="text-sm mt-2">{t('upload.maps.below')}</p>
+                <p>No maps available</p>
+                <p className="text-sm mt-2">Upload maps below to get started</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -152,7 +152,7 @@ const MapsList: React.FC<MapsListProps> = ({
                             onClick={() => handleUseMap(map.id)}
                           >
                             <MapIcon className="h-4 w-4 mr-2" />
-                            {t('use')}
+                            Use
                           </Button>
                         </div>
                         <div className="mt-1 text-sm text-muted-foreground">
