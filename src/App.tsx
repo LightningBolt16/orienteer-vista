@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -35,8 +35,9 @@ const App: React.FC = () => {
         <UserProvider>
           <LanguageProvider>
             <BrowserRouter>
+              {/* Only render one of the toast providers at the app level */}
               <Toaster />
-              <Sonner />
+              {/* <SonnerToaster /> - Commented out to avoid conflicts */}
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/" element={<Layout><Index /></Layout>} />
