@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Globe, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
+import LanguageSelector from './LanguageSelector';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -43,10 +44,6 @@ const Header: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrolled]);
-
-  const toggleLanguage = () => {
-    setLanguage(language === 'sv' ? 'en' : 'sv');
-  };
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -84,6 +81,8 @@ const Header: React.FC = () => {
                 </Link>
               )}
               
+              <LanguageSelector />
+              
               <button 
                 onClick={toggleMobileMenu}
                 className="p-2 text-foreground"
@@ -93,7 +92,6 @@ const Header: React.FC = () => {
               </button>
             </div>
             
-            {/* Mobile menu - Course Setter is removed from mobile view */}
             {mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 bg-background/95 backdrop-blur-sm shadow-lg p-4 flex flex-col space-y-4 animate-fade-in">
                 <Link 
@@ -130,23 +128,21 @@ const Header: React.FC = () => {
                 </Link>
                 
                 <Link 
-                  to="/subscription" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/subscription') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  <span>{t('subscription')}</span>
-                </Link>
-                
-                <Link 
                   to="/profile"
                   className="p-3 rounded-md flex items-center space-x-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <User className="h-5 w-5" />
                   <span>{t('profile')}</span>
+                </Link>
+
+                <Link 
+                  to="/subscription" 
+                  className="p-3 rounded-md flex items-center space-x-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <CreditCard className="h-5 w-5" />
+                  <span>{t('subscription')}</span>
                 </Link>
 
                 {isAuthenticated ? (
@@ -204,16 +200,6 @@ const Header: React.FC = () => {
               <FolderOpen className="h-4 w-4 mr-1" />
               <span>{t('myProjects')}</span>
             </Link>
-
-            <Link 
-              to="/subscription" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/subscription') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <CreditCard className="h-4 w-4 mr-1" />
-              <span>{t('subscription')}</span>
-            </Link>
             
             <div className="flex items-center space-x-2 ml-4">
               {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
@@ -222,6 +208,8 @@ const Header: React.FC = () => {
                   {t('rank')} {getUserRank()}
                 </Link>
               )}
+              
+              <LanguageSelector />
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -236,6 +224,9 @@ const Header: React.FC = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link to="/profile">{t('profile')}</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/subscription">{t('subscription')}</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {isAuthenticated ? (

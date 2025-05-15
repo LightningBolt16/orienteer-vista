@@ -19,7 +19,7 @@ const NotFound: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
       <h1 className="text-7xl font-bold mb-4">404</h1>
-      <p className="text-xl text-muted-foreground mb-6">{t('pageNotFound') || 'Oops! Page not found'}</p>
+      <p className="text-xl text-muted-foreground mb-6">{t('pageNotFound') || 'Page not found'}</p>
       <Link to="/">
         <Button variant="default">
           {t('returnHome') || 'Return to Home'}
