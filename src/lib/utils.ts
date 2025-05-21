@@ -1,7 +1,6 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { getNetworkStatus } from "./networkUtils"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -17,38 +16,18 @@ export function getBrowserPreferredLanguage(supportedLanguages: string[]): strin
   return supportedLanguages.includes(browserLang) ? browserLang : 'en';
 }
 
-/**
- * Enhanced fetch utility with retry mechanism and network status check
- */
 export async function fetchWithRetry(
   fetchFn: () => Promise<any>, 
   maxRetries: number = 3, 
-  delay: number = 1000,
-  requiresNetwork: boolean = true
+  delay: number = 1000
 ): Promise<any> {
   let lastError;
-  
-  // Immediately check network status if required
-  if (requiresNetwork && !getNetworkStatus()) {
-    throw new Error('You are offline. Please check your internet connection and try again.');
-  }
   
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fetchFn();
-    } catch (error: any) {
+    } catch (error) {
       console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`, error);
-      
-      // Check if it's a network error
-      if (error.message === 'Failed to fetch' || 
-          error.message?.includes('network') || 
-          error.message?.includes('offline')) {
-        // Re-check network status
-        if (!getNetworkStatus()) {
-          throw new Error('You are offline. Please check your internet connection and try again.');
-        }
-      }
-      
       lastError = error;
       
       // Wait before retrying
@@ -62,26 +41,3 @@ export async function fetchWithRetry(
   // All retries failed
   throw lastError;
 }
-
-/**
- * Cache for offline data storage
- */
-export const localCache = {
-  get: <T>(key: string, defaultValue: T): T => {
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
-    } catch (error) {
-      console.error('Error retrieving from cache:', error);
-      return defaultValue;
-    }
-  },
-  
-  set: <T>(key: string, value: T): void => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.error('Error storing in cache:', error);
-    }
-  }
-};

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Compass, AlertCircle, WifiOff, RefreshCw } from 'lucide-react';
+import { Compass, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { getNetworkStatus, subscribeToNetworkStatus } from '@/lib/networkUtils';
 
 const AuthPage: React.FC = () => {
   const { signIn, signUp, loading } = useUser();
@@ -19,7 +18,6 @@ const AuthPage: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<string>('login');
   const [error, setError] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState<boolean>(getNetworkStatus());
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -29,28 +27,10 @@ const AuthPage: React.FC = () => {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
-
-  // Subscribe to network status changes
-  useEffect(() => {
-    const unsubscribe = subscribeToNetworkStatus((online) => {
-      setIsOnline(online);
-      if (online && error?.includes('offline')) {
-        setError(null);
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [error]);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
-    // Check network status first
-    if (!isOnline) {
-      setError(t('offlineError') || 'You are currently offline. Please check your internet connection and try again.');
-      return;
-    }
     
     try {
       await signIn(loginEmail, loginPassword);
@@ -66,12 +46,6 @@ const AuthPage: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
-    // Check network status first
-    if (!isOnline) {
-      setError(t('offlineError') || 'You are currently offline. Please check your internet connection and try again.');
-      return;
-    }
     
     try {
       await signUp(registerEmail, registerPassword, registerName);
@@ -90,12 +64,6 @@ const AuthPage: React.FC = () => {
     setActiveTab(value);
   };
   
-  // Retry connection
-  const handleRetryConnection = () => {
-    setError(null);
-    window.location.reload();
-  };
-  
   return (
     <div className="flex justify-center items-center min-h-screen">
       <Card className="w-full max-w-md">
@@ -110,31 +78,10 @@ const AuthPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isOnline && (
-            <Alert variant="destructive" className="mb-4">
-              <WifiOff className="h-4 w-4 mr-2" />
-              <AlertDescription className="flex justify-between items-center">
-                <span>{t('offlineError') || 'You are currently offline'}</span>
-                <Button size="sm" variant="outline" onClick={handleRetryConnection}>
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  {t('retry')}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          
           {error && (
             <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              <AlertDescription className="flex justify-between items-center">
-                <span>{error}</span>
-                {error.includes('fetch') && (
-                  <Button size="sm" variant="outline" onClick={handleRetryConnection}>
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    {t('retry')}
-                  </Button>
-                )}
-              </AlertDescription>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
           
@@ -169,7 +116,7 @@ const AuthPage: React.FC = () => {
                     onChange={(e) => setLoginPassword(e.target.value)}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading || !isOnline}>
+                <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? t('signingIn') : t('signIn')}
                 </Button>
               </form>
@@ -209,7 +156,7 @@ const AuthPage: React.FC = () => {
                     onChange={(e) => setRegisterPassword(e.target.value)}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading || !isOnline}>
+                <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? t('registering') : t('register')}
                 </Button>
               </form>
