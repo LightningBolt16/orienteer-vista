@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
@@ -60,6 +59,26 @@ const Header: React.FC = () => {
   };
 
   const isAuthenticated = user && user.id !== '1';
+
+  // Connection status check
+  const checkConnection = async () => {
+    try {
+      const { supabase } = await import('../integrations/supabase/client');
+      
+      const { error } = await supabase.from('user_profiles')
+        .select('id')
+        .limit(1);
+        
+      if (error) {
+        throw error;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Connection check failed:', error);
+      return false;
+    }
+  };
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 px-6 py-4 transition-all duration-300 ${

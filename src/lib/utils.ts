@@ -15,3 +15,29 @@ export function getBrowserPreferredLanguage(supportedLanguages: string[]): strin
   const browserLang = detectBrowserLanguage();
   return supportedLanguages.includes(browserLang) ? browserLang : 'en';
 }
+
+export async function fetchWithRetry(
+  fetchFn: () => Promise<any>, 
+  maxRetries: number = 3, 
+  delay: number = 1000
+): Promise<any> {
+  let lastError;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fetchFn();
+    } catch (error) {
+      console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`, error);
+      lastError = error;
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Increase delay for next attempt (exponential backoff)
+      delay *= 2;
+    }
+  }
+  
+  // All retries failed
+  throw lastError;
+}

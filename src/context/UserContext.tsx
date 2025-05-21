@@ -4,6 +4,7 @@ import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Database } from '../integrations/supabase/types';
+import { fetchWithRetry } from '../lib/utils';
 
 type Tables = Database['public']['Tables'];
 type UserProfileRow = Tables['user_profiles']['Row'];
@@ -52,6 +53,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
 
+  // Attempt to refresh connection to Supabase
+  const refreshSupabaseConnection = async () => {
+    try {
+      // Try to get the current session to test connection
+      const { error } = await supabase.auth.getSession();
+      if (error) {
+        throw error;
+      }
+      
+      // Connection restored, fetch data
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      }
+      
+      fetchLeaderboard();
+      
+      // Notify user that connection is restored
+      toast({
+        title: t('connectionRestored') || 'Connection restored',
+        description: t('dataRefreshed') || 'Your data has been refreshed',
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to refresh connection:', error);
+      return false;
+    }
+  };
+
   // Set up authentication state listener and check for existing session
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -72,7 +102,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+      if (error) {
+        console.error('Error fetching session:', error);
+        setLoading(false);
+        
+        // Show error notification with retry button
+        toast({
+          title: t('connectionError') || 'Connection error',
+          description: t('tryAgainLater') || 'Please try again later or check your connection',
+          action: (
+            <button 
+              className="bg-orienteering hover:bg-orienteering/90 text-white py-1 px-3 rounded text-xs"
+              onClick={refreshSupabaseConnection}
+            >
+              {t('retry') || 'Retry'}
+            </button>
+          )
+        });
+        return;
+      }
+      
       setSession(currentSession);
       
       if (currentSession?.user) {
@@ -90,21 +140,26 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Fetch user profile from Supabase
+  // Fetch user profile from Supabase with retry
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const fetchProfile = async () => {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        setLoading(false);
-        return;
-      }
-
+        if (error) {
+          throw error;
+        }
+        
+        return data;
+      };
+      
+      // Use retry mechanism
+      const data = await fetchWithRetry(fetchProfile);
+      
       if (data) {
         setUserState({
           id: userId,
@@ -121,26 +176,45 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       setLoading(false);
-    } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
+    } catch (error: any) {
+      console.error('Error in fetchUserProfile after retries:', error);
+      toast({
+        title: t('error') || 'Error',
+        description: t('profileFetchError') || 'Failed to fetch your profile. Please try again.',
+        variant: 'destructive',
+        action: (
+          <button 
+            className="bg-orienteering hover:bg-orienteering/90 text-white py-1 px-3 rounded text-xs"
+            onClick={() => fetchUserProfile(userId)}
+          >
+            {t('retry') || 'Retry'}
+          </button>
+        )
+      });
       setLoading(false);
     }
   };
 
-  // Fetch leaderboard data
+  // Fetch leaderboard data with retry
   const fetchLeaderboard = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, name, accuracy, speed, profile_image')
-        .order('accuracy', { ascending: false })
-        .order('speed', { ascending: true })
-        .limit(10);
+      const fetchLeaderboardData = async () => {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('id, name, accuracy, speed, profile_image')
+          .order('accuracy', { ascending: false })
+          .order('speed', { ascending: true })
+          .limit(10);
 
-      if (error) {
-        console.error('Error fetching leaderboard:', error);
-        return;
-      }
+        if (error) {
+          throw error;
+        }
+        
+        return data;
+      };
+      
+      // Use retry mechanism
+      const data = await fetchWithRetry(fetchLeaderboardData);
 
       if (data && data.length > 0) {
         // Add rank to each entry and map profile_image to profileImage
@@ -155,8 +229,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
         setLeaderboard(rankedLeaderboard);
       }
-    } catch (error) {
-      console.error('Error in fetchLeaderboard:', error);
+    } catch (error: any) {
+      console.error('Error in fetchLeaderboard after retries:', error);
+      // Don't show toast here as it could be too intrusive
+      // Just keep the previous leaderboard state
     }
   };
 
@@ -282,35 +358,55 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Authentication methods
+  // Authentication methods with improved error handling
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) {
-        setLoading(false);
-        toast({
-          title: t('signInError'),
-          description: error.message,
-          variant: 'destructive'
+      const signInFn = async () => {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
         });
-        throw error;
-      }
+        
+        if (error) {
+          throw error;
+        }
+        
+        return data;
+      };
+      
+      // Use retry mechanism
+      await fetchWithRetry(signInFn);
       
       // Session will be updated by the onAuthStateChange listener
       // which will trigger fetchUserProfile
     } catch (error: any) {
       setLoading(false);
-      toast({
-        title: t('signInError'),
-        description: error.message || 'An unexpected error occurred',
-        variant: 'destructive'
-      });
+      
+      // Check if it's a network error
+      if (error.message === 'Failed to fetch' || error.message?.includes('network')) {
+        toast({
+          title: t('connectionError') || 'Connection error',
+          description: t('checkConnection') || 'Please check your internet connection and try again.',
+          variant: 'destructive',
+          action: (
+            <button 
+              className="bg-orienteering hover:bg-orienteering/90 text-white py-1 px-3 rounded text-xs"
+              onClick={refreshSupabaseConnection}
+            >
+              {t('retry') || 'Retry'}
+            </button>
+          )
+        });
+      } else {
+        toast({
+          title: t('signInError') || 'Sign in error',
+          description: error.message || 'An unexpected error occurred',
+          variant: 'destructive'
+        });
+      }
+      
       throw error;
     }
   };
@@ -332,7 +428,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         setLoading(false);
         toast({
-          title: t('signUpError'),
+          title: t('signUpError') || 'Sign up error',
           description: error.message,
           variant: 'destructive'
         });
@@ -342,13 +438,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       
       toast({
-        title: t('verifyEmail'),
-        description: t('verifyEmailDescription')
+        title: t('verifyEmail') || 'Verify email',
+        description: t('verifyEmailDescription') || 'Please check your email to verify your account.'
       });
     } catch (error: any) {
       setLoading(false);
       toast({
-        title: t('signUpError'),
+        title: t('signUpError') || 'Sign up error',
         description: error.message || 'An unexpected error occurred',
         variant: 'destructive'
       });
@@ -365,7 +461,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('Error signing out:', error);
         toast({
-          title: t('signOutError'),
+          title: t('signOutError') || 'Sign out error',
           description: error.message,
           variant: 'destructive'
         });
@@ -377,7 +473,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       console.error('Error in signOut:', error);
       toast({
-        title: t('signOutError'),
+        title: t('signOutError') || 'Sign out error',
         description: error.message || 'An unexpected error occurred',
         variant: 'destructive'
       });

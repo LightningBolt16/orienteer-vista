@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Compass } from 'lucide-react';
+import { Compass, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const AuthPage: React.FC = () => {
   const { signIn, signUp, loading } = useUser();
@@ -16,6 +17,7 @@ const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<string>('login');
+  const [error, setError] = useState<string | null>(null);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -28,22 +30,38 @@ const AuthPage: React.FC = () => {
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
     try {
       await signIn(loginEmail, loginPassword);
       navigate('/');
-    } catch (error) {
-      // Error is handled in signIn method
+    } catch (error: any) {
+      // Error may already be handled in signIn method, but set a backup error
+      if (error.message) {
+        setError(error.message);
+      }
     }
   };
   
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
     try {
       await signUp(registerEmail, registerPassword, registerName);
       setActiveTab('login');
-    } catch (error) {
-      // Error is handled in signUp method
+    } catch (error: any) {
+      // Error may already be handled in signUp method, but set a backup error
+      if (error.message) {
+        setError(error.message);
+      }
     }
+  };
+
+  // Clear error when switching tabs
+  const handleTabChange = (value: string) => {
+    setError(null);
+    setActiveTab(value);
   };
   
   return (
@@ -60,7 +78,14 @@ const AuthPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">{t('signIn')}</TabsTrigger>
               <TabsTrigger value="register">{t('register')}</TabsTrigger>

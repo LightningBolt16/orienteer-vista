@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -24,6 +23,37 @@ const Leaderboard: React.FC = () => {
   const isMobile = useIsMobile();
   const [sortField, setSortField] = useState<SortField>('accuracy');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Add refresh functionality
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    setHasError(false);
+    
+    try {
+      // Try to fetch leaderboard data again
+      // This is handled inside UserContext, but we need to trigger it
+      const { supabase } = await import('../integrations/supabase/client');
+      
+      const { error } = await supabase.from('user_profiles')
+        .select('id')
+        .limit(1);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Wait a moment to allow the fetch to complete
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error refreshing leaderboard:', error);
+      setHasError(true);
+      setIsLoading(false);
+    }
+  };
 
   // Calculate combined score (higher is better)
   const calculateCombinedScore = (accuracy: number, speed: number) => {
@@ -61,6 +91,52 @@ const Leaderboard: React.FC = () => {
     // Apply direction
     return sortDirection === 'desc' ? -comparison : comparison;
   });
+
+  // Loading and error states
+  if (isLoading) {
+    return (
+      <div className="glass-card p-4 animate-fade-in flex flex-col items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orienteering mb-4"></div>
+        <p className="text-center text-muted-foreground">{t('loading') || 'Loading...'}</p>
+      </div>
+    );
+  }
+
+  // Error state or empty leaderboard
+  if (hasError || leaderboard.length === 0) {
+    return (
+      <div className="glass-card p-6 animate-fade-in">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Trophy className="h-5 w-5 text-orienteering mr-2" />
+            <h2 className="text-xl font-medium">{t('leaderboard')}</h2>
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+          <h3 className="text-lg font-medium mb-2">
+            {hasError ? 
+              (t('connectionError') || 'Connection problem') : 
+              (t('noLeaderboardData') || 'No leaderboard data available')}
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            {hasError ? 
+              (t('leaderboardFetchError') || 'We couldn\'t load the leaderboard data.') : 
+              (t('emptyLeaderboard') || 'Be the first to complete a route!')}
+          </p>
+          <Button 
+            variant="outline" 
+            onClick={handleRefresh}
+            className="flex items-center"
+          >
+            <ArrowUp className="h-4 w-4 mr-2 rotate-45" />
+            {t('refresh') || 'Refresh'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Use compact layout for mobile
   if (isMobile) {
@@ -180,9 +256,19 @@ const Leaderboard: React.FC = () => {
           <Trophy className="h-5 w-5 text-orienteering mr-2" />
           <h2 className="text-xl font-medium">{t('leaderboard')}</h2>
         </div>
-        <div className="flex items-center text-sm text-muted-foreground">
-          <Users className="h-4 w-4 mr-1" />
-          <span>{leaderboard.length} {t('orienteers')}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center text-sm text-muted-foreground">
+            <Users className="h-4 w-4 mr-1" />
+            <span>{leaderboard.length} {t('orienteers')}</span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={handleRefresh}
+            className="ml-2"
+          >
+            <ArrowUp className="h-4 w-4 rotate-45" />
+          </Button>
         </div>
       </div>
       
