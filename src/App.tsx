@@ -17,6 +17,8 @@ import AuthPage from "./pages/AuthPage";
 import Subscription from "./pages/Subscription";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
+import { NetworkProvider } from "./context/NetworkContext";
+import { NetworkStatusIndicator } from "./components/NetworkStatusIndicator";
 
 // Initialize QueryClient with default settings
 const queryClient = new QueryClient({
@@ -32,26 +34,29 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <UserProvider>
-          <LanguageProvider>
-            <BrowserRouter>
-              {/* Only render one of the toast providers at the app level */}
-              <Toaster />
-              {/* <SonnerToaster /> - Commented out to avoid conflicts */}
-              <Routes>
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/" element={<Layout><Index /></Layout>} />
-                <Route path="/route-game" element={<Layout><RouteGame /></Layout>} />
-                <Route path="/course-setter" element={<Layout><CourseSetter /></Layout>} />
-                <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />
-                <Route path="/profile" element={<Layout><Profile /></Layout>} />
-                <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
-                <Route path="/subscription" element={<Layout><Subscription /></Layout>} />
-                <Route path="*" element={<Layout><NotFound /></Layout>} />
-              </Routes>
-            </BrowserRouter>
-          </LanguageProvider>
-        </UserProvider>
+        <NetworkProvider>
+          <UserProvider>
+            <LanguageProvider>
+              <BrowserRouter>
+                {/* Only render one of the toast providers at the app level */}
+                <Toaster />
+                {/* <SonnerToaster /> - Commented out to avoid conflicts */}
+                <NetworkStatusIndicator />
+                <Routes>
+                  <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/" element={<Layout><Index /></Layout>} />
+                  <Route path="/route-game" element={<Layout><RouteGame /></Layout>} />
+                  <Route path="/course-setter" element={<Layout><CourseSetter /></Layout>} />
+                  <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />
+                  <Route path="/profile" element={<Layout><Profile /></Layout>} />
+                  <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
+                  <Route path="/subscription" element={<Layout><Subscription /></Layout>} />
+                  <Route path="*" element={<Layout><NotFound /></Layout>} />
+                </Routes>
+              </BrowserRouter>
+            </LanguageProvider>
+          </UserProvider>
+        </NetworkProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
