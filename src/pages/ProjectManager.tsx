@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -95,7 +94,7 @@ const ProjectManager: React.FC = () => {
     }
   };
   
-  // Fix: Removed the second parameter that was causing the TS error
+  // Fixed: Removed the second parameter that was causing the TS error
   const renderCategoryBadge = (category: ProjectCategory) => {
     const styles = {
       training: 'bg-blue-100 text-blue-800',
