@@ -4,7 +4,7 @@ export interface RouteData {
   shortestColor: string;
   mainRouteLength: number;
   altRouteLength: number;
-  mapName?: string; // Added to track which map this route belongs to
+  mapName?: string;
 }
 
 export interface MapSource {
@@ -15,60 +15,92 @@ export interface MapSource {
   imagePathPrefix: string;
   mapImagePath?: string;
   description?: string;
-  folderName?: string; // The actual folder name for building paths
+  folderName?: string;
 }
 
-// Available map definitions - add new maps here
-const MAP_DEFINITIONS = [
-  { folderName: 'Rotondella', displayName: 'Rotondella', description: 'Italian orienteering terrain' },
-  { folderName: 'Kista', displayName: 'Kista', description: 'Swedish urban orienteering' },
+// Known map folders - the system will try to find CSVs in these folders
+// To add a new map, just add the folder name here
+const MAP_FOLDER_NAMES = ['Rotondella', 'Kista'];
+
+// Try different CSV naming patterns
+const getCSVPatterns = (folderName: string): string[] => [
+  `/maps/${folderName}/${folderName}.csv`,
+  `/maps/${folderName}/${folderName.toLowerCase()}.csv`,
+  `/maps/${folderName}/${folderName.toUpperCase()}.csv`,
 ];
+
+// Find the working CSV path for a map folder
+const findCSVPath = async (folderName: string): Promise<string | null> => {
+  const patterns = getCSVPatterns(folderName);
+  
+  for (const path of patterns) {
+    try {
+      const response = await fetch(path, { method: 'HEAD' });
+      if (response.ok) {
+        return path;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+// Validate that images exist for a map
+const validateMapImages = async (folderName: string, aspect: '16:9' | '9:16'): Promise<boolean> => {
+  const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
+  const testImagePath = `/maps/${folderName}/${aspectFolder}/candidate_1.png`;
+  
+  try {
+    const response = await fetch(testImagePath, { method: 'HEAD' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
 
 // Generate map sources for all available maps
 export const getAvailableMaps = async (): Promise<MapSource[]> => {
   try {
     const mapSources: MapSource[] = [];
     
-    for (const mapDef of MAP_DEFINITIONS) {
-      // Add landscape version (16:9)
-      mapSources.push({
-        id: `${mapDef.folderName.toLowerCase()}-landscape`,
-        name: mapDef.displayName,
-        aspect: '16:9',
-        csvPath: `/maps/${mapDef.folderName}/${mapDef.folderName}.csv`,
-        imagePathPrefix: `/maps/${mapDef.folderName}/16_9/candidate_`,
-        mapImagePath: `/maps/${mapDef.folderName}/${mapDef.folderName}.png`,
-        description: mapDef.description,
-        folderName: mapDef.folderName,
-      });
+    for (const folderName of MAP_FOLDER_NAMES) {
+      // Find the CSV file
+      const csvPath = await findCSVPath(folderName);
+      if (!csvPath) {
+        console.warn(`No CSV found for map: ${folderName}`);
+        continue;
+      }
       
-      // Add portrait version (9:16)
-      mapSources.push({
-        id: `${mapDef.folderName.toLowerCase()}-portrait`,
-        name: mapDef.displayName,
-        aspect: '9:16',
-        csvPath: `/maps/${mapDef.folderName}/${mapDef.folderName}.csv`,
-        imagePathPrefix: `/maps/${mapDef.folderName}/9_16/candidate_`,
-        mapImagePath: `/maps/${mapDef.folderName}/${mapDef.folderName}.png`,
-        description: mapDef.description,
-        folderName: mapDef.folderName,
-      });
+      // Check if landscape images exist
+      const hasLandscape = await validateMapImages(folderName, '16:9');
+      if (hasLandscape) {
+        mapSources.push({
+          id: `${folderName.toLowerCase()}-landscape`,
+          name: folderName,
+          aspect: '16:9',
+          csvPath,
+          imagePathPrefix: `/maps/${folderName}/16_9/candidate_`,
+          folderName,
+        });
+      }
+      
+      // Check if portrait images exist
+      const hasPortrait = await validateMapImages(folderName, '9:16');
+      if (hasPortrait) {
+        mapSources.push({
+          id: `${folderName.toLowerCase()}-portrait`,
+          name: folderName,
+          aspect: '9:16',
+          csvPath,
+          imagePathPrefix: `/maps/${folderName}/9_16/candidate_`,
+          folderName,
+        });
+      }
     }
 
-    // Validate maps by checking if CSV exists
-    const validMaps = await Promise.all(
-      mapSources.map(async (map) => {
-        try {
-          const response = await fetch(map.csvPath, { method: 'HEAD' });
-          return response.ok ? map : null;
-        } catch (error) {
-          console.warn(`Map ${map.name} not available:`, error);
-          return null;
-        }
-      })
-    );
-
-    return validMaps.filter(Boolean) as MapSource[];
+    console.log(`Found ${mapSources.length} valid map sources`);
+    return mapSources;
   } catch (error) {
     console.error('Error loading available maps:', error);
     return [];
@@ -93,9 +125,9 @@ const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
         return null;
       }
       
-      const sideValue = values[1]?.toLowerCase() || '';
+      const sideValue = values[1]?.toLowerCase().trim() || '';
       const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
-      const colorValue = values[2]?.toLowerCase() || 'red';
+      const colorValue = values[2]?.toLowerCase().trim() || 'red';
       const mainRouteLength = parseFloat(values[3]) || 0;
       const altRouteLength = parseFloat(values[4]) || 0;
       
@@ -114,6 +146,7 @@ const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
 // Fetch route data from a specific map source
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
+    console.log(`Fetching routes from: ${mapSource.csvPath}`);
     const response = await fetch(mapSource.csvPath);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
@@ -136,20 +169,19 @@ export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: R
     const aspect = isMobile ? '9:16' : '16:9';
     const filteredMaps = allMaps.filter(map => map.aspect === aspect);
     
+    console.log(`Fetching all routes for ${filteredMaps.length} maps`);
+    
     const allRoutes: RouteData[] = [];
     
     for (const mapSource of filteredMaps) {
       const routes = await fetchRouteDataForMap(mapSource);
-      // Add map identifier to each route for image path resolution
-      routes.forEach(route => {
-        route.mapName = mapSource.name;
-      });
       allRoutes.push(...routes);
     }
     
     // Shuffle the routes for variety
     const shuffledRoutes = allRoutes.sort(() => Math.random() - 0.5);
     
+    console.log(`Total routes loaded: ${shuffledRoutes.length}`);
     return { routes: shuffledRoutes, maps: filteredMaps };
   } catch (error) {
     console.error('Error fetching all routes:', error);
@@ -157,15 +189,7 @@ export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: R
   }
 };
 
-// Helper to get image URL based on map source and candidate index
-export const getImageUrl = (mapSource: MapSource, candidateIndex: number, isMobile: boolean): string => {
-  const aspectFolder = isMobile ? '9_16' : '16_9';
-  const folderName = mapSource.folderName || mapSource.name;
-  
-  return `/maps/${folderName}/${aspectFolder}/candidate_${candidateIndex}.png`;
-};
-
-// Get image URL when you have the map name instead of full MapSource
+// Helper to get image URL by map name
 export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean): string => {
   const aspectFolder = isMobile ? '9_16' : '16_9';
   return `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
