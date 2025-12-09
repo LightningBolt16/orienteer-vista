@@ -5,21 +5,23 @@ import Leaderboard from '../components/Leaderboard';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { getAvailableMaps, MapSource, fetchRouteDataForMap, RouteData } from '../utils/routeDataUtils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { getAvailableMaps, MapSource, fetchRouteDataForMap, fetchAllRoutesData, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Map, Shuffle } from 'lucide-react';
+
+type MapSelection = 'all' | string;
 
 const RouteGame: React.FC = () => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [selectedMapId, setSelectedMapId] = useState<string>('');
+  const [selectedMapId, setSelectedMapId] = useState<MapSelection>('all');
   const [selectedMap, setSelectedMap] = useState<MapSource | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [availableMaps, setAvailableMaps] = useState<MapSource[]>([]);
+  const [allMapsForRoutes, setAllMapsForRoutes] = useState<MapSource[]>([]);
   
   // Load available maps
   useEffect(() => {
@@ -29,32 +31,12 @@ const RouteGame: React.FC = () => {
         const maps = await getAvailableMaps();
         setAvailableMaps(maps);
         
-        // If no maps are available, show an error
         if (maps.length === 0) {
           toast({
             title: t('error'),
             description: t('noMapsAvailable'),
             variant: "destructive"
           });
-          setIsLoading(false);
-          return;
-        }
-        
-        // Filter maps based on device - don't explicitly mention portrait/landscape
-        const filteredMaps = maps.filter(map => 
-          isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
-        );
-        
-        // If no filtered maps available, switch to other aspect ratio
-        if (filteredMaps.length === 0) {
-          console.warn('No maps available for current device, using alternative aspect ratio');
-          // Try to use any available map regardless of aspect ratio
-          if (maps.length > 0) {
-            setSelectedMapId(maps[0].id);
-          }
-        } else {
-          // Default to first filtered map
-          setSelectedMapId(filteredMaps[0].id);
         }
       } catch (error) {
         console.error('Failed to load maps:', error);
@@ -68,56 +50,56 @@ const RouteGame: React.FC = () => {
     };
     
     loadMaps();
-  }, [isMobile, t]);
+  }, [t]);
   
-  // Load selected map data
+  // Load route data based on selection
   useEffect(() => {
-    if (!selectedMapId || availableMaps.length === 0) return;
-    
-    const mapSource = availableMaps.find(map => map.id === selectedMapId);
-    if (!mapSource) return;
-    
-    setSelectedMap(mapSource);
-    setIsLoading(true);
-    
-    fetchRouteDataForMap(mapSource)
-      .then(data => {
-        if (data.length === 0) {
-          toast({
-            title: t('error'),
-            description: t('errorLoadingPage'),
-            variant: "destructive"
-          });
-          return;
+    const loadRoutes = async () => {
+      if (availableMaps.length === 0) return;
+      
+      setIsLoading(true);
+      
+      try {
+        if (selectedMapId === 'all') {
+          // Fetch all routes from all maps
+          const { routes, maps } = await fetchAllRoutesData(isMobile);
+          setRouteData(routes);
+          setAllMapsForRoutes(maps);
+          setSelectedMap(null);
+        } else {
+          // Fetch routes for specific map
+          const aspect = isMobile ? '9:16' : '16:9';
+          const mapSource = availableMaps.find(
+            map => map.name === selectedMapId && map.aspect === aspect
+          );
+          
+          if (mapSource) {
+            const data = await fetchRouteDataForMap(mapSource);
+            setRouteData(data);
+            setSelectedMap(mapSource);
+            setAllMapsForRoutes([mapSource]);
+          }
         }
-        
-        console.log(`Loaded ${data.length} routes for map: ${mapSource.name}`);
-        setRouteData(data);
-      })
-      .catch(error => {
+      } catch (error) {
         console.error('Failed to load route data:', error);
         toast({
           title: t('error'),
           description: t('errorLoadingPage'),
           variant: "destructive"
         });
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [selectedMapId, availableMaps, t]);
+      }
+      
+      setIsLoading(false);
+    };
+    
+    loadRoutes();
+  }, [selectedMapId, availableMaps, isMobile, t]);
   
-  // Filter maps based on device without explicitly labeling them
-  const filteredMaps = availableMaps.filter(map => 
-    isMobile ? map.aspect === '9:16' : map.aspect === '16:9'
-  );
+  // Get unique map names for selection
+  const uniqueMapNames = getUniqueMapNames(availableMaps);
   
-  // Function to clean map names by removing orientation references
-  const cleanMapName = (name: string): string => {
-    return name
-      .replace(/\s*\(Landscape\)\s*$/i, '')
-      .replace(/\s*\(Portrait\)\s*$/i, '')
-      .trim();
+  const handleMapSelect = (mapName: MapSelection) => {
+    setSelectedMapId(mapName);
   };
   
   return (
@@ -130,52 +112,74 @@ const RouteGame: React.FC = () => {
             <CardDescription>{t('selectMapDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
-            {filteredMaps.length > 0 ? (
-              <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={t('selectMapPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredMaps.map(map => (
-                    <SelectItem key={map.id} value={map.id}>
-                      {cleanMapName(map.name)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {isLoading && availableMaps.length === 0 ? (
+              <div className="flex items-center p-4 text-sm text-muted-foreground">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary mr-2"></div>
+                {t('loadingMaps')}
+              </div>
+            ) : uniqueMapNames.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {/* All Maps Option */}
+                <button
+                  onClick={() => handleMapSelect('all')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                    selectedMapId === 'all'
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-card'
+                  }`}
+                >
+                  <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                  <span className="font-medium text-sm">All Maps</span>
+                  <span className="text-xs text-muted-foreground">Random mix</span>
+                </button>
+                
+                {/* Individual Map Options */}
+                {uniqueMapNames.map(mapName => (
+                  <button
+                    key={mapName}
+                    onClick={() => handleMapSelect(mapName)}
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                      selectedMapId === mapName
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border bg-card'
+                    }`}
+                  >
+                    <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                    <span className="font-medium text-sm">{mapName}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {availableMaps.find(m => m.name === mapName)?.description || 'Orienteering map'}
+                    </span>
+                  </button>
+                ))}
+              </div>
             ) : (
               <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
                 <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-                <span>
-                  {isLoading ? 
-                    t('loadingMaps') : 
-                    t('noMapsAvailable')}
-                </span>
+                <span>{t('noMapsAvailable')}</span>
               </div>
-            )}
-            {selectedMap?.description && (
-              <p className="mt-2 text-sm text-muted-foreground">{selectedMap.description}</p>
             )}
           </CardContent>
         </Card>
       </section>
       
-      {/* Route Selector Section - conditionally render mobile or desktop version */}
+      {/* Route Selector Section */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
-      ) : routeData.length > 0 && selectedMap && (
+      ) : routeData.length > 0 && (
         <section className="max-w-4xl mx-auto">
           {isMobile ? (
             <MobileRouteSelector 
               routeData={routeData} 
               mapSource={selectedMap}
+              allMaps={allMapsForRoutes}
             />
           ) : (
             <RouteSelector 
               routeData={routeData} 
               mapSource={selectedMap}
+              allMaps={allMapsForRoutes}
             />
           )}
         </section>

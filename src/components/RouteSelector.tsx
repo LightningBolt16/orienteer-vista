@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
-import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
-import { RouteData, MapSource, getImageUrl } from '../utils/routeDataUtils';
+import { RouteData, MapSource, getImageUrlByMapName } from '../utils/routeDataUtils';
 
-// Number of images to preload ahead of the current image
 const PRELOAD_AHEAD_COUNT = 10;
 
-interface RouteSelectorProps {
+export interface RouteSelectorProps {
   routeData: RouteData[];
-  mapSource: MapSource;
+  mapSource: MapSource | null;
+  allMaps?: MapSource[];
 }
 
-const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) => {
+const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, allMaps = [] }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
@@ -25,21 +24,24 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
   const transitionTimeout = useRef<number | null>(null);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Preload images when routeData changes or currentRouteIndex changes
+  // Get image URL for a route (handles both single map and all maps mode)
+  const getImageForRoute = (route: RouteData): string => {
+    const mapName = route.mapName || mapSource?.name || '';
+    return getImageUrlByMapName(mapName, route.candidateIndex, false);
+  };
+
+  // Preload images
   useEffect(() => {
-    if (routeData.length === 0 || !mapSource) return;
+    if (routeData.length === 0) return;
     
-    // Clear old preloaded images to prevent memory issues
     const currentlyNeededImages = new Set<string>();
     
-    // Preload current image and PRELOAD_AHEAD_COUNT images ahead
     for (let i = 0; i < PRELOAD_AHEAD_COUNT; i++) {
       const index = (currentRouteIndex + i) % routeData.length;
-      const candidateIndex = routeData[index].candidateIndex;
-      const imageUrl = getImageUrl(mapSource, candidateIndex, false);
+      const route = routeData[index];
+      const imageUrl = getImageForRoute(route);
       currentlyNeededImages.add(imageUrl);
       
-      // If we haven't preloaded this image yet, preload it
       if (!preloadedImages.current.has(imageUrl)) {
         const img = new Image();
         img.src = imageUrl;
@@ -47,23 +49,21 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
       }
     }
     
-    // Clean up preloaded images that are no longer needed
     preloadedImages.current.forEach((_, key) => {
       if (!currentlyNeededImages.has(key)) {
         preloadedImages.current.delete(key);
       }
     });
     
-    // Reset the timer for the new image
     setStartTime(Date.now());
     
     return () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
       if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     };
-  }, [currentRouteIndex, routeData, mapSource]);
+  }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
-  // Add keyboard support
+  // Keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTransitioning || routeData.length === 0) return;
@@ -84,14 +84,10 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
     
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
-    
-    // Calculate response time in milliseconds
     const responseTime = Date.now() - startTime;
     
-    // Update performance in the user context
     updatePerformance(isCorrect, responseTime);
     
-    // Set result message based on response time
     if (isCorrect) {
       if (responseTime < 1000) {
         setResultMessage(t('excellent'));
@@ -107,11 +103,9 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
     setShowResult(isCorrect ? 'win' : 'lose');
     setIsTransitioning(true);
     
-    // Clear any existing timeouts
     if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
     if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     
-    // Show result for a shorter time
     resultTimeout.current = window.setTimeout(() => {
       setShowResult(null);
       transitionTimeout.current = window.setTimeout(() => {
@@ -121,29 +115,24 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
     }, 400);
   };
 
-  // If no routes are loaded yet, show a loading state
   if (routeData.length === 0) {
     return <div className="flex justify-center items-center h-64">Loading routes...</div>;
   }
   
-  // Get current route data
   const currentRoute = routeData[currentRouteIndex];
   
-  // If current route is still undefined for some reason, show loading
   if (!currentRoute) {
     return <div className="flex justify-center items-center h-64">Loading route data...</div>;
   }
   
-  const currentImageUrl = getImageUrl(mapSource, currentRoute.candidateIndex, false);
+  const currentImageUrl = getImageForRoute(currentRoute);
   
-  // Map color strings to actual color values
   const getColorValue = (colorStr: string): string => {
     if (colorStr.toLowerCase() === 'red') return '#FF5733';
     if (colorStr.toLowerCase() === 'blue') return '#3357FF';
-    return colorStr; // If it's already a hex color or other value, use as is
+    return colorStr;
   };
   
-  // Set button colors based on shortest side and color
   const leftButtonColor = currentRoute.shortestSide === 'left' 
     ? getColorValue(currentRoute.shortestColor) 
     : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
@@ -154,9 +143,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
 
   return (
     <div className="relative w-full">
-      {/* Main card with image and controls */}
       <div className="glass-card overflow-hidden">
-        {/* Image container */}
         <div className="relative aspect-[16/9] overflow-hidden">
           <img 
             src={currentImageUrl} 
@@ -164,7 +151,6 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
             className={`w-full h-full object-cover transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
           />
           
-          {/* Win/Lose overlay */}
           {showResult && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
               {showResult === 'win' ? (
@@ -185,7 +171,6 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
             </div>
           )}
           
-          {/* Direction buttons */}
           <div className="absolute inset-x-0 bottom-0 p-6 flex justify-between">
             <button 
               onClick={() => handleDirectionSelect('left')} 
@@ -208,10 +193,12 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource }) =
         </div>
       </div>
 
-      {/* Optional: Display route information for debugging */}
       {currentRoute && (
-        <div className="mt-4 text-sm text-gray-500">
-          <p>Route #{currentRoute.candidateIndex} - Length comparison: Main {currentRoute.mainRouteLength.toFixed(2)}m vs Alt {currentRoute.altRouteLength.toFixed(2)}m</p>
+        <div className="mt-4 text-sm text-muted-foreground">
+          <p>
+            {currentRoute.mapName && <span className="font-medium">{currentRoute.mapName} - </span>}
+            Route #{currentRoute.candidateIndex} - Main {currentRoute.mainRouteLength.toFixed(0)}m vs Alt {currentRoute.altRouteLength.toFixed(0)}m
+          </p>
         </div>
       )}
     </div>

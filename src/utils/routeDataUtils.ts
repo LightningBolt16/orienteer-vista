@@ -4,6 +4,7 @@ export interface RouteData {
   shortestColor: string;
   mainRouteLength: number;
   altRouteLength: number;
+  mapName?: string; // Added to track which map this route belongs to
 }
 
 export interface MapSource {
@@ -12,51 +13,53 @@ export interface MapSource {
   aspect: '16:9' | '9:16';
   csvPath: string;
   imagePathPrefix: string;
-  mapImagePath?: string; // Path to the full map image (for course setter)
+  mapImagePath?: string;
   description?: string;
+  folderName?: string; // The actual folder name for building paths
 }
 
-// Helper function to capitalize the first letter of each word
-const capitalizeMapName = (folderName: string): string => {
-  return folderName
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-};
+// Available map definitions - add new maps here
+const MAP_DEFINITIONS = [
+  { folderName: 'Rotondella', displayName: 'Rotondella', description: 'Italian orienteering terrain' },
+  { folderName: 'Kista', displayName: 'Kista', description: 'Swedish urban orienteering' },
+];
 
-// Function to generate map sources based on available maps
+// Generate map sources for all available maps
 export const getAvailableMaps = async (): Promise<MapSource[]> => {
   try {
-    // Define map sources including only the Rotondella map
-    const mapSources: MapSource[] = [
-      {
-        id: 'rotondella-landscape',
-        name: 'Rotondella',
+    const mapSources: MapSource[] = [];
+    
+    for (const mapDef of MAP_DEFINITIONS) {
+      // Add landscape version (16:9)
+      mapSources.push({
+        id: `${mapDef.folderName.toLowerCase()}-landscape`,
+        name: mapDef.displayName,
         aspect: '16:9',
-        csvPath: '/maps/Rotondella.csv',
-        imagePathPrefix: '/maps/16_9/candidate_',
-        mapImagePath: '/maps/Rotondella.png',
-        description: 'Rotondella orienteering map for route choice training'
-      },
-      {
-        id: 'rotondella-portrait',
-        name: 'Rotondella',
+        csvPath: `/maps/${mapDef.folderName}/${mapDef.folderName}.csv`,
+        imagePathPrefix: `/maps/${mapDef.folderName}/16_9/candidate_`,
+        mapImagePath: `/maps/${mapDef.folderName}/${mapDef.folderName}.png`,
+        description: mapDef.description,
+        folderName: mapDef.folderName,
+      });
+      
+      // Add portrait version (9:16)
+      mapSources.push({
+        id: `${mapDef.folderName.toLowerCase()}-portrait`,
+        name: mapDef.displayName,
         aspect: '9:16',
-        csvPath: '/maps/Rotondella.csv',
-        imagePathPrefix: '/maps/9_16/candidate_',
-        mapImagePath: '/maps/Rotondella.png',
-        description: 'Rotondella orienteering map for mobile devices'
-      }
-    ];
+        csvPath: `/maps/${mapDef.folderName}/${mapDef.folderName}.csv`,
+        imagePathPrefix: `/maps/${mapDef.folderName}/9_16/candidate_`,
+        mapImagePath: `/maps/${mapDef.folderName}/${mapDef.folderName}.png`,
+        description: mapDef.description,
+        folderName: mapDef.folderName,
+      });
+    }
 
-    // Filter out maps that don't exist by checking if their map image exists
+    // Validate maps by checking if CSV exists
     const validMaps = await Promise.all(
       mapSources.map(async (map) => {
         try {
-          if (!map.mapImagePath) return null;
-          
-          // Try to fetch the map image to see if it exists
-          const response = await fetch(map.mapImagePath, { method: 'HEAD' });
+          const response = await fetch(map.csvPath, { method: 'HEAD' });
           return response.ok ? map : null;
         } catch (error) {
           console.warn(`Map ${map.name} not available:`, error);
@@ -72,103 +75,113 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
   }
 };
 
-// Fallback data for when CSV fetch fails
-const fallbackRouteData: RouteData[] = [
-  { candidateIndex: 1, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1451.24, altRouteLength: 1466.53 },
-  { candidateIndex: 2, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1532.60, altRouteLength: 1542.85 },
-  { candidateIndex: 3, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1205.36, altRouteLength: 1216.65 },
-  { candidateIndex: 4, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1651.07, altRouteLength: 1663.30 },
-  { candidateIndex: 5, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1429.73, altRouteLength: 1452.24 },
-  { candidateIndex: 6, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1157.17, altRouteLength: 1169.77 },
-  { candidateIndex: 7, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1598.61, altRouteLength: 1620.62 },
-  { candidateIndex: 8, shortestSide: 'right' as const, shortestColor: 'blue', mainRouteLength: 1079.92, altRouteLength: 1092.79 },
-  { candidateIndex: 9, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1564.17, altRouteLength: 1594.24 },
-  { candidateIndex: 10, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1060.21, altRouteLength: 1072.47 },
-  { candidateIndex: 11, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1419.95, altRouteLength: 1438.81 },
-  { candidateIndex: 12, shortestSide: 'left' as const, shortestColor: 'red', mainRouteLength: 1295.52, altRouteLength: 1306.98 },
-].sort((a, b) => a.candidateIndex - b.candidateIndex);
-
-// Get default route data (for backward compatibility)
-export const getRouteData = (): RouteData[] => {
-  return fallbackRouteData;
+// Parse CSV text into RouteData array
+const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
+  const lines = csvText.split('\n');
+  
+  return lines.slice(1)
+    .filter(line => line.trim() !== '')
+    .map((line) => {
+      const values = line.split(',');
+      
+      if (values[0].toLowerCase() === 'candidate_index') {
+        return null;
+      }
+      
+      const candidateIndex = parseInt(values[0]);
+      if (isNaN(candidateIndex)) {
+        return null;
+      }
+      
+      const sideValue = values[1]?.toLowerCase() || '';
+      const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
+      const colorValue = values[2]?.toLowerCase() || 'red';
+      const mainRouteLength = parseFloat(values[3]) || 0;
+      const altRouteLength = parseFloat(values[4]) || 0;
+      
+      return {
+        candidateIndex,
+        shortestSide,
+        shortestColor: colorValue,
+        mainRouteLength,
+        altRouteLength,
+        mapName,
+      };
+    })
+    .filter(item => item !== null) as RouteData[];
 };
 
 // Fetch route data from a specific map source
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
-    console.log('Fetching route data from:', mapSource.csvPath);
     const response = await fetch(mapSource.csvPath);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
     }
     const csvText = await response.text();
+    const data = parseCSV(csvText, mapSource.name);
     
-    // Parse CSV
-    const lines = csvText.split('\n');
-    const header = lines[0].split(',');
-    
-    console.log('CSV header:', header);
-    
-    const data = lines.slice(1)
-      .filter(line => line.trim() !== '') // Skip empty lines
-      .map((line) => {
-        const values = line.split(',');
-        
-        // Skip header line if it's repeated in the data
-        if (values[0].toLowerCase() === 'candidate_index') {
-          return null;
-        }
-        
-        // Ensure the side value is a valid 'left' or 'right' value
-        const sideValue = values[1]?.toLowerCase() || '';
-        const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
-        
-        // Color mapping - use the actual color value from CSV
-        const colorValue = values[2]?.toLowerCase() || 'red';
-        
-        const candidateIndex = parseInt(values[0]);
-        if (isNaN(candidateIndex)) {
-          console.warn('Invalid candidate index:', values[0]);
-          return null; // Skip invalid data
-        }
-        
-        const mainRouteLength = parseFloat(values[3]) || 0;
-        const altRouteLength = parseFloat(values[4]) || 0;
-        
-        console.log(`Parsed route data: ${candidateIndex}, ${shortestSide}, ${colorValue}, ${mainRouteLength}, ${altRouteLength}`);
-        
-        return {
-          candidateIndex,
-          shortestSide,
-          shortestColor: colorValue,
-          mainRouteLength,
-          altRouteLength
-        };
-      })
-      .filter(item => item !== null) as RouteData[];
-      
     console.log(`Loaded ${data.length} routes for map ${mapSource.name}`);
-    return data.sort((a, b) => a.candidateIndex - b.candidateIndex); // Sort by candidateIndex
+    return data.sort((a, b) => a.candidateIndex - b.candidateIndex);
   } catch (error) {
     console.error('Error fetching or parsing CSV:', error);
-    return fallbackRouteData; // Fallback to default data
+    return [];
+  }
+};
+
+// Fetch route data from ALL maps (for "All" option)
+export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: RouteData[]; maps: MapSource[] }> => {
+  try {
+    const allMaps = await getAvailableMaps();
+    const aspect = isMobile ? '9:16' : '16:9';
+    const filteredMaps = allMaps.filter(map => map.aspect === aspect);
+    
+    const allRoutes: RouteData[] = [];
+    
+    for (const mapSource of filteredMaps) {
+      const routes = await fetchRouteDataForMap(mapSource);
+      // Add map identifier to each route for image path resolution
+      routes.forEach(route => {
+        route.mapName = mapSource.name;
+      });
+      allRoutes.push(...routes);
+    }
+    
+    // Shuffle the routes for variety
+    const shuffledRoutes = allRoutes.sort(() => Math.random() - 0.5);
+    
+    return { routes: shuffledRoutes, maps: filteredMaps };
+  } catch (error) {
+    console.error('Error fetching all routes:', error);
+    return { routes: [], maps: [] };
   }
 };
 
 // Helper to get image URL based on map source and candidate index
 export const getImageUrl = (mapSource: MapSource, candidateIndex: number, isMobile: boolean): string => {
-  // Make sure to use the correct path format based on the device type
-  // For mobile devices, use the portrait format (9:16), for desktop use landscape (16:9)
-  let imagePathPrefix = mapSource.imagePathPrefix;
+  const aspectFolder = isMobile ? '9_16' : '16_9';
+  const folderName = mapSource.folderName || mapSource.name;
   
-  // If the path contains an aspect ratio, make sure we're using the correct one for the device type
-  if (mapSource.id.includes('landscape') && isMobile) {
-    // Convert landscape path to portrait path for mobile
-    imagePathPrefix = imagePathPrefix.replace('16_9', '9_16');
-  } else if (mapSource.id.includes('portrait') && !isMobile) {
-    // Convert portrait path to landscape path for desktop
-    imagePathPrefix = imagePathPrefix.replace('9_16', '16_9');
-  }
-  
-  return `${imagePathPrefix}${candidateIndex}.png`;
+  return `/maps/${folderName}/${aspectFolder}/candidate_${candidateIndex}.png`;
+};
+
+// Get image URL when you have the map name instead of full MapSource
+export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean): string => {
+  const aspectFolder = isMobile ? '9_16' : '16_9';
+  return `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
+};
+
+// Get unique map names from available maps
+export const getUniqueMapNames = (maps: MapSource[]): string[] => {
+  const uniqueNames = new Set(maps.map(m => m.name));
+  return Array.from(uniqueNames);
+};
+
+// Fallback data (for backward compatibility)
+export const getRouteData = (): RouteData[] => {
+  return [
+    { candidateIndex: 1, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1303.79, altRouteLength: 1318.85 },
+    { candidateIndex: 2, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1157.17, altRouteLength: 1169.77 },
+    { candidateIndex: 3, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 959.73, altRouteLength: 975.09 },
+  ];
 };
