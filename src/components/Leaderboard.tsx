@@ -36,9 +36,9 @@ const Leaderboard: React.FC = () => {
       // This is handled inside UserContext, but we need to trigger it
       const { supabase } = await import('../integrations/supabase/client');
       
-      const { error } = await supabase.from('user_profiles')
+      const { error } = await (supabase.from('user_profiles' as any)
         .select('id')
-        .limit(1);
+        .limit(1) as any);
         
       if (error) {
         throw error;

@@ -37,11 +37,11 @@ const MapsList: React.FC<MapsListProps> = ({
       
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('maps')
+        const { data, error } = await (supabase
+          .from('maps' as any)
           .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false });
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }) as any);
           
         if (error) {
           console.error('Error fetching maps:', error);
@@ -55,7 +55,7 @@ const MapsList: React.FC<MapsListProps> = ({
         }
         
         // Transform data to match MapInfo format and parse metadata from description
-        const transformedMaps: MapInfo[] = data.map(map => {
+        const transformedMaps: MapInfo[] = (data || []).map((map: any) => {
           // Try to parse the description as JSON to extract type and scale
           // Default to 'forest' type and '10000' scale
           let mapType: 'forest' | 'sprint' = 'forest';
