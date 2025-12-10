@@ -152,18 +152,18 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
           />
           
           {showResult && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               {showResult === 'win' ? (
                 <>
-                  <CheckCircle className="text-green-500 w-32 h-32 animate-[win-animation_0.4s_ease-out]" />
-                  <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
+                  <CheckCircle className="text-green-500 w-32 h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                  <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
                     {resultMessage}
                   </div>
                 </>
               ) : (
                 <>
-                  <XCircle className="text-red-500 w-32 h-32 animate-[lose-animation_0.4s_ease-out]" />
-                  <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white font-bold animate-fade-in">
+                  <XCircle className="text-red-500 w-32 h-32 animate-[lose-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
+                  <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
                     {resultMessage}
                   </div>
                 </>
