@@ -152,10 +152,10 @@ const Profile: React.FC = () => {
         .getPublicUrl(fileName);
 
       // Update user profile with avatar URL
-      await supabase
-        .from('user_profiles')
+      await (supabase
+        .from('user_profiles' as any)
         .update({ profile_image: publicUrl })
-        .eq('id', user.id);
+        .eq('user_id', user.id) as any);
 
       // Update local user state
       setUser({

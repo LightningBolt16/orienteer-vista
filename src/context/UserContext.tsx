@@ -2,12 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
-import { User, Session } from '@supabase/supabase-js';
-import { Database } from '../integrations/supabase/types';
+import { Session } from '@supabase/supabase-js';
 import { supabaseManager } from '../lib/supabaseUtils';
-
-type Tables = Database['public']['Tables'];
-type UserProfileRow = Tables['user_profiles']['Row'];
 
 type UserProfile = {
   id: string;
@@ -110,11 +106,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const data = await supabaseManager.executeWithRetry(
         async () => {
-          const { data, error } = await supabase
-            .from('user_profiles')
+          const { data, error } = await (supabase
+            .from('user_profiles' as any)
             .select('*')
-            .eq('id', userId)
-            .single();
+            .eq('user_id', userId)
+            .single() as any);
 
           if (error) {
             throw error;
@@ -165,12 +161,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const data = await supabaseManager.executeWithRetry(
         async () => {
-          const { data, error } = await supabase
-            .from('user_profiles')
-            .select('id, name, accuracy, speed, profile_image')
+          const { data, error } = await (supabase
+            .from('user_profiles' as any)
+            .select('user_id, name, accuracy, speed, profile_image')
             .order('accuracy', { ascending: false })
             .order('speed', { ascending: true })
-            .limit(10);
+            .limit(10) as any);
 
           if (error) {
             throw error;
@@ -182,8 +178,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       if (data && data.length > 0) {
-        const rankedLeaderboard = data.map((entry, index) => ({
-          id: entry.id,
+        const rankedLeaderboard = data.map((entry: any, index: number) => ({
+          id: entry.user_id,
           name: entry.name || 'User',
           accuracy: entry.accuracy || 0,
           speed: entry.speed || 0,
@@ -263,8 +259,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await supabaseManager.executeWithRetry(
         async () => {
-          const { error } = await supabase
-            .from('user_profiles')
+          const { error } = await (supabase
+            .from('user_profiles' as any)
             .update({
               accuracy: newAccuracy,
               speed: newSpeed,
@@ -275,7 +271,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
               },
               updated_at: new Date().toISOString()
             })
-            .eq('id', user.id);
+            .eq('user_id', user.id) as any);
             
           if (error) {
             throw error;
@@ -312,10 +308,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       await supabaseManager.executeWithRetry(
         async () => {
-          const { error } = await supabase
-            .from('user_profiles')
+          const { error } = await (supabase
+            .from('user_profiles' as any)
             .update(updateData)
-            .eq('id', updatedUser.id);
+            .eq('user_id', updatedUser.id) as any);
             
           if (error) {
             throw error;

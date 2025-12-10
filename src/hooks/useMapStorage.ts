@@ -4,7 +4,6 @@ import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { v4 as uuidv4 } from 'uuid';
-import { Database } from '../integrations/supabase/types';
 
 export interface MapUploadData {
   name: string;
@@ -15,11 +14,18 @@ export interface MapUploadData {
   isPublic?: boolean;
 }
 
-type Tables = Database['public']['Tables'];
-export type Map = Tables['maps']['Row'] & {
+export interface Map {
+  id: string;
+  user_id: string;
+  name: string;
+  file_url: string;
+  description: string | null;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
   type?: 'sprint' | 'forest';
   scale?: string;
-};
+}
 
 export const useMapStorage = () => {
   const [uploading, setUploading] = useState(false);
@@ -29,7 +35,7 @@ export const useMapStorage = () => {
   const { user, session } = useUser();
 
   // Helper function to extract map metadata from description
-  const parseMapMetadata = (map: Tables['maps']['Row']): Map => {
+  const parseMapMetadata = (map: any): Map => {
     let mapType: 'sprint' | 'forest' = 'forest';
     let mapScale = '10000';
     
@@ -62,11 +68,11 @@ export const useMapStorage = () => {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from('maps')
+      const { data, error } = await (supabase
+        .from('maps' as any)
         .select('*')
-        .eq('owner_id', session?.user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', session?.user.id)
+        .order('created_at', { ascending: false }) as any);
         
       if (error) {
         throw error;
@@ -133,18 +139,17 @@ export const useMapStorage = () => {
       };
       
       // Create database entry
-      const { error: dbError, data: mapRecord } = await supabase
-        .from('maps')
+      const { error: dbError, data: mapRecord } = await (supabase
+        .from('maps' as any)
         .insert({
           name: mapData.name,
           description: JSON.stringify(metadata), // Store metadata as JSON string
           file_url: publicUrl,
-          thumbnail_url: null,
-          owner_id: session.user.id,
+          user_id: session.user.id,
           is_public: mapData.isPublic || false,
         })
         .select()
-        .single();
+        .single() as any);
         
       if (dbError) {
         throw dbError;
@@ -180,21 +185,21 @@ export const useMapStorage = () => {
     
     try {
       // First, fetch the map to get the file path
-      const { data: mapData, error: fetchError } = await supabase
-        .from('maps')
+      const { data: mapData, error: fetchError } = await (supabase
+        .from('maps' as any)
         .select('*')
         .eq('id', mapId)
-        .single();
+        .single() as any);
         
       if (fetchError) {
         throw fetchError;
       }
       
       // Delete the database record
-      const { error: deleteError } = await supabase
-        .from('maps')
+      const { error: deleteError } = await (supabase
+        .from('maps' as any)
         .delete()
-        .eq('id', mapId);
+        .eq('id', mapId) as any);
         
       if (deleteError) {
         throw deleteError;

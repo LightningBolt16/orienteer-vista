@@ -32,7 +32,7 @@ export class SupabaseConnectionManager {
     
     try {
       // Simple health check - try to connect to Supabase
-      const { error } = await supabase.from('user_profiles').select('id').limit(1);
+      const { error } = await (supabase.from('user_profiles' as any).select('id').limit(1) as any);
       
       const latency = Date.now() - startTime;
       
