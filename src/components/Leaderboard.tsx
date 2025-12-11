@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -17,14 +17,50 @@ import { useIsMobile } from '../hooks/use-mobile';
 type SortField = 'accuracy' | 'speed' | 'combined';
 type SortDirection = 'asc' | 'desc';
 
-const Leaderboard: React.FC = () => {
-  const { leaderboard, user } = useUser();
+interface LeaderboardProps {
+  mapFilter?: string;
+}
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
+  const { leaderboard, user, fetchMapLeaderboard } = useUser();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [sortField, setSortField] = useState<SortField>('accuracy');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [displayLeaderboard, setDisplayLeaderboard] = useState<LeaderboardEntry[]>([]);
+
+  // Fetch leaderboard data based on mapFilter
+  useEffect(() => {
+    const loadLeaderboard = async () => {
+      setIsLoading(true);
+      try {
+        if (mapFilter === 'all') {
+          setDisplayLeaderboard(leaderboard);
+        } else {
+          const mapLeaderboard = await fetchMapLeaderboard(mapFilter);
+          setDisplayLeaderboard(mapLeaderboard);
+        }
+        setHasError(false);
+      } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        setHasError(true);
+      }
+      setIsLoading(false);
+    };
+    
+    loadLeaderboard();
+  }, [mapFilter, leaderboard, fetchMapLeaderboard]);
+
+  type LeaderboardEntry = {
+    id: string;
+    name: string;
+    accuracy: number;
+    speed: number;
+    rank?: number;
+    profileImage?: string;
+  };
 
   // Add refresh functionality
   const handleRefresh = async () => {
@@ -74,7 +110,7 @@ const Leaderboard: React.FC = () => {
   };
   
   // Sort the leaderboard
-  const sortedLeaderboard = [...leaderboard].sort((a, b) => {
+  const sortedLeaderboard = [...displayLeaderboard].sort((a, b) => {
     let comparison = 0;
     
     if (sortField === 'accuracy') {
@@ -103,7 +139,7 @@ const Leaderboard: React.FC = () => {
   }
 
   // Error state or empty leaderboard
-  if (hasError || leaderboard.length === 0) {
+  if (hasError || displayLeaderboard.length === 0) {
     return (
       <div className="glass-card p-6 animate-fade-in">
         <div className="flex items-center justify-between mb-6">
@@ -149,7 +185,7 @@ const Leaderboard: React.FC = () => {
           </div>
           <div className="flex items-center text-xs text-muted-foreground">
             <Users className="h-3 w-3 mr-1" />
-            <span>{leaderboard.length}</span>
+            <span>{displayLeaderboard.length}</span>
           </div>
         </div>
         
@@ -259,7 +295,7 @@ const Leaderboard: React.FC = () => {
         <div className="flex items-center gap-2">
           <div className="flex items-center text-sm text-muted-foreground">
             <Users className="h-4 w-4 mr-1" />
-            <span>{leaderboard.length} {t('orienteers')}</span>
+            <span>{displayLeaderboard.length} {t('orienteers')}</span>
           </div>
           <Button 
             variant="ghost" 

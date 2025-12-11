@@ -10,9 +10,10 @@ export interface RouteSelectorProps {
   routeData: RouteData[];
   mapSource: MapSource | null;
   allMaps?: MapSource[];
+  isFullscreen?: boolean;
 }
 
-const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, allMaps = [] }) => {
+const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, allMaps = [], isFullscreen = false }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
@@ -85,8 +86,9 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
     const responseTime = Date.now() - startTime;
+    const mapName = currentRoute.mapName || mapSource?.name;
     
-    updatePerformance(isCorrect, responseTime);
+    updatePerformance(isCorrect, responseTime, mapName);
     
     if (isCorrect) {
       if (responseTime < 1000) {
@@ -142,13 +144,13 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
 
   return (
-    <div className="relative w-full">
-      <div className="glass-card overflow-hidden">
-        <div className="relative aspect-[16/9] overflow-hidden">
+    <div className={`relative w-full ${isFullscreen ? 'h-full' : ''}`}>
+      <div className={`overflow-hidden ${isFullscreen ? 'h-full bg-black' : 'glass-card'}`}>
+        <div className={`relative overflow-hidden ${isFullscreen ? 'h-full flex items-center justify-center' : 'aspect-[16/9]'}`}>
           <img 
             src={currentImageUrl} 
             alt="Orienteering route" 
-            className={`w-full h-full object-cover transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
+            className={`transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''} ${isFullscreen ? 'max-w-full max-h-full object-contain' : 'w-full h-full object-contain'}`}
           />
           
           {showResult && (
@@ -193,7 +195,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
         </div>
       </div>
 
-      {currentRoute && (
+      {currentRoute && !isFullscreen && (
         <div className="mt-4 text-sm text-muted-foreground">
           <p>
             {currentRoute.mapName && <span className="font-medium">{currentRoute.mapName} - </span>}

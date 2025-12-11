@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
 import Leaderboard from '../components/Leaderboard';
@@ -8,7 +8,7 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { getAvailableMaps, MapSource, fetchRouteDataForMap, fetchAllRoutesData, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2 } from 'lucide-react';
 
 type MapSelection = 'all' | string;
 
@@ -22,6 +22,46 @@ const RouteGame: React.FC = () => {
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [availableMaps, setAvailableMaps] = useState<MapSource[]>([]);
   const [allMapsForRoutes, setAllMapsForRoutes] = useState<MapSource[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(async () => {
+    // For mobile or when native fullscreen isn't supported, use CSS-based fullscreen
+    if (isMobile || !document.fullscreenEnabled) {
+      setIsFullscreen(prev => !prev);
+      return;
+    }
+
+    // Desktop: use native fullscreen API
+    if (!gameContainerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await gameContainerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (error) {
+      // Fallback to CSS-based fullscreen if native fails
+      console.error('Fullscreen error, using CSS fallback:', error);
+      setIsFullscreen(prev => !prev);
+    }
+  }, [isMobile]);
+
+  // Listen for fullscreen changes (e.g., user presses Escape)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      // Only sync state with native fullscreen on desktop
+      if (!isMobile && document.fullscreenEnabled) {
+        setIsFullscreen(!!document.fullscreenElement);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [isMobile]);
   
   // Load available maps
   useEffect(() => {
@@ -168,35 +208,57 @@ const RouteGame: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
       ) : routeData.length > 0 && (
-        <section className="max-w-4xl mx-auto">
-          {isMobile ? (
-            <MobileRouteSelector 
-              routeData={routeData} 
-              mapSource={selectedMap}
-              allMaps={allMapsForRoutes}
-            />
-          ) : (
-            <RouteSelector 
-              routeData={routeData} 
-              mapSource={selectedMap}
-              allMaps={allMapsForRoutes}
-            />
-          )}
+        <section className={isFullscreen ? 'fixed inset-0 z-50' : 'max-w-4xl mx-auto'}>
+          <div 
+            ref={gameContainerRef}
+            className={`relative ${isFullscreen ? 'bg-black h-full w-full' : ''}`}
+          >
+            {/* Fullscreen Toggle Button */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleFullscreen}
+              className={`absolute z-20 ${isFullscreen ? 'top-4 right-4 bg-black/50 border-white/30 hover:bg-black/70' : 'top-2 right-2'}`}
+              title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+
+            <div className={isFullscreen ? 'h-full w-full' : ''}>
+              {isMobile ? (
+                <MobileRouteSelector 
+                  routeData={routeData} 
+                  mapSource={selectedMap}
+                  allMaps={allMapsForRoutes}
+                  isFullscreen={isFullscreen}
+                />
+              ) : (
+                <RouteSelector 
+                  routeData={routeData} 
+                  mapSource={selectedMap}
+                  allMaps={allMapsForRoutes}
+                  isFullscreen={isFullscreen}
+                />
+              )}
+            </div>
+          </div>
         </section>
       )}
       
       {/* Toggle Leaderboard Button */}
-      <div className="flex justify-center">
-        <Button
-          onClick={() => setShowLeaderboard(!showLeaderboard)}
-          className="bg-orienteering hover:bg-orienteering/90"
-        >
-          {showLeaderboard ? t('routeChoose') : t('leaderboard')}
-        </Button>
-      </div>
+      {!isFullscreen && (
+        <div className="flex justify-center">
+          <Button
+            onClick={() => setShowLeaderboard(!showLeaderboard)}
+            className="bg-orienteering hover:bg-orienteering/90"
+          >
+            {showLeaderboard ? t('routeChoose') : t('leaderboard')}
+          </Button>
+        </div>
+      )}
       
       {/* Leaderboard Section */}
-      {showLeaderboard && (
+      {showLeaderboard && !isFullscreen && (
         <section className="max-w-2xl mx-auto animate-fade-in">
           <Leaderboard />
         </section>
