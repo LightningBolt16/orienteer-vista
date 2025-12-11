@@ -26,6 +26,13 @@ const RouteGame: React.FC = () => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
   const toggleFullscreen = useCallback(async () => {
+    // For mobile or when native fullscreen isn't supported, use CSS-based fullscreen
+    if (isMobile || !document.fullscreenEnabled) {
+      setIsFullscreen(prev => !prev);
+      return;
+    }
+
+    // Desktop: use native fullscreen API
     if (!gameContainerRef.current) return;
 
     try {
@@ -37,19 +44,24 @@ const RouteGame: React.FC = () => {
         setIsFullscreen(false);
       }
     } catch (error) {
-      console.error('Fullscreen error:', error);
+      // Fallback to CSS-based fullscreen if native fails
+      console.error('Fullscreen error, using CSS fallback:', error);
+      setIsFullscreen(prev => !prev);
     }
-  }, []);
+  }, [isMobile]);
 
   // Listen for fullscreen changes (e.g., user presses Escape)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      // Only sync state with native fullscreen on desktop
+      if (!isMobile && document.fullscreenEnabled) {
+        setIsFullscreen(!!document.fullscreenElement);
+      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  }, [isMobile]);
   
   // Load available maps
   useEffect(() => {
@@ -196,10 +208,10 @@ const RouteGame: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
       ) : routeData.length > 0 && (
-        <section className={isFullscreen ? '' : 'max-w-4xl mx-auto'}>
+        <section className={isFullscreen ? 'fixed inset-0 z-50' : 'max-w-4xl mx-auto'}>
           <div 
             ref={gameContainerRef}
-            className={`relative ${isFullscreen ? 'bg-black h-screen w-screen' : ''}`}
+            className={`relative ${isFullscreen ? 'bg-black h-full w-full' : ''}`}
           >
             {/* Fullscreen Toggle Button */}
             <Button
