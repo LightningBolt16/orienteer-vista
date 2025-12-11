@@ -47,6 +47,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_map_stats: {
+        Row: {
+          accuracy: number | null
+          attempts: Json | null
+          created_at: string
+          id: string
+          map_name: string
+          speed: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          attempts?: Json | null
+          created_at?: string
+          id?: string
+          map_name: string
+          speed?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          attempts?: Json | null
+          created_at?: string
+          id?: string
+          map_name?: string
+          speed?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_map_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           accuracy: number | null
