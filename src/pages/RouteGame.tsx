@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
 import Leaderboard from '../components/Leaderboard';
@@ -8,7 +8,7 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { getAvailableMaps, MapSource, fetchRouteDataForMap, fetchAllRoutesData, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2 } from 'lucide-react';
 
 type MapSelection = 'all' | string;
 
@@ -22,6 +22,34 @@ const RouteGame: React.FC = () => {
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [availableMaps, setAvailableMaps] = useState<MapSource[]>([]);
   const [allMapsForRoutes, setAllMapsForRoutes] = useState<MapSource[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!gameContainerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await gameContainerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (error) {
+      console.error('Fullscreen error:', error);
+    }
+  }, []);
+
+  // Listen for fullscreen changes (e.g., user presses Escape)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
   
   // Load available maps
   useEffect(() => {
@@ -169,34 +197,54 @@ const RouteGame: React.FC = () => {
         </div>
       ) : routeData.length > 0 && (
         <section className="max-w-4xl mx-auto">
-          {isMobile ? (
-            <MobileRouteSelector 
-              routeData={routeData} 
-              mapSource={selectedMap}
-              allMaps={allMapsForRoutes}
-            />
-          ) : (
-            <RouteSelector 
-              routeData={routeData} 
-              mapSource={selectedMap}
-              allMaps={allMapsForRoutes}
-            />
-          )}
+          <div 
+            ref={gameContainerRef}
+            className={`relative ${isFullscreen ? 'bg-background flex flex-col items-center justify-center h-screen w-screen p-4' : ''}`}
+          >
+            {/* Fullscreen Toggle Button */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleFullscreen}
+              className={`absolute z-10 ${isFullscreen ? 'top-4 right-4' : 'top-2 right-2'}`}
+              title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+
+            <div className={isFullscreen ? 'w-full max-w-4xl' : ''}>
+              {isMobile ? (
+                <MobileRouteSelector 
+                  routeData={routeData} 
+                  mapSource={selectedMap}
+                  allMaps={allMapsForRoutes}
+                />
+              ) : (
+                <RouteSelector 
+                  routeData={routeData} 
+                  mapSource={selectedMap}
+                  allMaps={allMapsForRoutes}
+                />
+              )}
+            </div>
+          </div>
         </section>
       )}
       
       {/* Toggle Leaderboard Button */}
-      <div className="flex justify-center">
-        <Button
-          onClick={() => setShowLeaderboard(!showLeaderboard)}
-          className="bg-orienteering hover:bg-orienteering/90"
-        >
-          {showLeaderboard ? t('routeChoose') : t('leaderboard')}
-        </Button>
-      </div>
+      {!isFullscreen && (
+        <div className="flex justify-center">
+          <Button
+            onClick={() => setShowLeaderboard(!showLeaderboard)}
+            className="bg-orienteering hover:bg-orienteering/90"
+          >
+            {showLeaderboard ? t('routeChoose') : t('leaderboard')}
+          </Button>
+        </div>
+      )}
       
       {/* Leaderboard Section */}
-      {showLeaderboard && (
+      {showLeaderboard && !isFullscreen && (
         <section className="max-w-2xl mx-auto animate-fade-in">
           <Leaderboard />
         </section>
