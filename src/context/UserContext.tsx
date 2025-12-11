@@ -31,7 +31,7 @@ interface UserContextType {
   user: UserProfile | null;
   session: Session | null;
   leaderboard: LeaderboardEntry[];
-  updatePerformance: (isCorrect: boolean, responseTime: number) => void;
+  updatePerformance: (isCorrect: boolean, responseTime: number, mapName?: string) => void;
   setUser: (user: UserProfile) => void;
   getUserRank: () => number;
   signIn: (email: string, password: string) => Promise<void>;
@@ -39,6 +39,7 @@ interface UserContextType {
   signOut: () => Promise<void>;
   loading: boolean;
   isOfflineMode: boolean;
+  fetchMapLeaderboard: (mapName: string) => Promise<LeaderboardEntry[]>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -226,13 +227,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return userEntry?.rank || 0;
   };
 
-  // Update user performance with offline support
-  const updatePerformance = async (isCorrect: boolean, responseTime: number) => {
+  // Update user performance with offline support and per-map stats
+  const updatePerformance = async (isCorrect: boolean, responseTime: number, mapName?: string) => {
     if (!user || !session) {
       console.warn('Cannot update performance: No authenticated user');
       return;
     }
     
+    // Update overall stats
     const attempts = user.attempts || { total: 0, correct: 0, timeSum: 0 };
     const newTotal = attempts.total + 1;
     const newCorrect = attempts.correct + (isCorrect ? 1 : 0);
@@ -255,7 +257,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Update local state immediately
     setUserState(updatedUser);
     
-    // Try to update database, but don't fail if offline
+    // Try to update overall stats in database
     try {
       await supabaseManager.executeWithRetry(
         async () => {
@@ -280,8 +282,114 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'Update user performance'
       );
     } catch (error) {
-      console.error('Error updating performance (will retry later):', error);
-      // In a real app, you might queue this update for later
+      console.error('Error updating overall performance:', error);
+    }
+    
+    // Update per-map stats if mapName is provided
+    if (mapName) {
+      try {
+        // First try to get existing map stats
+        const { data: existingStats, error: fetchError } = await (supabase
+          .from('user_map_stats' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('map_name', mapName)
+          .maybeSingle() as any);
+        
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Error fetching map stats:', fetchError);
+          return;
+        }
+        
+        if (existingStats) {
+          // Update existing stats
+          const mapAttempts = existingStats.attempts || { total: 0, correct: 0, timeSum: 0 };
+          const mapNewTotal = mapAttempts.total + 1;
+          const mapNewCorrect = mapAttempts.correct + (isCorrect ? 1 : 0);
+          const mapNewTimeSum = mapAttempts.timeSum + (isCorrect ? responseTime : 0);
+          const mapNewAccuracy = mapNewTotal > 0 ? Math.round((mapNewCorrect / mapNewTotal) * 100) : 0;
+          const mapNewSpeed = mapNewCorrect > 0 ? Math.round(mapNewTimeSum / mapNewCorrect) : 0;
+          
+          await (supabase
+            .from('user_map_stats' as any)
+            .update({
+              accuracy: mapNewAccuracy,
+              speed: mapNewSpeed,
+              attempts: {
+                total: mapNewTotal,
+                correct: mapNewCorrect,
+                timeSum: mapNewTimeSum
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id)
+            .eq('map_name', mapName) as any);
+        } else {
+          // Insert new map stats
+          const mapNewAccuracy = isCorrect ? 100 : 0;
+          const mapNewSpeed = isCorrect ? responseTime : 0;
+          
+          await (supabase
+            .from('user_map_stats' as any)
+            .insert({
+              user_id: user.id,
+              map_name: mapName,
+              accuracy: mapNewAccuracy,
+              speed: mapNewSpeed,
+              attempts: {
+                total: 1,
+                correct: isCorrect ? 1 : 0,
+                timeSum: isCorrect ? responseTime : 0
+              }
+            }) as any);
+        }
+      } catch (error) {
+        console.error('Error updating map-specific stats:', error);
+      }
+    }
+  };
+
+  // Fetch leaderboard for a specific map
+  const fetchMapLeaderboard = async (mapName: string): Promise<LeaderboardEntry[]> => {
+    try {
+      if (mapName === 'all') {
+        // Return overall leaderboard
+        return leaderboard;
+      }
+      
+      const { data, error } = await (supabase
+        .from('user_map_stats' as any)
+        .select(`
+          user_id,
+          accuracy,
+          speed,
+          user_profiles!inner(name, profile_image)
+        `)
+        .eq('map_name', mapName)
+        .order('accuracy', { ascending: false })
+        .order('speed', { ascending: true })
+        .limit(10) as any);
+      
+      if (error) {
+        console.error('Error fetching map leaderboard:', error);
+        return [];
+      }
+      
+      if (data && data.length > 0) {
+        return data.map((entry: any, index: number) => ({
+          id: entry.user_id,
+          name: entry.user_profiles?.name || 'User',
+          accuracy: entry.accuracy || 0,
+          speed: entry.speed || 0,
+          rank: index + 1,
+          profileImage: entry.user_profiles?.profile_image
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error in fetchMapLeaderboard:', error);
+      return [];
     }
   };
 
@@ -449,7 +557,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signOut,
         loading,
-        isOfflineMode
+        isOfflineMode,
+        fetchMapLeaderboard
       }}
     >
       {children}

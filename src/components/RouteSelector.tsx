@@ -86,8 +86,9 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
     const responseTime = Date.now() - startTime;
+    const mapName = currentRoute.mapName || mapSource?.name;
     
-    updatePerformance(isCorrect, responseTime);
+    updatePerformance(isCorrect, responseTime, mapName);
     
     if (isCorrect) {
       if (responseTime < 1000) {
