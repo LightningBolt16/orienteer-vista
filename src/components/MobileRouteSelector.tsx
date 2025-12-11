@@ -4,6 +4,8 @@ import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { RouteData, MapSource, getImageUrlByMapName } from '../utils/routeDataUtils';
 import { AspectRatio } from './ui/aspect-ratio';
+import { useInactivityDetection } from '../hooks/useInactivityDetection';
+import PauseOverlay from './PauseOverlay';
 
 const PRELOAD_AHEAD_COUNT = 10;
 
@@ -25,6 +27,11 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Inactivity detection
+  const { isPaused, pauseReason, resume, resetTimer } = useInactivityDetection({
+    inactivityTimeout: 30000, // 30 seconds
+  });
 
   // Get image URL for a route (handles both single map and all maps mode)
   const getImageForRoute = (route: RouteData): string => {
@@ -57,21 +64,29 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
       }
     });
     
-    setStartTime(Date.now());
-    
     return () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
       if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     };
   }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
+  // Reset start time when resuming or changing route
+  useEffect(() => {
+    if (!isPaused) {
+      setStartTime(Date.now());
+    }
+  }, [isPaused, currentRouteIndex]);
+
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || routeData.length === 0) return;
+    if (isTransitioning || routeData.length === 0 || isPaused) return;
     
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
     const responseTime = Date.now() - startTime;
     const mapName = currentRoute.mapName || mapSource?.name;
+    
+    // Reset inactivity timer on interaction
+    resetTimer();
     
     updatePerformance(isCorrect, responseTime, mapName);
     
@@ -174,16 +189,22 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
                   )}
                 </div>
               )}
-              <div className="absolute inset-0 flex">
-                <div 
-                  className="w-1/2 h-full cursor-pointer" 
-                  onClick={() => handleDirectionSelect('left')}
-                />
-                <div 
-                  className="w-1/2 h-full cursor-pointer" 
-                  onClick={() => handleDirectionSelect('right')}
-                />
-              </div>
+              {!isPaused && (
+                <div className="absolute inset-0 flex">
+                  <div 
+                    className="w-1/2 h-full cursor-pointer" 
+                    onClick={() => handleDirectionSelect('left')}
+                  />
+                  <div 
+                    className="w-1/2 h-full cursor-pointer" 
+                    onClick={() => handleDirectionSelect('right')}
+                  />
+                </div>
+              )}
+              {/* Pause Overlay */}
+              {isPaused && (
+                <PauseOverlay reason={pauseReason} onResume={resume} />
+              )}
             </>
           ) : (
             <AspectRatio ratio={9/16}>
@@ -211,16 +232,22 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
                   )}
                 </div>
               )}
-              <div className="absolute inset-0 flex">
-                <div 
-                  className="w-1/2 h-full cursor-pointer" 
-                  onClick={() => handleDirectionSelect('left')}
-                />
-                <div 
-                  className="w-1/2 h-full cursor-pointer" 
-                  onClick={() => handleDirectionSelect('right')}
-                />
-              </div>
+              {!isPaused && (
+                <div className="absolute inset-0 flex">
+                  <div 
+                    className="w-1/2 h-full cursor-pointer" 
+                    onClick={() => handleDirectionSelect('left')}
+                  />
+                  <div 
+                    className="w-1/2 h-full cursor-pointer" 
+                    onClick={() => handleDirectionSelect('right')}
+                  />
+                </div>
+              )}
+              {/* Pause Overlay */}
+              {isPaused && (
+                <PauseOverlay reason={pauseReason} onResume={resume} />
+              )}
             </AspectRatio>
           )}
         </div>

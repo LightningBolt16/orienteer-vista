@@ -234,118 +234,149 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    // Update overall stats
-    const attempts = user.attempts || { total: 0, correct: 0, timeSum: 0 };
-    const newTotal = attempts.total + 1;
-    const newCorrect = attempts.correct + (isCorrect ? 1 : 0);
-    const newTimeSum = attempts.timeSum + (isCorrect ? responseTime : 0);
+    const effectiveMapName = mapName || 'unknown';
     
-    const newAccuracy = newTotal > 0 ? Math.round((newCorrect / newTotal) * 100) : 0;
-    const newSpeed = newCorrect > 0 ? Math.round(newTimeSum / newCorrect) : 0;
-    
-    const updatedUser = {
-      ...user,
-      accuracy: newAccuracy,
-      speed: newSpeed,
-      attempts: {
-        total: newTotal,
-        correct: newCorrect,
-        timeSum: newTimeSum
-      }
-    };
-    
-    // Update local state immediately
-    setUserState(updatedUser);
-    
-    // Try to update overall stats in database
+    // Record individual route attempt for rolling 100 calculation
     try {
-      await supabaseManager.executeWithRetry(
-        async () => {
-          const { error } = await (supabase
-            .from('user_profiles' as any)
-            .update({
-              accuracy: newAccuracy,
-              speed: newSpeed,
-              attempts: {
-                total: newTotal,
-                correct: newCorrect,
-                timeSum: newTimeSum
-              },
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id) as any);
-            
-          if (error) {
-            throw error;
-          }
-        },
-        'Update user performance'
-      );
+      await (supabase
+        .from('route_attempts' as any)
+        .insert({
+          user_id: user.id,
+          map_name: effectiveMapName,
+          is_correct: isCorrect,
+          response_time: responseTime
+        }) as any);
     } catch (error) {
-      console.error('Error updating overall performance:', error);
+      console.error('Error recording route attempt:', error);
     }
     
-    // Update per-map stats if mapName is provided
-    if (mapName) {
-      try {
-        // First try to get existing map stats
-        const { data: existingStats, error: fetchError } = await (supabase
+    // Calculate stats from last 100 attempts (rolling window)
+    try {
+      const { data: recentAttempts, error: fetchError } = await (supabase
+        .from('route_attempts' as any)
+        .select('is_correct, response_time')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100) as any);
+      
+      if (fetchError) {
+        console.error('Error fetching recent attempts:', fetchError);
+      } else if (recentAttempts && recentAttempts.length > 0) {
+        const total = recentAttempts.length;
+        const correct = recentAttempts.filter((a: any) => a.is_correct).length;
+        const correctAttempts = recentAttempts.filter((a: any) => a.is_correct);
+        const timeSum = correctAttempts.reduce((sum: number, a: any) => sum + a.response_time, 0);
+        
+        const newAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const newSpeed = correct > 0 ? Math.round(timeSum / correct) : 0;
+        
+        const updatedUser = {
+          ...user,
+          accuracy: newAccuracy,
+          speed: newSpeed,
+          attempts: {
+            total,
+            correct,
+            timeSum
+          }
+        };
+        
+        // Update local state immediately
+        setUserState(updatedUser);
+        
+        // Update overall stats in database
+        await supabaseManager.executeWithRetry(
+          async () => {
+            const { error } = await (supabase
+              .from('user_profiles' as any)
+              .update({
+                accuracy: newAccuracy,
+                speed: newSpeed,
+                attempts: {
+                  total,
+                  correct,
+                  timeSum
+                },
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id) as any);
+              
+            if (error) {
+              throw error;
+            }
+          },
+          'Update user performance'
+        );
+      }
+    } catch (error) {
+      console.error('Error calculating rolling stats:', error);
+    }
+    
+    // Update per-map stats from last 100 attempts for that map
+    try {
+      const { data: mapAttempts, error: mapFetchError } = await (supabase
+        .from('route_attempts' as any)
+        .select('is_correct, response_time')
+        .eq('user_id', user.id)
+        .eq('map_name', effectiveMapName)
+        .order('created_at', { ascending: false })
+        .limit(100) as any);
+      
+      if (mapFetchError) {
+        console.error('Error fetching map attempts:', mapFetchError);
+        return;
+      }
+      
+      if (mapAttempts && mapAttempts.length > 0) {
+        const mapTotal = mapAttempts.length;
+        const mapCorrect = mapAttempts.filter((a: any) => a.is_correct).length;
+        const mapCorrectAttempts = mapAttempts.filter((a: any) => a.is_correct);
+        const mapTimeSum = mapCorrectAttempts.reduce((sum: number, a: any) => sum + a.response_time, 0);
+        
+        const mapAccuracy = mapTotal > 0 ? Math.round((mapCorrect / mapTotal) * 100) : 0;
+        const mapSpeed = mapCorrect > 0 ? Math.round(mapTimeSum / mapCorrect) : 0;
+        
+        // Check if map stats exist
+        const { data: existingStats } = await (supabase
           .from('user_map_stats' as any)
-          .select('*')
+          .select('id')
           .eq('user_id', user.id)
-          .eq('map_name', mapName)
+          .eq('map_name', effectiveMapName)
           .maybeSingle() as any);
         
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          console.error('Error fetching map stats:', fetchError);
-          return;
-        }
-        
         if (existingStats) {
-          // Update existing stats
-          const mapAttempts = existingStats.attempts || { total: 0, correct: 0, timeSum: 0 };
-          const mapNewTotal = mapAttempts.total + 1;
-          const mapNewCorrect = mapAttempts.correct + (isCorrect ? 1 : 0);
-          const mapNewTimeSum = mapAttempts.timeSum + (isCorrect ? responseTime : 0);
-          const mapNewAccuracy = mapNewTotal > 0 ? Math.round((mapNewCorrect / mapNewTotal) * 100) : 0;
-          const mapNewSpeed = mapNewCorrect > 0 ? Math.round(mapNewTimeSum / mapNewCorrect) : 0;
-          
           await (supabase
             .from('user_map_stats' as any)
             .update({
-              accuracy: mapNewAccuracy,
-              speed: mapNewSpeed,
+              accuracy: mapAccuracy,
+              speed: mapSpeed,
               attempts: {
-                total: mapNewTotal,
-                correct: mapNewCorrect,
-                timeSum: mapNewTimeSum
+                total: mapTotal,
+                correct: mapCorrect,
+                timeSum: mapTimeSum
               },
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id)
-            .eq('map_name', mapName) as any);
+            .eq('map_name', effectiveMapName) as any);
         } else {
-          // Insert new map stats
-          const mapNewAccuracy = isCorrect ? 100 : 0;
-          const mapNewSpeed = isCorrect ? responseTime : 0;
-          
           await (supabase
             .from('user_map_stats' as any)
             .insert({
               user_id: user.id,
-              map_name: mapName,
-              accuracy: mapNewAccuracy,
-              speed: mapNewSpeed,
+              map_name: effectiveMapName,
+              accuracy: mapAccuracy,
+              speed: mapSpeed,
               attempts: {
-                total: 1,
-                correct: isCorrect ? 1 : 0,
-                timeSum: isCorrect ? responseTime : 0
+                total: mapTotal,
+                correct: mapCorrect,
+                timeSum: mapTimeSum
               }
             }) as any);
         }
-      } catch (error) {
-        console.error('Error updating map-specific stats:', error);
       }
+    } catch (error) {
+      console.error('Error updating map-specific stats:', error);
     }
   };
 

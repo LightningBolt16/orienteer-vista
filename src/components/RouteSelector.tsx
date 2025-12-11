@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { RouteData, MapSource, getImageUrlByMapName } from '../utils/routeDataUtils';
+import { useInactivityDetection } from '../hooks/useInactivityDetection';
+import PauseOverlay from './PauseOverlay';
 
 const PRELOAD_AHEAD_COUNT = 10;
 
@@ -24,6 +26,11 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Inactivity detection
+  const { isPaused, pauseReason, resume, resetTimer } = useInactivityDetection({
+    inactivityTimeout: 30000, // 30 seconds
+  });
 
   // Get image URL for a route (handles both single map and all maps mode)
   const getImageForRoute = (route: RouteData): string => {
@@ -56,18 +63,23 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
       }
     });
     
-    setStartTime(Date.now());
-    
     return () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
       if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     };
   }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
+  // Reset start time when resuming or changing route
+  useEffect(() => {
+    if (!isPaused) {
+      setStartTime(Date.now());
+    }
+  }, [isPaused, currentRouteIndex]);
+
   // Keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTransitioning || routeData.length === 0) return;
+      if (isTransitioning || routeData.length === 0 || isPaused) return;
       
       if (e.key === 'ArrowLeft') {
         handleDirectionSelect('left');
@@ -78,15 +90,18 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRouteIndex, isTransitioning, routeData]);
+  }, [currentRouteIndex, isTransitioning, routeData, isPaused]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || routeData.length === 0) return;
+    if (isTransitioning || routeData.length === 0 || isPaused) return;
     
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
     const responseTime = Date.now() - startTime;
     const mapName = currentRoute.mapName || mapSource?.name;
+    
+    // Reset inactivity timer on interaction
+    resetTimer();
     
     updatePerformance(isCorrect, responseTime, mapName);
     
@@ -178,7 +193,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
               onClick={() => handleDirectionSelect('left')} 
               style={{ backgroundColor: `${leftButtonColor}CC` }}
               className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-              disabled={isTransitioning}
+              disabled={isTransitioning || isPaused}
             >
               <ChevronLeft className="h-8 w-8" />
             </button>
@@ -187,11 +202,16 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
               onClick={() => handleDirectionSelect('right')} 
               style={{ backgroundColor: `${rightButtonColor}CC` }}
               className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-              disabled={isTransitioning}
+              disabled={isTransitioning || isPaused}
             >
               <ChevronRight className="h-8 w-8" />
             </button>
           </div>
+
+          {/* Pause Overlay */}
+          {isPaused && (
+            <PauseOverlay reason={pauseReason} onResume={resume} />
+          )}
         </div>
       </div>
 
