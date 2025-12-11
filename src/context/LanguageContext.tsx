@@ -121,6 +121,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       routeChoose: 'Choose Routes',
       orienteers: 'Orienteers',
       you: 'You',
+      allMaps: 'All Maps',
       
       // Course Setter
       mapLibrary: 'Map Library',
@@ -362,6 +363,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       routeChoose: 'Välj vägar',
       orienteers: 'Orienterare',
       you: 'Du',
+      allMaps: 'Alla kartor',
       
       // Course Setter
       mapLibrary: 'Kartbibliotek',

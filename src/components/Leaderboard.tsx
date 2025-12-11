@@ -17,7 +17,11 @@ import { useIsMobile } from '../hooks/use-mobile';
 type SortField = 'accuracy' | 'speed' | 'combined';
 type SortDirection = 'asc' | 'desc';
 
-const Leaderboard: React.FC = () => {
+interface LeaderboardProps {
+  mapFilter?: string;
+}
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
   const { leaderboard, user } = useUser();
   const { t } = useLanguage();
   const isMobile = useIsMobile();

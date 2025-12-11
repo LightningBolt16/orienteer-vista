@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import ProjectManager from "./pages/ProjectManager";
 import AuthPage from "./pages/AuthPage";
 import Subscription from "./pages/Subscription";
+import LeaderboardPage from "./pages/LeaderboardPage";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 import { NetworkProvider } from "./context/NetworkContext";
@@ -49,6 +50,7 @@ const App: React.FC = () => {
                   <Route path="/profile" element={<Layout><Profile /></Layout>} />
                   <Route path="/projects" element={<Layout><ProjectManager /></Layout>} />
                   <Route path="/subscription" element={<Layout><Subscription /></Layout>} />
+                  <Route path="/leaderboard" element={<Layout><LeaderboardPage /></Layout>} />
                   <Route path="*" element={<Layout><NotFound /></Layout>} />
                 </Routes>
               </BrowserRouter>

@@ -94,7 +94,7 @@ const Header: React.FC = () => {
           <>
             <div className="flex items-center space-x-4">
               {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
-                <Link to="/route-game" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
+                <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
                   {t('rank')} {getUserRank()}
                 </Link>
@@ -222,7 +222,7 @@ const Header: React.FC = () => {
             
             <div className="flex items-center space-x-2 ml-4">
               {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
-                <Link to="/route-game" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
+                <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
                   {t('rank')} {getUserRank()}
                 </Link>
