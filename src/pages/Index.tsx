@@ -46,34 +46,32 @@ const Index: React.FC = () => {
 
   return (
     <div className="animate-fade-in pb-12">
-      {/* Hero Section */}
+      {/* Route Choice Champions Header */}
       <div className="glass-card mb-12 p-8 md:p-12 rounded-3xl">
-        <div className="text-center md:text-left max-w-3xl mx-auto md:mx-0">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="text-orienteering">Orienteering</span> {t('orienteeringTools')}
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 md:pr-12">
-            {t('improvementText')}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-            <Link to="/route-game">
-              <Button size="lg" className="w-full sm:w-auto">
-                <Map className="mr-2 h-5 w-5" />
-                {t('routeGame')}
-              </Button>
-            </Link>
-            <Link to="/course-setter">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                <PenTool className="mr-2 h-5 w-5" />
-                {t('courseSetter')}
-              </Button>
-            </Link>
-          </div>
+        <div className="flex items-center justify-center mb-8">
+          <Trophy className="h-10 w-10 text-orienteering mr-4" />
+          <h1 className="text-4xl md:text-5xl font-bold">{t('routeChoiceChampions')}</h1>
+        </div>
+        
+        <p className="text-xl text-muted-foreground text-center mb-8">
+          {t('competeWithOthers')}
+        </p>
+        
+        <div className="flex justify-center mb-8">
+          <Link to="/route-game">
+            <Button size="lg">
+              {t('joinCompetition')}
+            </Button>
+          </Link>
+        </div>
+        
+        <div className="max-w-md mx-auto">
+          <Leaderboard />
         </div>
       </div>
 
       {/* Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link 
           to="/route-game" 
           className="glass-card p-6 rounded-xl hover:shadow-lg transition-all hover:scale-[1.01] hover:bg-white/90 cursor-pointer"
@@ -109,30 +107,6 @@ const Index: React.FC = () => {
             <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground" />
           </div>
         </Link>
-      </div>
-      
-      {/* Leaderboard Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 glass-card p-8 rounded-xl">
-          <div className="flex items-center mb-8">
-            <Trophy className="h-6 w-6 text-orienteering mr-3" />
-            <h2 className="text-2xl font-medium">{t('routeChoiceChampions')}</h2>
-          </div>
-          
-          <p className="text-muted-foreground mb-6">
-            {t('competeWithOthers')}
-          </p>
-          
-          <Link to="/route-game">
-            <Button>
-              {t('joinCompetition')}
-            </Button>
-          </Link>
-        </div>
-        
-        <div className="lg:col-span-1">
-          <Leaderboard />
-        </div>
       </div>
     </div>
   );
