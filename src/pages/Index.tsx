@@ -65,7 +65,7 @@ const Index: React.FC = () => {
           </Link>
         </div>
         
-        <div className="max-w-md mx-auto">
+        <div className="w-full">
           <Leaderboard />
         </div>
       </div>
