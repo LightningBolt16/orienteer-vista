@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      route_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          is_correct: boolean
+          map_name: string
+          response_time: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_correct: boolean
+          map_name: string
+          response_time: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          map_name?: string
+          response_time?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_map_stats: {
         Row: {
           accuracy: number | null

@@ -123,6 +123,30 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       you: 'You',
       allMaps: 'All Maps',
       
+      // Pause/Inactivity
+      gamePaused: 'Game Paused',
+      inactivityPauseMessage: 'The game was paused due to inactivity. Your time won\'t be affected.',
+      welcomeBack: 'Welcome Back!',
+      visibilityPauseMessage: 'The game was paused while you were away. Click to continue.',
+      continue: 'Continue',
+      
+      // Profile Stats
+      overview: 'Overview',
+      perMap: 'Per Map',
+      progress: 'Progress',
+      last100: 'last 100',
+      performanceByMap: 'Performance by Map',
+      noMapStats: 'No map statistics yet. Play some routes to see your per-map performance!',
+      attempts: 'Attempts',
+      performanceOverTime: 'Performance Over Time',
+      lastWeek: 'Last Week',
+      lastMonth: 'Last Month',
+      allTime: 'All Time',
+      noPerformanceData: 'No performance data yet. Play some routes to see your progress!',
+      accuracyOverTime: 'Accuracy Over Time',
+      speedOverTime: 'Average Speed Over Time',
+      dailyAttempts: 'Daily Attempts',
+      
       // Course Setter
       mapLibrary: 'Map Library',
       uploadMap: 'Upload Map',
