@@ -11,9 +11,10 @@ export interface MobileRouteSelectorProps {
   routeData: RouteData[];
   mapSource: MapSource | null;
   allMaps?: MapSource[];
+  isFullscreen?: boolean;
 }
 
-const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, mapSource, allMaps = [] }) => {
+const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, mapSource, allMaps = [], isFullscreen = false }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
@@ -127,8 +128,8 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
 
   return (
-    <div className="relative w-full">
-      <div className="glass-card overflow-hidden relative">
+    <div className={`relative w-full ${isFullscreen ? 'h-full' : ''}`}>
+      <div className={`overflow-hidden relative ${isFullscreen ? 'h-full bg-black' : 'glass-card'}`}>
         {/* Side glow effects */}
         <div 
           className="absolute left-0 top-0 bottom-0 w-3 z-10 side-glow"
@@ -145,49 +146,86 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
           }}
         />
         
-        <div className="relative overflow-hidden">
-          <AspectRatio ratio={9/16}>
-            <img 
-              src={currentImageUrl} 
-              alt="Orienteering route" 
-              className={`w-full h-full object-cover transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
-            />
-            
-            {showResult && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                {showResult === 'win' ? (
-                  <>
-                    <CheckCircle className="text-green-500 w-20 h-20 sm:w-32 sm:h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
-                    <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
-                      {resultMessage}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="text-red-500 w-20 h-20 sm:w-32 sm:h-32 animate-[lose-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
-                    <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
-                      {resultMessage}
-                    </div>
-                  </>
-                )}
+        <div className={`relative overflow-hidden ${isFullscreen ? 'h-full flex items-center justify-center' : ''}`}>
+          {isFullscreen ? (
+            <>
+              <img 
+                src={currentImageUrl} 
+                alt="Orienteering route" 
+                className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
+              />
+              {showResult && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  {showResult === 'win' ? (
+                    <>
+                      <CheckCircle className="text-green-500 w-20 h-20 sm:w-32 sm:h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                      <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
+                        {resultMessage}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="text-red-500 w-20 h-20 sm:w-32 sm:h-32 animate-[lose-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
+                      <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
+                        {resultMessage}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="absolute inset-0 flex">
+                <div 
+                  className="w-1/2 h-full cursor-pointer" 
+                  onClick={() => handleDirectionSelect('left')}
+                />
+                <div 
+                  className="w-1/2 h-full cursor-pointer" 
+                  onClick={() => handleDirectionSelect('right')}
+                />
               </div>
-            )}
-            
-            <div className="absolute inset-0 flex">
-              <div 
-                className="w-1/2 h-full cursor-pointer" 
-                onClick={() => handleDirectionSelect('left')}
+            </>
+          ) : (
+            <AspectRatio ratio={9/16}>
+              <img 
+                src={currentImageUrl} 
+                alt="Orienteering route" 
+                className={`w-full h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
               />
-              <div 
-                className="w-1/2 h-full cursor-pointer" 
-                onClick={() => handleDirectionSelect('right')}
-              />
-            </div>
-          </AspectRatio>
+              {showResult && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  {showResult === 'win' ? (
+                    <>
+                      <CheckCircle className="text-green-500 w-20 h-20 sm:w-32 sm:h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                      <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
+                        {resultMessage}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="text-red-500 w-20 h-20 sm:w-32 sm:h-32 animate-[lose-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
+                      <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
+                        {resultMessage}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="absolute inset-0 flex">
+                <div 
+                  className="w-1/2 h-full cursor-pointer" 
+                  onClick={() => handleDirectionSelect('left')}
+                />
+                <div 
+                  className="w-1/2 h-full cursor-pointer" 
+                  onClick={() => handleDirectionSelect('right')}
+                />
+              </div>
+            </AspectRatio>
+          )}
         </div>
       </div>
 
-      {currentRoute && (
+      {currentRoute && !isFullscreen && (
         <div className="mt-4 text-sm text-muted-foreground text-center">
           <p>
             {currentRoute.mapName && <span className="font-medium">{currentRoute.mapName} - </span>}
