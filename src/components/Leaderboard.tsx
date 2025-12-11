@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle } from 'lucide-react';
+import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -12,6 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useIsMobile } from '../hooks/use-mobile';
 
 type SortField = 'accuracy' | 'speed' | 'combined';
@@ -25,7 +31,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
   const { leaderboard, user, fetchMapLeaderboard } = useUser();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
-  const [sortField, setSortField] = useState<SortField>('accuracy');
+  const [sortField, setSortField] = useState<SortField>('combined');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -182,6 +188,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
           <div className="flex items-center">
             <Trophy className="h-5 w-5 text-orienteering mr-2" />
             <h2 className="text-lg font-medium">{t('leaderboard')}</h2>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground ml-2 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <div className="flex items-center text-xs text-muted-foreground">
             <Users className="h-3 w-3 mr-1" />
@@ -291,6 +307,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
         <div className="flex items-center">
           <Trophy className="h-5 w-5 text-orienteering mr-2" />
           <h2 className="text-xl font-medium">{t('leaderboard')}</h2>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-muted-foreground ml-2 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center text-sm text-muted-foreground">

@@ -112,6 +112,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       accuracy: 'Accuracy',
       speed: 'Speed',
       leaderboard: 'Leaderboard',
+      leaderboardTooltip: 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.',
+      overall: 'Overall',
       rank: 'Rank',
       selectMap: 'Select Map',
       selectMapDescription: 'Choose a map to practice route choices on',
