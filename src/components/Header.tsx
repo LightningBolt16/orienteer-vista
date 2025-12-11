@@ -125,43 +125,12 @@ const Header: React.FC = () => {
                 </Link>
                 
                 <Link 
-                  to="/course-setter" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/course-setter') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <PenTool className="h-5 w-5" />
-                  <span>{t('courseSetter')}</span>
-                </Link>
-                
-                <Link 
-                  to="/my-files" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/my-files') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <FolderOpen className="h-5 w-5" />
-                  <span>{t('myProjects')}</span>
-                </Link>
-                
-                <Link 
                   to="/profile"
                   className="p-3 rounded-md flex items-center space-x-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <User className="h-5 w-5" />
                   <span>{t('profile')}</span>
-                </Link>
-
-                <Link 
-                  to="/subscription" 
-                  className="p-3 rounded-md flex items-center space-x-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  <span>{t('subscription')}</span>
                 </Link>
 
                 {isAuthenticated ? (
@@ -200,25 +169,6 @@ const Header: React.FC = () => {
               <span>{t('routeGame')}</span>
             </Link>
             
-            <Link 
-              to="/course-setter" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/course-setter') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <PenTool className="h-4 w-4 mr-1" />
-              <span>{t('courseSetter')}</span>
-            </Link>
-            
-            <Link 
-              to="/my-files" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/my-files') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <FolderOpen className="h-4 w-4 mr-1" />
-              <span>{t('myProjects')}</span>
-            </Link>
             
             <div className="flex items-center space-x-2 ml-4">
               {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
@@ -243,9 +193,6 @@ const Header: React.FC = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link to="/profile">{t('profile')}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/subscription">{t('subscription')}</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {isAuthenticated ? (
