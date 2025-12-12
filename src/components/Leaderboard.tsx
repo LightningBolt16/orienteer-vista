@@ -158,6 +158,37 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
     );
   }
 
+  // Not logged in state
+  if (!user) {
+    return (
+      <div className="glass-card p-6 animate-fade-in">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Trophy className="h-5 w-5 text-orienteering mr-2" />
+            <h2 className="text-xl font-medium">{t('leaderboard')}</h2>
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Users className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">
+            {t('loginToViewLeaderboard') || 'Log in to view the leaderboard'}
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            {t('loginToViewLeaderboardDesc') || 'Sign in to see how you rank against other players.'}
+          </p>
+          <Button 
+            variant="default" 
+            onClick={() => navigate('/auth')}
+            className="flex items-center"
+          >
+            {t('login') || 'Log In'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Error state or empty leaderboard
   if (hasError || displayLeaderboard.length === 0) {
     return (
@@ -197,15 +228,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
   // Use compact layout for mobile
   if (isMobile) {
     return (
-      <div className="glass-card p-4 animate-fade-in">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Trophy className="h-5 w-5 text-orienteering mr-2" />
-            <h2 className="text-lg font-medium">{t('leaderboard')}</h2>
+      <div className="glass-card p-3 animate-fade-in w-full max-w-full overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center min-w-0">
+            <Trophy className="h-4 w-4 text-orienteering mr-1.5 flex-shrink-0" />
+            <h2 className="text-base font-medium truncate">{t('leaderboard')}</h2>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-muted-foreground ml-2 cursor-help" />
+                  <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 cursor-help flex-shrink-0" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
@@ -213,54 +244,54 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
               </Tooltip>
             </TooltipProvider>
           </div>
-          <div className="flex items-center text-xs text-muted-foreground">
+          <div className="flex items-center text-xs text-muted-foreground flex-shrink-0">
             <Users className="h-3 w-3 mr-1" />
             <span>{displayLeaderboard.length}</span>
           </div>
         </div>
         
-        <div className="mb-2 flex justify-between text-xs">
+        <div className="mb-2 flex justify-between text-xs gap-1">
           <Button 
             variant="ghost" 
             size="sm" 
-            className="px-2 h-7"
+            className="px-1.5 h-6 text-xs flex-1"
             onClick={() => handleSort('accuracy')}
           >
-            <Target className="h-3 w-3 mr-1" />
-            {t('accuracy')}
+            <Target className="h-3 w-3 mr-0.5" />
+            <span className="truncate">{t('accuracy')}</span>
             {sortField === 'accuracy' && (
-              sortDirection === 'desc' ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />
+              sortDirection === 'desc' ? <ArrowDown className="h-3 w-3 ml-0.5 flex-shrink-0" /> : <ArrowUp className="h-3 w-3 ml-0.5 flex-shrink-0" />
             )}
           </Button>
           
           <Button 
             variant="ghost" 
             size="sm" 
-            className="px-2 h-7"
+            className="px-1.5 h-6 text-xs flex-1"
             onClick={() => handleSort('speed')}
           >
-            <Zap className="h-3 w-3 mr-1" />
-            {t('speed')}
+            <Zap className="h-3 w-3 mr-0.5" />
+            <span className="truncate">{t('speed')}</span>
             {sortField === 'speed' && (
-              sortDirection === 'desc' ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />
+              sortDirection === 'desc' ? <ArrowDown className="h-3 w-3 ml-0.5 flex-shrink-0" /> : <ArrowUp className="h-3 w-3 ml-0.5 flex-shrink-0" />
             )}
           </Button>
           
           <Button 
             variant="ghost" 
             size="sm" 
-            className="px-2 h-7"
+            className="px-1.5 h-6 text-xs flex-1"
             onClick={() => handleSort('combined')}
           >
-            <Trophy className="h-3 w-3 mr-1" />
-            {t('overall')}
+            <Trophy className="h-3 w-3 mr-0.5" />
+            <span className="truncate">{t('overall')}</span>
             {sortField === 'combined' && (
-              sortDirection === 'desc' ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />
+              sortDirection === 'desc' ? <ArrowDown className="h-3 w-3 ml-0.5 flex-shrink-0" /> : <ArrowUp className="h-3 w-3 ml-0.5 flex-shrink-0" />
             )}
           </Button>
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {sortedLeaderboard.slice(0, 10).map((entry, index) => {
             const rankChange = getRankChange(index + 1, entry.previousRank);
             const RankIcon = rankChange.icon;
@@ -269,51 +300,53 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
             return (
               <div 
                 key={entry.id} 
-                className={`flex items-center p-2 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center p-2 rounded-lg transition-all cursor-pointer min-w-0 ${
                   isCurrentUser ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
                 }`}
                 onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
               >
-                <div className="flex items-center mr-2">
-                  <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${
+                <div className="flex items-center mr-1.5 flex-shrink-0">
+                  <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-medium ${
                     index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
                   }`}>
                     {index + 1}
                   </div>
-                  <RankIcon className={`h-3 w-3 ml-1 ${rankChange.color}`} />
+                  <RankIcon className={`h-2.5 w-2.5 ml-0.5 ${rankChange.color}`} />
                 </div>
                 
-                <Avatar className="h-6 w-6 mr-2">
+                <Avatar className="h-5 w-5 mr-1.5 flex-shrink-0">
                   {entry.profileImage ? (
                     <AvatarImage 
                       src={entry.profileImage} 
                       alt={entry.name || 'User avatar'} 
                     />
                   ) : (
-                    <AvatarFallback className="bg-secondary text-[10px]">
+                    <AvatarFallback className="bg-secondary text-[8px]">
                       {entry.name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   )}
                 </Avatar>
                 
-                <div className="flex-grow truncate text-sm">
-                  <span className="font-medium truncate">{entry.name}</span>
-                  {entry.id === user?.id && (
-                    <span className="ml-1 text-[10px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full">
-                      {t('you')}
-                    </span>
-                  )}
+                <div className="flex-1 min-w-0 mr-2">
+                  <div className="flex items-center min-w-0">
+                    <span className="font-medium text-xs truncate">{entry.name}</span>
+                    {entry.id === user?.id && (
+                      <span className="ml-1 text-[8px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full flex-shrink-0">
+                        {t('you')}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="flex items-center" title={t('accuracy')}>
-                    <Target className="h-3 w-3 text-orienteering mr-1" />
-                    <span className="font-medium text-xs">{entry.accuracy}%</span>
+                    <Target className="h-2.5 w-2.5 text-orienteering mr-0.5" />
+                    <span className="font-medium text-[10px]">{entry.accuracy}%</span>
                   </div>
                   
                   <div className="flex items-center" title={t('speed')}>
-                    <Zap className="h-3 w-3 text-amber-500 mr-1" />
-                    <span className="font-medium text-xs">{entry.speed || 0}</span>
+                    <Zap className="h-2.5 w-2.5 text-amber-500 mr-0.5" />
+                    <span className="font-medium text-[10px]">{entry.speed || 0}</span>
                   </div>
                 </div>
               </div>
