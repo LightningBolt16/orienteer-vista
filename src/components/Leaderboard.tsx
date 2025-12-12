@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -28,6 +29,7 @@ interface LeaderboardProps {
 }
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
+  const navigate = useNavigate();
   const { leaderboard, user, fetchMapLeaderboard } = useUser();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -262,13 +264,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
           {sortedLeaderboard.slice(0, 10).map((entry, index) => {
             const rankChange = getRankChange(index + 1, entry.previousRank);
             const RankIcon = rankChange.icon;
+            const isCurrentUser = entry.id === user?.id;
             
             return (
               <div 
                 key={entry.id} 
-                className={`flex items-center p-2 rounded-lg transition-all ${
-                  entry.id === user?.id ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
+                className={`flex items-center p-2 rounded-lg transition-all cursor-pointer ${
+                  isCurrentUser ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
                 }`}
+                onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
               >
                 <div className="flex items-center mr-2">
                   <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${
@@ -392,9 +396,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
           {sortedLeaderboard.slice(0, 10).map((entry, index) => {
             const rankChange = getRankChange(index + 1, entry.previousRank);
             const RankIcon = rankChange.icon;
+            const isCurrentUser = entry.id === user?.id;
             
             return (
-              <TableRow key={entry.id} className={entry.id === user?.id ? 'bg-orienteering/5' : ''}>
+              <TableRow 
+                key={entry.id} 
+                className={`${isCurrentUser ? 'bg-orienteering/5' : ''} ${!isCurrentUser ? 'cursor-pointer hover:bg-secondary/50' : ''}`}
+                onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
+              >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     <div className={`w-8 h-8 flex items-center justify-center rounded-full ${
