@@ -150,36 +150,7 @@ const Profile: React.FC = () => {
     }
   };
 
-  // Create the avatar bucket if it doesn't exist yet
-  useEffect(() => {
-    const createBucketIfNotExists = async () => {
-      try {
-        const { data: buckets, error: getBucketsError } = await supabase.storage.listBuckets();
-        
-        if (getBucketsError) {
-          console.error('Error checking buckets:', getBucketsError);
-          return;
-        }
-        
-        const avatarBucketExists = buckets.some(bucket => bucket.name === 'avatars');
-        
-        if (!avatarBucketExists) {
-          const { error: createBucketError } = await supabase.storage.createBucket('avatars', {
-            public: true,
-            fileSizeLimit: 1024 * 1024 * 2
-          });
-          
-          if (createBucketError) {
-            console.error('Error creating avatar bucket:', createBucketError);
-          }
-        }
-      } catch (error) {
-        console.error('Error in createBucketIfNotExists:', error);
-      }
-    };
-    
-    createBucketIfNotExists();
-  }, []);
+  // Bucket is already created via migration, no need to check/create from client
 
   // Redirect to auth page if not logged in and not a guest
   useEffect(() => {
@@ -254,7 +225,8 @@ const Profile: React.FC = () => {
     setUploading(true);
 
     try {
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+      // Use folder structure with user ID to match RLS policy
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       const { data, error } = await supabase.storage
         .from('avatars')
