@@ -10,6 +10,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Compass, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { z } from 'zod';
+
+// Validation schemas
+const loginSchema = z.object({
+  email: z.string()
+    .trim()
+    .email('Invalid email format')
+    .max(255, 'Email too long'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+});
+
+const registerSchema = z.object({
+  name: z.string()
+    .trim()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be less than 100 characters'),
+  email: z.string()
+    .trim()
+    .email('Invalid email format')
+    .max(255, 'Email too long'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(72, 'Password too long')
+});
 
 const AuthPage: React.FC = () => {
   const { signIn, signUp, loading } = useUser();
@@ -32,11 +57,17 @@ const AuthPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     
+    // Validate with Zod
+    const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
+    if (!result.success) {
+      setError(result.error.errors[0].message);
+      return;
+    }
+    
     try {
-      await signIn(loginEmail, loginPassword);
+      await signIn(result.data.email, result.data.password);
       navigate('/');
     } catch (error: any) {
-      // Error may already be handled in signIn method, but set a backup error
       if (error.message) {
         setError(error.message);
       }
@@ -47,11 +78,21 @@ const AuthPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     
+    // Validate with Zod
+    const result = registerSchema.safeParse({ 
+      name: registerName, 
+      email: registerEmail, 
+      password: registerPassword 
+    });
+    if (!result.success) {
+      setError(result.error.errors[0].message);
+      return;
+    }
+    
     try {
-      await signUp(registerEmail, registerPassword, registerName);
+      await signUp(result.data.email, result.data.password, result.data.name);
       setActiveTab('login');
     } catch (error: any) {
-      // Error may already be handled in signUp method, but set a backup error
       if (error.message) {
         setError(error.message);
       }
