@@ -143,7 +143,20 @@ const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
     .filter(item => item !== null) as RouteData[];
 };
 
-// Fetch route data from a specific map source
+// Check if a specific route image exists
+const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16:9' | '9:16'): Promise<boolean> => {
+  const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
+  const imagePath = `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
+  
+  try {
+    const response = await fetch(imagePath, { method: 'HEAD' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+// Fetch route data from a specific map source, validating each image exists
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
     console.log(`Fetching routes from: ${mapSource.csvPath}`);
@@ -154,8 +167,27 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
     const csvText = await response.text();
     const data = parseCSV(csvText, mapSource.name);
     
-    console.log(`Loaded ${data.length} routes for map ${mapSource.name}`);
-    return data.sort((a, b) => a.candidateIndex - b.candidateIndex);
+    // Validate each route has a corresponding image
+    const validatedRoutes: RouteData[] = [];
+    
+    // Check all images in parallel for better performance
+    const imageCheckPromises = data.map(async (route) => {
+      const exists = await checkImageExists(mapSource.name, route.candidateIndex, mapSource.aspect);
+      return { route, exists };
+    });
+    
+    const results = await Promise.all(imageCheckPromises);
+    
+    for (const { route, exists } of results) {
+      if (exists) {
+        validatedRoutes.push(route);
+      } else {
+        console.log(`Skipping route ${route.candidateIndex} for ${mapSource.name} (${mapSource.aspect}) - image not found`);
+      }
+    }
+    
+    console.log(`Loaded ${validatedRoutes.length}/${data.length} routes for map ${mapSource.name} (${mapSource.aspect})`);
+    return validatedRoutes.sort((a, b) => a.candidateIndex - b.candidateIndex);
   } catch (error) {
     console.error('Error fetching or parsing CSV:', error);
     return [];
