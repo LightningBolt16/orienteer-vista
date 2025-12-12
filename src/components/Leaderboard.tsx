@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info } from 'lucide-react';
+import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -65,7 +65,19 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
     accuracy: number;
     speed: number;
     rank?: number;
+    previousRank?: number;
     profileImage?: string;
+  };
+
+  // Get rank change indicator
+  const getRankChange = (currentRank: number, previousRank?: number) => {
+    if (!previousRank || previousRank === currentRank) {
+      return { icon: Minus, color: 'text-muted-foreground', change: 0 };
+    }
+    if (previousRank > currentRank) {
+      return { icon: TrendingUp, color: 'text-green-500', change: previousRank - currentRank };
+    }
+    return { icon: TrendingDown, color: 'text-red-500', change: currentRank - previousRank };
   };
 
   // Add refresh functionality
@@ -247,54 +259,62 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
         </div>
         
         <div className="space-y-2">
-          {sortedLeaderboard.slice(0, 10).map((entry, index) => (
-            <div 
-              key={entry.id} 
-              className={`flex items-center p-2 rounded-lg transition-all ${
-                entry.id === user?.id ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
-              }`}
-            >
-              <div className={`w-6 h-6 flex items-center justify-center rounded-full mr-2 text-xs ${
-                index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
-              }`}>
-                {index + 1}
-              </div>
-              
-              <Avatar className="h-6 w-6 mr-2">
-                {entry.profileImage ? (
-                  <AvatarImage 
-                    src={entry.profileImage} 
-                    alt={entry.name || 'User avatar'} 
-                  />
-                ) : (
-                  <AvatarFallback className="bg-secondary text-[10px]">
-                    {entry.name?.charAt(0).toUpperCase() || '?'}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              
-              <div className="flex-grow truncate text-sm">
-                <span className="font-medium truncate">{entry.name}</span>
-                {entry.id === user?.id && (
-                  <span className="ml-1 text-[10px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full">
-                    {t('you')}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center" title={t('accuracy')}>
-                  <Target className="h-3 w-3 text-orienteering mr-1" />
-                  <span className="font-medium text-xs">{entry.accuracy}%</span>
+          {sortedLeaderboard.slice(0, 10).map((entry, index) => {
+            const rankChange = getRankChange(index + 1, entry.previousRank);
+            const RankIcon = rankChange.icon;
+            
+            return (
+              <div 
+                key={entry.id} 
+                className={`flex items-center p-2 rounded-lg transition-all ${
+                  entry.id === user?.id ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
+                }`}
+              >
+                <div className="flex items-center mr-2">
+                  <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${
+                    index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <RankIcon className={`h-3 w-3 ml-1 ${rankChange.color}`} />
                 </div>
                 
-                <div className="flex items-center" title={t('speed')}>
-                  <Zap className="h-3 w-3 text-amber-500 mr-1" />
-                  <span className="font-medium text-xs">{entry.speed || 0}</span>
+                <Avatar className="h-6 w-6 mr-2">
+                  {entry.profileImage ? (
+                    <AvatarImage 
+                      src={entry.profileImage} 
+                      alt={entry.name || 'User avatar'} 
+                    />
+                  ) : (
+                    <AvatarFallback className="bg-secondary text-[10px]">
+                      {entry.name?.charAt(0).toUpperCase() || '?'}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                
+                <div className="flex-grow truncate text-sm">
+                  <span className="font-medium truncate">{entry.name}</span>
+                  {entry.id === user?.id && (
+                    <span className="ml-1 text-[10px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full">
+                      {t('you')}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center" title={t('accuracy')}>
+                    <Target className="h-3 w-3 text-orienteering mr-1" />
+                    <span className="font-medium text-xs">{entry.accuracy}%</span>
+                  </div>
+                  
+                  <div className="flex items-center" title={t('speed')}>
+                    <Zap className="h-3 w-3 text-amber-500 mr-1" />
+                    <span className="font-medium text-xs">{entry.speed || 0}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -369,59 +389,67 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedLeaderboard.slice(0, 10).map((entry, index) => (
-            <TableRow key={entry.id} className={entry.id === user?.id ? 'bg-orienteering/5' : ''}>
-              <TableCell className="font-medium">
-                <div className={`w-8 h-8 flex items-center justify-center rounded-full ${
-                  index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
-                }`}>
-                  {index + 1}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center">
-                  <Avatar className="h-8 w-8 mr-3">
-                    {entry.profileImage ? (
-                      <AvatarImage 
-                        src={entry.profileImage} 
-                        alt={entry.name || 'User avatar'} 
-                      />
-                    ) : (
-                      <AvatarFallback className="bg-secondary text-xs">
-                        {entry.name?.charAt(0).toUpperCase() || '?'}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div>
-                    <span className="font-medium">{entry.name}</span>
-                    {entry.id === user?.id && (
-                      <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
-                        {t('you')}
-                      </span>
-                    )}
+          {sortedLeaderboard.slice(0, 10).map((entry, index) => {
+            const rankChange = getRankChange(index + 1, entry.previousRank);
+            const RankIcon = rankChange.icon;
+            
+            return (
+              <TableRow key={entry.id} className={entry.id === user?.id ? 'bg-orienteering/5' : ''}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 flex items-center justify-center rounded-full ${
+                      index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <RankIcon className={`h-4 w-4 ${rankChange.color}`} />
                   </div>
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end">
-                  <span className="font-semibold">{entry.accuracy}%</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end">
-                  <span className="font-semibold">{entry.speed || 0}</span>
-                  <span className="text-muted-foreground text-sm ml-1">ms</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-end">
-                  <span className="font-semibold">
-                    {calculateCombinedScore(entry.accuracy, entry.speed || 0).toFixed(1)}
-                  </span>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center">
+                    <Avatar className="h-8 w-8 mr-3">
+                      {entry.profileImage ? (
+                        <AvatarImage 
+                          src={entry.profileImage} 
+                          alt={entry.name || 'User avatar'} 
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-secondary text-xs">
+                          {entry.name?.charAt(0).toUpperCase() || '?'}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <span className="font-medium">{entry.name}</span>
+                      {entry.id === user?.id && (
+                        <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
+                          {t('you')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end">
+                    <span className="font-semibold">{entry.accuracy}%</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end">
+                    <span className="font-semibold">{entry.speed || 0}</span>
+                    <span className="text-muted-foreground text-sm ml-1">ms</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end">
+                    <span className="font-semibold">
+                      {calculateCombinedScore(entry.accuracy, entry.speed || 0).toFixed(1)}
+                    </span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

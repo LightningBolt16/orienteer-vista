@@ -81,6 +81,7 @@ export type Database = {
           created_at: string
           id: string
           map_name: string
+          previous_rank: number | null
           speed: number | null
           updated_at: string
           user_id: string
@@ -91,6 +92,7 @@ export type Database = {
           created_at?: string
           id?: string
           map_name: string
+          previous_rank?: number | null
           speed?: number | null
           updated_at?: string
           user_id: string
@@ -101,6 +103,7 @@ export type Database = {
           created_at?: string
           id?: string
           map_name?: string
+          previous_rank?: number | null
           speed?: number | null
           updated_at?: string
           user_id?: string
@@ -122,6 +125,7 @@ export type Database = {
           created_at: string
           id: string
           name: string | null
+          previous_rank: number | null
           profile_image: string | null
           speed: number | null
           updated_at: string
@@ -133,6 +137,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string | null
+          previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
           updated_at?: string
@@ -144,6 +149,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string | null
+          previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
           updated_at?: string

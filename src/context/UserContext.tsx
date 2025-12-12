@@ -24,6 +24,7 @@ type LeaderboardEntry = {
   accuracy: number;
   speed: number;
   rank?: number;
+  previousRank?: number;
   profileImage?: string;
 };
 
@@ -164,10 +165,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         async () => {
           const { data, error } = await (supabase
             .from('user_profiles' as any)
-            .select('user_id, name, accuracy, speed, profile_image')
+            .select('user_id, name, accuracy, speed, profile_image, previous_rank')
             .order('accuracy', { ascending: false })
             .order('speed', { ascending: true })
-            .limit(10) as any);
+            .limit(50) as any);
 
           if (error) {
             throw error;
@@ -179,16 +180,33 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       if (data && data.length > 0) {
-        const rankedLeaderboard = data.map((entry: any, index: number) => ({
+        // Calculate combined score for proper sorting
+        const calculateScore = (accuracy: number, speed: number) => {
+          if (speed === 0) return accuracy;
+          return accuracy * (1000 / Math.max(speed, 1));
+        };
+
+        // Sort by combined score
+        const sortedData = [...data].sort((a: any, b: any) => {
+          const scoreA = calculateScore(a.accuracy || 0, a.speed || 0);
+          const scoreB = calculateScore(b.accuracy || 0, b.speed || 0);
+          return scoreB - scoreA;
+        });
+
+        const rankedLeaderboard = sortedData.map((entry: any, index: number) => ({
           id: entry.user_id,
           name: entry.name || 'User',
           accuracy: entry.accuracy || 0,
           speed: entry.speed || 0,
           rank: index + 1,
+          previousRank: entry.previous_rank || null,
           profileImage: entry.profile_image
         }));
       
         setLeaderboard(rankedLeaderboard);
+
+        // Update previous_rank in database for all users (async, don't wait)
+        updatePreviousRanks(rankedLeaderboard);
       }
     } catch (error: any) {
       console.error('Error in fetchLeaderboard after retries:', error);
@@ -196,7 +214,29 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Calculate user rank based on accuracy and speed
+  // Update previous ranks in database periodically
+  const updatePreviousRanks = async (rankedLeaderboard: LeaderboardEntry[]) => {
+    try {
+      for (const entry of rankedLeaderboard.slice(0, 20)) {
+        if (entry.rank !== entry.previousRank) {
+          await (supabase
+            .from('user_profiles' as any)
+            .update({ previous_rank: entry.rank })
+            .eq('user_id', entry.id) as any);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating previous ranks:', error);
+    }
+  };
+
+  // Calculate combined score (higher is better) - matches leaderboard formula
+  const calculateCombinedScore = (accuracy: number, speed: number) => {
+    if (speed === 0) return accuracy;
+    return accuracy * (1000 / Math.max(speed, 1));
+  };
+
+  // Calculate user rank based on combined score (accuracy + speed)
   const getUserRank = (): number => {
     if (!user || !user.attempts || user.attempts.total === 0) return 0;
     
@@ -212,11 +252,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
     
+    // Sort by combined score (same as leaderboard default)
     fullLeaderboard.sort((a, b) => {
-      if (a.accuracy !== b.accuracy) {
-        return b.accuracy - a.accuracy;
-      }
-      return a.speed - b.speed;
+      const scoreA = calculateCombinedScore(a.accuracy, a.speed);
+      const scoreB = calculateCombinedScore(b.accuracy, b.speed);
+      return scoreB - scoreA;
     });
     
     fullLeaderboard.forEach((entry, index) => {
