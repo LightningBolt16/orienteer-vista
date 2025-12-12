@@ -5,7 +5,8 @@ import Leaderboard from '../components/Leaderboard';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { getAvailableMaps, MapSource, fetchRouteDataForMap, fetchAllRoutesData, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
+import { useRouteCache } from '../context/RouteCache';
+import { MapSource, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2 } from 'lucide-react';
@@ -15,24 +16,28 @@ type MapSelection = 'all' | string;
 const RouteGame: React.FC = () => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const { desktopCache, mobileCache, isPreloading, getRoutesForMap } = useRouteCache();
+  
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedMapId, setSelectedMapId] = useState<MapSelection>('all');
   const [selectedMap, setSelectedMap] = useState<MapSource | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
-  const [availableMaps, setAvailableMaps] = useState<MapSource[]>([]);
   const [allMapsForRoutes, setAllMapsForRoutes] = useState<MapSource[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
+  // Get available maps from cache
+  const cache = isMobile ? mobileCache : desktopCache;
+  const availableMaps = cache?.maps || [];
+  const uniqueMapNames = getUniqueMapNames(availableMaps);
+
   const toggleFullscreen = useCallback(async () => {
-    // For mobile or when native fullscreen isn't supported, use CSS-based fullscreen
     if (isMobile || !document.fullscreenEnabled) {
       setIsFullscreen(prev => !prev);
       return;
     }
 
-    // Desktop: use native fullscreen API
     if (!gameContainerRef.current) return;
 
     try {
@@ -44,16 +49,13 @@ const RouteGame: React.FC = () => {
         setIsFullscreen(false);
       }
     } catch (error) {
-      // Fallback to CSS-based fullscreen if native fails
       console.error('Fullscreen error, using CSS fallback:', error);
       setIsFullscreen(prev => !prev);
     }
   }, [isMobile]);
 
-  // Listen for fullscreen changes (e.g., user presses Escape)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      // Only sync state with native fullscreen on desktop
       if (!isMobile && document.fullscreenEnabled) {
         setIsFullscreen(!!document.fullscreenElement);
       }
@@ -63,62 +65,32 @@ const RouteGame: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [isMobile]);
   
-  // Load available maps
+  // Load route data based on selection - uses cache
   useEffect(() => {
-    const loadMaps = async () => {
+    const loadRoutes = async () => {
+      if (isPreloading) return;
+      
       setIsLoading(true);
+      
       try {
-        const maps = await getAvailableMaps();
-        setAvailableMaps(maps);
+        const { routes, maps } = await getRoutesForMap(selectedMapId, isMobile);
+        setRouteData(routes);
+        setAllMapsForRoutes(maps);
         
-        if (maps.length === 0) {
+        if (selectedMapId !== 'all') {
+          const aspect = isMobile ? '9:16' : '16:9';
+          const mapSource = maps.find(m => m.name === selectedMapId && m.aspect === aspect);
+          setSelectedMap(mapSource || null);
+        } else {
+          setSelectedMap(null);
+        }
+        
+        if (routes.length === 0 && !isPreloading) {
           toast({
             title: t('error'),
             description: t('noMapsAvailable'),
             variant: "destructive"
           });
-        }
-      } catch (error) {
-        console.error('Failed to load maps:', error);
-        toast({
-          title: t('error'),
-          description: t('errorLoadingPage'),
-          variant: "destructive"
-        });
-      }
-      setIsLoading(false);
-    };
-    
-    loadMaps();
-  }, [t]);
-  
-  // Load route data based on selection
-  useEffect(() => {
-    const loadRoutes = async () => {
-      if (availableMaps.length === 0) return;
-      
-      setIsLoading(true);
-      
-      try {
-        if (selectedMapId === 'all') {
-          // Fetch all routes from all maps
-          const { routes, maps } = await fetchAllRoutesData(isMobile);
-          setRouteData(routes);
-          setAllMapsForRoutes(maps);
-          setSelectedMap(null);
-        } else {
-          // Fetch routes for specific map
-          const aspect = isMobile ? '9:16' : '16:9';
-          const mapSource = availableMaps.find(
-            map => map.name === selectedMapId && map.aspect === aspect
-          );
-          
-          if (mapSource) {
-            const data = await fetchRouteDataForMap(mapSource);
-            setRouteData(data);
-            setSelectedMap(mapSource);
-            setAllMapsForRoutes([mapSource]);
-          }
         }
       } catch (error) {
         console.error('Failed to load route data:', error);
@@ -133,14 +105,13 @@ const RouteGame: React.FC = () => {
     };
     
     loadRoutes();
-  }, [selectedMapId, availableMaps, isMobile, t]);
-  
-  // Get unique map names for selection
-  const uniqueMapNames = getUniqueMapNames(availableMaps);
+  }, [selectedMapId, isMobile, isPreloading, getRoutesForMap, t]);
   
   const handleMapSelect = (mapName: MapSelection) => {
     setSelectedMapId(mapName);
   };
+
+  const showLoadingSpinner = isPreloading || isLoading;
   
   return (
     <div className="pb-20 space-y-8">
@@ -152,7 +123,7 @@ const RouteGame: React.FC = () => {
             <CardDescription>{t('selectMapDescription')}</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading && availableMaps.length === 0 ? (
+            {isPreloading ? (
               <div className="flex items-center p-4 text-sm text-muted-foreground">
                 <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary mr-2"></div>
                 {t('loadingMaps')}
@@ -203,7 +174,7 @@ const RouteGame: React.FC = () => {
       </section>
       
       {/* Route Selector Section */}
-      {isLoading ? (
+      {showLoadingSpinner ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
