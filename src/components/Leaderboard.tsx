@@ -45,12 +45,53 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
       setIsLoading(true);
       try {
         if (mapFilter === 'all') {
-          setDisplayLeaderboard(leaderboard);
+          // Always use the context leaderboard for "all" - if empty, wait for it
+          if (leaderboard.length > 0) {
+            setDisplayLeaderboard(leaderboard);
+            setHasError(false);
+          } else {
+            // Leaderboard not loaded yet, fetch directly
+            const { supabase } = await import('../integrations/supabase/client');
+            const { data, error } = await (supabase
+              .from('user_profiles' as any)
+              .select('user_id, name, accuracy, speed, profile_image, previous_rank')
+              .order('accuracy', { ascending: false })
+              .order('speed', { ascending: true })
+              .limit(50) as any);
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+              const calculateScore = (accuracy: number, speed: number) => {
+                if (speed === 0) return accuracy;
+                return accuracy * (1000 / Math.max(speed, 1));
+              };
+              
+              const sortedData = [...data].sort((a: any, b: any) => {
+                const scoreA = calculateScore(a.accuracy || 0, a.speed || 0);
+                const scoreB = calculateScore(b.accuracy || 0, b.speed || 0);
+                return scoreB - scoreA;
+              });
+              
+              const rankedLeaderboard = sortedData.map((entry: any, index: number) => ({
+                id: entry.user_id,
+                name: entry.name || 'User',
+                accuracy: entry.accuracy || 0,
+                speed: entry.speed || 0,
+                rank: index + 1,
+                previousRank: entry.previous_rank || null,
+                profileImage: entry.profile_image
+              }));
+              
+              setDisplayLeaderboard(rankedLeaderboard);
+              setHasError(false);
+            }
+          }
         } else {
           const mapLeaderboard = await fetchMapLeaderboard(mapFilter);
           setDisplayLeaderboard(mapLeaderboard);
+          setHasError(false);
         }
-        setHasError(false);
       } catch (error) {
         console.error('Error loading leaderboard:', error);
         setHasError(true);
