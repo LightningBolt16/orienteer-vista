@@ -298,12 +298,12 @@ const Profile: React.FC = () => {
     }
   };
 
-  // Get user stats
-  const totalAttempts = user.attempts?.total || 0;
-  const correctAttempts = user.attempts?.correct || 0;
-  const incorrectAttempts = totalAttempts - correctAttempts;
-  const avgResponseTime = user.speed ? `${user.speed}` : '0';
-  const accuracy = user.accuracy || 0;
+  // Get user stats - all-time data for profile
+  const alltimeTotal = user.alltimeTotal || 0;
+  const alltimeCorrect = user.alltimeCorrect || 0;
+  const alltimeIncorrect = alltimeTotal - alltimeCorrect;
+  const alltimeAccuracy = alltimeTotal > 0 ? Math.round((alltimeCorrect / alltimeTotal) * 100) : 0;
+  const alltimeAvgSpeed = alltimeCorrect > 0 && user.alltimeTimeSum ? Math.round(user.alltimeTimeSum / alltimeCorrect) : 0;
   const rank = getUserRank();
 
   return (
@@ -379,7 +379,7 @@ const Profile: React.FC = () => {
               <p className="text-muted-foreground mt-1">{t('orienteeringEnthusiast')}</p>
             </div>
             
-            {totalAttempts > 0 && (
+            {alltimeTotal > 0 && (
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering">
                 <span className="font-semibold">{t('rank')} {rank}</span>
               </div>
@@ -396,27 +396,27 @@ const Profile: React.FC = () => {
               <TabsTrigger value="progress">{t('progress') || 'Progress'}</TabsTrigger>
             </TabsList>
 
-            {/* Overview Tab */}
+            {/* Overview Tab - All Time Stats */}
             <TabsContent value="overview">
-              <h2 className="text-xl font-semibold mb-6">{t('yourStatistics')}</h2>
+              <h2 className="text-xl font-semibold mb-6">{t('allTimeStatistics') || 'All-Time Statistics'}</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg bg-secondary/50">
                   <div className="text-3xl font-bold text-orienteering flex items-center">
-                    {avgResponseTime}
+                    {alltimeAvgSpeed}
                     <span className="text-sm ml-1">ms</span>
                   </div>
                   <div className="text-sm text-muted-foreground">{t('avgResponseTime')}</div>
                 </div>
                 
                 <div className="p-4 rounded-lg bg-secondary/50">
-                  <div className="text-3xl font-bold text-orienteering">{totalAttempts}</div>
-                  <div className="text-sm text-muted-foreground">{t('totalAttempts')} ({t('last100') || 'last 100'})</div>
+                  <div className="text-3xl font-bold text-orienteering">{alltimeTotal}</div>
+                  <div className="text-sm text-muted-foreground">{t('totalAttempts')}</div>
                 </div>
                 
                 <div className="p-4 rounded-lg bg-secondary/50">
                   <div className="text-3xl font-bold text-orienteering">
-                    {accuracy}%
+                    {alltimeAccuracy}%
                   </div>
                   <div className="text-sm text-muted-foreground">{t('accuracy')}</div>
                 </div>
@@ -426,7 +426,7 @@ const Profile: React.FC = () => {
                 <div className="p-4 rounded-lg border border-border flex items-center">
                   <CheckCircle className="h-10 w-10 text-green-500 mr-4" />
                   <div>
-                    <div className="text-lg font-medium">{correctAttempts}</div>
+                    <div className="text-lg font-medium">{alltimeCorrect}</div>
                     <div className="text-sm text-muted-foreground">{t('correctChoices')}</div>
                   </div>
                 </div>
@@ -434,7 +434,7 @@ const Profile: React.FC = () => {
                 <div className="p-4 rounded-lg border border-border flex items-center">
                   <XCircle className="h-10 w-10 text-red-500 mr-4" />
                   <div>
-                    <div className="text-lg font-medium">{incorrectAttempts}</div>
+                    <div className="text-lg font-medium">{alltimeIncorrect}</div>
                     <div className="text-sm text-muted-foreground">{t('incorrectChoices')}</div>
                   </div>
                 </div>

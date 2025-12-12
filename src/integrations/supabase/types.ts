@@ -121,6 +121,9 @@ export type Database = {
       user_profiles: {
         Row: {
           accuracy: number | null
+          alltime_correct: number | null
+          alltime_time_sum: number | null
+          alltime_total: number | null
           attempts: Json | null
           created_at: string
           id: string
@@ -133,6 +136,9 @@ export type Database = {
         }
         Insert: {
           accuracy?: number | null
+          alltime_correct?: number | null
+          alltime_time_sum?: number | null
+          alltime_total?: number | null
           attempts?: Json | null
           created_at?: string
           id?: string
@@ -145,6 +151,9 @@ export type Database = {
         }
         Update: {
           accuracy?: number | null
+          alltime_correct?: number | null
+          alltime_time_sum?: number | null
+          alltime_total?: number | null
           attempts?: Json | null
           created_at?: string
           id?: string

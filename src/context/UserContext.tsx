@@ -16,6 +16,9 @@ type UserProfile = {
     timeSum: number;
   };
   profileImage?: string;
+  alltimeTotal?: number;
+  alltimeCorrect?: number;
+  alltimeTimeSum?: number;
 };
 
 type LeaderboardEntry = {
@@ -134,7 +137,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             total: 0,
             correct: 0,
             timeSum: 0
-          }
+          },
+          alltimeTotal: data.alltime_total || 0,
+          alltimeCorrect: data.alltime_correct || 0,
+          alltimeTimeSum: data.alltime_time_sum || 0
         });
         setIsOfflineMode(false);
       }
@@ -310,6 +316,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
         const newSpeed = correct > 0 ? Math.round(timeSum / correct) : 0;
         
+        // Update all-time stats
+        const newAlltimeTotal = (user.alltimeTotal || 0) + 1;
+        const newAlltimeCorrect = (user.alltimeCorrect || 0) + (isCorrect ? 1 : 0);
+        const newAlltimeTimeSum = (user.alltimeTimeSum || 0) + (isCorrect ? responseTime : 0);
+
         const updatedUser = {
           ...user,
           accuracy: newAccuracy,
@@ -318,13 +329,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             total,
             correct,
             timeSum
-          }
+          },
+          alltimeTotal: newAlltimeTotal,
+          alltimeCorrect: newAlltimeCorrect,
+          alltimeTimeSum: newAlltimeTimeSum
         };
         
         // Update local state immediately
         setUserState(updatedUser);
         
-        // Update overall stats in database
         await supabaseManager.executeWithRetry(
           async () => {
             const { error } = await (supabase
@@ -337,6 +350,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   correct,
                   timeSum
                 },
+                alltime_total: newAlltimeTotal,
+                alltime_correct: newAlltimeCorrect,
+                alltime_time_sum: newAlltimeTimeSum,
                 updated_at: new Date().toISOString()
               })
               .eq('user_id', user.id) as any);
