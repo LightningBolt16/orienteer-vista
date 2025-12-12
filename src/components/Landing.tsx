@@ -29,7 +29,7 @@ const Landing: React.FC = () => {
           <div className="flex justify-center mb-4">
             <Compass className="h-16 w-16 text-orienteering" />
           </div>
-          <CardTitle className="text-3xl font-bold">OL.se</CardTitle>
+          <CardTitle className="text-3xl font-bold">Ljungdell.uk</CardTitle>
           <CardDescription className="text-lg">
             {t('orienteeringToolsPlatform') || "Orienteering Tools Platform"}
           </CardDescription>
