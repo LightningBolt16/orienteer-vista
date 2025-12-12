@@ -29,9 +29,15 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
 
   // Inactivity detection
-  const { isPaused, pauseReason, resume, resetTimer } = useInactivityDetection({
+  const { isPaused, pauseReason, resume: baseResume, resetTimer } = useInactivityDetection({
     inactivityTimeout: 30000, // 30 seconds
   });
+
+  // Resume and advance to next route so timer restarts fresh
+  const handleResume = () => {
+    setCurrentRouteIndex((prev) => (prev + 1) % routeData.length);
+    baseResume();
+  };
 
   // Get image URL for a route (handles both single map and all maps mode)
   const getImageForRoute = (route: RouteData): string => {
@@ -203,7 +209,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
               )}
               {/* Pause Overlay */}
               {isPaused && (
-                <PauseOverlay reason={pauseReason} onResume={resume} />
+                <PauseOverlay reason={pauseReason} onResume={handleResume} />
               )}
             </>
           ) : (
@@ -246,7 +252,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
               )}
               {/* Pause Overlay */}
               {isPaused && (
-                <PauseOverlay reason={pauseReason} onResume={resume} />
+                <PauseOverlay reason={pauseReason} onResume={handleResume} />
               )}
             </AspectRatio>
           )}
