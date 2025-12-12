@@ -22,11 +22,13 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [resultMessage, setResultMessage] = useState<string>('');
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const { updatePerformance } = useUser();
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
   const transitionTimeout = useRef<number | null>(null);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
+  const previousRouteDataRef = useRef<RouteData[]>(routeData);
 
   // Inactivity detection
   const { isPaused, pauseReason, resume: baseResume, resetTimer } = useInactivityDetection({
@@ -45,13 +47,45 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     return getImageUrlByMapName(mapName, route.candidateIndex, true);
   };
 
-  // Preload images
+  // Reset index when routeData changes (map switch)
+  useEffect(() => {
+    if (routeData !== previousRouteDataRef.current && routeData.length > 0) {
+      setCurrentRouteIndex(0);
+      setIsImageLoaded(false);
+      setShowResult(null);
+      setIsTransitioning(false);
+      previousRouteDataRef.current = routeData;
+    }
+  }, [routeData]);
+
+  // Preload current image and wait for it to load
   useEffect(() => {
     if (routeData.length === 0) return;
     
-    const currentlyNeededImages = new Set<string>();
+    const currentRoute = routeData[currentRouteIndex];
+    if (!currentRoute) return;
     
-    for (let i = 0; i < PRELOAD_AHEAD_COUNT; i++) {
+    const currentImageUrl = getImageForRoute(currentRoute);
+    
+    // Check if already preloaded
+    const existingImg = preloadedImages.current.get(currentImageUrl);
+    if (existingImg?.complete) {
+      setIsImageLoaded(true);
+    } else {
+      setIsImageLoaded(false);
+      const img = new Image();
+      img.onload = () => {
+        setIsImageLoaded(true);
+        preloadedImages.current.set(currentImageUrl, img);
+      };
+      img.src = currentImageUrl;
+    }
+    
+    // Preload upcoming images
+    const currentlyNeededImages = new Set<string>();
+    currentlyNeededImages.add(currentImageUrl);
+    
+    for (let i = 1; i < PRELOAD_AHEAD_COUNT; i++) {
       const index = (currentRouteIndex + i) % routeData.length;
       const route = routeData[index];
       const imageUrl = getImageForRoute(route);
@@ -114,10 +148,35 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
     if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
     
-    resultTimeout.current = window.setTimeout(() => {
+    // Set up preload for next image
+    const nextIndex = (currentRouteIndex + 1) % routeData.length;
+    const nextRoute = routeData[nextIndex];
+    const nextImageUrl = getImageForRoute(nextRoute);
+    
+    const preloadNextImage = (): Promise<void> => {
+      return new Promise((resolve) => {
+        const existingImg = preloadedImages.current.get(nextImageUrl);
+        if (existingImg?.complete) {
+          resolve();
+        } else {
+          const img = new Image();
+          img.onload = () => {
+            preloadedImages.current.set(nextImageUrl, img);
+            resolve();
+          };
+          img.onerror = () => resolve(); // Continue even if load fails
+          img.src = nextImageUrl;
+        }
+      });
+    };
+    
+    resultTimeout.current = window.setTimeout(async () => {
+      // Wait for next image to be loaded before transitioning
+      await preloadNextImage();
+      setIsImageLoaded(true);
       setShowResult(null);
       transitionTimeout.current = window.setTimeout(() => {
-        setCurrentRouteIndex((currentRouteIndex + 1) % routeData.length);
+        setCurrentRouteIndex(nextIndex);
         setIsTransitioning(false);
       }, 200);
     }, 400);
@@ -149,6 +208,9 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     ? getColorValue(currentRoute.shortestColor) 
     : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
 
+  // Show result overlay while loading next image
+  const showLoadingResult = !isImageLoaded && showResult;
+
   return (
     <div className={`relative w-full ${isFullscreen ? 'h-full' : ''}`}>
       <div className={`overflow-hidden relative ${isFullscreen ? 'h-full bg-black' : 'glass-card'}`}>
@@ -171,14 +233,17 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
         <div className={`relative overflow-hidden ${isFullscreen ? 'h-full flex items-center justify-center' : ''}`}>
           {isFullscreen ? (
             <>
-              <img 
-                src={currentImageUrl} 
-                alt="Orienteering route" 
-                className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
-              />
-              {showResult && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  {showResult === 'win' ? (
+              {/* Only show image when loaded and not in loading-result state */}
+              {isImageLoaded && !showLoadingResult && (
+                <img 
+                  src={currentImageUrl} 
+                  alt="Orienteering route" 
+                  className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
+                />
+              )}
+              {(showResult || showLoadingResult) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-background/80">
+                  {(showResult === 'win' || showLoadingResult === 'win') ? (
                     <>
                       <CheckCircle className="text-green-500 w-20 h-20 sm:w-32 sm:h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
                       <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
@@ -195,7 +260,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
                   )}
                 </div>
               )}
-              {!isPaused && (
+              {!isPaused && isImageLoaded && !showLoadingResult && (
                 <div className="absolute inset-0 flex">
                   <div 
                     className="w-1/2 h-full cursor-pointer" 
@@ -214,14 +279,17 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
             </>
           ) : (
             <AspectRatio ratio={9/16}>
-              <img 
-                src={currentImageUrl} 
-                alt="Orienteering route" 
-                className={`w-full h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
-              />
-              {showResult && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  {showResult === 'win' ? (
+              {/* Only show image when loaded and not in loading-result state */}
+              {isImageLoaded && !showLoadingResult && (
+                <img 
+                  src={currentImageUrl} 
+                  alt="Orienteering route" 
+                  className={`w-full h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''}`}
+                />
+              )}
+              {(showResult || showLoadingResult) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-background/80">
+                  {(showResult === 'win' || showLoadingResult === 'win') ? (
                     <>
                       <CheckCircle className="text-green-500 w-20 h-20 sm:w-32 sm:h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
                       <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
@@ -238,7 +306,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
                   )}
                 </div>
               )}
-              {!isPaused && (
+              {!isPaused && isImageLoaded && !showLoadingResult && (
                 <div className="absolute inset-0 flex">
                   <div 
                     className="w-1/2 h-full cursor-pointer" 
