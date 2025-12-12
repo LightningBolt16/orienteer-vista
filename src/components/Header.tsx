@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
+import { Loader2 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
   NavigationMenu,
@@ -26,8 +27,12 @@ import LanguageSelector from './LanguageSelector';
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, getUserRank, signOut } = useUser();
+  const { user, getUserRank, signOut, leaderboard } = useUser();
   const { language, setLanguage, t } = useLanguage();
+  
+  // Get rank only if leaderboard is loaded
+  const currentRank = leaderboard.length > 0 ? getUserRank() : 0;
+  const hasValidRank = user?.attempts?.total !== undefined && user.attempts.total > 0 && currentRank > 0;
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -93,10 +98,10 @@ const Header: React.FC = () => {
         {isMobile ? (
           <>
             <div className="flex items-center space-x-4">
-              {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
+              {hasValidRank && (
                 <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
-                  {t('rank')} {getUserRank()}
+                  {t('rank')} {currentRank}
                 </Link>
               )}
               
@@ -171,10 +176,10 @@ const Header: React.FC = () => {
             
             
             <div className="flex items-center space-x-2 ml-4">
-              {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
+              {hasValidRank && (
                 <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
-                  {t('rank')} {getUserRank()}
+                  {t('rank')} {currentRank}
                 </Link>
               )}
               
