@@ -87,7 +87,7 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2 hover-scale">
           <Compass className="h-8 w-8 text-orienteering" />
-          <span className="text-xl font-semibold tracking-tight">OL.se</span>
+          <span className="text-xl font-semibold tracking-tight">Ljungdell.uk</span>
         </Link>
         
         {isMobile ? (
