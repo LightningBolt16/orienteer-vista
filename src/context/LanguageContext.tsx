@@ -124,7 +124,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       orienteers: 'Orienteers',
       you: 'You',
       allMaps: 'All Maps',
-      
+      loginRequired: 'Login Required',
+      loginToPlayRouteGame: 'You need to be logged in to play the route choice game and track your progress.',
       // Pause/Inactivity
       gamePaused: 'Game Paused',
       inactivityPauseMessage: 'The game was paused due to inactivity. Your time won\'t be affected.',
@@ -390,6 +391,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       orienteers: 'Orienterare',
       you: 'Du',
       allMaps: 'Alla kartor',
+      loginRequired: 'Inloggning krävs',
+      loginToPlayRouteGame: 'Du måste vara inloggad för att spela vägvalsspelet och spåra dina framsteg.',
       
       // Course Setter
       mapLibrary: 'Kartbibliotek',

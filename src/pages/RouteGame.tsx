@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
 import Leaderboard from '../components/Leaderboard';
@@ -6,16 +7,19 @@ import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useRouteCache } from '../context/RouteCache';
+import { useUser } from '../context/UserContext';
 import { MapSource, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2 } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
 
 type MapSelection = 'all' | string;
 
 const RouteGame: React.FC = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { user, loading: userLoading } = useUser();
   const { desktopCache, mobileCache, isPreloading, getRoutesForMap } = useRouteCache();
   
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -111,6 +115,41 @@ const RouteGame: React.FC = () => {
     setSelectedMapId(mapName);
   };
 
+  // Show login prompt if not authenticated
+  if (userLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="pb-20 flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md mx-auto text-center">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-center gap-2">
+              <LogIn className="h-6 w-6" />
+              {t('loginRequired')}
+            </CardTitle>
+            <CardDescription>
+              {t('loginToPlayRouteGame')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => navigate('/auth')}
+              className="bg-orienteering hover:bg-orienteering/90"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              {t('signIn')}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const showLoadingSpinner = isPreloading || isLoading;
   
   return (
