@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2 } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useAdmin } from '../hooks/useAdmin';
 import { Loader2 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
@@ -29,6 +30,7 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const { user, getUserRank, signOut, leaderboard } = useUser();
   const { language, setLanguage, t } = useLanguage();
+  const { isAdmin } = useAdmin();
   
   // Get rank only if leaderboard is loaded
   const currentRank = leaderboard.length > 0 ? getUserRank() : 0;
@@ -170,6 +172,17 @@ const Header: React.FC = () => {
                     <span>{t('signIn')}</span>
                   </Link>
                 )}
+                
+                {isAdmin && (
+                  <Link 
+                    to="/admin/club-requests"
+                    className="p-3 rounded-md flex items-center space-x-2 text-yellow-600"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Shield className="h-5 w-5" />
+                    <span>{t('admin')}</span>
+                  </Link>
+                )}
               </div>
             )}
           </>
@@ -220,6 +233,14 @@ const Header: React.FC = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/profile">{t('profile')}</Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/club-requests" className="text-yellow-600">
+                        <Shield className="h-4 w-4 mr-2" />
+                        {t('admin')}
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   {isAuthenticated ? (
                     <DropdownMenuItem onClick={handleSignOut} className="text-red-500">
