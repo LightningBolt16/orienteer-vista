@@ -229,6 +229,7 @@ export type Database = {
           previous_rank: number | null
           profile_image: string | null
           speed: number | null
+          tutorial_seen: boolean
           updated_at: string
           user_id: string
         }
@@ -244,6 +245,7 @@ export type Database = {
           previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
+          tutorial_seen?: boolean
           updated_at?: string
           user_id: string
         }
@@ -259,6 +261,7 @@ export type Database = {
           previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
+          tutorial_seen?: boolean
           updated_at?: string
           user_id?: string
         }
