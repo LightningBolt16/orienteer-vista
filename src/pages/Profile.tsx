@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays, subMonths, startOfDay, parseISO } from 'date-fns';
+import { ImageCropper } from '../components/ImageCropper';
 
 interface MapStats {
   map_name: string;
@@ -38,6 +39,8 @@ const Profile: React.FC = () => {
   const [performanceData, setPerformanceData] = useState<PerformanceDataPoint[]>([]);
   const [timeFilter, setTimeFilter] = useState<'week' | 'month' | 'all'>('week');
   const [loadingStats, setLoadingStats] = useState(true);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -213,26 +216,31 @@ const Profile: React.FC = () => {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: t('fileTooLarge'),
-        description: t('maxFileSize'),
-        variant: "destructive"
-      });
-      return;
+    // Create object URL for cropper
+    const imageUrl = URL.createObjectURL(file);
+    setImageToCrop(imageUrl);
+    setCropperOpen(true);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+  };
 
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!user) return;
+    
     setUploading(true);
 
     try {
-      // Use folder structure with user ID to match RLS policy
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/${Date.now()}.jpg`;
 
       const { data, error } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, {
+        .upload(fileName, croppedBlob, {
           cacheControl: '3600',
-          upsert: true
+          upsert: true,
+          contentType: 'image/jpeg'
         });
 
       if (error) {
@@ -267,6 +275,11 @@ const Profile: React.FC = () => {
       });
     } finally {
       setUploading(false);
+      // Clean up object URL
+      if (imageToCrop) {
+        URL.revokeObjectURL(imageToCrop);
+        setImageToCrop(null);
+      }
     }
   };
 
@@ -317,6 +330,22 @@ const Profile: React.FC = () => {
               </div>
             )}
           </div>
+          
+          {/* Image Cropper Dialog */}
+          {imageToCrop && (
+            <ImageCropper
+              open={cropperOpen}
+              onClose={() => {
+                setCropperOpen(false);
+                if (imageToCrop) {
+                  URL.revokeObjectURL(imageToCrop);
+                  setImageToCrop(null);
+                }
+              }}
+              imageSrc={imageToCrop}
+              onCropComplete={handleCropComplete}
+            />
+          )}
           
           {/* Profile Info */}
           <div className="flex-grow space-y-6 text-center md:text-left">
