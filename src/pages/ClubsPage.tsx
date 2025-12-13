@@ -11,8 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock } from 'lucide-react';
+import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import ImageCropper from '@/components/ImageCropper';
 
 interface Club {
   id: string;
@@ -52,6 +53,11 @@ const ClubsPage: React.FC = () => {
   const [newClubDescription, setNewClubDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<{ club_name: string; status: string } | null>(null);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const isAdmin = userMembership?.role === 'admin';
 
   const isAuthenticated = user && user.id !== '1' && session;
 
@@ -239,6 +245,74 @@ const ClubsPage: React.FC = () => {
     return accuracy * (1000 / speed);
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageToCrop(reader.result as string);
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!userClub) return;
+
+    try {
+      setUploading(true);
+      setCropperOpen(false);
+
+      const fileName = `${userClub.id}/${Date.now()}.jpg`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('club-logos')
+        .upload(fileName, croppedBlob, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('club-logos')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('clubs')
+        .update({ logo_url: publicUrl })
+        .eq('id', userClub.id);
+
+      if (updateError) throw updateError;
+
+      setUserClub({ ...userClub, logo_url: publicUrl });
+      toast({ title: t('success'), description: t('logoUpdated') });
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      setImageToCrop(null);
+    }
+  };
+
+  const handleKickMember = async (memberId: string) => {
+    if (!isAdmin || !userClub) return;
+
+    try {
+      const { error } = await supabase
+        .from('club_members')
+        .delete()
+        .eq('club_id', userClub.id)
+        .eq('user_id', memberId);
+
+      if (error) throw error;
+
+      toast({ title: t('success'), description: t('memberRemoved') });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen pt-24 flex items-center justify-center">
@@ -310,8 +384,7 @@ const ClubsPage: React.FC = () => {
                         {sortedByAverage.map((club, index) => (
                           <div 
                             key={club.id} 
-                            className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                            onClick={() => navigate(`/clubs/${club.id}`)}
+                            className="flex items-center gap-4 p-3 rounded-lg bg-muted/50"
                           >
                             <span className="text-lg font-bold w-8">{index + 1}</span>
                             <Avatar className="h-10 w-10">
@@ -350,8 +423,7 @@ const ClubsPage: React.FC = () => {
                         {sortedByTotal.map((club, index) => (
                           <div 
                             key={club.id} 
-                            className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                            onClick={() => navigate(`/clubs/${club.id}`)}
+                            className="flex items-center gap-4 p-3 rounded-lg bg-muted/50"
                           >
                             <span className="text-lg font-bold w-8">{index + 1}</span>
                             <Avatar className="h-10 w-10">
@@ -475,10 +547,24 @@ const ClubsPage: React.FC = () => {
               <>
                 <Card>
                   <CardHeader className="flex flex-row items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={userClub.logo_url || ''} />
-                      <AvatarFallback className="text-xl">{userClub.name[0]}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative group">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={userClub.logo_url || ''} />
+                        <AvatarFallback className="text-xl">{userClub.name[0]}</AvatarFallback>
+                      </Avatar>
+                      {isAdmin && (
+                        <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                          <Upload className="h-5 w-5 text-white" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                            disabled={uploading}
+                          />
+                        </label>
+                      )}
+                    </div>
                     <div className="flex-1">
                       <CardTitle className="text-2xl">{userClub.name}</CardTitle>
                       <p className="text-muted-foreground">{userClub.member_count} {t('members')}</p>
@@ -528,9 +614,24 @@ const ClubsPage: React.FC = () => {
                               </p>
                               <p className="text-sm text-muted-foreground capitalize">{member.role}</p>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold">{score.toFixed(1)}</p>
-                              <p className="text-xs text-muted-foreground">{t('overall')}</p>
+                            <div className="text-right flex items-center gap-3">
+                              <div>
+                                <p className="font-semibold">{score.toFixed(1)}</p>
+                                <p className="text-xs text-muted-foreground">{t('overall')}</p>
+                              </div>
+                              {isAdmin && member.user_id !== user?.id && member.role !== 'admin' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleKickMember(member.user_id);
+                                  }}
+                                >
+                                  <UserMinus className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         );
@@ -552,6 +653,16 @@ const ClubsPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ImageCropper
+        open={cropperOpen}
+        onClose={() => {
+          setCropperOpen(false);
+          setImageToCrop(null);
+        }}
+        imageSrc={imageToCrop || ''}
+        onCropComplete={handleCropComplete}
+      />
     </div>
   );
 };

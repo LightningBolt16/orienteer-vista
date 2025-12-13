@@ -18,7 +18,6 @@ import Subscription from "./pages/Subscription";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import UserProfile from "./pages/UserProfile";
 import ClubsPage from "./pages/ClubsPage";
-import ClubDetailPage from "./pages/ClubDetailPage";
 import AdminClubRequests from "./pages/AdminClubRequests";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
@@ -59,7 +58,6 @@ const App: React.FC = () => {
                     <Route path="/leaderboard" element={<Layout><LeaderboardPage /></Layout>} />
                     <Route path="/user/:userId" element={<Layout><UserProfile /></Layout>} />
                     <Route path="/clubs" element={<Layout><ClubsPage /></Layout>} />
-                    <Route path="/clubs/:clubId" element={<Layout><ClubDetailPage /></Layout>} />
                     <Route path="/admin/club-requests" element={<Layout><AdminClubRequests /></Layout>} />
                     <Route path="*" element={<Layout><NotFound /></Layout>} />
                   </Routes>
