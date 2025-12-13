@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
 import Leaderboard from '../components/Leaderboard';
+import RouteGameTutorial, { useRouteGameTutorial } from '../components/RouteGameTutorial';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
@@ -21,6 +22,7 @@ const RouteGame: React.FC = () => {
   const isMobile = useIsMobile();
   const { user, loading: userLoading } = useUser();
   const { desktopCache, mobileCache, isPreloading, getRoutesForMap } = useRouteCache();
+  const { showTutorial, closeTutorial } = useRouteGameTutorial();
   
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedMapId, setSelectedMapId] = useState<MapSelection>('all');
@@ -154,6 +156,10 @@ const RouteGame: React.FC = () => {
   
   return (
     <div className="pb-20 space-y-8">
+      {/* Tutorial Overlay */}
+      {showTutorial && (
+        <RouteGameTutorial isMobile={isMobile} onClose={closeTutorial} />
+      )}
       {/* Map Selection */}
       <section className="max-w-4xl mx-auto">
         <Card>

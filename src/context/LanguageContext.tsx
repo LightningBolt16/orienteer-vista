@@ -342,6 +342,23 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       reject: 'Reject',
       clubApproved: 'Club has been approved',
       clubRejected: 'Club request has been rejected',
+      
+      // Tutorial
+      tutorialTitle: 'How to Play',
+      tutorialSubtitle: 'Learn the basics of the route choice game',
+      tutorialGoal: 'Your Goal',
+      tutorialGoalDesc: 'Identify the shortest route between two control points on the orienteering map. The faster and more accurate you are, the higher your score!',
+      tutorialControls: 'Controls',
+      tutorialMobileDesc: 'Tap the left or right side of the screen to choose which route is shorter.',
+      tutorialTapLeft: 'Left route',
+      tutorialTapRight: 'Right route',
+      tutorialDesktopClick: 'Click the red or blue button to select',
+      tutorialDesktopKeys: 'Or use arrow keys (← →) on your keyboard',
+      tutorialLeftRoute: 'Left route',
+      tutorialRightRoute: 'Right route',
+      tutorialTip: 'Pro Tip',
+      tutorialTipDesc: 'Speed matters! Faster correct answers give you bonus points. Only your last 100 attempts count toward your leaderboard score.',
+      tutorialStart: "Let's Go!",
     },
     sv: {
       // Navigation & Common Elements
@@ -632,6 +649,23 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       reject: 'Avslå',
       clubApproved: 'Klubben har godkänts',
       clubRejected: 'Klubbförfrågan har avslagits',
+      
+      // Tutorial
+      tutorialTitle: 'Hur man spelar',
+      tutorialSubtitle: 'Lär dig grunderna i vägvalsspelet',
+      tutorialGoal: 'Ditt mål',
+      tutorialGoalDesc: 'Identifiera den kortaste vägen mellan två kontrollpunkter på orienteringskartan. Ju snabbare och mer träffsäker du är, desto högre poäng!',
+      tutorialControls: 'Kontroller',
+      tutorialMobileDesc: 'Tryck på vänster eller höger sida av skärmen för att välja vilken väg som är kortare.',
+      tutorialTapLeft: 'Vänster väg',
+      tutorialTapRight: 'Höger väg',
+      tutorialDesktopClick: 'Klicka på röd eller blå knapp för att välja',
+      tutorialDesktopKeys: 'Eller använd piltangenterna (← →) på tangentbordet',
+      tutorialLeftRoute: 'Vänster väg',
+      tutorialRightRoute: 'Höger väg',
+      tutorialTip: 'Proffstips',
+      tutorialTipDesc: 'Hastighet räknas! Snabbare korrekta svar ger bonuspoäng. Endast dina senaste 100 försök räknas mot din topplista.',
+      tutorialStart: 'Kör igång!',
     },
   };
 
