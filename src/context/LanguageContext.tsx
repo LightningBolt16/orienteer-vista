@@ -330,6 +330,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       backToClubs: 'Back to Clubs',
       logoUpdated: 'Club logo updated',
       noMembers: 'No members yet',
+      
+      // Admin
+      admin: 'Admin',
+      adminClubRequests: 'Club Requests',
+      noPendingRequests: 'No pending club requests',
+      requestedBy: 'Requested by',
+      pending: 'Pending',
+      approve: 'Approve',
+      reject: 'Reject',
+      clubApproved: 'Club has been approved',
+      clubRejected: 'Club request has been rejected',
     },
     sv: {
       // Navigation & Common Elements
@@ -608,6 +619,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       backToClubs: 'Tillbaka till klubbar',
       logoUpdated: 'Klubblogotypen uppdaterad',
       noMembers: 'Inga medlemmar ännu',
+      
+      // Admin
+      admin: 'Admin',
+      adminClubRequests: 'Klubbförfrågningar',
+      noPendingRequests: 'Inga väntande klubbförfrågningar',
+      requestedBy: 'Begärd av',
+      pending: 'Väntar',
+      approve: 'Godkänn',
+      reject: 'Avslå',
+      clubApproved: 'Klubben har godkänts',
+      clubRejected: 'Klubbförfrågan har avslagits',
     },
   };
 
