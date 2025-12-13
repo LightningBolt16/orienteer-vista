@@ -10,6 +10,7 @@ interface ImageCropperProps {
   onClose: () => void;
   imageSrc: string;
   onCropComplete: (croppedBlob: Blob) => void;
+  aspect?: number;
 }
 
 function centerAspectCrop(
@@ -131,3 +132,5 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
     </Dialog>
   );
 };
+
+export default ImageCropper;

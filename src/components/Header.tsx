@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Loader2 } from 'lucide-react';
@@ -119,6 +119,17 @@ const Header: React.FC = () => {
             {mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 bg-background/95 backdrop-blur-sm shadow-lg p-4 flex flex-col space-y-4 animate-fade-in">
                 <Link 
+                  to="/clubs" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/clubs') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Building2 className="h-5 w-5" />
+                  <span>{t('clubs')}</span>
+                </Link>
+                
+                <Link 
                   to="/route-game" 
                   className={`p-3 rounded-md flex items-center space-x-2 ${
                     isCurrentPath('/route-game') ? 'bg-muted text-orienteering' : ''
@@ -164,6 +175,16 @@ const Header: React.FC = () => {
           </>
         ) : (
           <nav className="flex items-center space-x-8">
+            <Link 
+              to="/clubs" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/clubs') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              <span>{t('clubs')}</span>
+            </Link>
+            
             <Link 
               to="/route-game" 
               className={`nav-link text-sm font-medium flex items-center space-x-1 ${
