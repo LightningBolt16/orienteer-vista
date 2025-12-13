@@ -19,6 +19,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useIsMobile } from '../hooks/use-mobile';
 
 type SortField = 'accuracy' | 'speed' | 'combined';
@@ -274,16 +279,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
           <div className="flex items-center min-w-0">
             <Trophy className="h-4 w-4 text-orienteering mr-1.5 flex-shrink-0" />
             <h2 className="text-base font-medium truncate">{t('leaderboard')}</h2>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 cursor-help flex-shrink-0" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 cursor-pointer flex-shrink-0" />
+              </PopoverTrigger>
+              <PopoverContent className="max-w-xs">
+                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex items-center text-xs text-muted-foreground flex-shrink-0">
             <Users className="h-3 w-3 mr-1" />
