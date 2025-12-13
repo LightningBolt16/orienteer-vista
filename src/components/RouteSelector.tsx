@@ -210,19 +210,12 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
   
   const currentImageUrl = getImageForRoute(currentRoute);
   
-  const getColorValue = (colorStr: string): string => {
-    if (colorStr.toLowerCase() === 'red') return '#FF5733';
-    if (colorStr.toLowerCase() === 'blue') return '#3357FF';
-    return colorStr;
-  };
+  const RED_COLOR = '#FF5733';
+  const BLUE_COLOR = '#3357FF';
   
-  const leftButtonColor = currentRoute.shortestSide === 'left' 
-    ? getColorValue(currentRoute.shortestColor) 
-    : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
-    
-  const rightButtonColor = currentRoute.shortestSide === 'right' 
-    ? getColorValue(currentRoute.shortestColor) 
-    : getColorValue(currentRoute.shortestColor === 'red' ? 'blue' : 'red');
+  // Assign colors consistently: left is always red, right is always blue
+  const leftButtonColor = RED_COLOR;
+  const rightButtonColor = BLUE_COLOR;
 
   // Show result overlay while loading next image
   const showLoadingResult = !isImageLoaded && showResult;
