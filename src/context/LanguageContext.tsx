@@ -329,6 +329,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       loginToViewClubs: 'You need to be logged in to view and join clubs.',
       backToClubs: 'Back to Clubs',
       logoUpdated: 'Club logo updated',
+      memberRemoved: 'Member removed from club',
       noMembers: 'No members yet',
       
       // Admin
@@ -618,6 +619,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       loginToViewClubs: 'Du måste vara inloggad för att se och gå med i klubbar.',
       backToClubs: 'Tillbaka till klubbar',
       logoUpdated: 'Klubblogotypen uppdaterad',
+      memberRemoved: 'Medlem borttagen från klubben',
       noMembers: 'Inga medlemmar ännu',
       
       // Admin
