@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Medal, Users, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, Medal, Users, Upload, Loader2, UserMinus } from 'lucide-react';
 import ImageCropper from '@/components/ImageCropper';
 
 interface Club {
@@ -174,6 +174,25 @@ const ClubDetailPage: React.FC = () => {
     }
   };
 
+  const handleKickMember = async (memberId: string, memberName: string) => {
+    if (!isAdmin || !club) return;
+
+    try {
+      const { error } = await supabase
+        .from('club_members')
+        .delete()
+        .eq('club_id', club.id)
+        .eq('user_id', memberId);
+
+      if (error) throw error;
+
+      toast({ title: t('success'), description: t('memberRemoved') });
+      fetchClubData();
+    } catch (error: any) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+    }
+  };
+
   const calculateScore = (accuracy: number, speed: number) => {
     if (!speed || speed === 0) return 0;
     return accuracy * (1000 / speed);
@@ -291,9 +310,24 @@ const ClubDetailPage: React.FC = () => {
                         </p>
                         <p className="text-sm text-muted-foreground capitalize">{member.role}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{score.toFixed(1)}</p>
-                        <p className="text-xs text-muted-foreground">{t('overall')}</p>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="font-semibold">{score.toFixed(1)}</p>
+                          <p className="text-xs text-muted-foreground">{t('overall')}</p>
+                        </div>
+                        {isAdmin && member.user_id !== user?.id && member.role !== 'admin' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleKickMember(member.user_id, member.user_profile?.name || 'Unknown');
+                            }}
+                          >
+                            <UserMinus className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
