@@ -71,7 +71,7 @@ const RouteGameTutorial: React.FC<RouteGameTutorialProps> = ({ isMobile, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-6 animate-fade-in">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-fade-in max-h-[90vh] overflow-y-auto">
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold text-foreground">
             {t('tutorialTitle')}
