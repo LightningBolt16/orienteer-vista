@@ -2,35 +2,68 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { ChevronLeft, ChevronRight, Keyboard, MousePointer, Hand } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useUser } from '../context/UserContext';
 
 interface RouteGameTutorialProps {
   isMobile: boolean;
   onClose: () => void;
 }
 
-const TUTORIAL_STORAGE_KEY = 'route-game-tutorial-seen';
-
 export const useRouteGameTutorial = () => {
   const [showTutorial, setShowTutorial] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useUser();
 
   useEffect(() => {
-    const seen = localStorage.getItem(TUTORIAL_STORAGE_KEY);
-    if (!seen) {
-      setShowTutorial(true);
-    }
-  }, []);
+    const checkTutorialStatus = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
 
-  const closeTutorial = () => {
-    localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('tutorial_seen')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking tutorial status:', error);
+          setIsLoading(false);
+          return;
+        }
+
+        if (data && !data.tutorial_seen) {
+          setShowTutorial(true);
+        }
+      } catch (err) {
+        console.error('Error checking tutorial:', err);
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkTutorialStatus();
+  }, [user]);
+
+  const closeTutorial = async () => {
+    if (!user) return;
+    
     setShowTutorial(false);
+
+    try {
+      await supabase
+        .from('user_profiles')
+        .update({ tutorial_seen: true })
+        .eq('user_id', user.id);
+    } catch (err) {
+      console.error('Error updating tutorial status:', err);
+    }
   };
 
-  const resetTutorial = () => {
-    localStorage.removeItem(TUTORIAL_STORAGE_KEY);
-    setShowTutorial(true);
-  };
-
-  return { showTutorial, closeTutorial, resetTutorial };
+  return { showTutorial: !isLoading && showTutorial, closeTutorial };
 };
 
 const RouteGameTutorial: React.FC<RouteGameTutorialProps> = ({ isMobile, onClose }) => {
