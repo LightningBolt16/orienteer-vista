@@ -318,31 +318,7 @@ const ClubsPage: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-24 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orienteering" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen pt-24 px-4">
-        <div className="max-w-2xl mx-auto text-center py-12">
-          <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h1 className="text-2xl font-bold mb-4">{t('loginRequired')}</h1>
-          <p className="text-muted-foreground mb-6">{t('loginToViewClubs')}</p>
-          <Button onClick={() => navigate('/auth')}>
-            <LogIn className="h-4 w-4 mr-2" />
-            {t('signIn')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle member sort
+  // Handle member sort - must be before any early returns
   const handleMemberSort = (field: MemberSortField) => {
     if (memberSortField === field) {
       setMemberSortDirection(memberSortDirection === 'asc' ? 'desc' : 'asc');
@@ -352,7 +328,7 @@ const ClubsPage: React.FC = () => {
     }
   };
 
-  // Sort members based on current sort field and direction
+  // Sort members based on current sort field and direction - hook must be before early returns
   const sortedMembers = useMemo(() => {
     const sorted = [...clubMembers].sort((a, b) => {
       const accuracyA = Number(a.user_profile?.accuracy) || 0;
@@ -398,8 +374,39 @@ const ClubsPage: React.FC = () => {
     return bestFirstSorted.findIndex(m => m.user_id === memberId) + 1;
   };
 
-  const sortedByAverage = [...clubs].sort((a, b) => b.average_score - a.average_score);
-  const sortedByTotal = [...clubs].sort((a, b) => b.total_score - a.total_score);
+  const sortedByAverage = useMemo(() => 
+    [...clubs].sort((a, b) => b.average_score - a.average_score), 
+    [clubs]
+  );
+  
+  const sortedByTotal = useMemo(() => 
+    [...clubs].sort((a, b) => b.total_score - a.total_score), 
+    [clubs]
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-24 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orienteering" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen pt-24 px-4">
+        <div className="max-w-2xl mx-auto text-center py-12">
+          <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h1 className="text-2xl font-bold mb-4">{t('loginRequired')}</h1>
+          <p className="text-muted-foreground mb-6">{t('loginToViewClubs')}</p>
+          <Button onClick={() => navigate('/auth')}>
+            <LogIn className="h-4 w-4 mr-2" />
+            {t('signIn')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-24 px-4 pb-12">
