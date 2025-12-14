@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -11,9 +11,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus } from 'lucide-react';
+import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import ImageCropper from '@/components/ImageCropper';
+
+type MemberSortField = 'accuracy' | 'speed' | 'combined';
+type SortDirection = 'asc' | 'desc';
 
 interface Club {
   id: string;
@@ -56,6 +59,8 @@ const ClubsPage: React.FC = () => {
   const [cropperOpen, setCropperOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [memberSortField, setMemberSortField] = useState<MemberSortField>('combined');
+  const [memberSortDirection, setMemberSortDirection] = useState<SortDirection>('desc');
 
   const isAdmin = userMembership?.role === 'admin';
 
@@ -337,14 +342,64 @@ const ClubsPage: React.FC = () => {
     );
   }
 
+  // Handle member sort
+  const handleMemberSort = (field: MemberSortField) => {
+    if (memberSortField === field) {
+      setMemberSortDirection(memberSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setMemberSortField(field);
+      setMemberSortDirection('desc');
+    }
+  };
+
+  // Sort members based on current sort field and direction
+  const sortedMembers = useMemo(() => {
+    const sorted = [...clubMembers].sort((a, b) => {
+      const accuracyA = Number(a.user_profile?.accuracy) || 0;
+      const accuracyB = Number(b.user_profile?.accuracy) || 0;
+      const speedA = Number(a.user_profile?.speed) || Infinity;
+      const speedB = Number(b.user_profile?.speed) || Infinity;
+      
+      if (memberSortField === 'accuracy') {
+        return accuracyB - accuracyA;
+      } else if (memberSortField === 'speed') {
+        // Lower speed is better
+        return speedA - speedB;
+      } else {
+        const scoreA = calculateScore(accuracyA, speedA === Infinity ? 0 : speedA);
+        const scoreB = calculateScore(accuracyB, speedB === Infinity ? 0 : speedB);
+        return scoreB - scoreA;
+      }
+    });
+    
+    // If direction is ascending, reverse to show worst first
+    return memberSortDirection === 'asc' ? [...sorted].reverse() : sorted;
+  }, [clubMembers, memberSortField, memberSortDirection]);
+
+  // Get the rank for each member (always based on "best first" order)
+  const getMemberRank = (memberId: string) => {
+    const bestFirstSorted = [...clubMembers].sort((a, b) => {
+      const accuracyA = Number(a.user_profile?.accuracy) || 0;
+      const accuracyB = Number(b.user_profile?.accuracy) || 0;
+      const speedA = Number(a.user_profile?.speed) || Infinity;
+      const speedB = Number(b.user_profile?.speed) || Infinity;
+      
+      if (memberSortField === 'accuracy') {
+        return accuracyB - accuracyA;
+      } else if (memberSortField === 'speed') {
+        return speedA - speedB;
+      } else {
+        const scoreA = calculateScore(accuracyA, speedA === Infinity ? 0 : speedA);
+        const scoreB = calculateScore(accuracyB, speedB === Infinity ? 0 : speedB);
+        return scoreB - scoreA;
+      }
+    });
+    
+    return bestFirstSorted.findIndex(m => m.user_id === memberId) + 1;
+  };
+
   const sortedByAverage = [...clubs].sort((a, b) => b.average_score - a.average_score);
   const sortedByTotal = [...clubs].sort((a, b) => b.total_score - a.total_score);
-
-  const sortedMembers = [...clubMembers].sort((a, b) => {
-    const scoreA = a.user_profile ? calculateScore(Number(a.user_profile.accuracy), Number(a.user_profile.speed)) : 0;
-    const scoreB = b.user_profile ? calculateScore(Number(b.user_profile.accuracy), Number(b.user_profile.speed)) : 0;
-    return scoreB - scoreA;
-  });
 
   return (
     <div className="min-h-screen pt-24 px-4 pb-12">
@@ -588,11 +643,54 @@ const ClubsPage: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {/* Sort buttons */}
+                    <div className="mb-4 flex justify-between gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleMemberSort('accuracy')}
+                      >
+                        <Target className="h-4 w-4 mr-1" />
+                        {t('accuracy')}
+                        {memberSortField === 'accuracy' && (
+                          memberSortDirection === 'desc' ? <ArrowDown className="h-4 w-4 ml-1" /> : <ArrowUp className="h-4 w-4 ml-1" />
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleMemberSort('speed')}
+                      >
+                        <Zap className="h-4 w-4 mr-1" />
+                        {t('speed')}
+                        {memberSortField === 'speed' && (
+                          memberSortDirection === 'desc' ? <ArrowDown className="h-4 w-4 ml-1" /> : <ArrowUp className="h-4 w-4 ml-1" />
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleMemberSort('combined')}
+                      >
+                        <Trophy className="h-4 w-4 mr-1" />
+                        {t('overall')}
+                        {memberSortField === 'combined' && (
+                          memberSortDirection === 'desc' ? <ArrowDown className="h-4 w-4 ml-1" /> : <ArrowUp className="h-4 w-4 ml-1" />
+                        )}
+                      </Button>
+                    </div>
+
                     <div className="space-y-3">
-                      {sortedMembers.map((member, index) => {
-                        const score = member.user_profile 
-                          ? calculateScore(Number(member.user_profile.accuracy), Number(member.user_profile.speed))
-                          : 0;
+                      {sortedMembers.map((member) => {
+                        const accuracy = Number(member.user_profile?.accuracy) || 0;
+                        const speed = Number(member.user_profile?.speed) || 0;
+                        const score = calculateScore(accuracy, speed);
+                        const rank = getMemberRank(member.user_id);
                         
                         return (
                           <div 
@@ -602,7 +700,11 @@ const ClubsPage: React.FC = () => {
                             }`}
                             onClick={() => member.user_id !== user?.id && navigate(`/user/${member.user_id}`)}
                           >
-                            <span className="text-lg font-bold w-8">{index + 1}</span>
+                            <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
+                              rank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                            }`}>
+                              {rank}
+                            </div>
                             <Avatar className="h-10 w-10">
                               <AvatarImage src={member.user_profile?.profile_image || ''} />
                               <AvatarFallback>{member.user_profile?.name?.[0] || '?'}</AvatarFallback>
@@ -615,9 +717,19 @@ const ClubsPage: React.FC = () => {
                               <p className="text-sm text-muted-foreground capitalize">{member.role}</p>
                             </div>
                             <div className="text-right flex items-center gap-3">
-                              <div>
-                                <p className="font-semibold">{score.toFixed(1)}</p>
-                                <p className="text-xs text-muted-foreground">{t('overall')}</p>
+                              <div className="flex items-center gap-4">
+                                <div>
+                                  <p className="font-semibold">{accuracy}%</p>
+                                  <p className="text-xs text-muted-foreground">{t('accuracy')}</p>
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{speed || 0}</p>
+                                  <p className="text-xs text-muted-foreground">{t('speed')}</p>
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{score.toFixed(1)}</p>
+                                  <p className="text-xs text-muted-foreground">{t('overall')}</p>
+                                </div>
                               </div>
                               {isAdmin && member.user_id !== user?.id && member.role !== 'admin' && (
                                 <Button

@@ -146,8 +146,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     }));
   }, [displayLeaderboard, sortField]);
 
-  // Get rank change indicator based on the current sort type's ranking
-  const getRankChange = (currentRank: number, previousRank?: number) => {
+  // Get rank change indicator - currently we only have previousRank for combined/overall score
+  // For accuracy and speed, we don't have historical rank data, so we show neutral
+  const getRankChange = (currentRank: number, previousRank?: number, forSortField?: SortField) => {
+    // Only show rank change for combined/overall since that's what previousRank tracks
+    // For accuracy and speed we don't have historical per-type rank data
+    if (forSortField !== 'combined') {
+      return { icon: Minus, color: 'text-muted-foreground', change: 0 };
+    }
+    
     if (!previousRank || previousRank === currentRank) {
       return { icon: Minus, color: 'text-muted-foreground', change: 0 };
     }
@@ -189,7 +196,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection(field === 'speed' ? 'asc' : 'desc');
+      // All fields default to 'desc' for display (best at top)
+      setSortDirection('desc');
     }
   };
   
@@ -325,7 +333,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
 
   // Render a single entry row (mobile)
   const renderMobileEntry = (entry: typeof rankedLeaderboard[0]) => {
-    const rankChange = getRankChange(entry.currentSortRank, entry.previousRank);
+    const rankChange = getRankChange(entry.currentSortRank, entry.previousRank, sortField);
     const RankIcon = rankChange.icon;
     const isCurrentUser = entry.id === user?.id;
     
@@ -387,7 +395,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
 
   // Render a single entry row (desktop)
   const renderDesktopEntry = (entry: typeof rankedLeaderboard[0]) => {
-    const rankChange = getRankChange(entry.currentSortRank, entry.previousRank);
+    const rankChange = getRankChange(entry.currentSortRank, entry.previousRank, sortField);
     const RankIcon = rankChange.icon;
     const isCurrentUser = entry.id === user?.id;
     
