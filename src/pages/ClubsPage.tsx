@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown } from 'lucide-react';
+import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import ImageCropper from '@/components/ImageCropper';
 
@@ -448,7 +448,14 @@ const ClubsPage: React.FC = () => {
                             key={club.id} 
                             className="flex items-center gap-4 p-3 rounded-lg bg-muted/50"
                           >
-                            <span className="text-lg font-bold w-8">{index + 1}</span>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
+                                index + 1 <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                              }`}>
+                                {index + 1}
+                              </div>
+                              <Minus className="h-4 w-4 text-muted-foreground" />
+                            </div>
                             <Avatar className="h-10 w-10">
                               <AvatarImage src={club.logo_url || ''} />
                               <AvatarFallback>{club.name[0]}</AvatarFallback>
@@ -487,7 +494,14 @@ const ClubsPage: React.FC = () => {
                             key={club.id} 
                             className="flex items-center gap-4 p-3 rounded-lg bg-muted/50"
                           >
-                            <span className="text-lg font-bold w-8">{index + 1}</span>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
+                                index + 1 <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                              }`}>
+                                {index + 1}
+                              </div>
+                              <Minus className="h-4 w-4 text-muted-foreground" />
+                            </div>
                             <Avatar className="h-10 w-10">
                               <AvatarImage src={club.logo_url || ''} />
                               <AvatarFallback>{club.name[0]}</AvatarFallback>
@@ -707,10 +721,13 @@ const ClubsPage: React.FC = () => {
                             }`}
                             onClick={() => member.user_id !== user?.id && navigate(`/user/${member.user_id}`)}
                           >
-                            <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
-                              rank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
-                            }`}>
-                              {rank}
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
+                                rank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                              }`}>
+                                {rank}
+                              </div>
+                              <Minus className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <Avatar className="h-10 w-10">
                               <AvatarImage src={member.user_profile?.profile_image || ''} />
