@@ -276,7 +276,7 @@ const RouteGame: React.FC = () => {
       {/* Leaderboard Section */}
       {showLeaderboard && !isFullscreen && (
         <section className="max-w-2xl mx-auto animate-fade-in">
-          <Leaderboard />
+          <Leaderboard showAll={true} />
         </section>
       )}
     </div>

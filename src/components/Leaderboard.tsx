@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
@@ -31,9 +31,20 @@ type SortDirection = 'asc' | 'desc';
 
 interface LeaderboardProps {
   mapFilter?: string;
+  showAll?: boolean; // If true, show all users. If false, show top 10 + current user's position
 }
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
+type LeaderboardEntry = {
+  id: string;
+  name: string;
+  accuracy: number;
+  speed: number;
+  rank?: number;
+  previousRank?: number;
+  profileImage?: string;
+};
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = false }) => {
   const navigate = useNavigate();
   const { leaderboard, user, fetchMapLeaderboard } = useUser();
   const { t } = useLanguage();
@@ -107,17 +118,35 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
     loadLeaderboard();
   }, [mapFilter, leaderboard, fetchMapLeaderboard]);
 
-  type LeaderboardEntry = {
-    id: string;
-    name: string;
-    accuracy: number;
-    speed: number;
-    rank?: number;
-    previousRank?: number;
-    profileImage?: string;
+  // Calculate combined score (higher is better)
+  const calculateCombinedScore = (accuracy: number, speed: number) => {
+    if (speed === 0) return accuracy;
+    return accuracy * (1000 / Math.max(speed, 1));
   };
 
-  // Get rank change indicator
+  // Get the ranked leaderboard based on current sort field (always descending for ranking)
+  const rankedLeaderboard = useMemo(() => {
+    const sorted = [...displayLeaderboard].sort((a, b) => {
+      if (sortField === 'accuracy') {
+        return b.accuracy - a.accuracy;
+      } else if (sortField === 'speed') {
+        // For speed, lower is better, so ascending for "best"
+        return (a.speed || Infinity) - (b.speed || Infinity);
+      } else {
+        const scoreA = calculateCombinedScore(a.accuracy, a.speed || 0);
+        const scoreB = calculateCombinedScore(b.accuracy, b.speed || 0);
+        return scoreB - scoreA;
+      }
+    });
+    
+    // Assign ranks based on the sorted order
+    return sorted.map((entry, index) => ({
+      ...entry,
+      currentSortRank: index + 1
+    }));
+  }, [displayLeaderboard, sortField]);
+
+  // Get rank change indicator based on the current sort type's ranking
   const getRankChange = (currentRank: number, previousRank?: number) => {
     if (!previousRank || previousRank === currentRank) {
       return { icon: Minus, color: 'text-muted-foreground', change: 0 };
@@ -134,8 +163,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
     setHasError(false);
     
     try {
-      // Try to fetch leaderboard data again
-      // This is handled inside UserContext, but we need to trigger it
       const { supabase } = await import('../integrations/supabase/client');
       
       const { error } = await (supabase.from('user_profiles' as any)
@@ -146,7 +173,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
         throw error;
       }
       
-      // Wait a moment to allow the fetch to complete
       setTimeout(() => {
         setIsLoading(false);
       }, 1000);
@@ -156,43 +182,69 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
       setIsLoading(false);
     }
   };
-
-  // Calculate combined score (higher is better)
-  const calculateCombinedScore = (accuracy: number, speed: number) => {
-    if (speed === 0) return accuracy; // If no speed, just use accuracy
-    return accuracy * (1000 / Math.max(speed, 1)); // Higher accuracy and lower speed (faster time) is better
-  };
   
   // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      // Toggle direction if same field
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // Set new field and default direction
       setSortField(field);
-      setSortDirection(field === 'speed' ? 'asc' : 'desc'); // For speed, lower is better
+      setSortDirection(field === 'speed' ? 'asc' : 'desc');
     }
   };
   
-  // Sort the leaderboard
-  const sortedLeaderboard = [...displayLeaderboard].sort((a, b) => {
-    let comparison = 0;
-    
-    if (sortField === 'accuracy') {
-      comparison = a.accuracy - b.accuracy;
-    } else if (sortField === 'speed') {
-      // For speed, lower is better
-      comparison = (a.speed || 0) - (b.speed || 0);
+  // Get the display order based on sort direction
+  // Ranking is always based on "best first" order, but display can be flipped
+  const displayLeaderboardOrdered = useMemo(() => {
+    if (sortDirection === 'desc') {
+      return rankedLeaderboard;
     } else {
-      const scoreA = calculateCombinedScore(a.accuracy, a.speed || 0);
-      const scoreB = calculateCombinedScore(b.accuracy, b.speed || 0);
-      comparison = scoreA - scoreB;
+      // Reverse the display order but keep the original ranks
+      return [...rankedLeaderboard].reverse();
+    }
+  }, [rankedLeaderboard, sortDirection]);
+
+  // Get entries to display based on showAll prop
+  const getEntriesToDisplay = useMemo(() => {
+    if (showAll) {
+      return displayLeaderboardOrdered;
     }
     
-    // Apply direction
-    return sortDirection === 'desc' ? -comparison : comparison;
-  });
+    // Show top 10
+    const top10 = displayLeaderboardOrdered.slice(0, 10);
+    
+    // Check if current user is in top 10
+    const currentUserInTop10 = top10.some(entry => entry.id === user?.id);
+    
+    if (currentUserInTop10 || !user?.id) {
+      return top10;
+    }
+    
+    // Find user's position in the full sorted list
+    const userIndex = rankedLeaderboard.findIndex(entry => entry.id === user?.id);
+    
+    if (userIndex === -1) {
+      return top10;
+    }
+    
+    // Get user with one position above and below
+    const userSection: typeof rankedLeaderboard = [];
+    
+    // One position above (if exists and not in top 10)
+    if (userIndex > 0 && userIndex - 1 >= 10) {
+      userSection.push(rankedLeaderboard[userIndex - 1]);
+    }
+    
+    // User's position
+    userSection.push(rankedLeaderboard[userIndex]);
+    
+    // One position below (if exists)
+    if (userIndex < rankedLeaderboard.length - 1) {
+      userSection.push(rankedLeaderboard[userIndex + 1]);
+    }
+    
+    return { top10, userSection };
+  }, [displayLeaderboardOrdered, rankedLeaderboard, showAll, user?.id]);
 
   // Loading and error states
   if (isLoading) {
@@ -271,8 +323,141 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
     );
   }
 
+  // Render a single entry row (mobile)
+  const renderMobileEntry = (entry: typeof rankedLeaderboard[0]) => {
+    const rankChange = getRankChange(entry.currentSortRank, entry.previousRank);
+    const RankIcon = rankChange.icon;
+    const isCurrentUser = entry.id === user?.id;
+    
+    return (
+      <div 
+        key={entry.id} 
+        className={`flex items-center p-2 rounded-lg transition-all cursor-pointer min-w-0 ${
+          isCurrentUser ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
+        }`}
+        onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
+      >
+        <div className="flex items-center mr-1.5 flex-shrink-0">
+          <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-medium ${
+            entry.currentSortRank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+          }`}>
+            {entry.currentSortRank}
+          </div>
+          <RankIcon className={`h-2.5 w-2.5 ml-0.5 ${rankChange.color}`} />
+        </div>
+        
+        <Avatar className="h-5 w-5 mr-1.5 flex-shrink-0">
+          {entry.profileImage ? (
+            <AvatarImage 
+              src={entry.profileImage} 
+              alt={entry.name || 'User avatar'} 
+            />
+          ) : (
+            <AvatarFallback className="bg-secondary text-[8px]">
+              {entry.name?.charAt(0).toUpperCase() || '?'}
+            </AvatarFallback>
+          )}
+        </Avatar>
+        
+        <div className="flex-1 min-w-0 mr-2">
+          <div className="flex items-center min-w-0">
+            <span className="font-medium text-xs truncate">{entry.name}</span>
+            {entry.id === user?.id && (
+              <span className="ml-1 text-[8px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full flex-shrink-0">
+                {t('you')}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center" title={t('accuracy')}>
+            <Target className="h-2.5 w-2.5 text-orienteering mr-0.5" />
+            <span className="font-medium text-[10px]">{entry.accuracy}%</span>
+          </div>
+          
+          <div className="flex items-center" title={t('speed')}>
+            <Zap className="h-2.5 w-2.5 text-amber-500 mr-0.5" />
+            <span className="font-medium text-[10px]">{entry.speed || 0}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render a single entry row (desktop)
+  const renderDesktopEntry = (entry: typeof rankedLeaderboard[0]) => {
+    const rankChange = getRankChange(entry.currentSortRank, entry.previousRank);
+    const RankIcon = rankChange.icon;
+    const isCurrentUser = entry.id === user?.id;
+    
+    return (
+      <TableRow 
+        key={entry.id} 
+        className={`${isCurrentUser ? 'bg-orienteering/5' : ''} ${!isCurrentUser ? 'cursor-pointer hover:bg-secondary/50' : ''}`}
+        onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
+      >
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full ${
+              entry.currentSortRank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+            }`}>
+              {entry.currentSortRank}
+            </div>
+            <RankIcon className={`h-4 w-4 ${rankChange.color}`} />
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center">
+            <Avatar className="h-8 w-8 mr-3">
+              {entry.profileImage ? (
+                <AvatarImage 
+                  src={entry.profileImage} 
+                  alt={entry.name || 'User avatar'} 
+                />
+              ) : (
+                <AvatarFallback className="bg-secondary text-xs">
+                  {entry.name?.charAt(0).toUpperCase() || '?'}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <div>
+              <span className="font-medium">{entry.name}</span>
+              {entry.id === user?.id && (
+                <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
+                  {t('you')}
+                </span>
+              )}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end">
+            <span className="font-semibold">{entry.accuracy}%</span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end">
+            <span className="font-semibold">{entry.speed || 0}</span>
+            <span className="text-muted-foreground text-sm ml-1">ms</span>
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center justify-end">
+            <span className="font-semibold">
+              {calculateCombinedScore(entry.accuracy, entry.speed || 0).toFixed(1)}
+            </span>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   // Use compact layout for mobile
   if (isMobile) {
+    const entries = getEntriesToDisplay;
+    const hasUserSection = !showAll && !Array.isArray(entries) && 'userSection' in entries;
+    
     return (
       <div className="glass-card p-3 animate-fade-in w-full max-w-full overflow-hidden">
         <div className="flex items-center justify-between mb-3">
@@ -336,72 +521,31 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
         </div>
         
         <div className="space-y-1.5">
-          {sortedLeaderboard.slice(0, 10).map((entry, index) => {
-            const rankChange = getRankChange(index + 1, entry.previousRank);
-            const RankIcon = rankChange.icon;
-            const isCurrentUser = entry.id === user?.id;
-            
-            return (
-              <div 
-                key={entry.id} 
-                className={`flex items-center p-2 rounded-lg transition-all cursor-pointer min-w-0 ${
-                  isCurrentUser ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
-                }`}
-                onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
-              >
-                <div className="flex items-center mr-1.5 flex-shrink-0">
-                  <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-medium ${
-                    index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
-                  }`}>
-                    {index + 1}
-                  </div>
-                  <RankIcon className={`h-2.5 w-2.5 ml-0.5 ${rankChange.color}`} />
-                </div>
-                
-                <Avatar className="h-5 w-5 mr-1.5 flex-shrink-0">
-                  {entry.profileImage ? (
-                    <AvatarImage 
-                      src={entry.profileImage} 
-                      alt={entry.name || 'User avatar'} 
-                    />
-                  ) : (
-                    <AvatarFallback className="bg-secondary text-[8px]">
-                      {entry.name?.charAt(0).toUpperCase() || '?'}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                
-                <div className="flex-1 min-w-0 mr-2">
-                  <div className="flex items-center min-w-0">
-                    <span className="font-medium text-xs truncate">{entry.name}</span>
-                    {entry.id === user?.id && (
-                      <span className="ml-1 text-[8px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full flex-shrink-0">
-                        {t('you')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="flex items-center" title={t('accuracy')}>
-                    <Target className="h-2.5 w-2.5 text-orienteering mr-0.5" />
-                    <span className="font-medium text-[10px]">{entry.accuracy}%</span>
-                  </div>
-                  
-                  <div className="flex items-center" title={t('speed')}>
-                    <Zap className="h-2.5 w-2.5 text-amber-500 mr-0.5" />
-                    <span className="font-medium text-[10px]">{entry.speed || 0}</span>
-                  </div>
-                </div>
+          {hasUserSection ? (
+            <>
+              {(entries as { top10: typeof rankedLeaderboard; userSection: typeof rankedLeaderboard }).top10.map(renderMobileEntry)}
+              
+              {/* Separator */}
+              <div className="flex items-center py-2">
+                <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
+                <span className="px-2 text-xs text-muted-foreground">•••</span>
+                <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
               </div>
-            );
-          })}
+              
+              {(entries as { top10: typeof rankedLeaderboard; userSection: typeof rankedLeaderboard }).userSection.map(renderMobileEntry)}
+            </>
+          ) : (
+            (Array.isArray(entries) ? entries : []).map(renderMobileEntry)
+          )}
         </div>
       </div>
     );
   }
 
   // Desktop layout with table
+  const entries = getEntriesToDisplay;
+  const hasUserSection = !showAll && !Array.isArray(entries) && 'userSection' in entries;
+
   return (
     <div className="glass-card p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">
@@ -470,72 +614,26 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all' }) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedLeaderboard.slice(0, 10).map((entry, index) => {
-            const rankChange = getRankChange(index + 1, entry.previousRank);
-            const RankIcon = rankChange.icon;
-            const isCurrentUser = entry.id === user?.id;
-            
-            return (
-              <TableRow 
-                key={entry.id} 
-                className={`${isCurrentUser ? 'bg-orienteering/5' : ''} ${!isCurrentUser ? 'cursor-pointer hover:bg-secondary/50' : ''}`}
-                onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
-              >
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 flex items-center justify-center rounded-full ${
-                      index < 3 ? 'bg-orienteering text-white' : 'bg-secondary'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <RankIcon className={`h-4 w-4 ${rankChange.color}`} />
-                  </div>
-                </TableCell>
-                <TableCell>
+          {hasUserSection ? (
+            <>
+              {(entries as { top10: typeof rankedLeaderboard; userSection: typeof rankedLeaderboard }).top10.map(renderDesktopEntry)}
+              
+              {/* Separator row */}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="py-2">
                   <div className="flex items-center">
-                    <Avatar className="h-8 w-8 mr-3">
-                      {entry.profileImage ? (
-                        <AvatarImage 
-                          src={entry.profileImage} 
-                          alt={entry.name || 'User avatar'} 
-                        />
-                      ) : (
-                        <AvatarFallback className="bg-secondary text-xs">
-                          {entry.name?.charAt(0).toUpperCase() || '?'}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div>
-                      <span className="font-medium">{entry.name}</span>
-                      {entry.id === user?.id && (
-                        <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">
-                          {t('you')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end">
-                    <span className="font-semibold">{entry.accuracy}%</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end">
-                    <span className="font-semibold">{entry.speed || 0}</span>
-                    <span className="text-muted-foreground text-sm ml-1">ms</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end">
-                    <span className="font-semibold">
-                      {calculateCombinedScore(entry.accuracy, entry.speed || 0).toFixed(1)}
-                    </span>
+                    <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
+                    <span className="px-4 text-sm text-muted-foreground">•••</span>
+                    <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
                   </div>
                 </TableCell>
               </TableRow>
-            );
-          })}
+              
+              {(entries as { top10: typeof rankedLeaderboard; userSection: typeof rankedLeaderboard }).userSection.map(renderDesktopEntry)}
+            </>
+          ) : (
+            (Array.isArray(entries) ? entries : []).map(renderDesktopEntry)
+          )}
         </TableBody>
       </Table>
     </div>
