@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
@@ -8,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Compass, AlertCircle } from 'lucide-react';
+import { Compass, AlertCircle, Mail, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { z } from 'zod';
 
@@ -43,6 +44,7 @@ const AuthPage: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<string>('login');
   const [error, setError] = useState<string | null>(null);
+  const [registrationSuccess, setRegistrationSuccess] = useState<boolean>(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -91,7 +93,7 @@ const AuthPage: React.FC = () => {
     
     try {
       await signUp(result.data.email, result.data.password, result.data.name);
-      setActiveTab('login');
+      setRegistrationSuccess(true);
     } catch (error: any) {
       if (error.message) {
         setError(error.message);
@@ -99,11 +101,54 @@ const AuthPage: React.FC = () => {
     }
   };
 
-  // Clear error when switching tabs
+  // Clear error and success when switching tabs
   const handleTabChange = (value: string) => {
     setError(null);
+    setRegistrationSuccess(false);
     setActiveTab(value);
   };
+
+  // Show email verification success screen
+  if (registrationSuccess) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1 flex flex-col items-center">
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+              <Mail className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl text-center">{t('checkYourEmail')}</CardTitle>
+            <CardDescription className="text-center">
+              {t('verificationEmailSent')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="border-primary/20 bg-primary/5">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-sm">
+                {t('verificationEmailInstructions')}
+              </AlertDescription>
+            </Alert>
+            <p className="text-sm text-muted-foreground text-center">
+              {t('verificationEmailNote')}
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => {
+                setRegistrationSuccess(false);
+                setActiveTab('login');
+              }}
+            >
+              {t('backToLogin')}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
   
   return (
     <div className="flex justify-center items-center min-h-screen">
