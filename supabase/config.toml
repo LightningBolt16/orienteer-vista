@@ -1,1 +1,7 @@
 project_id = "pldlmtuxqxszaajxtufx"
+
+[functions.notify-club-request]
+verify_jwt = false
+
+[functions.notify-club-approved]
+verify_jwt = false

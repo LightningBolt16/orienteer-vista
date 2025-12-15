@@ -115,6 +115,18 @@ const AdminClubRequests: React.FC = () => {
 
       if (updateError) throw updateError;
 
+      // Notify the user via email
+      try {
+        await supabase.functions.invoke('notify-club-approved', {
+          body: {
+            clubName: request.club_name,
+            userId: request.requested_by
+          }
+        });
+      } catch (emailError) {
+        console.error('Failed to send approval notification email:', emailError);
+      }
+
       toast.success(t('clubApproved'));
       setRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {

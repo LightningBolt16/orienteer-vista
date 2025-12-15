@@ -234,6 +234,19 @@ const ClubsPage: React.FC = () => {
 
       if (error) throw error;
 
+      // Notify admin via email
+      try {
+        await supabase.functions.invoke('notify-club-request', {
+          body: {
+            clubName: newClubName.trim(),
+            requestedBy: user.id,
+            description: newClubDescription.trim() || null
+          }
+        });
+      } catch (emailError) {
+        console.error('Failed to send admin notification email:', emailError);
+      }
+
       toast({ title: t('success'), description: t('clubRequestSubmitted') });
       setRequestDialogOpen(false);
       setNewClubName('');
