@@ -476,7 +476,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
                 <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 cursor-pointer flex-shrink-0" />
               </PopoverTrigger>
               <PopoverContent className="max-w-xs">
-                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
+                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Attempts older than 30 days start losing value (fully gone after 120 days). Accuracy above 50% gives exponential boost, below 50% gives penalty. Overall score = (1000 ÷ Speed) × Accuracy Multiplier × 100.'}</p>
               </PopoverContent>
             </Popover>
           </div>
