@@ -4,6 +4,7 @@ import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { supabaseManager } from '../lib/supabaseUtils';
+import { calculateWeightedStats, calculateCombinedScore as calcCombinedScore, AttemptData } from '../utils/scoringUtils';
 
 type UserProfile = {
   id: string;
@@ -164,7 +165,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Fetch leaderboard data with retry
+  // Fetch leaderboard data with retry - now uses weighted scoring with time decay
   const fetchLeaderboard = async () => {
     try {
       const data = await supabaseManager.executeWithRetry(
@@ -186,16 +187,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       if (data && data.length > 0) {
-        // Calculate combined score for proper sorting
-        const calculateScore = (accuracy: number, speed: number) => {
-          if (speed === 0) return accuracy;
-          return accuracy * (1000 / Math.max(speed, 1));
-        };
-
-        // Sort by combined score
+        // Sort by combined score using new scoring formula with accuracy multiplier
         const sortedData = [...data].sort((a: any, b: any) => {
-          const scoreA = calculateScore(a.accuracy || 0, a.speed || 0);
-          const scoreB = calculateScore(b.accuracy || 0, b.speed || 0);
+          const scoreA = calcCombinedScore(a.accuracy || 0, a.speed || 0);
+          const scoreB = calcCombinedScore(b.accuracy || 0, b.speed || 0);
           return scoreB - scoreA;
         });
 
@@ -236,10 +231,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Calculate combined score (higher is better) - matches leaderboard formula
+  // Calculate combined score (higher is better) - uses new scoring with accuracy multiplier
   const calculateCombinedScore = (accuracy: number, speed: number) => {
-    if (speed === 0) return accuracy;
-    return accuracy * (1000 / Math.max(speed, 1));
+    return calcCombinedScore(accuracy, speed);
   };
 
   // Calculate user rank based on combined score (accuracy + speed)
@@ -296,11 +290,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error recording route attempt:', error);
     }
     
-    // Calculate stats from last 100 attempts (rolling window)
+    // Calculate stats from last 100 attempts with time decay (weighted scoring)
     try {
       const { data: recentAttempts, error: fetchError } = await (supabase
         .from('route_attempts' as any)
-        .select('is_correct, response_time')
+        .select('is_correct, response_time, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100) as any);
@@ -308,13 +302,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (fetchError) {
         console.error('Error fetching recent attempts:', fetchError);
       } else if (recentAttempts && recentAttempts.length > 0) {
+        // Use weighted stats with time decay
+        const weightedStats = calculateWeightedStats(recentAttempts as AttemptData[]);
+        
         const total = recentAttempts.length;
         const correct = recentAttempts.filter((a: any) => a.is_correct).length;
         const correctAttempts = recentAttempts.filter((a: any) => a.is_correct);
         const timeSum = correctAttempts.reduce((sum: number, a: any) => sum + a.response_time, 0);
         
-        const newAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
-        const newSpeed = correct > 0 ? Math.round(timeSum / correct) : 0;
+        // Use weighted accuracy and speed for display/leaderboard
+        const newAccuracy = weightedStats.accuracy;
+        const newSpeed = weightedStats.speed;
         
         // Update all-time stats
         const newAlltimeTotal = (user.alltimeTotal || 0) + 1;
@@ -368,11 +366,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error calculating rolling stats:', error);
     }
     
-    // Update per-map stats from last 100 attempts for that map
+    // Update per-map stats from last 100 attempts for that map with time decay
     try {
       const { data: mapAttempts, error: mapFetchError } = await (supabase
         .from('route_attempts' as any)
-        .select('is_correct, response_time')
+        .select('is_correct, response_time, created_at')
         .eq('user_id', user.id)
         .eq('map_name', effectiveMapName)
         .order('created_at', { ascending: false })
@@ -384,13 +382,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       if (mapAttempts && mapAttempts.length > 0) {
+        // Use weighted stats with time decay for per-map stats
+        const mapWeightedStats = calculateWeightedStats(mapAttempts as AttemptData[]);
+        
         const mapTotal = mapAttempts.length;
         const mapCorrect = mapAttempts.filter((a: any) => a.is_correct).length;
         const mapCorrectAttempts = mapAttempts.filter((a: any) => a.is_correct);
         const mapTimeSum = mapCorrectAttempts.reduce((sum: number, a: any) => sum + a.response_time, 0);
         
-        const mapAccuracy = mapTotal > 0 ? Math.round((mapCorrect / mapTotal) * 100) : 0;
-        const mapSpeed = mapCorrect > 0 ? Math.round(mapTimeSum / mapCorrect) : 0;
+        // Use weighted accuracy and speed
+        const mapAccuracy = mapWeightedStats.accuracy;
+        const mapSpeed = mapWeightedStats.speed;
         
         // Check if map stats exist
         const { data: existingStats } = await (supabase

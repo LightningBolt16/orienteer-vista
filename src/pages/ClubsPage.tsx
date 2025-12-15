@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import ImageCropper from '@/components/ImageCropper';
+import { calculateCombinedScore as calcCombinedScore } from '@/utils/scoringUtils';
 
 type MemberSortField = 'accuracy' | 'speed' | 'combined';
 type SortDirection = 'asc' | 'desc';
@@ -108,7 +109,7 @@ const ClubsPage: React.FC = () => {
             const scores = profiles.map(p => {
               const accuracy = Number(p.accuracy) || 0;
               const speed = Number(p.speed) || 1;
-              return accuracy * (1000 / speed);
+              return calcCombinedScore(accuracy, speed);
             });
             totalScore = scores.reduce((a, b) => a + b, 0);
             averageScore = totalScore / scores.length;
@@ -246,8 +247,7 @@ const ClubsPage: React.FC = () => {
   };
 
   const calculateScore = (accuracy: number, speed: number) => {
-    if (!speed || speed === 0) return 0;
-    return accuracy * (1000 / speed);
+    return calcCombinedScore(accuracy, speed);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
