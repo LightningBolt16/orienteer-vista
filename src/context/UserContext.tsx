@@ -4,6 +4,7 @@ import { useLanguage } from './LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { supabaseManager } from '../lib/supabaseUtils';
+import { calculateWeightedStats, calculateCombinedScore as calcCombinedScore, AttemptData } from '../utils/scoringUtils';
 
 type UserProfile = {
   id: string;
@@ -16,6 +17,9 @@ type UserProfile = {
     timeSum: number;
   };
   profileImage?: string;
+  alltimeTotal?: number;
+  alltimeCorrect?: number;
+  alltimeTimeSum?: number;
 };
 
 type LeaderboardEntry = {
@@ -24,6 +28,7 @@ type LeaderboardEntry = {
   accuracy: number;
   speed: number;
   rank?: number;
+  previousRank?: number;
   profileImage?: string;
 };
 
@@ -133,7 +138,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             total: 0,
             correct: 0,
             timeSum: 0
-          }
+          },
+          alltimeTotal: data.alltime_total || 0,
+          alltimeCorrect: data.alltime_correct || 0,
+          alltimeTimeSum: data.alltime_time_sum || 0
         });
         setIsOfflineMode(false);
       }
@@ -157,17 +165,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Fetch leaderboard data with retry
+  // Fetch leaderboard data with retry - now uses weighted scoring with time decay
   const fetchLeaderboard = async () => {
     try {
       const data = await supabaseManager.executeWithRetry(
         async () => {
           const { data, error } = await (supabase
             .from('user_profiles' as any)
-            .select('user_id, name, accuracy, speed, profile_image')
+            .select('user_id, name, accuracy, speed, profile_image, previous_rank')
             .order('accuracy', { ascending: false })
             .order('speed', { ascending: true })
-            .limit(10) as any);
+            .limit(50) as any);
 
           if (error) {
             throw error;
@@ -179,16 +187,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       if (data && data.length > 0) {
-        const rankedLeaderboard = data.map((entry: any, index: number) => ({
+        // Sort by combined score using new scoring formula with accuracy multiplier
+        const sortedData = [...data].sort((a: any, b: any) => {
+          const scoreA = calcCombinedScore(a.accuracy || 0, a.speed || 0);
+          const scoreB = calcCombinedScore(b.accuracy || 0, b.speed || 0);
+          return scoreB - scoreA;
+        });
+
+        const rankedLeaderboard = sortedData.map((entry: any, index: number) => ({
           id: entry.user_id,
           name: entry.name || 'User',
           accuracy: entry.accuracy || 0,
           speed: entry.speed || 0,
           rank: index + 1,
+          previousRank: entry.previous_rank || null,
           profileImage: entry.profile_image
         }));
       
         setLeaderboard(rankedLeaderboard);
+
+        // Update previous_rank in database for all users (async, don't wait)
+        updatePreviousRanks(rankedLeaderboard);
       }
     } catch (error: any) {
       console.error('Error in fetchLeaderboard after retries:', error);
@@ -196,7 +215,28 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Calculate user rank based on accuracy and speed
+  // Update previous ranks in database periodically
+  const updatePreviousRanks = async (rankedLeaderboard: LeaderboardEntry[]) => {
+    try {
+      for (const entry of rankedLeaderboard.slice(0, 20)) {
+        if (entry.rank !== entry.previousRank) {
+          await (supabase
+            .from('user_profiles' as any)
+            .update({ previous_rank: entry.rank })
+            .eq('user_id', entry.id) as any);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating previous ranks:', error);
+    }
+  };
+
+  // Calculate combined score (higher is better) - uses new scoring with accuracy multiplier
+  const calculateCombinedScore = (accuracy: number, speed: number) => {
+    return calcCombinedScore(accuracy, speed);
+  };
+
+  // Calculate user rank based on combined score (accuracy + speed)
   const getUserRank = (): number => {
     if (!user || !user.attempts || user.attempts.total === 0) return 0;
     
@@ -212,11 +252,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
     
+    // Sort by combined score (same as leaderboard default)
     fullLeaderboard.sort((a, b) => {
-      if (a.accuracy !== b.accuracy) {
-        return b.accuracy - a.accuracy;
-      }
-      return a.speed - b.speed;
+      const scoreA = calculateCombinedScore(a.accuracy, a.speed);
+      const scoreB = calculateCombinedScore(b.accuracy, b.speed);
+      return scoreB - scoreA;
     });
     
     fullLeaderboard.forEach((entry, index) => {
@@ -234,118 +274,167 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    // Update overall stats
-    const attempts = user.attempts || { total: 0, correct: 0, timeSum: 0 };
-    const newTotal = attempts.total + 1;
-    const newCorrect = attempts.correct + (isCorrect ? 1 : 0);
-    const newTimeSum = attempts.timeSum + (isCorrect ? responseTime : 0);
+    const effectiveMapName = mapName || 'unknown';
     
-    const newAccuracy = newTotal > 0 ? Math.round((newCorrect / newTotal) * 100) : 0;
-    const newSpeed = newCorrect > 0 ? Math.round(newTimeSum / newCorrect) : 0;
-    
-    const updatedUser = {
-      ...user,
-      accuracy: newAccuracy,
-      speed: newSpeed,
-      attempts: {
-        total: newTotal,
-        correct: newCorrect,
-        timeSum: newTimeSum
-      }
-    };
-    
-    // Update local state immediately
-    setUserState(updatedUser);
-    
-    // Try to update overall stats in database
+    // Record individual route attempt for rolling 100 calculation
     try {
-      await supabaseManager.executeWithRetry(
-        async () => {
-          const { error } = await (supabase
-            .from('user_profiles' as any)
-            .update({
-              accuracy: newAccuracy,
-              speed: newSpeed,
-              attempts: {
-                total: newTotal,
-                correct: newCorrect,
-                timeSum: newTimeSum
-              },
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id) as any);
-            
-          if (error) {
-            throw error;
-          }
-        },
-        'Update user performance'
-      );
+      await (supabase
+        .from('route_attempts' as any)
+        .insert({
+          user_id: user.id,
+          map_name: effectiveMapName,
+          is_correct: isCorrect,
+          response_time: responseTime
+        }) as any);
     } catch (error) {
-      console.error('Error updating overall performance:', error);
+      console.error('Error recording route attempt:', error);
     }
     
-    // Update per-map stats if mapName is provided
-    if (mapName) {
-      try {
-        // First try to get existing map stats
-        const { data: existingStats, error: fetchError } = await (supabase
+    // Calculate stats from last 100 attempts with time decay (weighted scoring)
+    try {
+      const { data: recentAttempts, error: fetchError } = await (supabase
+        .from('route_attempts' as any)
+        .select('is_correct, response_time, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100) as any);
+      
+      if (fetchError) {
+        console.error('Error fetching recent attempts:', fetchError);
+      } else if (recentAttempts && recentAttempts.length > 0) {
+        // Use weighted stats with time decay
+        const weightedStats = calculateWeightedStats(recentAttempts as AttemptData[]);
+        
+        const total = recentAttempts.length;
+        const correct = recentAttempts.filter((a: any) => a.is_correct).length;
+        const correctAttempts = recentAttempts.filter((a: any) => a.is_correct);
+        const timeSum = correctAttempts.reduce((sum: number, a: any) => sum + a.response_time, 0);
+        
+        // Use weighted accuracy and speed for display/leaderboard
+        const newAccuracy = weightedStats.accuracy;
+        const newSpeed = weightedStats.speed;
+        
+        // Update all-time stats
+        const newAlltimeTotal = (user.alltimeTotal || 0) + 1;
+        const newAlltimeCorrect = (user.alltimeCorrect || 0) + (isCorrect ? 1 : 0);
+        const newAlltimeTimeSum = (user.alltimeTimeSum || 0) + (isCorrect ? responseTime : 0);
+
+        const updatedUser = {
+          ...user,
+          accuracy: newAccuracy,
+          speed: newSpeed,
+          attempts: {
+            total,
+            correct,
+            timeSum
+          },
+          alltimeTotal: newAlltimeTotal,
+          alltimeCorrect: newAlltimeCorrect,
+          alltimeTimeSum: newAlltimeTimeSum
+        };
+        
+        // Update local state immediately
+        setUserState(updatedUser);
+        
+        await supabaseManager.executeWithRetry(
+          async () => {
+            const { error } = await (supabase
+              .from('user_profiles' as any)
+              .update({
+                accuracy: newAccuracy,
+                speed: newSpeed,
+                attempts: {
+                  total,
+                  correct,
+                  timeSum
+                },
+                alltime_total: newAlltimeTotal,
+                alltime_correct: newAlltimeCorrect,
+                alltime_time_sum: newAlltimeTimeSum,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id) as any);
+              
+            if (error) {
+              throw error;
+            }
+          },
+          'Update user performance'
+        );
+      }
+    } catch (error) {
+      console.error('Error calculating rolling stats:', error);
+    }
+    
+    // Update per-map stats from last 100 attempts for that map with time decay
+    try {
+      const { data: mapAttempts, error: mapFetchError } = await (supabase
+        .from('route_attempts' as any)
+        .select('is_correct, response_time, created_at')
+        .eq('user_id', user.id)
+        .eq('map_name', effectiveMapName)
+        .order('created_at', { ascending: false })
+        .limit(100) as any);
+      
+      if (mapFetchError) {
+        console.error('Error fetching map attempts:', mapFetchError);
+        return;
+      }
+      
+      if (mapAttempts && mapAttempts.length > 0) {
+        // Use weighted stats with time decay for per-map stats
+        const mapWeightedStats = calculateWeightedStats(mapAttempts as AttemptData[]);
+        
+        const mapTotal = mapAttempts.length;
+        const mapCorrect = mapAttempts.filter((a: any) => a.is_correct).length;
+        const mapCorrectAttempts = mapAttempts.filter((a: any) => a.is_correct);
+        const mapTimeSum = mapCorrectAttempts.reduce((sum: number, a: any) => sum + a.response_time, 0);
+        
+        // Use weighted accuracy and speed
+        const mapAccuracy = mapWeightedStats.accuracy;
+        const mapSpeed = mapWeightedStats.speed;
+        
+        // Check if map stats exist
+        const { data: existingStats } = await (supabase
           .from('user_map_stats' as any)
-          .select('*')
+          .select('id')
           .eq('user_id', user.id)
-          .eq('map_name', mapName)
+          .eq('map_name', effectiveMapName)
           .maybeSingle() as any);
         
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          console.error('Error fetching map stats:', fetchError);
-          return;
-        }
-        
         if (existingStats) {
-          // Update existing stats
-          const mapAttempts = existingStats.attempts || { total: 0, correct: 0, timeSum: 0 };
-          const mapNewTotal = mapAttempts.total + 1;
-          const mapNewCorrect = mapAttempts.correct + (isCorrect ? 1 : 0);
-          const mapNewTimeSum = mapAttempts.timeSum + (isCorrect ? responseTime : 0);
-          const mapNewAccuracy = mapNewTotal > 0 ? Math.round((mapNewCorrect / mapNewTotal) * 100) : 0;
-          const mapNewSpeed = mapNewCorrect > 0 ? Math.round(mapNewTimeSum / mapNewCorrect) : 0;
-          
           await (supabase
             .from('user_map_stats' as any)
             .update({
-              accuracy: mapNewAccuracy,
-              speed: mapNewSpeed,
+              accuracy: mapAccuracy,
+              speed: mapSpeed,
               attempts: {
-                total: mapNewTotal,
-                correct: mapNewCorrect,
-                timeSum: mapNewTimeSum
+                total: mapTotal,
+                correct: mapCorrect,
+                timeSum: mapTimeSum
               },
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id)
-            .eq('map_name', mapName) as any);
+            .eq('map_name', effectiveMapName) as any);
         } else {
-          // Insert new map stats
-          const mapNewAccuracy = isCorrect ? 100 : 0;
-          const mapNewSpeed = isCorrect ? responseTime : 0;
-          
           await (supabase
             .from('user_map_stats' as any)
             .insert({
               user_id: user.id,
-              map_name: mapName,
-              accuracy: mapNewAccuracy,
-              speed: mapNewSpeed,
+              map_name: effectiveMapName,
+              accuracy: mapAccuracy,
+              speed: mapSpeed,
               attempts: {
-                total: 1,
-                correct: isCorrect ? 1 : 0,
-                timeSum: isCorrect ? responseTime : 0
+                total: mapTotal,
+                correct: mapCorrect,
+                timeSum: mapTimeSum
               }
             }) as any);
         }
-      } catch (error) {
-        console.error('Error updating map-specific stats:', error);
       }
+    } catch (error) {
+      console.error('Error updating map-specific stats:', error);
     }
   };
 

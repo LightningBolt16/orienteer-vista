@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useAdmin } from '../hooks/useAdmin';
+import { Loader2 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
   NavigationMenu,
@@ -26,8 +28,13 @@ import LanguageSelector from './LanguageSelector';
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, getUserRank, signOut } = useUser();
+  const { user, getUserRank, signOut, leaderboard } = useUser();
   const { language, setLanguage, t } = useLanguage();
+  const { isAdmin } = useAdmin();
+  
+  // Get rank only if leaderboard is loaded
+  const currentRank = leaderboard.length > 0 ? getUserRank() : 0;
+  const hasValidRank = user?.attempts?.total !== undefined && user.attempts.total > 0 && currentRank > 0;
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -87,16 +94,16 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2 hover-scale">
           <Compass className="h-8 w-8 text-orienteering" />
-          <span className="text-xl font-semibold tracking-tight">OL.se</span>
+          <span className="text-xl font-semibold tracking-tight">Ljungdell.uk</span>
         </Link>
         
         {isMobile ? (
           <>
             <div className="flex items-center space-x-4">
-              {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
+              {hasValidRank && (
                 <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
-                  {t('rank')} {getUserRank()}
+                  {t('rank')} {currentRank}
                 </Link>
               )}
               
@@ -114,6 +121,17 @@ const Header: React.FC = () => {
             {mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 bg-background/95 backdrop-blur-sm shadow-lg p-4 flex flex-col space-y-4 animate-fade-in">
                 <Link 
+                  to="/clubs" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/clubs') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Building2 className="h-5 w-5" />
+                  <span>{t('clubs')}</span>
+                </Link>
+                
+                <Link 
                   to="/route-game" 
                   className={`p-3 rounded-md flex items-center space-x-2 ${
                     isCurrentPath('/route-game') ? 'bg-muted text-orienteering' : ''
@@ -125,43 +143,12 @@ const Header: React.FC = () => {
                 </Link>
                 
                 <Link 
-                  to="/course-setter" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/course-setter') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <PenTool className="h-5 w-5" />
-                  <span>{t('courseSetter')}</span>
-                </Link>
-                
-                <Link 
-                  to="/my-files" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/my-files') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <FolderOpen className="h-5 w-5" />
-                  <span>{t('myProjects')}</span>
-                </Link>
-                
-                <Link 
                   to="/profile"
                   className="p-3 rounded-md flex items-center space-x-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <User className="h-5 w-5" />
                   <span>{t('profile')}</span>
-                </Link>
-
-                <Link 
-                  to="/subscription" 
-                  className="p-3 rounded-md flex items-center space-x-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  <span>{t('subscription')}</span>
                 </Link>
 
                 {isAuthenticated ? (
@@ -185,11 +172,32 @@ const Header: React.FC = () => {
                     <span>{t('signIn')}</span>
                   </Link>
                 )}
+                
+                {isAdmin && (
+                  <Link 
+                    to="/admin/club-requests"
+                    className="p-3 rounded-md flex items-center space-x-2 text-yellow-600"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Shield className="h-5 w-5" />
+                    <span>{t('admin')}</span>
+                  </Link>
+                )}
               </div>
             )}
           </>
         ) : (
           <nav className="flex items-center space-x-8">
+            <Link 
+              to="/clubs" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/clubs') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              <span>{t('clubs')}</span>
+            </Link>
+            
             <Link 
               to="/route-game" 
               className={`nav-link text-sm font-medium flex items-center space-x-1 ${
@@ -200,31 +208,12 @@ const Header: React.FC = () => {
               <span>{t('routeGame')}</span>
             </Link>
             
-            <Link 
-              to="/course-setter" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/course-setter') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <PenTool className="h-4 w-4 mr-1" />
-              <span>{t('courseSetter')}</span>
-            </Link>
-            
-            <Link 
-              to="/my-files" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/my-files') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <FolderOpen className="h-4 w-4 mr-1" />
-              <span>{t('myProjects')}</span>
-            </Link>
             
             <div className="flex items-center space-x-2 ml-4">
-              {user?.attempts?.total !== undefined && user.attempts.total > 0 && (
+              {hasValidRank && (
                 <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
-                  {t('rank')} {getUserRank()}
+                  {t('rank')} {currentRank}
                 </Link>
               )}
               
@@ -244,9 +233,14 @@ const Header: React.FC = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/profile">{t('profile')}</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/subscription">{t('subscription')}</Link>
-                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin/club-requests" className="text-yellow-600">
+                        <Shield className="h-4 w-4 mr-2" />
+                        {t('admin')}
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   {isAuthenticated ? (
                     <DropdownMenuItem onClick={handleSignOut} className="text-red-500">

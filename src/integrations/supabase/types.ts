@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      club_members: {
+        Row: {
+          club_id: string
+          id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_members_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_requests: {
+        Row: {
+          club_name: string
+          created_at: string
+          description: string | null
+          id: string
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          club_name: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          club_name?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      clubs: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_approved: boolean
+          logo_url: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_approved?: boolean
+          logo_url?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_approved?: boolean
+          logo_url?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       maps: {
         Row: {
           created_at: string
@@ -47,6 +145,33 @@ export type Database = {
         }
         Relationships: []
       }
+      route_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          is_correct: boolean
+          map_name: string
+          response_time: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_correct: boolean
+          map_name: string
+          response_time: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          map_name?: string
+          response_time?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_map_stats: {
         Row: {
           accuracy: number | null
@@ -54,6 +179,7 @@ export type Database = {
           created_at: string
           id: string
           map_name: string
+          previous_rank: number | null
           speed: number | null
           updated_at: string
           user_id: string
@@ -64,6 +190,7 @@ export type Database = {
           created_at?: string
           id?: string
           map_name: string
+          previous_rank?: number | null
           speed?: number | null
           updated_at?: string
           user_id: string
@@ -74,6 +201,7 @@ export type Database = {
           created_at?: string
           id?: string
           map_name?: string
+          previous_rank?: number | null
           speed?: number | null
           updated_at?: string
           user_id?: string
@@ -91,35 +219,71 @@ export type Database = {
       user_profiles: {
         Row: {
           accuracy: number | null
+          alltime_correct: number | null
+          alltime_time_sum: number | null
+          alltime_total: number | null
           attempts: Json | null
           created_at: string
           id: string
           name: string | null
+          previous_rank: number | null
           profile_image: string | null
           speed: number | null
+          tutorial_seen: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
           accuracy?: number | null
+          alltime_correct?: number | null
+          alltime_time_sum?: number | null
+          alltime_total?: number | null
           attempts?: Json | null
           created_at?: string
           id?: string
           name?: string | null
+          previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
+          tutorial_seen?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
           accuracy?: number | null
+          alltime_correct?: number | null
+          alltime_time_sum?: number | null
+          alltime_total?: number | null
           attempts?: Json | null
           created_at?: string
           id?: string
           name?: string | null
+          previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
+          tutorial_seen?: boolean
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
@@ -129,10 +293,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -259,6 +429,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
