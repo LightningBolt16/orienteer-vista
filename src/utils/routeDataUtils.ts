@@ -16,6 +16,7 @@ export interface MapSource {
   mapImagePath?: string;
   description?: string;
   folderName?: string;
+  namingScheme?: 'candidate' | 'route'; // 'candidate' = candidate_1.png, 'route' = route_0.png
 }
 
 // Known map folders - the system will try to find CSVs in these folders
@@ -46,17 +47,23 @@ const findCSVPath = async (folderName: string): Promise<string | null> => {
   return null;
 };
 
-// Validate that images exist for a map
-const validateMapImages = async (folderName: string, aspect: '16:9' | '9:16'): Promise<boolean> => {
+// Detect which naming scheme a map folder uses
+const detectNamingScheme = async (folderName: string, aspect: '16:9' | '9:16'): Promise<'candidate' | 'route' | null> => {
   const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
-  const testImagePath = `/maps/${folderName}/${aspectFolder}/candidate_1.png`;
   
+  // Try candidate_1.png first (old scheme)
   try {
-    const response = await fetch(testImagePath, { method: 'HEAD' });
-    return response.ok;
-  } catch {
-    return false;
-  }
+    const candidateResponse = await fetch(`/maps/${folderName}/${aspectFolder}/candidate_1.png`, { method: 'HEAD' });
+    if (candidateResponse.ok) return 'candidate';
+  } catch {}
+  
+  // Try route_0.png (new scheme)
+  try {
+    const routeResponse = await fetch(`/maps/${folderName}/${aspectFolder}/route_0.png`, { method: 'HEAD' });
+    if (routeResponse.ok) return 'route';
+  } catch {}
+  
+  return null;
 };
 
 // Generate map sources for all available maps
@@ -65,36 +72,39 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
     const mapSources: MapSource[] = [];
     
     for (const folderName of MAP_FOLDER_NAMES) {
-      // Find the CSV file
       const csvPath = await findCSVPath(folderName);
       if (!csvPath) {
         console.warn(`No CSV found for map: ${folderName}`);
         continue;
       }
       
-      // Check if landscape images exist
-      const hasLandscape = await validateMapImages(folderName, '16:9');
-      if (hasLandscape) {
+      // Check landscape
+      const landscapeScheme = await detectNamingScheme(folderName, '16:9');
+      if (landscapeScheme) {
+        const prefix = landscapeScheme === 'candidate' ? 'candidate_' : 'route_';
         mapSources.push({
           id: `${folderName.toLowerCase()}-landscape`,
           name: folderName,
           aspect: '16:9',
           csvPath,
-          imagePathPrefix: `/maps/${folderName}/16_9/candidate_`,
+          imagePathPrefix: `/maps/${folderName}/16_9/${prefix}`,
           folderName,
+          namingScheme: landscapeScheme,
         });
       }
       
-      // Check if portrait images exist
-      const hasPortrait = await validateMapImages(folderName, '9:16');
-      if (hasPortrait) {
+      // Check portrait
+      const portraitScheme = await detectNamingScheme(folderName, '9:16');
+      if (portraitScheme) {
+        const prefix = portraitScheme === 'candidate' ? 'candidate_' : 'route_';
         mapSources.push({
           id: `${folderName.toLowerCase()}-portrait`,
           name: folderName,
           aspect: '9:16',
           csvPath,
-          imagePathPrefix: `/maps/${folderName}/9_16/candidate_`,
+          imagePathPrefix: `/maps/${folderName}/9_16/${prefix}`,
           folderName,
+          namingScheme: portraitScheme,
         });
       }
     }
@@ -143,23 +153,31 @@ const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
     .filter(item => item !== null) as RouteData[];
 };
 
-// Check if a specific route image exists
-const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16:9' | '9:16'): Promise<boolean> => {
+// Check if a specific route image exists (tries both naming schemes)
+const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16:9' | '9:16', namingScheme?: 'candidate' | 'route'): Promise<boolean> => {
   const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
-  const imagePath = `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
   
+  // If we know the scheme, use it directly
+  if (namingScheme === 'route') {
+    const imagePath = `/maps/${mapName}/${aspectFolder}/route_${candidateIndex}.png`;
+    try {
+      const response = await fetch(imagePath, { method: 'HEAD' });
+      return response.ok;
+    } catch { return false; }
+  }
+  
+  // Default: try candidate scheme
+  const imagePath = `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
   try {
     const response = await fetch(imagePath, { method: 'HEAD' });
     return response.ok;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 };
 
 // Fetch route data from a specific map source, validating each image exists
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
-    console.log(`Fetching routes from: ${mapSource.csvPath}`);
+    console.log(`Fetching routes from: ${mapSource.csvPath} (scheme: ${mapSource.namingScheme})`);
     const response = await fetch(mapSource.csvPath);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
@@ -169,10 +187,8 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
     
     // Validate each route has a corresponding image
     const validatedRoutes: RouteData[] = [];
-    
-    // Check all images in parallel for better performance
     const imageCheckPromises = data.map(async (route) => {
-      const exists = await checkImageExists(mapSource.name, route.candidateIndex, mapSource.aspect);
+      const exists = await checkImageExists(mapSource.name, route.candidateIndex, mapSource.aspect, mapSource.namingScheme);
       return { route, exists };
     });
     
