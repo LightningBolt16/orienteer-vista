@@ -45,7 +45,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email to user
     const emailResponse = await resend.emails.send({
-      from: "Ljungdell.uk <onboarding@resend.dev>",
+      from: "Ljungdell.uk <noreply@ljungdell.uk>",
       to: [userEmail],
       subject: `Your Club "${clubName}" Has Been Approved!`,
       html: `

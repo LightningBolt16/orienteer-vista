@@ -41,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email to admin
     const emailResponse = await resend.emails.send({
-      from: "Ljungdell.uk <onboarding@resend.dev>",
+      from: "Ljungdell.uk <noreply@ljungdell.uk>",
       to: ["elias.ljungdell@gmail.com"],
       subject: `New Club Request: ${clubName}`,
       html: `
