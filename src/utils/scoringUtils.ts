@@ -116,6 +116,7 @@ export const calculateWeightedStats = (attempts: AttemptData[]): WeightedStats =
 /**
  * Calculate combined score with accuracy multiplier
  * Higher is better
+ * Score is multiplied by 100 for more detailed display
  */
 export const calculateCombinedScore = (accuracy: number, speed: number): number => {
   if (speed === 0) return 0;
@@ -124,9 +125,10 @@ export const calculateCombinedScore = (accuracy: number, speed: number): number 
   
   // Base score: 1000 / speed (faster = higher)
   // Multiplied by accuracy multiplier
+  // Then multiplied by 100 for more detailed scores
   const baseScore = 1000 / Math.max(speed, 1);
   
-  return baseScore * accuracyMultiplier;
+  return baseScore * accuracyMultiplier * 100;
 };
 
 /**
