@@ -565,7 +565,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
                 <Info className="h-4 w-4 text-muted-foreground ml-2 cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Overall score = Accuracy × (1000 ÷ Speed). Higher accuracy and faster times give better scores.'}</p>
+                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Attempts older than 30 days start losing value (fully gone after 120 days). Accuracy above 50% gives exponential boost, below 50% gives penalty. Overall score = (1000 ÷ Speed) × Accuracy Multiplier × 100.'}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
