@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
+import { calculateCombinedScore as calcCombinedScore, calculateAccuracyMultiplier } from '../utils/scoringUtils';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { 
@@ -79,8 +80,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
             
             if (data && data.length > 0) {
               const calculateScore = (accuracy: number, speed: number) => {
-                if (speed === 0) return accuracy;
-                return accuracy * (1000 / Math.max(speed, 1));
+                return calcCombinedScore(accuracy, speed);
               };
               
               const sortedData = [...data].sort((a: any, b: any) => {
@@ -118,10 +118,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     loadLeaderboard();
   }, [mapFilter, leaderboard, fetchMapLeaderboard]);
 
-  // Calculate combined score (higher is better)
+  // Calculate combined score using new formula with accuracy multiplier
   const calculateCombinedScore = (accuracy: number, speed: number) => {
-    if (speed === 0) return accuracy;
-    return accuracy * (1000 / Math.max(speed, 1));
+    return calcCombinedScore(accuracy, speed);
   };
 
   // Get the ranked leaderboard based on current sort field (always descending for ranking)
