@@ -117,38 +117,79 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
   }
 };
 
-// Parse CSV text into RouteData array
+// Detect CSV format based on header
+type CSVFormat = 'old' | 'new';
+
+const detectCSVFormat = (headerLine: string): CSVFormat => {
+  const header = headerLine.toLowerCase();
+  // New format: ID, Main_Side, Main_Len, Alt_Len, Overlap_Pct, Hardness, Pass_Num
+  if (header.includes('main_side') || header.includes('main_len')) {
+    return 'new';
+  }
+  // Old format: Candidate_Index, Shortest_Side, Shortest_Color, Main_Route_Length, Alt_Route_Length
+  return 'old';
+};
+
+// Parse CSV text into RouteData array (supports both old and new formats)
 const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
   const lines = csvText.split('\n');
+  if (lines.length < 2) return [];
+  
+  const headerLine = lines[0];
+  const format = detectCSVFormat(headerLine);
+  
+  // Handle both comma and tab-separated values
+  const splitLine = (line: string): string[] => {
+    if (line.includes('\t')) {
+      return line.split('\t');
+    }
+    return line.split(',');
+  };
   
   return lines.slice(1)
     .filter(line => line.trim() !== '')
     .map((line) => {
-      const values = line.split(',');
-      
-      if (values[0].toLowerCase() === 'candidate_index') {
-        return null;
-      }
+      const values = splitLine(line);
       
       const candidateIndex = parseInt(values[0]);
       if (isNaN(candidateIndex)) {
         return null;
       }
       
-      const sideValue = values[1]?.toLowerCase().trim() || '';
-      const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
-      const colorValue = values[2]?.toLowerCase().trim() || 'red';
-      const mainRouteLength = parseFloat(values[3]) || 0;
-      const altRouteLength = parseFloat(values[4]) || 0;
-      
-      return {
-        candidateIndex,
-        shortestSide,
-        shortestColor: colorValue,
-        mainRouteLength,
-        altRouteLength,
-        mapName,
-      };
+      if (format === 'new') {
+        // New format: ID, Main_Side, Main_Len, Alt_Len, Overlap_Pct, Hardness, Pass_Num
+        const sideValue = values[1]?.toLowerCase().trim() || '';
+        const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
+        const mainRouteLength = parseFloat(values[2]) || 0;
+        const altRouteLength = parseFloat(values[3]) || 0;
+        // Color is derived from side in new format
+        const shortestColor = shortestSide === 'left' ? 'red' : 'blue';
+        
+        return {
+          candidateIndex,
+          shortestSide,
+          shortestColor,
+          mainRouteLength,
+          altRouteLength,
+          mapName,
+        };
+      } else {
+        // Old format: Candidate_Index, Shortest_Side, Shortest_Color, Main_Route_Length, Alt_Route_Length
+        const sideValue = values[1]?.toLowerCase().trim() || '';
+        const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
+        const colorValue = values[2]?.toLowerCase().trim() || 'red';
+        const mainRouteLength = parseFloat(values[3]) || 0;
+        const altRouteLength = parseFloat(values[4]) || 0;
+        
+        return {
+          candidateIndex,
+          shortestSide,
+          shortestColor: colorValue,
+          mainRouteLength,
+          altRouteLength,
+          mapName,
+        };
+      }
     })
     .filter(item => item !== null) as RouteData[];
 };
