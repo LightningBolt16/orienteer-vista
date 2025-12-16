@@ -223,6 +223,7 @@ export type Database = {
           alltime_time_sum: number | null
           alltime_total: number | null
           attempts: Json | null
+          bio: string | null
           created_at: string
           id: string
           name: string | null
@@ -239,6 +240,7 @@ export type Database = {
           alltime_time_sum?: number | null
           alltime_total?: number | null
           attempts?: Json | null
+          bio?: string | null
           created_at?: string
           id?: string
           name?: string | null
@@ -255,6 +257,7 @@ export type Database = {
           alltime_time_sum?: number | null
           alltime_total?: number | null
           attempts?: Json | null
+          bio?: string | null
           created_at?: string
           id?: string
           name?: string | null
