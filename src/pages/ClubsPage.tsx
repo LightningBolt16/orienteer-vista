@@ -62,6 +62,7 @@ const ClubsPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [memberSortField, setMemberSortField] = useState<MemberSortField>('combined');
   const [memberSortDirection, setMemberSortDirection] = useState<SortDirection>('desc');
+  const [activeTab, setActiveTab] = useState<string>(userClub ? 'my-club' : 'leaderboard');
 
   const isAdmin = userMembership?.role === 'admin';
 
@@ -429,7 +430,7 @@ const ClubsPage: React.FC = () => {
           <p className="text-muted-foreground">{t('clubsDescription')}</p>
         </div>
 
-        <Tabs defaultValue={userClub ? 'my-club' : 'leaderboard'} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="leaderboard">{t('clubLeaderboard')}</TabsTrigger>
             <TabsTrigger value="all-clubs">{t('allClubs')}</TabsTrigger>
@@ -809,7 +810,7 @@ const ClubsPage: React.FC = () => {
                 <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <h2 className="text-xl font-semibold mb-2">{t('notInClub')}</h2>
                 <p className="text-muted-foreground mb-4">{t('joinClubPrompt')}</p>
-                <Button onClick={() => document.querySelector('[value="all-clubs"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}>
+                <Button onClick={() => setActiveTab('all-clubs')}>
                   {t('browseClubs')}
                 </Button>
               </div>

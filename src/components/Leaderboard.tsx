@@ -342,7 +342,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
         className={`flex items-center p-2 rounded-lg transition-all cursor-pointer min-w-0 ${
           isCurrentUser ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-secondary'
         }`}
-        onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
+        onClick={() => navigate(isCurrentUser ? '/profile' : `/user/${entry.id}`)}
       >
         <div className="flex items-center mr-1.5 flex-shrink-0">
           <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-medium ${
@@ -401,8 +401,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     return (
       <TableRow 
         key={entry.id} 
-        className={`${isCurrentUser ? 'bg-orienteering/5' : ''} ${!isCurrentUser ? 'cursor-pointer hover:bg-secondary/50' : ''}`}
-        onClick={() => !isCurrentUser && navigate(`/user/${entry.id}`)}
+        className={`${isCurrentUser ? 'bg-orienteering/5' : ''} cursor-pointer hover:bg-secondary/50`}
+        onClick={() => navigate(isCurrentUser ? '/profile' : `/user/${entry.id}`)}
       >
         <TableCell className="font-medium">
           <div className="flex items-center gap-2">

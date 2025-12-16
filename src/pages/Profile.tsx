@@ -33,7 +33,9 @@ interface PerformanceDataPoint {
 const Profile: React.FC = () => {
   const { user, setUser, getUserRank, loading } = useUser();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingBio, setIsEditingBio] = useState(false);
   const [userName, setUserName] = useState('');
+  const [userBio, setUserBio] = useState('');
   const [uploading, setUploading] = useState(false);
   const [mapStats, setMapStats] = useState<MapStats[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformanceDataPoint[]>([]);
