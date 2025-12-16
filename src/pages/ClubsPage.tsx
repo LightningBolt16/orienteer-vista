@@ -729,42 +729,57 @@ const ClubsPage: React.FC = () => {
                         return (
                           <div 
                             key={member.user_id} 
-                            className={`flex items-center gap-4 p-3 rounded-lg bg-muted/50 ${
+                            className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 rounded-lg bg-muted/50 ${
                               member.user_id !== user?.id ? 'hover:bg-muted cursor-pointer' : ''
                             }`}
                             onClick={() => member.user_id !== user?.id && navigate(`/user/${member.user_id}`)}
                           >
-                            <div className="flex items-center gap-2">
-                              <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
-                                rank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
-                              }`}>
-                                {rank}
+                            <div className="flex items-center gap-2 sm:gap-4">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${
+                                  rank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
+                                }`}>
+                                  {rank}
+                                </div>
+                                <Minus className="h-4 w-4 text-muted-foreground hidden sm:block" />
                               </div>
-                              <Minus className="h-4 w-4 text-muted-foreground" />
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={member.user_profile?.profile_image || ''} />
+                                <AvatarFallback>{member.user_profile?.name?.[0] || '?'}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">
+                                  {member.user_profile?.name || 'Unknown'}
+                                  {member.user_id === user?.id && <span className="text-orienteering ml-2">({t('you')})</span>}
+                                </p>
+                                <p className="text-sm text-muted-foreground capitalize">{member.role}</p>
+                              </div>
+                              {isAdmin && member.user_id !== user?.id && member.role !== 'admin' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 sm:hidden"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleKickMember(member.user_id);
+                                  }}
+                                >
+                                  <UserMinus className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={member.user_profile?.profile_image || ''} />
-                              <AvatarFallback>{member.user_profile?.name?.[0] || '?'}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <p className="font-medium">
-                                {member.user_profile?.name || 'Unknown'}
-                                {member.user_id === user?.id && <span className="text-orienteering ml-2">({t('you')})</span>}
-                              </p>
-                              <p className="text-sm text-muted-foreground capitalize">{member.role}</p>
-                            </div>
-                            <div className="text-right flex items-center gap-3">
+                            <div className="flex items-center justify-between sm:justify-end gap-3 pl-10 sm:pl-0">
                               <div className="flex items-center gap-4">
-                                <div>
-                                  <p className="font-semibold">{accuracy}%</p>
+                                <div className="text-center">
+                                  <p className="font-semibold text-sm">{accuracy}%</p>
                                   <p className="text-xs text-muted-foreground">{t('accuracy')}</p>
                                 </div>
-                                <div>
-                                  <p className="font-semibold">{speed || 0}</p>
+                                <div className="text-center">
+                                  <p className="font-semibold text-sm">{speed || 0}</p>
                                   <p className="text-xs text-muted-foreground">{t('speed')}</p>
                                 </div>
-                                <div>
-                                  <p className="font-semibold">{score.toFixed(1)}</p>
+                                <div className="text-center">
+                                  <p className="font-semibold text-sm">{score.toFixed(1)}</p>
                                   <p className="text-xs text-muted-foreground">{t('overall')}</p>
                                 </div>
                               </div>
@@ -772,7 +787,7 @@ const ClubsPage: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 hidden sm:flex"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleKickMember(member.user_id);
