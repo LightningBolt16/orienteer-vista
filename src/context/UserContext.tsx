@@ -103,8 +103,25 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Also fetch the leaderboard on mount
     fetchLeaderboard();
 
+    // Subscribe to real-time updates on user_profiles for leaderboard refresh
+    const leaderboardChannel = supabase
+      .channel('leaderboard-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles'
+        },
+        () => {
+          fetchLeaderboard();
+        }
+      )
+      .subscribe();
+
     return () => {
       subscription.unsubscribe();
+      supabase.removeChannel(leaderboardChannel);
     };
   }, []);
 
