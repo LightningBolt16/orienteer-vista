@@ -17,6 +17,7 @@ type UserProfile = {
     timeSum: number;
   };
   profileImage?: string;
+  bio?: string;
   alltimeTotal?: number;
   alltimeCorrect?: number;
   alltimeTimeSum?: number;
@@ -134,6 +135,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           accuracy: data.accuracy || 0,
           speed: data.speed || 0,
           profileImage: data.profile_image || undefined,
+          bio: data.bio || undefined,
           attempts: data.attempts as { total: number; correct: number; timeSum: number } || {
             total: 0,
             correct: 0,
@@ -501,6 +503,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (updatedUser.profileImage !== undefined) {
         updateData.profile_image = updatedUser.profileImage;
+      }
+      
+      if (updatedUser.bio !== undefined) {
+        updateData.bio = updatedUser.bio;
       }
       
       await supabaseManager.executeWithRetry(
