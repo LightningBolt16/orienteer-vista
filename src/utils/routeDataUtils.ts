@@ -283,11 +283,23 @@ export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: R
 // Cache for detected naming schemes per map
 const namingSchemeCache: Map<string, 'candidate' | 'route'> = new Map();
 
-// Helper to get image URL by map name (tries to detect naming scheme)
+// Helper to get image URL by map name
+// Uses cached scheme if available, otherwise defaults based on known map configurations
 export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean): string => {
   const aspectFolder = isMobile ? '9_16' : '16_9';
-  const cachedScheme = namingSchemeCache.get(`${mapName}-${aspectFolder}`);
-  const prefix = cachedScheme === 'route' ? 'route_' : 'candidate_';
+  const cacheKey = `${mapName}-${aspectFolder}`;
+  const cachedScheme = namingSchemeCache.get(cacheKey);
+  
+  // Use cached scheme, or determine default based on map name
+  // Rotondella uses 'route_' prefix, others use 'candidate_'
+  let prefix: string;
+  if (cachedScheme) {
+    prefix = cachedScheme === 'route' ? 'route_' : 'candidate_';
+  } else {
+    // Fallback: Rotondella uses route_ prefix, others use candidate_
+    prefix = mapName.toLowerCase() === 'rotondella' ? 'route_' : 'candidate_';
+  }
+  
   return `/maps/${mapName}/${aspectFolder}/${prefix}${candidateIndex}.png`;
 };
 
