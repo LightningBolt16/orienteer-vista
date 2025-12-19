@@ -113,12 +113,12 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     };
   }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
-  // Start timer only when image is loaded and not paused
+  // Start timer only when image is loaded, not paused, and not transitioning
   useEffect(() => {
     if (!isPaused && isImageLoaded && !isTransitioning) {
       setStartTime(Date.now());
     }
-  }, [isPaused, isImageLoaded, currentRouteIndex]);
+  }, [isPaused, isImageLoaded, currentRouteIndex, isTransitioning]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
     if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;

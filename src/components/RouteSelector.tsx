@@ -112,12 +112,12 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     };
   }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
-  // Start timer only when image is loaded and not paused
+  // Start timer only when image is loaded, not paused, and not transitioning
   useEffect(() => {
     if (!isPaused && isImageLoaded && !isTransitioning) {
       setStartTime(Date.now());
     }
-  }, [isPaused, isImageLoaded, currentRouteIndex]);
+  }, [isPaused, isImageLoaded, currentRouteIndex, isTransitioning]);
 
   // Keyboard support
   useEffect(() => {
