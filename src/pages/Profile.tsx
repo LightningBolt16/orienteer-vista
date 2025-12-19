@@ -570,12 +570,13 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="accuracy" 
                           stroke="hsl(var(--orienteering))" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(var(--orienteering))', r: 4 }}
-                          connectNulls
+                          dot={{ fill: 'hsl(var(--orienteering))', r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          connectNulls={true}
                           name={t('accuracy') || 'Accuracy'}
                         />
                       </LineChart>
@@ -598,12 +599,13 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="speed" 
                           stroke="hsl(142, 76%, 36%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(142, 76%, 36%)', r: 4 }}
-                          connectNulls
+                          dot={{ fill: 'hsl(142, 76%, 36%)', r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          connectNulls={true}
                           name={t('speed') || 'Speed (ms)'}
                         />
                       </LineChart>
@@ -626,12 +628,13 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="attempts" 
                           stroke="hsl(217, 91%, 60%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(217, 91%, 60%)', r: 4 }}
-                          connectNulls
+                          dot={{ fill: 'hsl(217, 91%, 60%)', r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          connectNulls={true}
                           name={t('attempts') || 'Attempts'}
                         />
                       </LineChart>

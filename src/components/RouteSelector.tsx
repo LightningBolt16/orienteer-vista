@@ -119,22 +119,6 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     }
   }, [isPaused, isImageLoaded, currentRouteIndex, isTransitioning]);
 
-  // Keyboard support
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTransitioning || routeData.length === 0 || isPaused) return;
-      
-      if (e.key === 'ArrowLeft') {
-        handleDirectionSelect('left');
-      } else if (e.key === 'ArrowRight') {
-        handleDirectionSelect('right');
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRouteIndex, isTransitioning, routeData, isPaused]);
-
   const handleDirectionSelect = (direction: 'left' | 'right') => {
     if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;
     
@@ -206,6 +190,25 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
       }, 200);
     }, 400);
   };
+
+  // Keyboard support - use ref to get latest handler without re-registering listener
+  const handleDirectionSelectRef = useRef(handleDirectionSelect);
+  handleDirectionSelectRef.current = handleDirectionSelect;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleDirectionSelectRef.current('left');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleDirectionSelectRef.current('right');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Show loading if no routes
   if (routeData.length === 0) {
