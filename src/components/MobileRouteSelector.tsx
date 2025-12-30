@@ -20,9 +20,10 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [resultMessage, setResultMessage] = useState<string>('');
   const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [isWarmUp, setIsWarmUp] = useState(true); // First attempt is warm-up, doesn't count
   const { updatePerformance } = useUser();
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
@@ -54,6 +55,8 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
       setIsImageLoaded(false);
       setShowResult(null);
       setIsTransitioning(false);
+      setIsWarmUp(true); // Reset warm-up on map switch
+      setStartTime(null);
       previousRouteDataRef.current = routeData;
     }
   }, [routeData]);
@@ -110,15 +113,15 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     };
   }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
-  // Reset start time when resuming or changing route
+  // Start timer only when image is loaded, not paused, and not transitioning
   useEffect(() => {
-    if (!isPaused) {
+    if (!isPaused && isImageLoaded && !isTransitioning) {
       setStartTime(Date.now());
     }
-  }, [isPaused, currentRouteIndex]);
+  }, [isPaused, isImageLoaded, currentRouteIndex, isTransitioning]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || routeData.length === 0 || isPaused) return;
+    if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;
     
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
@@ -128,9 +131,16 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
     // Reset inactivity timer on interaction
     resetTimer();
     
-    updatePerformance(isCorrect, responseTime, mapName);
+    // Only record performance if not warm-up (first attempt after load/switch doesn't count)
+    if (!isWarmUp) {
+      updatePerformance(isCorrect, responseTime, mapName);
+    } else {
+      setIsWarmUp(false); // First attempt done, subsequent ones count
+    }
     
-    if (isCorrect) {
+    if (isWarmUp) {
+      setResultMessage(t('warmUp') || 'Warm-up!');
+    } else if (isCorrect) {
       if (responseTime < 1000) {
         setResultMessage(t('excellent'));
       } else if (responseTime < 2000) {

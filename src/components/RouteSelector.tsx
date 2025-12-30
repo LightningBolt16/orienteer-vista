@@ -19,9 +19,10 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [resultMessage, setResultMessage] = useState<string>('');
   const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [isWarmUp, setIsWarmUp] = useState(true); // First attempt is warm-up, doesn't count
   const { updatePerformance } = useUser();
   const { t } = useLanguage();
   const resultTimeout = useRef<number | null>(null);
@@ -53,6 +54,8 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
       setIsImageLoaded(false);
       setShowResult(null);
       setIsTransitioning(false);
+      setIsWarmUp(true); // Reset warm-up on map switch
+      setStartTime(null);
       previousRouteDataRef.current = routeData;
     }
   }, [routeData]);
@@ -109,31 +112,15 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     };
   }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
-  // Reset start time when resuming or changing route
+  // Start timer only when image is loaded, not paused, and not transitioning
   useEffect(() => {
-    if (!isPaused) {
+    if (!isPaused && isImageLoaded && !isTransitioning) {
       setStartTime(Date.now());
     }
-  }, [isPaused, currentRouteIndex]);
-
-  // Keyboard support
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTransitioning || routeData.length === 0 || isPaused) return;
-      
-      if (e.key === 'ArrowLeft') {
-        handleDirectionSelect('left');
-      } else if (e.key === 'ArrowRight') {
-        handleDirectionSelect('right');
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRouteIndex, isTransitioning, routeData, isPaused]);
+  }, [isPaused, isImageLoaded, currentRouteIndex, isTransitioning]);
 
   const handleDirectionSelect = (direction: 'left' | 'right') => {
-    if (isTransitioning || routeData.length === 0 || isPaused) return;
+    if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;
     
     const currentRoute = routeData[currentRouteIndex];
     const isCorrect = direction === currentRoute.shortestSide;
@@ -143,9 +130,16 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
     // Reset inactivity timer on interaction
     resetTimer();
     
-    updatePerformance(isCorrect, responseTime, mapName);
+    // Only record performance if not warm-up (first attempt after load/switch doesn't count)
+    if (!isWarmUp) {
+      updatePerformance(isCorrect, responseTime, mapName);
+    } else {
+      setIsWarmUp(false); // First attempt done, subsequent ones count
+    }
     
-    if (isCorrect) {
+    if (isWarmUp) {
+      setResultMessage(t('warmUp') || 'Warm-up!');
+    } else if (isCorrect) {
       if (responseTime < 1000) {
         setResultMessage(t('excellent'));
       } else if (responseTime < 2000) {
@@ -196,6 +190,25 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
       }, 200);
     }, 400);
   };
+
+  // Keyboard support - use ref to get latest handler without re-registering listener
+  const handleDirectionSelectRef = useRef(handleDirectionSelect);
+  handleDirectionSelectRef.current = handleDirectionSelect;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleDirectionSelectRef.current('left');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleDirectionSelectRef.current('right');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Show loading if no routes
   if (routeData.length === 0) {

@@ -199,6 +199,22 @@ const Profile: React.FC = () => {
     });
   };
 
+  const handleSaveBio = () => {
+    if (!user) return;
+    
+    setUser({
+      ...user,
+      bio: userBio.trim() || undefined
+    });
+    
+    setIsEditingBio(false);
+    
+    toast({
+      title: t('profileUpdated'),
+      description: t('profileUpdateSuccess')
+    });
+  };
+
   const handleImageClick = () => {
     fileInputRef.current?.click();
   };
@@ -379,7 +395,37 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
               )}
-              <p className="text-muted-foreground mt-1">{t('orienteeringEnthusiast')}</p>
+              {isEditingBio ? (
+                <div className="flex items-center space-x-2 mt-1">
+                  <input
+                    type="text"
+                    value={userBio}
+                    onChange={(e) => setUserBio(e.target.value)}
+                    placeholder={t('orienteeringEnthusiast')}
+                    className="text-sm text-muted-foreground w-full bg-transparent border-b border-muted focus:border-orienteering focus:outline-none pb-1"
+                    autoFocus
+                  />
+                  <button 
+                    onClick={handleSaveBio}
+                    className="p-1 text-orienteering hover:bg-orienteering/10 rounded-full transition-colors"
+                  >
+                    <Save className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center md:justify-start mt-1">
+                  <p className="text-muted-foreground">{user.bio || t('orienteeringEnthusiast')}</p>
+                  <button 
+                    onClick={() => {
+                      setUserBio(user.bio || '');
+                      setIsEditingBio(true);
+                    }}
+                    className="ml-2 p-1 text-muted-foreground hover:text-foreground rounded-full transition-colors"
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
             </div>
             
             {alltimeTotal > 0 && (
@@ -524,11 +570,13 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="accuracy" 
                           stroke="hsl(var(--orienteering))" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(var(--orienteering))' }}
+                          dot={{ fill: 'hsl(var(--orienteering))', r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          connectNulls={true}
                           name={t('accuracy') || 'Accuracy'}
                         />
                       </LineChart>
@@ -551,11 +599,13 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="speed" 
                           stroke="hsl(142, 76%, 36%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(142, 76%, 36%)' }}
+                          dot={{ fill: 'hsl(142, 76%, 36%)', r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          connectNulls={true}
                           name={t('speed') || 'Speed (ms)'}
                         />
                       </LineChart>
@@ -578,11 +628,13 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="attempts" 
                           stroke="hsl(217, 91%, 60%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(217, 91%, 60%)' }}
+                          dot={{ fill: 'hsl(217, 91%, 60%)', r: 4, strokeWidth: 0 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          connectNulls={true}
                           name={t('attempts') || 'Attempts'}
                         />
                       </LineChart>

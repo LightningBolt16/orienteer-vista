@@ -82,6 +82,7 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
       const landscapeScheme = await detectNamingScheme(folderName, '16:9');
       if (landscapeScheme) {
         const prefix = landscapeScheme === 'candidate' ? 'candidate_' : 'route_';
+        cacheNamingScheme(folderName, '16:9', landscapeScheme);
         mapSources.push({
           id: `${folderName.toLowerCase()}-landscape`,
           name: folderName,
@@ -97,6 +98,7 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
       const portraitScheme = await detectNamingScheme(folderName, '9:16');
       if (portraitScheme) {
         const prefix = portraitScheme === 'candidate' ? 'candidate_' : 'route_';
+        cacheNamingScheme(folderName, '9:16', portraitScheme);
         mapSources.push({
           id: `${folderName.toLowerCase()}-portrait`,
           name: folderName,
@@ -278,10 +280,33 @@ export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: R
   }
 };
 
+// Cache for detected naming schemes per map
+const namingSchemeCache: Map<string, 'candidate' | 'route'> = new Map();
+
 // Helper to get image URL by map name
+// Uses cached scheme if available, otherwise defaults based on known map configurations
 export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean): string => {
   const aspectFolder = isMobile ? '9_16' : '16_9';
-  return `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
+  const cacheKey = `${mapName}-${aspectFolder}`;
+  const cachedScheme = namingSchemeCache.get(cacheKey);
+  
+  // Use cached scheme, or determine default based on map name
+  // Rotondella uses 'route_' prefix, others use 'candidate_'
+  let prefix: string;
+  if (cachedScheme) {
+    prefix = cachedScheme === 'route' ? 'route_' : 'candidate_';
+  } else {
+    // Fallback: Rotondella uses route_ prefix, others use candidate_
+    prefix = mapName.toLowerCase() === 'rotondella' ? 'route_' : 'candidate_';
+  }
+  
+  return `/maps/${mapName}/${aspectFolder}/${prefix}${candidateIndex}.png`;
+};
+
+// Initialize naming scheme cache for a map
+export const cacheNamingScheme = (mapName: string, aspect: '16:9' | '9:16', scheme: 'candidate' | 'route'): void => {
+  const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
+  namingSchemeCache.set(`${mapName}-${aspectFolder}`, scheme);
 };
 
 // Get unique map names from available maps
