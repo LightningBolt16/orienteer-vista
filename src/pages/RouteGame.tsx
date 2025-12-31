@@ -191,28 +191,39 @@ const RouteGame: React.FC = () => {
                 </button>
                 
                 {/* Individual Map Options */}
-                {uniqueMapNames.map(mapName => (
-                  <button
-                    key={mapName}
-                    onClick={() => handleMapSelect(mapName)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                      selectedMapId === mapName
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-card'
-                    }`}
-                  >
-                    {isPwtMap(mapName) && (
-                      <div className="absolute top-1 right-1">
-                        <PwtAttribution variant="badge" className="scale-75 origin-top-right" />
-                      </div>
-                    )}
-                    <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <span className="font-medium text-sm">{mapName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {availableMaps.find(m => m.name === mapName)?.description || 'Orienteering map'}
-                    </span>
-                  </button>
-                ))}
+                {uniqueMapNames.map(mapName => {
+                  const isPwt = isPwtMap(mapName);
+                  const isKnivsta = mapName.toLowerCase().includes('knivsta');
+                  const isBelgien = mapName.toLowerCase().includes('belgien');
+                  const countryFlag = isPwt ? '🇮🇹' : isKnivsta ? '🇸🇪' : isBelgien ? '🇧🇪' : null;
+                  
+                  return (
+                    <button
+                      key={mapName}
+                      onClick={() => handleMapSelect(mapName)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                        selectedMapId === mapName
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      {countryFlag && (
+                        <div className="absolute top-1 right-1 text-lg">
+                          {countryFlag}
+                        </div>
+                      )}
+                      {isPwt ? (
+                        <PwtAttribution variant="badge" className="mb-2" />
+                      ) : (
+                        <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                      )}
+                      <span className="font-medium text-sm">{mapName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {availableMaps.find(m => m.name === mapName)?.description || 'Orienteering map'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
