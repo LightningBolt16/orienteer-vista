@@ -13,6 +13,7 @@ import { MapSource, RouteData, getUniqueMapNames } from '../utils/routeDataUtils
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
+import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 
 type MapSelection = 'all' | string;
 
@@ -194,12 +195,17 @@ const RouteGame: React.FC = () => {
                   <button
                     key={mapName}
                     onClick={() => handleMapSelect(mapName)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
                       selectedMapId === mapName
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-card'
                     }`}
                   >
+                    {isPwtMap(mapName) && (
+                      <div className="absolute top-1 right-1">
+                        <PwtAttribution variant="badge" className="scale-75 origin-top-right" />
+                      </div>
+                    )}
                     <Map className="h-8 w-8 mb-2 text-muted-foreground" />
                     <span className="font-medium text-sm">{mapName}</span>
                     <span className="text-xs text-muted-foreground">
@@ -277,6 +283,13 @@ const RouteGame: React.FC = () => {
       {showLeaderboard && !isFullscreen && (
         <section className="max-w-2xl mx-auto animate-fade-in">
           <Leaderboard showAll={true} />
+        </section>
+      )}
+
+      {/* PWT Attribution Footer */}
+      {!isFullscreen && (
+        <section className="max-w-lg mx-auto">
+          <PwtAttribution variant="footer" />
         </section>
       )}
     </div>
