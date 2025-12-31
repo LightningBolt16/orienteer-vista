@@ -14,6 +14,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { toast } from '../components/ui/use-toast';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
+import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
+import flagItaly from '@/assets/flag-italy.png';
+import flagSweden from '@/assets/flag-sweden.png';
+import flagBelgium from '@/assets/flag-belgium.png';
 
 type MapSelection = 'all' | string;
 
@@ -195,7 +199,7 @@ const RouteGame: React.FC = () => {
                   const isPwt = isPwtMap(mapName);
                   const isKnivsta = mapName.toLowerCase().includes('knivsta');
                   const isBelgien = mapName.toLowerCase().includes('belgien');
-                  const countryFlag = isPwt ? '🇮🇹' : isKnivsta ? '🇸🇪' : isBelgien ? '🇧🇪' : null;
+                  const countryFlag = isPwt ? flagItaly : isKnivsta ? flagSweden : isBelgien ? flagBelgium : null;
                   
                   return (
                     <button
@@ -208,12 +212,16 @@ const RouteGame: React.FC = () => {
                       }`}
                     >
                       {countryFlag && (
-                        <div className="absolute top-1 right-1 text-lg">
-                          {countryFlag}
-                        </div>
+                        <img 
+                          src={countryFlag} 
+                          alt="Country flag" 
+                          className="absolute top-1 right-1 h-4 w-6 object-cover rounded-sm shadow-sm"
+                        />
                       )}
                       {isPwt ? (
                         <PwtAttribution variant="badge" className="mb-2" />
+                      ) : isKnivsta ? (
+                        <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
                       ) : (
                         <Map className="h-8 w-8 mb-2 text-muted-foreground" />
                       )}
