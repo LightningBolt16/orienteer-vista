@@ -25,15 +25,18 @@ interface PlayerState {
 }
 
 const SPEED_BONUS = 0.5; // Bonus points for being faster
+const WRONG_PENALTY = -0.5; // Penalty for wrong answers in timed mode
 
 const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart }) => {
   const { t } = useLanguage();
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
+  const [routesCompleted, setRoutesCompleted] = useState(0); // Track for timed mode
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
   const [timeRemaining, setTimeRemaining] = useState<number | null>(settings.timeLimit ?? null);
+  const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
   
   const [player1, setPlayer1] = useState<PlayerState>({
     score: 0,
@@ -56,14 +59,36 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
   const transitionTimeout = useRef<number | null>(null);
   const timerInterval = useRef<number | null>(null);
+  const gameTimerInterval = useRef<number | null>(null);
 
-  const currentRoute = routes[currentRouteIndex];
+  const currentRoute = routes[currentRouteIndex % routes.length]; // Loop routes for timed mode
   // Use mobile (9:16) maps for better split-screen display
   const currentImageUrl = currentRoute 
     ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, true)
     : '';
 
-  // Timer countdown
+  const isTimedMode = settings.gameType === 'timed';
+
+  // Game timer countdown (for timed mode)
+  useEffect(() => {
+    if (isTimedMode && settings.gameDuration && !gameOver) {
+      gameTimerInterval.current = window.setInterval(() => {
+        setGameTimeRemaining(prev => {
+          if (prev === null || prev <= 0) {
+            setGameOver(true);
+            return 0;
+          }
+          return prev - 0.1;
+        });
+      }, 100);
+      
+      return () => {
+        if (gameTimerInterval.current) clearInterval(gameTimerInterval.current);
+      };
+    }
+  }, [isTimedMode, settings.gameDuration, gameOver]);
+
+  // Per-route timer countdown
   useEffect(() => {
     if (settings.timeLimit && !gameOver && isImageLoaded && !isTransitioning) {
       timerInterval.current = window.setInterval(() => {
@@ -71,7 +96,6 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
           if (prev === null || prev <= 0) return prev;
           const newTime = prev - 0.1;
           if (newTime <= 0) {
-            // Time's up - force both players to have "answered" (wrong if they haven't)
             if (!player1.hasAnswered) {
               setPlayer1(p => ({ ...p, hasAnswered: true, lastAnswer: null }));
             }
@@ -164,6 +188,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     
     let p1Bonus = 0;
     let p2Bonus = 0;
+    let p1Penalty = 0;
+    let p2Penalty = 0;
     
     // Speed bonus in speed mode
     if (settings.gameMode === 'speed' && p1Correct && p2Correct) {
@@ -176,13 +202,19 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       }
     }
     
+    // Penalty for wrong answers in timed mode
+    if (isTimedMode) {
+      if (!p1Correct && player1.lastAnswer !== null) p1Penalty = WRONG_PENALTY;
+      if (!p2Correct && player2.lastAnswer !== null) p2Penalty = WRONG_PENALTY;
+    }
+    
     setPlayer1(prev => ({
       ...prev,
       showResult: p1Correct ? 'win' : 'lose',
       resultMessage: p1Correct 
         ? (p1Bonus > 0 ? 'Correct! +Speed Bonus!' : 'Correct!') 
-        : (player1.lastAnswer === null ? 'Time Out!' : 'Wrong!'),
-      score: prev.score + p1Bonus,
+        : (player1.lastAnswer === null ? 'Time Out!' : `Wrong! ${p1Penalty}pts`),
+      score: prev.score + p1Bonus + p1Penalty,
     }));
     
     setPlayer2(prev => ({
@@ -190,15 +222,17 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       showResult: p2Correct ? 'win' : 'lose',
       resultMessage: p2Correct 
         ? (p2Bonus > 0 ? 'Correct! +Speed Bonus!' : 'Correct!') 
-        : (player2.lastAnswer === null ? 'Time Out!' : 'Wrong!'),
-      score: prev.score + p2Bonus,
+        : (player2.lastAnswer === null ? 'Time Out!' : `Wrong! ${p2Penalty}pts`),
+      score: prev.score + p2Bonus + p2Penalty,
     }));
     
+    setRoutesCompleted(prev => prev + 1);
     setIsTransitioning(true);
     
     // Move to next route after delay
     transitionTimeout.current = window.setTimeout(() => {
-      if (currentRouteIndex + 1 >= totalRoutes) {
+      // In timed mode, keep going until time runs out
+      if (!isTimedMode && currentRouteIndex + 1 >= totalRoutes) {
         setGameOver(true);
       } else {
         setCurrentRouteIndex(prev => prev + 1);
@@ -221,8 +255,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         setIsImageLoaded(false);
       }
       setIsTransitioning(false);
-    }, 1000);
-  }, [player1, player2, currentRoute, currentRouteIndex, totalRoutes, settings.gameMode]);
+    }, isTimedMode ? 500 : 1000); // Faster transitions in timed mode
+  }, [player1, player2, currentRoute, currentRouteIndex, totalRoutes, settings.gameMode, isTimedMode]);
 
   // Check if round should end
   useEffect(() => {

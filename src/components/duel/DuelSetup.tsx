@@ -15,7 +15,9 @@ import flagBelgium from '@/assets/flag-belgium.png';
 
 export interface DuelSettings {
   mapId: string;
+  gameType: 'routes' | 'timed'; // routes = fixed count, timed = unlimited within time
   routeCount: number;
+  gameDuration?: number; // total game time in seconds (for timed mode)
   gameMode: 'speed' | 'wait';
   timeLimit?: number; // seconds per route, undefined means no limit
 }
@@ -26,21 +28,33 @@ interface DuelSetupProps {
 }
 
 const ROUTE_COUNT_OPTIONS = [5, 10, 15, 20, 30, 50, 75, 100];
-const TIME_OPTIONS = [
+const TIME_PER_ROUTE_OPTIONS = [
   { label: 'No limit', value: undefined },
   { label: '3s', value: 3 },
   { label: '5s', value: 5 },
   { label: '10s', value: 10 },
   { label: '15s', value: 15 },
 ];
+const GAME_DURATION_OPTIONS = [
+  { label: '30s', value: 30 },
+  { label: '1 min', value: 60 },
+  { label: '2 min', value: 120 },
+  { label: '3 min', value: 180 },
+  { label: '5 min', value: 300 },
+  { label: '10 min', value: 600 },
+];
 
 const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
   const { t } = useLanguage();
   const { mobileCache, isPreloading } = useRouteCache();
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
+  const [gameType, setGameType] = useState<'routes' | 'timed'>('routes');
   const [selectedRouteCount, setSelectedRouteCount] = useState<number>(10);
   const [customRouteCount, setCustomRouteCount] = useState<string>('');
-  const [isCustom, setIsCustom] = useState(false);
+  const [isCustomRoutes, setIsCustomRoutes] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState<number>(60);
+  const [customDuration, setCustomDuration] = useState<string>('');
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
   const [gameMode, setGameMode] = useState<'speed' | 'wait'>('speed');
   const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
 
@@ -48,10 +62,13 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
   const uniqueMapNames = getUniqueMapNames(availableMaps);
 
   const handleStart = () => {
-    const routeCount = isCustom ? parseInt(customRouteCount) || 10 : selectedRouteCount;
+    const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
+    const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
     onStart({
       mapId: selectedMapId,
-      routeCount: Math.min(Math.max(1, routeCount), 200),
+      gameType,
+      routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
+      gameDuration: gameType === 'timed' ? gameDuration : undefined,
       gameMode,
       timeLimit,
     });
@@ -59,11 +76,12 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
 
   const handleRouteCountSelect = (count: number) => {
     setSelectedRouteCount(count);
-    setIsCustom(false);
+    setIsCustomRoutes(false);
   };
 
-  const handleCustomSelect = () => {
-    setIsCustom(true);
+  const handleDurationSelect = (duration: number) => {
+    setSelectedDuration(duration);
+    setIsCustomDuration(false);
   };
 
   return (
@@ -186,78 +204,167 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
         </CardContent>
       </Card>
 
-      {/* Time Limit Selection */}
+      {/* Time Limit per Route (only for routes mode or speed mode) */}
+      {gameType === 'routes' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5" />
+              Time Limit per Route
+            </CardTitle>
+            <CardDescription>Set a time limit per route (optional)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3 justify-center">
+              {TIME_PER_ROUTE_OPTIONS.map(option => (
+                <button
+                  key={option.label}
+                  onClick={() => setTimeLimit(option.value)}
+                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-all hover:border-primary/50 ${
+                    timeLimit === option.value
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-card'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Game Type Selection */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Timer className="h-5 w-5" />
-            Time Limit
+            <Clock className="h-5 w-5" />
+            Game Length
           </CardTitle>
-          <CardDescription>Set a time limit per route (optional)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3 justify-center">
-            {TIME_OPTIONS.map(option => (
-              <button
-                key={option.label}
-                onClick={() => setTimeLimit(option.value)}
-                className={`px-4 py-2 rounded-lg border-2 font-medium transition-all hover:border-primary/50 ${
-                  timeLimit === option.value
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border bg-card'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Route Count Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Number of Routes</CardTitle>
-          <CardDescription>How many routes to compete on</CardDescription>
+          <CardDescription>Choose fixed routes or time-based challenge</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3 justify-center">
-            {ROUTE_COUNT_OPTIONS.map(count => (
-              <button
-                key={count}
-                onClick={() => handleRouteCountSelect(count)}
-                className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
-                  !isCustom && selectedRouteCount === count
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border bg-card'
-                }`}
-              >
-                {count}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={handleCustomSelect}
-              className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
-                isCustom
-                  ? 'border-primary bg-primary/10 text-primary'
+              onClick={() => setGameType('routes')}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                gameType === 'routes'
+                  ? 'border-primary bg-primary/10'
                   : 'border-border bg-card'
               }`}
             >
-              Custom
+              <Map className="h-8 w-8 mb-2 text-green-500" />
+              <span className="font-medium text-sm">Fixed Routes</span>
+              <span className="text-xs text-muted-foreground text-center">Set number of routes</span>
+            </button>
+            
+            <button
+              onClick={() => setGameType('timed')}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                gameType === 'timed'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
+            >
+              <Timer className="h-8 w-8 mb-2 text-orange-500" />
+              <span className="font-medium text-sm">Time Challenge</span>
+              <span className="text-xs text-muted-foreground text-center">Race against the clock</span>
             </button>
           </div>
-          
-          {isCustom && (
-            <div className="flex items-center justify-center gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={200}
-                placeholder="Enter number (1-200)"
-                value={customRouteCount}
-                onChange={(e) => setCustomRouteCount(e.target.value)}
-                className="w-48 text-center"
-              />
+
+          {/* Route Count (for routes mode) */}
+          {gameType === 'routes' && (
+            <div className="space-y-3 pt-2">
+              <p className="text-sm font-medium text-center">Number of Routes</p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {ROUTE_COUNT_OPTIONS.map(count => (
+                  <button
+                    key={count}
+                    onClick={() => handleRouteCountSelect(count)}
+                    className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                      !isCustomRoutes && selectedRouteCount === count
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card'
+                    }`}
+                  >
+                    {count}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setIsCustomRoutes(true)}
+                  className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                    isCustomRoutes
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-card'
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+              
+              {isCustomRoutes && (
+                <div className="flex items-center justify-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={200}
+                    placeholder="Enter number (1-200)"
+                    value={customRouteCount}
+                    onChange={(e) => setCustomRouteCount(e.target.value)}
+                    className="w-48 text-center"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Duration (for timed mode) */}
+          {gameType === 'timed' && (
+            <div className="space-y-3 pt-2">
+              <p className="text-sm font-medium text-center">Game Duration</p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {GAME_DURATION_OPTIONS.map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleDurationSelect(option.value)}
+                    className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                      !isCustomDuration && selectedDuration === option.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setIsCustomDuration(true)}
+                  className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                    isCustomDuration
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-card'
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+              
+              {isCustomDuration && (
+                <div className="flex items-center justify-center gap-2">
+                  <Input
+                    type="number"
+                    min={10}
+                    max={3600}
+                    placeholder="Seconds (10-3600)"
+                    value={customDuration}
+                    onChange={(e) => setCustomDuration(e.target.value)}
+                    className="w-48 text-center"
+                  />
+                </div>
+              )}
+              
+              <p className="text-xs text-center text-amber-600 dark:text-amber-400">
+                ⚠️ Wrong answers: -0.5 points penalty
+              </p>
             </div>
           )}
         </CardContent>
@@ -268,7 +375,11 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
         <Button variant="outline" onClick={onBack} className="flex-1">
           Back
         </Button>
-        <Button onClick={handleStart} className="flex-1" disabled={isPreloading || (isCustom && !customRouteCount)}>
+        <Button 
+          onClick={handleStart} 
+          className="flex-1" 
+          disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
+        >
           <Swords className="h-5 w-5 mr-2" />
           Start Duel!
         </Button>

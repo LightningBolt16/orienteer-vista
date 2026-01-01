@@ -15,6 +15,7 @@ const DuelMode: React.FC = () => {
   const [gameRoutes, setGameRoutes] = useState<RouteData[]>([]);
   const [settings, setSettings] = useState<DuelSettings>({
     mapId: 'all',
+    gameType: 'routes',
     routeCount: 10,
     gameMode: 'speed',
   });
