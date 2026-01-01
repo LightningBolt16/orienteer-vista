@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
 import { useLanguage } from '../../context/LanguageContext';
 import { useRouteCache } from '../../context/RouteCache';
 import { MapSource, getUniqueMapNames } from '../../utils/routeDataUtils';
-import { Map, Shuffle, Swords, AlertCircle } from 'lucide-react';
+import { Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause } from 'lucide-react';
 import { isPwtMap } from '../PwtAttribution';
 import PwtAttribution from '../PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
@@ -12,24 +13,57 @@ import flagItaly from '@/assets/flag-italy.png';
 import flagSweden from '@/assets/flag-sweden.png';
 import flagBelgium from '@/assets/flag-belgium.png';
 
+export interface DuelSettings {
+  mapId: string;
+  routeCount: number;
+  gameMode: 'speed' | 'wait';
+  timeLimit?: number; // seconds per route, undefined means no limit
+}
+
 interface DuelSetupProps {
-  onStart: (mapId: string, routeCount: number) => void;
+  onStart: (settings: DuelSettings) => void;
   onBack: () => void;
 }
 
-const ROUTE_COUNT_OPTIONS = [5, 10, 15, 20, 30];
+const ROUTE_COUNT_OPTIONS = [5, 10, 15, 20, 30, 50, 75, 100];
+const TIME_OPTIONS = [
+  { label: 'No limit', value: undefined },
+  { label: '3s', value: 3 },
+  { label: '5s', value: 5 },
+  { label: '10s', value: 10 },
+  { label: '15s', value: 15 },
+];
 
 const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
   const { t } = useLanguage();
-  const { desktopCache, isPreloading } = useRouteCache();
+  const { mobileCache, isPreloading } = useRouteCache();
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
   const [selectedRouteCount, setSelectedRouteCount] = useState<number>(10);
+  const [customRouteCount, setCustomRouteCount] = useState<string>('');
+  const [isCustom, setIsCustom] = useState(false);
+  const [gameMode, setGameMode] = useState<'speed' | 'wait'>('speed');
+  const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
 
-  const availableMaps = desktopCache?.maps || [];
+  const availableMaps = mobileCache?.maps || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
 
   const handleStart = () => {
-    onStart(selectedMapId, selectedRouteCount);
+    const routeCount = isCustom ? parseInt(customRouteCount) || 10 : selectedRouteCount;
+    onStart({
+      mapId: selectedMapId,
+      routeCount: Math.min(Math.max(1, routeCount), 200),
+      gameMode,
+      timeLimit,
+    });
+  };
+
+  const handleRouteCountSelect = (count: number) => {
+    setSelectedRouteCount(count);
+    setIsCustom(false);
+  };
+
+  const handleCustomSelect = () => {
+    setIsCustom(true);
   };
 
   return (
@@ -115,20 +149,85 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
         </CardContent>
       </Card>
 
+      {/* Game Mode Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Game Mode</CardTitle>
+          <CardDescription>How do you want to compete?</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setGameMode('speed')}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                gameMode === 'speed'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
+            >
+              <Zap className="h-8 w-8 mb-2 text-yellow-500" />
+              <span className="font-medium text-sm">Speed Race</span>
+              <span className="text-xs text-muted-foreground text-center">Fastest answer wins bonus points</span>
+            </button>
+            
+            <button
+              onClick={() => setGameMode('wait')}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                gameMode === 'wait'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
+            >
+              <Pause className="h-8 w-8 mb-2 text-blue-500" />
+              <span className="font-medium text-sm">Turn-Based</span>
+              <span className="text-xs text-muted-foreground text-center">Wait for both players</span>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Time Limit Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Timer className="h-5 w-5" />
+            Time Limit
+          </CardTitle>
+          <CardDescription>Set a time limit per route (optional)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {TIME_OPTIONS.map(option => (
+              <button
+                key={option.label}
+                onClick={() => setTimeLimit(option.value)}
+                className={`px-4 py-2 rounded-lg border-2 font-medium transition-all hover:border-primary/50 ${
+                  timeLimit === option.value
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Route Count Selection */}
       <Card>
         <CardHeader>
           <CardTitle>Number of Routes</CardTitle>
           <CardDescription>How many routes to compete on</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3 justify-center">
             {ROUTE_COUNT_OPTIONS.map(count => (
               <button
                 key={count}
-                onClick={() => setSelectedRouteCount(count)}
-                className={`px-6 py-3 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
-                  selectedRouteCount === count
+                onClick={() => handleRouteCountSelect(count)}
+                className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                  !isCustom && selectedRouteCount === count
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-card'
                 }`}
@@ -136,7 +235,31 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
                 {count}
               </button>
             ))}
+            <button
+              onClick={handleCustomSelect}
+              className={`px-5 py-2.5 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                isCustom
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-card'
+              }`}
+            >
+              Custom
+            </button>
           </div>
+          
+          {isCustom && (
+            <div className="flex items-center justify-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={200}
+                placeholder="Enter number (1-200)"
+                value={customRouteCount}
+                onChange={(e) => setCustomRouteCount(e.target.value)}
+                className="w-48 text-center"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -145,7 +268,7 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
         <Button variant="outline" onClick={onBack} className="flex-1">
           Back
         </Button>
-        <Button onClick={handleStart} className="flex-1" disabled={isPreloading}>
+        <Button onClick={handleStart} className="flex-1" disabled={isPreloading || (isCustom && !customRouteCount)}>
           <Swords className="h-5 w-5 mr-2" />
           Start Duel!
         </Button>

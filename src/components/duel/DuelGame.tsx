@@ -5,10 +5,12 @@ import { RouteData, getImageUrlByMapName } from '../../utils/routeDataUtils';
 import DuelPlayerPanel from './DuelPlayerPanel';
 import DuelScoreBar from './DuelScoreBar';
 import { Trophy, RotateCcw, Home } from 'lucide-react';
+import { DuelSettings } from './DuelSetup';
 
 interface DuelGameProps {
   routes: RouteData[];
   totalRoutes: number;
+  settings: DuelSettings;
   onExit: () => void;
   onRestart: () => void;
 }
@@ -19,14 +21,19 @@ interface PlayerState {
   lastAnswer: 'left' | 'right' | null;
   showResult: 'win' | 'lose' | null;
   resultMessage: string;
+  answerTime: number | null;
 }
 
-const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRestart }) => {
+const SPEED_BONUS = 0.5; // Bonus points for being faster
+
+const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart }) => {
   const { t } = useLanguage();
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(settings.timeLimit ?? null);
   
   const [player1, setPlayer1] = useState<PlayerState>({
     score: 0,
@@ -34,6 +41,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRest
     lastAnswer: null,
     showResult: null,
     resultMessage: '',
+    answerTime: null,
   });
   
   const [player2, setPlayer2] = useState<PlayerState>({
@@ -42,15 +50,53 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRest
     lastAnswer: null,
     showResult: null,
     resultMessage: '',
+    answerTime: null,
   });
 
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
   const transitionTimeout = useRef<number | null>(null);
+  const timerInterval = useRef<number | null>(null);
 
   const currentRoute = routes[currentRouteIndex];
+  // Use mobile (9:16) maps for better split-screen display
   const currentImageUrl = currentRoute 
-    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, false)
+    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, true)
     : '';
+
+  // Timer countdown
+  useEffect(() => {
+    if (settings.timeLimit && !gameOver && isImageLoaded && !isTransitioning) {
+      timerInterval.current = window.setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev === null || prev <= 0) return prev;
+          const newTime = prev - 0.1;
+          if (newTime <= 0) {
+            // Time's up - force both players to have "answered" (wrong if they haven't)
+            if (!player1.hasAnswered) {
+              setPlayer1(p => ({ ...p, hasAnswered: true, lastAnswer: null }));
+            }
+            if (!player2.hasAnswered) {
+              setPlayer2(p => ({ ...p, hasAnswered: true, lastAnswer: null }));
+            }
+            return 0;
+          }
+          return newTime;
+        });
+      }, 100);
+      
+      return () => {
+        if (timerInterval.current) clearInterval(timerInterval.current);
+      };
+    }
+  }, [settings.timeLimit, gameOver, isImageLoaded, isTransitioning, player1.hasAnswered, player2.hasAnswered]);
+
+  // Reset timer on new route
+  useEffect(() => {
+    if (settings.timeLimit) {
+      setTimeRemaining(settings.timeLimit);
+    }
+    setRouteStartTime(Date.now());
+  }, [currentRouteIndex, settings.timeLimit]);
 
   // Preload images
   useEffect(() => {
@@ -71,12 +117,12 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRest
       img.src = imageUrl;
     }
 
-    // Preload next few images
+    // Preload next few images (mobile versions)
     for (let i = 1; i <= 3; i++) {
       const nextIndex = currentRouteIndex + i;
       if (nextIndex < routes.length) {
         const nextRoute = routes[nextIndex];
-        const nextUrl = getImageUrlByMapName(nextRoute.mapName || '', nextRoute.candidateIndex, false);
+        const nextUrl = getImageUrlByMapName(nextRoute.mapName || '', nextRoute.candidateIndex, true);
         if (!preloadedImages.current.has(nextUrl)) {
           const img = new Image();
           img.src = nextUrl;
@@ -99,63 +145,101 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRest
     
     if (playerState.hasAnswered) return;
     
+    const answerTime = Date.now() - routeStartTime;
     const isCorrect = direction === currentRoute?.shortestSide;
     
     setPlayer(prev => ({
       ...prev,
       hasAnswered: true,
       lastAnswer: direction,
+      answerTime,
       score: isCorrect ? prev.score + 1 : prev.score,
     }));
-  }, [isTransitioning, gameOver, player1, player2, currentRoute]);
+  }, [isTransitioning, gameOver, player1, player2, currentRoute, routeStartTime]);
 
-  // Check if both players have answered
-  useEffect(() => {
-    if (player1.hasAnswered && player2.hasAnswered && !isTransitioning) {
-      // Show results
-      const p1Correct = player1.lastAnswer === currentRoute?.shortestSide;
-      const p2Correct = player2.lastAnswer === currentRoute?.shortestSide;
-      
-      setPlayer1(prev => ({
-        ...prev,
-        showResult: p1Correct ? 'win' : 'lose',
-        resultMessage: p1Correct ? 'Correct!' : 'Wrong!',
-      }));
-      
-      setPlayer2(prev => ({
-        ...prev,
-        showResult: p2Correct ? 'win' : 'lose',
-        resultMessage: p2Correct ? 'Correct!' : 'Wrong!',
-      }));
-      
-      setIsTransitioning(true);
-      
-      // Move to next route after delay
-      transitionTimeout.current = window.setTimeout(() => {
-        if (currentRouteIndex + 1 >= totalRoutes) {
-          setGameOver(true);
-        } else {
-          setCurrentRouteIndex(prev => prev + 1);
-          setPlayer1(prev => ({
-            ...prev,
-            hasAnswered: false,
-            lastAnswer: null,
-            showResult: null,
-            resultMessage: '',
-          }));
-          setPlayer2(prev => ({
-            ...prev,
-            hasAnswered: false,
-            lastAnswer: null,
-            showResult: null,
-            resultMessage: '',
-          }));
-          setIsImageLoaded(false);
+  // Process round results
+  const processRoundResults = useCallback(() => {
+    const p1Correct = player1.lastAnswer === currentRoute?.shortestSide;
+    const p2Correct = player2.lastAnswer === currentRoute?.shortestSide;
+    
+    let p1Bonus = 0;
+    let p2Bonus = 0;
+    
+    // Speed bonus in speed mode
+    if (settings.gameMode === 'speed' && p1Correct && p2Correct) {
+      if (player1.answerTime && player2.answerTime) {
+        if (player1.answerTime < player2.answerTime) {
+          p1Bonus = SPEED_BONUS;
+        } else if (player2.answerTime < player1.answerTime) {
+          p2Bonus = SPEED_BONUS;
         }
-        setIsTransitioning(false);
-      }, 1200);
+      }
     }
-  }, [player1.hasAnswered, player2.hasAnswered, currentRoute, currentRouteIndex, totalRoutes, isTransitioning]);
+    
+    setPlayer1(prev => ({
+      ...prev,
+      showResult: p1Correct ? 'win' : 'lose',
+      resultMessage: p1Correct 
+        ? (p1Bonus > 0 ? 'Correct! +Speed Bonus!' : 'Correct!') 
+        : (player1.lastAnswer === null ? 'Time Out!' : 'Wrong!'),
+      score: prev.score + p1Bonus,
+    }));
+    
+    setPlayer2(prev => ({
+      ...prev,
+      showResult: p2Correct ? 'win' : 'lose',
+      resultMessage: p2Correct 
+        ? (p2Bonus > 0 ? 'Correct! +Speed Bonus!' : 'Correct!') 
+        : (player2.lastAnswer === null ? 'Time Out!' : 'Wrong!'),
+      score: prev.score + p2Bonus,
+    }));
+    
+    setIsTransitioning(true);
+    
+    // Move to next route after delay
+    transitionTimeout.current = window.setTimeout(() => {
+      if (currentRouteIndex + 1 >= totalRoutes) {
+        setGameOver(true);
+      } else {
+        setCurrentRouteIndex(prev => prev + 1);
+        setPlayer1(prev => ({
+          ...prev,
+          hasAnswered: false,
+          lastAnswer: null,
+          showResult: null,
+          resultMessage: '',
+          answerTime: null,
+        }));
+        setPlayer2(prev => ({
+          ...prev,
+          hasAnswered: false,
+          lastAnswer: null,
+          showResult: null,
+          resultMessage: '',
+          answerTime: null,
+        }));
+        setIsImageLoaded(false);
+      }
+      setIsTransitioning(false);
+    }, 1000);
+  }, [player1, player2, currentRoute, currentRouteIndex, totalRoutes, settings.gameMode]);
+
+  // Check if round should end
+  useEffect(() => {
+    if (isTransitioning) return;
+    
+    if (settings.gameMode === 'wait') {
+      // Wait mode: both players must answer
+      if (player1.hasAnswered && player2.hasAnswered && !player1.showResult) {
+        processRoundResults();
+      }
+    } else {
+      // Speed mode: move on immediately when both have answered OR after a short delay when one answers
+      if (player1.hasAnswered && player2.hasAnswered && !player1.showResult) {
+        processRoundResults();
+      }
+    }
+  }, [player1.hasAnswered, player2.hasAnswered, player1.showResult, isTransitioning, settings.gameMode, processRoundResults]);
 
   // Keyboard controls
   useEffect(() => {
@@ -202,11 +286,11 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRest
           
           <div className="flex justify-center gap-8 text-2xl font-bold">
             <div className="text-red-500">
-              P1: {player1.score}
+              P1: {player1.score.toFixed(1)}
             </div>
             <div className="text-muted-foreground">-</div>
             <div className="text-blue-500">
-              P2: {player2.score}
+              P2: {player2.score.toFixed(1)}
             </div>
           </div>
           
@@ -238,6 +322,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, onExit, onRest
           player2Score={player2.score}
           totalRoutes={totalRoutes}
           currentRoute={currentRouteIndex}
+          timeRemaining={timeRemaining}
+          timeLimit={settings.timeLimit}
         />
       </div>
       
