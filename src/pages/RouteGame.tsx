@@ -13,6 +13,11 @@ import { MapSource, RouteData, getUniqueMapNames } from '../utils/routeDataUtils
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
+import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
+import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
+import flagItaly from '@/assets/flag-italy.png';
+import flagSweden from '@/assets/flag-sweden.png';
+import flagBelgium from '@/assets/flag-belgium.png';
 
 type MapSelection = 'all' | string;
 
@@ -190,23 +195,43 @@ const RouteGame: React.FC = () => {
                 </button>
                 
                 {/* Individual Map Options */}
-                {uniqueMapNames.map(mapName => (
-                  <button
-                    key={mapName}
-                    onClick={() => handleMapSelect(mapName)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                      selectedMapId === mapName
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-card'
-                    }`}
-                  >
-                    <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <span className="font-medium text-sm">{mapName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {availableMaps.find(m => m.name === mapName)?.description || 'Orienteering map'}
-                    </span>
-                  </button>
-                ))}
+                {uniqueMapNames.map(mapName => {
+                  const isPwt = isPwtMap(mapName);
+                  const isKnivsta = mapName.toLowerCase().includes('knivsta');
+                  const isBelgien = mapName.toLowerCase().includes('belgien');
+                  const countryFlag = isPwt ? flagItaly : isKnivsta ? flagSweden : isBelgien ? flagBelgium : null;
+                  
+                  return (
+                    <button
+                      key={mapName}
+                      onClick={() => handleMapSelect(mapName)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                        selectedMapId === mapName
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      {countryFlag && (
+                        <img 
+                          src={countryFlag} 
+                          alt="Country flag" 
+                          className="absolute top-1 right-1 h-4 w-6 object-cover rounded-sm shadow-sm"
+                        />
+                      )}
+                      {isPwt ? (
+                        <PwtAttribution variant="badge" className="mb-2" />
+                      ) : isKnivsta ? (
+                        <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
+                      ) : (
+                        <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                      )}
+                      <span className="font-medium text-sm">{mapName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {availableMaps.find(m => m.name === mapName)?.description || 'Orienteering map'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
@@ -277,6 +302,13 @@ const RouteGame: React.FC = () => {
       {showLeaderboard && !isFullscreen && (
         <section className="max-w-2xl mx-auto animate-fade-in">
           <Leaderboard showAll={true} />
+        </section>
+      )}
+
+      {/* PWT Attribution Footer */}
+      {!isFullscreen && (
+        <section className="max-w-lg mx-auto">
+          <PwtAttribution variant="footer" />
         </section>
       )}
     </div>
