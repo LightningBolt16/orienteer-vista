@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRouteCache } from '../context/RouteCache';
 import { RouteData } from '../utils/routeDataUtils';
 import DuelIntro from '../components/duel/DuelIntro';
-import DuelSetup from '../components/duel/DuelSetup';
+import DuelSetup, { DuelSettings } from '../components/duel/DuelSetup';
 import DuelGame from '../components/duel/DuelGame';
 
 type DuelPhase = 'intro' | 'setup' | 'playing';
@@ -13,11 +13,13 @@ const DuelMode: React.FC = () => {
   const { getRoutesForMap, isPreloading } = useRouteCache();
   const [phase, setPhase] = useState<DuelPhase>('intro');
   const [gameRoutes, setGameRoutes] = useState<RouteData[]>([]);
-  const [totalRoutes, setTotalRoutes] = useState(10);
-  const [selectedMapId, setSelectedMapId] = useState<string>('all');
+  const [settings, setSettings] = useState<DuelSettings>({
+    mapId: 'all',
+    routeCount: 10,
+    gameMode: 'speed',
+  });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if user has seen the intro before (using localStorage for simplicity)
   useEffect(() => {
     const hasSeenIntro = localStorage.getItem('duel-intro-seen');
     if (hasSeenIntro === 'true') {
@@ -30,17 +32,14 @@ const DuelMode: React.FC = () => {
     setPhase('setup');
   };
 
-  const handleSetupComplete = async (mapId: string, routeCount: number) => {
+  const handleSetupComplete = async (newSettings: DuelSettings) => {
     setIsLoading(true);
-    setSelectedMapId(mapId);
-    setTotalRoutes(routeCount);
+    setSettings(newSettings);
     
     try {
-      const { routes } = await getRoutesForMap(mapId, false);
-      
-      // Shuffle and limit routes
+      const { routes } = await getRoutesForMap(newSettings.mapId, true);
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
-      const selectedRoutes = shuffled.slice(0, routeCount);
+      const selectedRoutes = shuffled.slice(0, newSettings.routeCount);
       
       setGameRoutes(selectedRoutes);
       setPhase('playing');
@@ -56,13 +55,12 @@ const DuelMode: React.FC = () => {
   };
 
   const handleRestart = async () => {
-    // Reload routes with same settings
     setIsLoading(true);
     
     try {
-      const { routes } = await getRoutesForMap(selectedMapId, false);
+      const { routes } = await getRoutesForMap(settings.mapId, true);
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
-      const selectedRoutes = shuffled.slice(0, totalRoutes);
+      const selectedRoutes = shuffled.slice(0, settings.routeCount);
       
       setGameRoutes(selectedRoutes);
     } catch (error) {
@@ -100,7 +98,8 @@ const DuelMode: React.FC = () => {
       {phase === 'playing' && gameRoutes.length > 0 && (
         <DuelGame 
           routes={gameRoutes}
-          totalRoutes={totalRoutes}
+          totalRoutes={settings.routeCount}
+          settings={settings}
           onExit={handleBackToSetup}
           onRestart={handleRestart}
         />

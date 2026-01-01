@@ -1,10 +1,13 @@
 import React from 'react';
+import { Timer } from 'lucide-react';
 
 interface DuelScoreBarProps {
   player1Score: number;
   player2Score: number;
   totalRoutes: number;
   currentRoute: number;
+  timeRemaining?: number | null;
+  timeLimit?: number;
 }
 
 const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
@@ -12,6 +15,8 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
   player2Score,
   totalRoutes,
   currentRoute,
+  timeRemaining,
+  timeLimit,
 }) => {
   const maxScore = Math.max(player1Score, player2Score, 1);
   const p1Width = (player1Score / totalRoutes) * 100;
@@ -19,9 +24,15 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
 
   return (
     <div className="w-full bg-card border border-border rounded-lg p-3 space-y-2">
-      {/* Route Progress */}
-      <div className="text-center text-sm text-muted-foreground">
-        Route {Math.min(currentRoute + 1, totalRoutes)} of {totalRoutes}
+      {/* Route Progress & Timer */}
+      <div className="flex justify-center items-center gap-4 text-sm text-muted-foreground">
+        <span>Route {Math.min(currentRoute + 1, totalRoutes)} of {totalRoutes}</span>
+        {timeLimit && timeRemaining !== null && timeRemaining !== undefined && (
+          <span className={`flex items-center gap-1 font-bold ${timeRemaining <= 3 ? 'text-red-500' : ''}`}>
+            <Timer className="h-4 w-4" />
+            {timeRemaining.toFixed(1)}s
+          </span>
+        )}
       </div>
 
       {/* Score Display */}
