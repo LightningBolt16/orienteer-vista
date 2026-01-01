@@ -8,6 +8,8 @@ interface DuelScoreBarProps {
   currentRoute: number;
   timeRemaining?: number | null;
   timeLimit?: number;
+  gameTimeRemaining?: number | null;
+  isTimedMode?: boolean;
 }
 
 const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
@@ -17,17 +19,31 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
   currentRoute,
   timeRemaining,
   timeLimit,
+  gameTimeRemaining,
+  isTimedMode,
 }) => {
-  const maxScore = Math.max(player1Score, player2Score, 1);
-  const p1Width = (player1Score / totalRoutes) * 100;
-  const p2Width = (player2Score / totalRoutes) * 100;
+  const p1Width = (player1Score / Math.max(totalRoutes, 10)) * 100;
+  const p2Width = (player2Score / Math.max(totalRoutes, 10)) * 100;
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="w-full bg-card border border-border rounded-lg p-3 space-y-2">
       {/* Route Progress & Timer */}
       <div className="flex justify-center items-center gap-4 text-sm text-muted-foreground">
-        <span>Route {Math.min(currentRoute + 1, totalRoutes)} of {totalRoutes}</span>
-        {timeLimit && timeRemaining !== null && timeRemaining !== undefined && (
+        {isTimedMode ? (
+          <span className={`flex items-center gap-1 font-bold text-lg ${gameTimeRemaining && gameTimeRemaining <= 10 ? 'text-red-500 animate-pulse' : 'text-orange-500'}`}>
+            <Timer className="h-5 w-5" />
+            {gameTimeRemaining !== null && gameTimeRemaining !== undefined ? formatTime(gameTimeRemaining) : '0:00'}
+          </span>
+        ) : (
+          <span>Route {Math.min(currentRoute + 1, totalRoutes)} of {totalRoutes}</span>
+        )}
+        {!isTimedMode && timeLimit && timeRemaining !== null && timeRemaining !== undefined && (
           <span className={`flex items-center gap-1 font-bold ${timeRemaining <= 3 ? 'text-red-500' : ''}`}>
             <Timer className="h-4 w-4" />
             {timeRemaining.toFixed(1)}s
