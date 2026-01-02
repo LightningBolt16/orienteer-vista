@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { RouteData, getImageUrlByMapName } from '../../utils/routeDataUtils';
 import DuelPlayerPanel from './DuelPlayerPanel';
 import DuelScoreBar from './DuelScoreBar';
-import { Trophy, RotateCcw, Home, Smartphone, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Trophy, RotateCcw, Home, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
 
 interface DuelGameProps {
@@ -37,7 +37,6 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
   const [isMobile, setIsMobile] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
   
   const [player1, setPlayer1] = useState<PlayerState>({
     score: 0,
@@ -73,22 +72,18 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
 
   const isTimedMode = settings.gameType === 'timed';
 
-  // Detect mobile and orientation
+  // Detect mobile
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth <= 768 || 'ontouchstart' in window;
-      const landscape = window.innerWidth > window.innerHeight;
       setIsMobile(mobile);
-      setIsLandscape(landscape);
     };
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    window.addEventListener('orientationchange', checkMobile);
     
     return () => {
       window.removeEventListener('resize', checkMobile);
-      window.removeEventListener('orientationchange', checkMobile);
     };
   }, []);
 
@@ -337,26 +332,10 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     return <div className="flex justify-center items-center h-64 text-foreground">Loading routes...</div>;
   }
 
-  // Mobile Portrait - Show rotate instruction
-  if (isMobile && !isLandscape) {
-    return (
-      <div className="fixed inset-0 bg-background flex flex-col items-center justify-center p-8 text-center">
-        <Smartphone className="h-16 w-16 text-primary mb-4 animate-pulse" style={{ transform: 'rotate(90deg)' }} />
-        <h2 className="text-2xl font-bold text-foreground mb-2">Rotate Your Phone</h2>
-        <p className="text-muted-foreground mb-6">
-          Hold your phone in landscape mode for the best duel experience!
-        </p>
-        <Button variant="outline" onClick={onExit}>
-          <Home className="h-4 w-4 mr-2" />
-          Exit Duel
-        </Button>
-      </div>
-    );
-  }
-
-  // Mobile Landscape - Fullscreen route with overlayed buttons for each player
-  // Player 1 sits at TOP of phone (notch side), Player 2 at BOTTOM (charging port side)
-  if (isMobile && isLandscape) {
+  // Mobile Mode - Fullscreen with buttons on LEFT and RIGHT edges
+  // Player 1 sits at LEFT side of phone, Player 2 at RIGHT side
+  // Each player has their L/R buttons stacked vertically on their side
+  if (isMobile) {
     const RED_COLOR = '#FF5733';
     const BLUE_COLOR = '#3357FF';
     
@@ -378,10 +357,10 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         </div>
 
         {/* Center HUD - Timer/Progress and Scores */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
           <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center gap-4">
             <div className="text-red-500 font-bold text-lg">
-              {player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}
+              P1: {player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}
             </div>
             <div className="text-white font-mono font-bold text-xl">
               {isTimedMode && gameTimeRemaining !== null ? (
@@ -393,7 +372,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
               )}
             </div>
             <div className="text-blue-500 font-bold text-lg">
-              {player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}
+              P2: {player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}
             </div>
           </div>
         </div>
@@ -401,58 +380,58 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         {/* Exit button */}
         <button 
           onClick={onExit}
-          className="absolute top-2 right-2 z-50 bg-black/60 text-white px-3 py-1 rounded-full text-sm"
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 text-white px-4 py-2 rounded-full text-sm"
         >
           Exit
         </button>
 
-        {/* Player 1 buttons - TOP of screen (rotated 180° for user at notch side) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex gap-8" style={{ transform: 'translateX(-50%) rotate(180deg)' }}>
+        {/* Player 1 buttons - LEFT side of screen (rotated 90° CCW for user sitting on left) */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-4" style={{ transform: 'translateY(-50%) rotate(-90deg)' }}>
           {/* Result indicator */}
           {player1.showResult && (
-            <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 text-2xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`} style={{ transform: 'translateX(-50%) rotate(180deg)' }}>
+            <div className={`absolute -right-12 top-1/2 -translate-y-1/2 text-2xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`} style={{ transform: 'rotate(90deg)' }}>
               {player1.showResult === 'win' ? '✓' : '✗'}
             </div>
           )}
           {player1.hasAnswered && !player1.showResult && (
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-white/50 text-sm" style={{ transform: 'translateX(-50%) rotate(180deg)' }}>Waiting...</div>
+            <div className="absolute -right-16 top-1/2 -translate-y-1/2 text-white/50 text-xs" style={{ transform: 'rotate(90deg)' }}>Wait</div>
           )}
           
-          {/* Left button (appears as RIGHT from P1's perspective due to rotation) */}
+          {/* Left button */}
           <button
             onClick={() => handlePlayerAnswer(1, 'left')}
             disabled={isTransitioning || player1.hasAnswered}
             style={{ backgroundColor: `${RED_COLOR}CC` }}
-            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
+            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
               player1.hasAnswered ? 'opacity-40' : ''
             }`}
           >
-            <ArrowLeft className="h-8 w-8 text-white" />
+            <ArrowLeft className="h-7 w-7 text-white" />
           </button>
           
-          {/* Right button (appears as LEFT from P1's perspective due to rotation) */}
+          {/* Right button */}
           <button
             onClick={() => handlePlayerAnswer(1, 'right')}
             disabled={isTransitioning || player1.hasAnswered}
             style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
+            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
               player1.hasAnswered ? 'opacity-40' : ''
             }`}
           >
-            <ArrowRight className="h-8 w-8 text-white" />
+            <ArrowRight className="h-7 w-7 text-white" />
           </button>
         </div>
 
-        {/* Player 2 buttons - BOTTOM of screen (normal orientation for user at charging port side) */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex gap-8">
+        {/* Player 2 buttons - RIGHT side of screen (rotated 90° CW for user sitting on right) */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-4" style={{ transform: 'translateY(-50%) rotate(90deg)' }}>
           {/* Result indicator */}
           {player2.showResult && (
-            <div className={`absolute -top-8 left-1/2 -translate-x-1/2 text-2xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+            <div className={`absolute -left-12 top-1/2 -translate-y-1/2 text-2xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`} style={{ transform: 'rotate(-90deg)' }}>
               {player2.showResult === 'win' ? '✓' : '✗'}
             </div>
           )}
           {player2.hasAnswered && !player2.showResult && (
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-white/50 text-sm">Waiting...</div>
+            <div className="absolute -left-16 top-1/2 -translate-y-1/2 text-white/50 text-xs" style={{ transform: 'rotate(-90deg)' }}>Wait</div>
           )}
           
           {/* Left button */}
@@ -460,11 +439,11 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
             onClick={() => handlePlayerAnswer(2, 'left')}
             disabled={isTransitioning || player2.hasAnswered}
             style={{ backgroundColor: `${RED_COLOR}CC` }}
-            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
+            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
               player2.hasAnswered ? 'opacity-40' : ''
             }`}
           >
-            <ArrowLeft className="h-8 w-8 text-white" />
+            <ArrowLeft className="h-7 w-7 text-white" />
           </button>
           
           {/* Right button */}
@@ -472,11 +451,11 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
             onClick={() => handlePlayerAnswer(2, 'right')}
             disabled={isTransitioning || player2.hasAnswered}
             style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
+            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
               player2.hasAnswered ? 'opacity-40' : ''
             }`}
           >
-            <ArrowRight className="h-8 w-8 text-white" />
+            <ArrowRight className="h-7 w-7 text-white" />
           </button>
         </div>
       </div>
