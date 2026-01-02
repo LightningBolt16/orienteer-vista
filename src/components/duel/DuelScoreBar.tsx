@@ -11,6 +11,7 @@ interface DuelScoreBarProps {
   gameTimeRemaining?: number | null;
   isTimedMode?: boolean;
   routesCompleted?: number;
+  roundTimeRemaining?: number | null;
 }
 
 const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
@@ -23,6 +24,7 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
   gameTimeRemaining,
   isTimedMode,
   routesCompleted = 0,
+  roundTimeRemaining,
 }) => {
   // Show pending scores (before both players answered) or confirmed scores
   const displayP1 = player1PendingScore;
@@ -53,7 +55,15 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
             </span>
           </div>
         ) : (
-          <span>Route {Math.min(currentRoute + 1, totalRoutes)} of {totalRoutes}</span>
+          <div className="flex items-center gap-4">
+            <span>Route {Math.min(currentRoute + 1, totalRoutes)} of {totalRoutes}</span>
+            {roundTimeRemaining !== null && roundTimeRemaining !== undefined && (
+              <span className={`flex items-center gap-1 font-bold ${roundTimeRemaining <= 5 ? 'text-destructive animate-pulse' : 'text-primary'}`}>
+                <Timer className="h-4 w-4" />
+                {roundTimeRemaining}s
+              </span>
+            )}
+          </div>
         )}
       </div>
 

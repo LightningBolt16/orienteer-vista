@@ -357,122 +357,122 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   // Mobile Landscape - Fullscreen single route with split buttons
   if (isMobile && isLandscape) {
     return (
-      <div className="fixed inset-0 bg-black flex">
-        {/* Exit button */}
-        <button 
-          onClick={onExit}
-          className="absolute top-2 right-2 z-50 bg-black/50 text-white px-3 py-1 rounded text-sm"
-        >
-          Exit
-        </button>
-
-        {/* Score bar at top */}
-        <div className="absolute top-0 left-0 right-0 z-40 p-1">
-          <DuelScoreBar 
-            player1Score={player1.score}
-            player2Score={player2.score}
-            player1PendingScore={player1.pendingScore}
-            player2PendingScore={player2.pendingScore}
-            totalRoutes={totalRoutes}
-            currentRoute={currentRouteIndex}
-            gameTimeRemaining={gameTimeRemaining}
-            isTimedMode={isTimedMode}
-            routesCompleted={routesCompleted}
-          />
-        </div>
-
-        {/* Player 1 buttons - Left half */}
-        <div className="w-1/2 h-full flex flex-col relative">
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            {player1.showResult && (
-              <div className={`text-4xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
-                {player1.resultMessage}
-              </div>
-            )}
-            {player1.hasAnswered && !player1.showResult && (
-              <div className="text-2xl text-white/50">Waiting...</div>
+      <div className="fixed inset-0 bg-black flex flex-col">
+        {/* Top bar with scores and timer */}
+        <div className="flex-shrink-0 flex items-center justify-between px-2 py-1 bg-black/80 z-50">
+          {/* P1 Score */}
+          <div className="flex items-center gap-2">
+            <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold">P1</span>
+            <span className="text-white font-bold">{player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}</span>
+          </div>
+          
+          {/* Timer / Progress */}
+          <div className="text-white font-mono text-lg font-bold">
+            {isTimedMode && gameTimeRemaining !== null ? (
+              <span className={gameTimeRemaining < 10 ? 'text-red-400 animate-pulse' : ''}>
+                {Math.floor(gameTimeRemaining / 60)}:{String(Math.floor(gameTimeRemaining % 60)).padStart(2, '0')}
+              </span>
+            ) : (
+              <span>{routesCompleted + 1} / {totalRoutes}</span>
             )}
           </div>
           
-          <div className="flex-1 flex">
+          {/* P2 Score */}
+          <div className="flex items-center gap-2">
+            <span className="text-white font-bold">{player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}</span>
+            <span className="bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-bold">P2</span>
+          </div>
+          
+          {/* Exit button */}
+          <button 
+            onClick={onExit}
+            className="bg-white/20 text-white px-2 py-0.5 rounded text-xs ml-2"
+          >
+            Exit
+          </button>
+        </div>
+
+        {/* Main game area */}
+        <div className="flex-1 flex min-h-0">
+          {/* Player 1 side - Left/Right stacked vertically on left */}
+          <div className="w-1/4 h-full flex flex-col relative border-r border-red-500/30">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none">
+              {player1.showResult && (
+                <div className={`text-2xl font-bold text-center ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                  {player1.showResult === 'win' ? '✓' : '✗'}
+                </div>
+              )}
+              {player1.hasAnswered && !player1.showResult && (
+                <div className="text-lg text-white/50">...</div>
+              )}
+            </div>
+            
             <button
               onClick={() => handlePlayerAnswer(1, 'left')}
               disabled={isTransitioning || player1.hasAnswered}
-              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-red-500/30 ${
-                player1.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              className={`flex-1 flex items-center justify-center bg-red-500/10 active:bg-red-500/40 border-b border-red-500/30 ${
+                player1.hasAnswered ? 'opacity-30' : ''
               }`}
             >
-              <ArrowLeft className="h-16 w-16" />
+              <ArrowLeft className="h-10 w-10 text-red-400" />
             </button>
             <button
               onClick={() => handlePlayerAnswer(1, 'right')}
               disabled={isTransitioning || player1.hasAnswered}
-              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-red-500/30 ${
-                player1.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              className={`flex-1 flex items-center justify-center bg-red-500/10 active:bg-red-500/40 ${
+                player1.hasAnswered ? 'opacity-30' : ''
               }`}
             >
-              <ArrowRight className="h-16 w-16" />
+              <ArrowRight className="h-10 w-10 text-red-400" />
             </button>
           </div>
-          
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-            P1
-          </div>
-        </div>
 
-        {/* Center image */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="relative w-[60%] max-h-[80%]">
+          {/* Center - Route image (takes full height, object-contain) */}
+          <div className="flex-1 flex items-center justify-center bg-black p-1">
             {isImageLoaded ? (
               <img
                 src={currentImageUrl}
                 alt="Route"
-                className={`w-full h-full object-contain transition-opacity duration-300 ${
+                className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
                   isTransitioning ? 'opacity-50' : 'opacity-100'
                 }`}
               />
             ) : (
-              <div className="w-full aspect-video bg-muted animate-pulse rounded-lg" />
+              <div className="w-full h-full bg-muted/20 animate-pulse rounded" />
             )}
           </div>
-        </div>
 
-        {/* Player 2 buttons - Right half */}
-        <div className="w-1/2 h-full flex flex-col relative">
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-            {player2.showResult && (
-              <div className={`text-4xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
-                {player2.resultMessage}
-              </div>
-            )}
-            {player2.hasAnswered && !player2.showResult && (
-              <div className="text-2xl text-white/50">Waiting...</div>
-            )}
-          </div>
-          
-          <div className="flex-1 flex">
+          {/* Player 2 side - Left/Right stacked vertically on right */}
+          <div className="w-1/4 h-full flex flex-col relative border-l border-blue-500/30">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none">
+              {player2.showResult && (
+                <div className={`text-2xl font-bold text-center ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                  {player2.showResult === 'win' ? '✓' : '✗'}
+                </div>
+              )}
+              {player2.hasAnswered && !player2.showResult && (
+                <div className="text-lg text-white/50">...</div>
+              )}
+            </div>
+            
             <button
               onClick={() => handlePlayerAnswer(2, 'left')}
               disabled={isTransitioning || player2.hasAnswered}
-              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-blue-500/30 ${
-                player2.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              className={`flex-1 flex items-center justify-center bg-blue-500/10 active:bg-blue-500/40 border-b border-blue-500/30 ${
+                player2.hasAnswered ? 'opacity-30' : ''
               }`}
             >
-              <ArrowLeft className="h-16 w-16" />
+              <ArrowLeft className="h-10 w-10 text-blue-400" />
             </button>
             <button
               onClick={() => handlePlayerAnswer(2, 'right')}
               disabled={isTransitioning || player2.hasAnswered}
-              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-blue-500/30 ${
-                player2.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              className={`flex-1 flex items-center justify-center bg-blue-500/10 active:bg-blue-500/40 ${
+                player2.hasAnswered ? 'opacity-30' : ''
               }`}
             >
-              <ArrowRight className="h-16 w-16" />
+              <ArrowRight className="h-10 w-10 text-blue-400" />
             </button>
-          </div>
-          
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-            P2
           </div>
         </div>
       </div>
