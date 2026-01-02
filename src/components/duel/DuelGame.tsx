@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '../ui/button';
-import { useLanguage } from '../../context/LanguageContext';
 import { RouteData, getImageUrlByMapName } from '../../utils/routeDataUtils';
 import DuelPlayerPanel from './DuelPlayerPanel';
 import DuelScoreBar from './DuelScoreBar';
-import { Trophy, RotateCcw, Home } from 'lucide-react';
+import { Trophy, RotateCcw, Home, Smartphone, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
 
 interface DuelGameProps {
@@ -17,57 +16,81 @@ interface DuelGameProps {
 
 interface PlayerState {
   score: number;
+  pendingScore: number; // Score shown before round ends
   hasAnswered: boolean;
   lastAnswer: 'left' | 'right' | null;
   showResult: 'win' | 'lose' | null;
   resultMessage: string;
   answerTime: number | null;
+  currentRouteIndex: number; // For independent continuation
 }
 
-const SPEED_BONUS = 0.5; // Bonus points for being faster
-const WRONG_PENALTY = -0.5; // Penalty for wrong answers in timed mode
+const SPEED_BONUS = 0.5;
+const WRONG_PENALTY = -0.5;
 
 const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart }) => {
-  const { t } = useLanguage();
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
-  const [routesCompleted, setRoutesCompleted] = useState(0); // Track for timed mode
+  const [routesCompleted, setRoutesCompleted] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(settings.timeLimit ?? null);
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
   
   const [player1, setPlayer1] = useState<PlayerState>({
     score: 0,
+    pendingScore: 0,
     hasAnswered: false,
     lastAnswer: null,
     showResult: null,
     resultMessage: '',
     answerTime: null,
+    currentRouteIndex: 0,
   });
   
   const [player2, setPlayer2] = useState<PlayerState>({
     score: 0,
+    pendingScore: 0,
     hasAnswered: false,
     lastAnswer: null,
     showResult: null,
     resultMessage: '',
     answerTime: null,
+    currentRouteIndex: 0,
   });
 
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
   const transitionTimeout = useRef<number | null>(null);
-  const timerInterval = useRef<number | null>(null);
   const gameTimerInterval = useRef<number | null>(null);
 
-  const currentRoute = routes[currentRouteIndex % routes.length]; // Loop routes for timed mode
-  // Use mobile (9:16) maps for better split-screen display
+  const currentRoute = routes[currentRouteIndex % routes.length];
+  // Use 16:9 for desktop, 16:9 landscape for mobile too (better for fullscreen)
   const currentImageUrl = currentRoute 
-    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, true)
+    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, false)
     : '';
 
   const isTimedMode = settings.gameType === 'timed';
+
+  // Detect mobile and orientation
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth <= 768 || 'ontouchstart' in window;
+      const landscape = window.innerWidth > window.innerHeight;
+      setIsMobile(mobile);
+      setIsLandscape(landscape);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    window.addEventListener('orientationchange', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('orientationchange', checkMobile);
+    };
+  }, []);
 
   // Game timer countdown (for timed mode)
   useEffect(() => {
@@ -88,39 +111,10 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     }
   }, [isTimedMode, settings.gameDuration, gameOver]);
 
-  // Per-route timer countdown
-  useEffect(() => {
-    if (settings.timeLimit && !gameOver && isImageLoaded && !isTransitioning) {
-      timerInterval.current = window.setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev === null || prev <= 0) return prev;
-          const newTime = prev - 0.1;
-          if (newTime <= 0) {
-            if (!player1.hasAnswered) {
-              setPlayer1(p => ({ ...p, hasAnswered: true, lastAnswer: null }));
-            }
-            if (!player2.hasAnswered) {
-              setPlayer2(p => ({ ...p, hasAnswered: true, lastAnswer: null }));
-            }
-            return 0;
-          }
-          return newTime;
-        });
-      }, 100);
-      
-      return () => {
-        if (timerInterval.current) clearInterval(timerInterval.current);
-      };
-    }
-  }, [settings.timeLimit, gameOver, isImageLoaded, isTransitioning, player1.hasAnswered, player2.hasAnswered]);
-
   // Reset timer on new route
   useEffect(() => {
-    if (settings.timeLimit) {
-      setTimeRemaining(settings.timeLimit);
-    }
     setRouteStartTime(Date.now());
-  }, [currentRouteIndex, settings.timeLimit]);
+  }, [currentRouteIndex]);
 
   // Preload images
   useEffect(() => {
@@ -141,17 +135,15 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       img.src = imageUrl;
     }
 
-    // Preload next few images (mobile versions)
+    // Preload next few images
     for (let i = 1; i <= 3; i++) {
-      const nextIndex = currentRouteIndex + i;
-      if (nextIndex < routes.length) {
-        const nextRoute = routes[nextIndex];
-        const nextUrl = getImageUrlByMapName(nextRoute.mapName || '', nextRoute.candidateIndex, true);
-        if (!preloadedImages.current.has(nextUrl)) {
-          const img = new Image();
-          img.src = nextUrl;
-          preloadedImages.current.set(nextUrl, img);
-        }
+      const nextIndex = (currentRouteIndex + i) % routes.length;
+      const nextRoute = routes[nextIndex];
+      const nextUrl = getImageUrlByMapName(nextRoute.mapName || '', nextRoute.candidateIndex, false);
+      if (!preloadedImages.current.has(nextUrl)) {
+        const img = new Image();
+        img.src = nextUrl;
+        preloadedImages.current.set(nextUrl, img);
       }
     }
 
@@ -160,7 +152,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     };
   }, [currentRouteIndex, routes, currentRoute, currentImageUrl]);
 
-  // Handle player answer
+  // Handle player answer - DELAYED scoring
   const handlePlayerAnswer = useCallback((player: 1 | 2, direction: 'left' | 'right') => {
     if (isTransitioning || gameOver) return;
     
@@ -170,60 +162,60 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     if (playerState.hasAnswered) return;
     
     const answerTime = Date.now() - routeStartTime;
-    const isCorrect = direction === currentRoute?.shortestSide;
     
+    // Just mark as answered - don't update score yet!
     setPlayer(prev => ({
       ...prev,
       hasAnswered: true,
       lastAnswer: direction,
       answerTime,
-      score: isCorrect ? prev.score + 1 : prev.score,
     }));
-  }, [isTransitioning, gameOver, player1, player2, currentRoute, routeStartTime]);
+  }, [isTransitioning, gameOver, player1, player2, routeStartTime]);
 
-  // Process round results
+  // Process round results - ONLY called when both players have answered
   const processRoundResults = useCallback(() => {
     const p1Correct = player1.lastAnswer === currentRoute?.shortestSide;
     const p2Correct = player2.lastAnswer === currentRoute?.shortestSide;
     
-    let p1Bonus = 0;
-    let p2Bonus = 0;
-    let p1Penalty = 0;
-    let p2Penalty = 0;
+    let p1Score = p1Correct ? 1 : 0;
+    let p2Score = p2Correct ? 1 : 0;
     
     // Speed bonus in speed mode
     if (settings.gameMode === 'speed' && p1Correct && p2Correct) {
       if (player1.answerTime && player2.answerTime) {
         if (player1.answerTime < player2.answerTime) {
-          p1Bonus = SPEED_BONUS;
+          p1Score += SPEED_BONUS;
         } else if (player2.answerTime < player1.answerTime) {
-          p2Bonus = SPEED_BONUS;
+          p2Score += SPEED_BONUS;
         }
       }
     }
     
     // Penalty for wrong answers in timed mode
     if (isTimedMode) {
-      if (!p1Correct && player1.lastAnswer !== null) p1Penalty = WRONG_PENALTY;
-      if (!p2Correct && player2.lastAnswer !== null) p2Penalty = WRONG_PENALTY;
+      if (!p1Correct && player1.lastAnswer !== null) p1Score += WRONG_PENALTY;
+      if (!p2Correct && player2.lastAnswer !== null) p2Score += WRONG_PENALTY;
     }
     
+    // NOW update both scores and pending scores together
     setPlayer1(prev => ({
       ...prev,
       showResult: p1Correct ? 'win' : 'lose',
       resultMessage: p1Correct 
-        ? (p1Bonus > 0 ? 'Correct! +Speed Bonus!' : 'Correct!') 
-        : (player1.lastAnswer === null ? 'Time Out!' : `Wrong! ${p1Penalty}pts`),
-      score: prev.score + p1Bonus + p1Penalty,
+        ? (p1Score > 1 ? 'Correct! +Speed Bonus!' : 'Correct!') 
+        : (player1.lastAnswer === null ? 'Time Out!' : 'Wrong!'),
+      score: prev.score + p1Score,
+      pendingScore: prev.score + p1Score,
     }));
     
     setPlayer2(prev => ({
       ...prev,
       showResult: p2Correct ? 'win' : 'lose',
       resultMessage: p2Correct 
-        ? (p2Bonus > 0 ? 'Correct! +Speed Bonus!' : 'Correct!') 
-        : (player2.lastAnswer === null ? 'Time Out!' : `Wrong! ${p2Penalty}pts`),
-      score: prev.score + p2Bonus + p2Penalty,
+        ? (p2Score > 1 ? 'Correct! +Speed Bonus!' : 'Correct!') 
+        : (player2.lastAnswer === null ? 'Time Out!' : 'Wrong!'),
+      score: prev.score + p2Score,
+      pendingScore: prev.score + p2Score,
     }));
     
     setRoutesCompleted(prev => prev + 1);
@@ -231,7 +223,6 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     
     // Move to next route after delay
     transitionTimeout.current = window.setTimeout(() => {
-      // In timed mode, keep going until time runs out
       if (!isTimedMode && currentRouteIndex + 1 >= totalRoutes) {
         setGameOver(true);
       } else {
@@ -255,32 +246,27 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         setIsImageLoaded(false);
       }
       setIsTransitioning(false);
-    }, isTimedMode ? 500 : 1000); // Faster transitions in timed mode
+    }, isTimedMode ? 500 : 1000);
   }, [player1, player2, currentRoute, currentRouteIndex, totalRoutes, settings.gameMode, isTimedMode]);
 
-  // Check if round should end
+  // Check if round should end - ONLY when BOTH players answered
   useEffect(() => {
     if (isTransitioning) return;
     
-    if (settings.gameMode === 'wait') {
-      // Wait mode: both players must answer
-      if (player1.hasAnswered && player2.hasAnswered && !player1.showResult) {
-        processRoundResults();
-      }
-    } else {
-      // Speed mode: move on immediately when both have answered OR after a short delay when one answers
-      if (player1.hasAnswered && player2.hasAnswered && !player1.showResult) {
-        processRoundResults();
-      }
+    // Round ends ONLY when both players have answered
+    if (player1.hasAnswered && player2.hasAnswered && !player1.showResult) {
+      processRoundResults();
     }
-  }, [player1.hasAnswered, player2.hasAnswered, player1.showResult, isTransitioning, settings.gameMode, processRoundResults]);
+  }, [player1.hasAnswered, player2.hasAnswered, player1.showResult, isTransitioning, processRoundResults]);
 
-  // Keyboard controls
+  // Keyboard controls (desktop only)
   useEffect(() => {
+    if (isMobile) return;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       if (gameOver) return;
       
-      // Player 1: WASD
+      // Player 1: A/D
       if (e.key === 'a' || e.key === 'A') {
         e.preventDefault();
         handlePlayerAnswer(1, 'left');
@@ -289,7 +275,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         handlePlayerAnswer(1, 'right');
       }
       
-      // Player 2: Arrows
+      // Player 2: Arrow keys
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         handlePlayerAnswer(2, 'left');
@@ -301,7 +287,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlePlayerAnswer, gameOver]);
+  }, [handlePlayerAnswer, gameOver, isMobile]);
 
   // Game Over Screen
   if (gameOver) {
@@ -309,22 +295,26 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
-        <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-8 space-y-6 animate-fade-in text-center">
+        <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-8 space-y-6 text-center">
           <Trophy className={`h-20 w-20 mx-auto ${
             winner === 1 ? 'text-red-500' : winner === 2 ? 'text-blue-500' : 'text-yellow-500'
           }`} />
           
-          <h2 className="text-3xl font-bold">
+          <h2 className="text-3xl font-bold text-foreground">
             {winner === 0 ? "It's a Tie!" : `Player ${winner} Wins!`}
           </h2>
           
+          {isTimedMode && (
+            <p className="text-muted-foreground">{routesCompleted} routes completed</p>
+          )}
+          
           <div className="flex justify-center gap-8 text-2xl font-bold">
             <div className="text-red-500">
-              P1: {player1.score.toFixed(1)}
+              P1: {player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}
             </div>
             <div className="text-muted-foreground">-</div>
             <div className="text-blue-500">
-              P2: {player2.score.toFixed(1)}
+              P2: {player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}
             </div>
           </div>
           
@@ -344,9 +334,152 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   }
 
   if (!currentRoute) {
-    return <div className="flex justify-center items-center h-64">Loading routes...</div>;
+    return <div className="flex justify-center items-center h-64 text-foreground">Loading routes...</div>;
   }
 
+  // Mobile Portrait - Show rotate instruction
+  if (isMobile && !isLandscape) {
+    return (
+      <div className="fixed inset-0 bg-background flex flex-col items-center justify-center p-8 text-center">
+        <Smartphone className="h-16 w-16 text-primary mb-4 animate-pulse" style={{ transform: 'rotate(90deg)' }} />
+        <h2 className="text-2xl font-bold text-foreground mb-2">Rotate Your Phone</h2>
+        <p className="text-muted-foreground mb-6">
+          Hold your phone in landscape mode for the best duel experience!
+        </p>
+        <Button variant="outline" onClick={onExit}>
+          <Home className="h-4 w-4 mr-2" />
+          Exit Duel
+        </Button>
+      </div>
+    );
+  }
+
+  // Mobile Landscape - Fullscreen single route with split buttons
+  if (isMobile && isLandscape) {
+    return (
+      <div className="fixed inset-0 bg-black flex">
+        {/* Exit button */}
+        <button 
+          onClick={onExit}
+          className="absolute top-2 right-2 z-50 bg-black/50 text-white px-3 py-1 rounded text-sm"
+        >
+          Exit
+        </button>
+
+        {/* Score bar at top */}
+        <div className="absolute top-0 left-0 right-0 z-40 p-1">
+          <DuelScoreBar 
+            player1Score={player1.score}
+            player2Score={player2.score}
+            player1PendingScore={player1.pendingScore}
+            player2PendingScore={player2.pendingScore}
+            totalRoutes={totalRoutes}
+            currentRoute={currentRouteIndex}
+            gameTimeRemaining={gameTimeRemaining}
+            isTimedMode={isTimedMode}
+            routesCompleted={routesCompleted}
+          />
+        </div>
+
+        {/* Player 1 buttons - Left half */}
+        <div className="w-1/2 h-full flex flex-col relative">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {player1.showResult && (
+              <div className={`text-4xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                {player1.resultMessage}
+              </div>
+            )}
+            {player1.hasAnswered && !player1.showResult && (
+              <div className="text-2xl text-white/50">Waiting...</div>
+            )}
+          </div>
+          
+          <div className="flex-1 flex">
+            <button
+              onClick={() => handlePlayerAnswer(1, 'left')}
+              disabled={isTransitioning || player1.hasAnswered}
+              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-red-500/30 ${
+                player1.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              <ArrowLeft className="h-16 w-16" />
+            </button>
+            <button
+              onClick={() => handlePlayerAnswer(1, 'right')}
+              disabled={isTransitioning || player1.hasAnswered}
+              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-red-500/30 ${
+                player1.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              <ArrowRight className="h-16 w-16" />
+            </button>
+          </div>
+          
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+            P1
+          </div>
+        </div>
+
+        {/* Center image */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <div className="relative w-[60%] max-h-[80%]">
+            {isImageLoaded ? (
+              <img
+                src={currentImageUrl}
+                alt="Route"
+                className={`w-full h-full object-contain transition-opacity duration-300 ${
+                  isTransitioning ? 'opacity-50' : 'opacity-100'
+                }`}
+              />
+            ) : (
+              <div className="w-full aspect-video bg-muted animate-pulse rounded-lg" />
+            )}
+          </div>
+        </div>
+
+        {/* Player 2 buttons - Right half */}
+        <div className="w-1/2 h-full flex flex-col relative">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            {player2.showResult && (
+              <div className={`text-4xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                {player2.resultMessage}
+              </div>
+            )}
+            {player2.hasAnswered && !player2.showResult && (
+              <div className="text-2xl text-white/50">Waiting...</div>
+            )}
+          </div>
+          
+          <div className="flex-1 flex">
+            <button
+              onClick={() => handlePlayerAnswer(2, 'left')}
+              disabled={isTransitioning || player2.hasAnswered}
+              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-blue-500/30 ${
+                player2.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              <ArrowLeft className="h-16 w-16" />
+            </button>
+            <button
+              onClick={() => handlePlayerAnswer(2, 'right')}
+              disabled={isTransitioning || player2.hasAnswered}
+              className={`flex-1 flex items-center justify-center text-white text-6xl transition-all active:bg-blue-500/30 ${
+                player2.hasAnswered ? 'opacity-30' : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              <ArrowRight className="h-16 w-16" />
+            </button>
+          </div>
+          
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+            P2
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop - Split screen with two panels
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
       {/* Score Bar */}
@@ -354,8 +487,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         <DuelScoreBar 
           player1Score={player1.score}
           player2Score={player2.score}
-          player1PendingScore={player1.score}
-          player2PendingScore={player2.score}
+          player1PendingScore={player1.pendingScore}
+          player2PendingScore={player2.pendingScore}
           totalRoutes={totalRoutes}
           currentRoute={currentRouteIndex}
           gameTimeRemaining={gameTimeRemaining}
