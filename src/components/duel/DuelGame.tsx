@@ -354,10 +354,13 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         <DuelScoreBar 
           player1Score={player1.score}
           player2Score={player2.score}
+          player1PendingScore={player1.score}
+          player2PendingScore={player2.score}
           totalRoutes={totalRoutes}
           currentRoute={currentRouteIndex}
-          timeRemaining={timeRemaining}
-          timeLimit={settings.timeLimit}
+          gameTimeRemaining={gameTimeRemaining}
+          isTimedMode={isTimedMode}
+          routesCompleted={routesCompleted}
         />
       </div>
       
