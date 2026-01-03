@@ -112,6 +112,104 @@ export type Database = {
         }
         Relationships: []
       }
+      duel_answers: {
+        Row: {
+          answer: string
+          answer_time_ms: number | null
+          created_at: string
+          id: string
+          is_correct: boolean | null
+          player_id: string
+          room_id: string
+          route_index: number
+        }
+        Insert: {
+          answer: string
+          answer_time_ms?: number | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          player_id: string
+          room_id: string
+          route_index: number
+        }
+        Update: {
+          answer?: string
+          answer_time_ms?: number | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          player_id?: string
+          room_id?: string
+          route_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duel_answers_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "duel_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duel_rooms: {
+        Row: {
+          created_at: string
+          current_route_index: number | null
+          game_ends_at: string | null
+          game_started_at: string | null
+          guest_id: string | null
+          guest_ready: boolean | null
+          guest_score: number | null
+          host_id: string
+          host_ready: boolean | null
+          host_score: number | null
+          id: string
+          room_code: string
+          routes: Json | null
+          settings: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_route_index?: number | null
+          game_ends_at?: string | null
+          game_started_at?: string | null
+          guest_id?: string | null
+          guest_ready?: boolean | null
+          guest_score?: number | null
+          host_id: string
+          host_ready?: boolean | null
+          host_score?: number | null
+          id?: string
+          room_code: string
+          routes?: Json | null
+          settings?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_route_index?: number | null
+          game_ends_at?: string | null
+          game_started_at?: string | null
+          guest_id?: string | null
+          guest_ready?: boolean | null
+          guest_score?: number | null
+          host_id?: string
+          host_ready?: boolean | null
+          host_score?: number | null
+          id?: string
+          room_code?: string
+          routes?: Json | null
+          settings?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       maps: {
         Row: {
           created_at: string
@@ -296,6 +394,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_duel_rooms: { Args: never; Returns: undefined }
+      generate_room_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

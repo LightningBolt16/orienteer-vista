@@ -57,10 +57,15 @@ const Index: React.FC = () => {
           {t('competeWithOthers')}
         </p>
         
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center gap-4 mb-8">
           <Link to="/route-game">
             <Button size="lg">
               {t('joinCompetition')}
+            </Button>
+          </Link>
+          <Link to="/duel">
+            <Button size="lg" variant="outline">
+              Duel Mode
             </Button>
           </Link>
         </div>

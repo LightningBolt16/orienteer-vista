@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import RouteGame from "./pages/RouteGame";
+import DuelMode from "./pages/DuelMode";
 import CourseSetter from "./pages/CourseSetter";
 import MyFiles from "./pages/MyFiles";
 import Profile from "./pages/Profile";
@@ -50,6 +51,7 @@ const App: React.FC = () => {
                     <Route path="/auth" element={<AuthPage />} />
                     <Route path="/" element={<Layout><Index /></Layout>} />
                     <Route path="/route-game" element={<Layout><RouteGame /></Layout>} />
+                    <Route path="/duel" element={<DuelMode />} />
                     <Route path="/course-setter" element={<Layout><CourseSetter /></Layout>} />
                     <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />
                     <Route path="/profile" element={<Layout><Profile /></Layout>} />
