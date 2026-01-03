@@ -20,6 +20,9 @@ export interface MapSource {
   description?: string;
   folderName?: string;
   namingScheme?: 'candidate' | 'route';
+  countryCode?: string;
+  logoPath?: string;
+  mapType?: string;
 }
 
 // Supabase storage URL for route images
@@ -75,7 +78,7 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
     // Try database first
     const { data: dbMaps, error } = await supabase
       .from('route_maps')
-      .select('id, name, description');
+      .select('id, name, description, country_code, logo_path, map_type');
 
     if (!error && dbMaps && dbMaps.length > 0) {
       console.log(`Found ${dbMaps.length} maps in database`);
@@ -106,6 +109,9 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
             imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/16_9/candidate_`,
             folderName: dbMap.name,
             description: dbMap.description || undefined,
+            countryCode: dbMap.country_code || undefined,
+            logoPath: dbMap.logo_path || undefined,
+            mapType: dbMap.map_type || undefined,
           });
         }
 
@@ -118,6 +124,9 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
             imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/9_16/candidate_`,
             folderName: dbMap.name,
             description: dbMap.description || undefined,
+            countryCode: dbMap.country_code || undefined,
+            logoPath: dbMap.logo_path || undefined,
+            mapType: dbMap.map_type || undefined,
           });
         }
       }

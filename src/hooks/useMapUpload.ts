@@ -12,7 +12,7 @@ interface ParsedRoute {
 }
 
 interface UploadProgress {
-  stage: 'idle' | 'validating' | 'creating-map' | 'uploading-16_9' | 'uploading-9_16' | 'saving-metadata' | 'complete' | 'error';
+  stage: 'idle' | 'validating' | 'creating-map' | 'uploading-logo' | 'uploading-16_9' | 'uploading-9_16' | 'saving-metadata' | 'complete' | 'error';
   current: number;
   total: number;
   message: string;
@@ -26,6 +26,12 @@ interface FolderValidation {
   images9_16: File[];
   parsedRoutes: ParsedRoute[];
   errors: string[];
+}
+
+interface MapMetadata {
+  countryCode?: string;
+  mapType?: string;
+  logoFile?: File;
 }
 
 export const useMapUpload = () => {
@@ -193,8 +199,39 @@ export const useMapUpload = () => {
     return paths;
   }, []);
 
-  const uploadMap = useCallback(async (validation: FolderValidation): Promise<void> => {
+  const uploadLogo = useCallback(async (mapName: string, logoFile: File): Promise<string> => {
+    const folderName = mapName.toLowerCase();
+    const extension = logoFile.name.split('.').pop() || 'png';
+    const filePath = `${folderName}/logo.${extension}`;
+    
+    const { error } = await supabase.storage
+      .from('map-logos')
+      .upload(filePath, logoFile, { 
+        upsert: true,
+        contentType: logoFile.type
+      });
+
+    if (error) throw new Error(`Failed to upload logo: ${error.message}`);
+    
+    return filePath;
+  }, []);
+
+  const uploadMap = useCallback(async (validation: FolderValidation, metadata?: MapMetadata): Promise<void> => {
     try {
+      let logoPath: string | undefined;
+
+      // Stage: Upload logo if provided
+      if (metadata?.logoFile) {
+        setProgress({
+          stage: 'uploading-logo',
+          current: 0,
+          total: 1,
+          message: 'Uploading logo...'
+        });
+        
+        logoPath = await uploadLogo(validation.mapName, metadata.logoFile);
+      }
+
       // Stage: Creating map entry
       setProgress({
         stage: 'creating-map',
@@ -205,7 +242,12 @@ export const useMapUpload = () => {
 
       const { data: mapData, error: mapError } = await supabase
         .from('route_maps')
-        .insert({ name: validation.mapName })
+        .insert({ 
+          name: validation.mapName,
+          country_code: metadata?.countryCode || null,
+          map_type: metadata?.mapType || 'forest',
+          logo_path: logoPath || null,
+        })
         .select('id')
         .single();
 
@@ -310,7 +352,7 @@ export const useMapUpload = () => {
       });
       throw error;
     }
-  }, [uploadImages]);
+  }, [uploadImages, uploadLogo]);
 
   const reset = useCallback(() => {
     setProgress({

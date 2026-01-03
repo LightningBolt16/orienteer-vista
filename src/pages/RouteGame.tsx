@@ -15,11 +15,40 @@ import { toast } from '../components/ui/use-toast';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
-import flagItaly from '@/assets/flag-italy.png';
-import flagSweden from '@/assets/flag-sweden.png';
-import flagBelgium from '@/assets/flag-belgium.png';
 
 type MapSelection = 'all' | string;
+
+// Country code to flag emoji mapping
+const COUNTRY_FLAGS: Record<string, string> = {
+  IT: '🇮🇹',
+  SE: '🇸🇪',
+  BE: '🇧🇪',
+  NO: '🇳🇴',
+  FI: '🇫🇮',
+  CH: '🇨🇭',
+  FR: '🇫🇷',
+  DE: '🇩🇪',
+  ES: '🇪🇸',
+  PT: '🇵🇹',
+  DK: '🇩🇰',
+  CZ: '🇨🇿',
+  PL: '🇵🇱',
+  GB: '🇬🇧',
+  US: '🇺🇸',
+  AU: '🇦🇺',
+  NZ: '🇳🇿',
+  JP: '🇯🇵',
+  AT: '🇦🇹',
+  HU: '🇭🇺',
+  RU: '🇷🇺',
+  UA: '🇺🇦',
+  EE: '🇪🇪',
+  LV: '🇱🇻',
+  LT: '🇱🇹',
+};
+
+// Storage URL for map logos
+const LOGO_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/map-logos`;
 
 const RouteGame: React.FC = () => {
   const { t } = useLanguage();
@@ -196,12 +225,20 @@ const RouteGame: React.FC = () => {
                 
                 {/* Individual Map Options */}
                 {uniqueMapNames.map(mapName => {
+                  // Find the map source to get metadata
+                  const mapSource = availableMaps.find(m => m.name === mapName);
+                  const countryCode = mapSource?.countryCode;
+                  const logoPath = mapSource?.logoPath;
                   const isPwt = isPwtMap(mapName);
                   const isKnivsta = mapName.toLowerCase().includes('knivsta');
                   const isEkeby = mapName.toLowerCase().includes('ekeby');
-                  const isBelgien = mapName.toLowerCase().includes('belgien');
-                  const isGeel = mapName.toLowerCase().includes('geel');
-                  const countryFlag = isPwt ? flagItaly : (isKnivsta || isEkeby) ? flagSweden : (isBelgien || isGeel) ? flagBelgium : null;
+                  
+                  // Use emoji flag from country code, or fallback to legacy logic
+                  const countryFlag = countryCode ? COUNTRY_FLAGS[countryCode] : null;
+                  
+                  // Determine which logo to show
+                  const showKartkompanietLogo = isKnivsta || isEkeby;
+                  const customLogoUrl = logoPath ? `${LOGO_STORAGE_URL}/${logoPath}` : null;
                   
                   return (
                     <button
@@ -214,22 +251,22 @@ const RouteGame: React.FC = () => {
                       }`}
                     >
                       {countryFlag && (
-                        <img 
-                          src={countryFlag} 
-                          alt="Country flag" 
-                          className="absolute top-1 right-1 h-4 w-6 object-cover rounded-sm shadow-sm"
-                        />
+                        <span className="absolute top-1 right-1 text-lg">
+                          {countryFlag}
+                        </span>
                       )}
                       {isPwt ? (
                         <PwtAttribution variant="badge" className="mb-2" />
-                      ) : (isKnivsta || isEkeby) ? (
+                      ) : customLogoUrl ? (
+                        <img src={customLogoUrl} alt={`${mapName} logo`} className="h-8 w-8 mb-2 object-contain rounded" />
+                      ) : showKartkompanietLogo ? (
                         <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
                       ) : (
                         <Map className="h-8 w-8 mb-2 text-muted-foreground" />
                       )}
                       <span className="font-medium text-sm">{mapName}</span>
                       <span className="text-xs text-muted-foreground">
-                        {availableMaps.find(m => m.name === mapName)?.description || 'Orienteering map'}
+                        {mapSource?.description || 'Orienteering map'}
                       </span>
                     </button>
                   );

@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, CheckCircle, XCircle, Loader2, FolderOpen, FileText, Image } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, Loader2, FolderOpen, FileText, Image, Globe, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useMapUpload } from '@/hooks/useMapUpload';
 import { toast } from '@/components/ui/use-toast';
 
@@ -21,9 +23,48 @@ interface FolderValidation {
   errors: string[];
 }
 
+// Common orienteering countries
+const COUNTRIES = [
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
+  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
+  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
+  { code: 'FI', name: 'Finland', flag: '🇫🇮' },
+  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
+  { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
+  { code: 'CZ', name: 'Czech Republic', flag: '🇨🇿' },
+  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
+  { code: 'AT', name: 'Austria', flag: '🇦🇹' },
+  { code: 'HU', name: 'Hungary', flag: '🇭🇺' },
+  { code: 'RU', name: 'Russia', flag: '🇷🇺' },
+  { code: 'UA', name: 'Ukraine', flag: '🇺🇦' },
+  { code: 'EE', name: 'Estonia', flag: '🇪🇪' },
+  { code: 'LV', name: 'Latvia', flag: '🇱🇻' },
+  { code: 'LT', name: 'Lithuania', flag: '🇱🇹' },
+];
+
+const MAP_TYPES = [
+  { value: 'forest', label: 'Forest' },
+  { value: 'sprint', label: 'Sprint' },
+  { value: 'urban', label: 'Urban' },
+  { value: 'park', label: 'Park' },
+];
+
 const MapUploadWizard: React.FC = () => {
   const [step, setStep] = useState<'select' | 'validate' | 'upload' | 'complete'>('select');
   const [validation, setValidation] = useState<FolderValidation | null>(null);
+  const [countryCode, setCountryCode] = useState<string>('');
+  const [mapType, setMapType] = useState<string>('forest');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const { progress, validateFolder, uploadMap, reset } = useMapUpload();
 
   const handleFolderSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,12 +76,23 @@ const MapUploadWizard: React.FC = () => {
     setValidation(result);
   }, [validateFolder]);
 
+  const handleLogoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+    }
+  }, []);
+
   const handleUpload = useCallback(async () => {
     if (!validation || !validation.isValid) return;
 
     setStep('upload');
     try {
-      await uploadMap(validation);
+      await uploadMap(validation, {
+        countryCode: countryCode || undefined,
+        mapType: mapType || 'forest',
+        logoFile: logoFile || undefined,
+      });
       setStep('complete');
       toast({
         title: 'Upload Complete',
@@ -53,11 +105,14 @@ const MapUploadWizard: React.FC = () => {
         variant: 'destructive'
       });
     }
-  }, [validation, uploadMap]);
+  }, [validation, uploadMap, countryCode, mapType, logoFile]);
 
   const handleReset = useCallback(() => {
     setStep('select');
     setValidation(null);
+    setCountryCode('');
+    setMapType('forest');
+    setLogoFile(null);
     reset();
   }, [reset]);
 
@@ -182,6 +237,79 @@ const MapUploadWizard: React.FC = () => {
                     <li key={i}>{error}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Map Metadata */}
+            {validation.isValid && (
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+                <h3 className="font-medium flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Map Metadata (Optional)
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Select value={countryCode} onValueChange={setCountryCode}>
+                      <SelectTrigger id="country">
+                        <SelectValue placeholder="Select country..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRIES.map(country => (
+                          <SelectItem key={country.code} value={country.code}>
+                            <span className="flex items-center gap-2">
+                              <span>{country.flag}</span>
+                              <span>{country.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="mapType">Map Type</Label>
+                    <Select value={mapType} onValueChange={setMapType}>
+                      <SelectTrigger id="mapType">
+                        <SelectValue placeholder="Select type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MAP_TYPES.map(type => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="logo">Custom Logo (Optional)</Label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="file"
+                      id="logo-input"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleLogoSelect}
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => document.getElementById('logo-input')?.click()}
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      {logoFile ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                    {logoFile && (
+                      <span className="text-sm text-muted-foreground">
+                        {logoFile.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
