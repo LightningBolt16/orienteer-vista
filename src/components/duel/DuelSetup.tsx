@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { useLanguage } from '../../context/LanguageContext';
 import { useRouteCache } from '../../context/RouteCache';
 import { MapSource, getUniqueMapNames } from '../../utils/routeDataUtils';
-import { Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause } from 'lucide-react';
+import { Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, Wifi, Users } from 'lucide-react';
 import { isPwtMap } from '../PwtAttribution';
 import PwtAttribution from '../PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
@@ -20,10 +20,12 @@ export interface DuelSettings {
   gameDuration?: number; // total game time in seconds (for timed mode)
   gameMode: 'speed' | 'wait';
   timeLimit?: number; // seconds per route, undefined means no limit
+  isOnline?: boolean; // true for online multiplayer
 }
 
 interface DuelSetupProps {
   onStart: (settings: DuelSettings) => void;
+  onStartOnline: (settings: DuelSettings) => void;
   onBack: () => void;
 }
 
@@ -44,7 +46,7 @@ const GAME_DURATION_OPTIONS = [
   { label: '10 min', value: 600 },
 ];
 
-const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
+const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack }) => {
   const { t } = useLanguage();
   const { mobileCache, isPreloading } = useRouteCache();
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
@@ -373,17 +375,40 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex gap-4">
-        <Button variant="outline" onClick={onBack} className="flex-1">
-          Back
-        </Button>
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            Back
+          </Button>
+          <Button 
+            onClick={handleStart} 
+            className="flex-1" 
+            disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
+          >
+            <Users className="h-5 w-5 mr-2" />
+            Local Duel
+          </Button>
+        </div>
         <Button 
-          onClick={handleStart} 
-          className="flex-1" 
+          onClick={() => {
+            const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
+            const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
+            onStartOnline({
+              mapId: selectedMapId,
+              gameType,
+              routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
+              gameDuration: gameType === 'timed' ? gameDuration : undefined,
+              gameMode,
+              timeLimit,
+              isOnline: true,
+            });
+          }}
+          variant="outline"
+          className="w-full border-primary/50 text-primary hover:bg-primary/10"
           disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
         >
-          <Swords className="h-5 w-5 mr-2" />
-          Start Duel!
+          <Wifi className="h-5 w-5 mr-2" />
+          Online Duel
         </Button>
       </div>
     </div>

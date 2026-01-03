@@ -3,7 +3,9 @@ import { Button } from '../ui/button';
 import { RouteData, getImageUrlByMapName } from '../../utils/routeDataUtils';
 import DuelPlayerPanel from './DuelPlayerPanel';
 import DuelScoreBar from './DuelScoreBar';
-import { Trophy, RotateCcw, Home, ArrowLeft, ArrowRight, Smartphone } from 'lucide-react';
+import MobileDuelView from './MobileDuelView';
+import MobileDuelIndependentView from './MobileDuelIndependentView';
+import { Trophy, RotateCcw, Home } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
 
 interface DuelGameProps {
@@ -39,7 +41,6 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
   const [isMobile, setIsMobile] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
   
   // Independent mode: speed + timed = each player progresses independently
   const isIndependentMode = settings.gameMode === 'speed' && settings.gameType === 'timed';
@@ -84,54 +85,33 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     ? routes[player2.currentRouteIndex % routes.length]
     : currentRoute;
   
-  // Use 16:9 for desktop, 16:9 landscape for mobile too (better for fullscreen)
+  // Use portrait (9:16) images for mobile, landscape (16:9) for desktop
   const currentImageUrl = currentRoute 
-    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, false)
+    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, isMobile)
     : '';
     
   // Per-player image URLs for independent mode
   const player1ImageUrl = player1Route 
-    ? getImageUrlByMapName(player1Route.mapName || '', player1Route.candidateIndex, false)
+    ? getImageUrlByMapName(player1Route.mapName || '', player1Route.candidateIndex, isMobile)
     : '';
   const player2ImageUrl = player2Route 
-    ? getImageUrlByMapName(player2Route.mapName || '', player2Route.candidateIndex, false)
+    ? getImageUrlByMapName(player2Route.mapName || '', player2Route.candidateIndex, isMobile)
     : '';
 
   const isTimedMode = settings.gameType === 'timed';
 
-  // Detect mobile and force landscape
+  // Detect mobile (no forced orientation - use portrait naturally)
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth <= 768 || 'ontouchstart' in window;
       setIsMobile(mobile);
-      setIsLandscape(window.innerWidth > window.innerHeight);
     };
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    window.addEventListener('orientationchange', checkMobile);
-    
-    // Force landscape on mobile
-    const forceLandscape = async () => {
-      if ('ontouchstart' in window && screen.orientation && 'lock' in screen.orientation) {
-        try {
-          await (screen.orientation as any).lock('landscape');
-        } catch (e) {
-          console.log('Could not lock orientation');
-        }
-      }
-    };
-    
-    forceLandscape();
     
     return () => {
       window.removeEventListener('resize', checkMobile);
-      window.removeEventListener('orientationchange', checkMobile);
-      if (screen.orientation && 'unlock' in screen.orientation) {
-        try {
-          screen.orientation.unlock();
-        } catch (e) {}
-      }
     };
   }, []);
 
@@ -431,323 +411,58 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     return <div className="flex justify-center items-center h-64 text-foreground">Loading routes...</div>;
   }
 
-  // Mobile Mode - Fullscreen landscape with tappable screen quarters
-  // Player 1 sits at LEFT side of phone, Player 2 at RIGHT side
-  // Each player has red (left) and blue (right) zones as tappable screen quarters
+  // Mobile Mode - Portrait with full quadrant touch overlays
+  // Player 1 at bottom (charging port), Player 2 at top (notch)
   if (isMobile) {
-    const RED_COLOR = '#FF5733';
-    const BLUE_COLOR = '#3357FF';
-    
-    // Show rotate prompt if not in landscape
-    if (!isLandscape) {
-      return (
-        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center text-white z-50">
-          <Smartphone className="h-16 w-16 mb-4 animate-pulse" style={{ transform: 'rotate(90deg)' }} />
-          <p className="text-lg font-medium">Rotate your device</p>
-          <p className="text-sm text-white/60 mt-2">Landscape mode required for duel</p>
-          <button 
-            onClick={onExit}
-            className="mt-6 bg-white/20 px-4 py-2 rounded-full text-sm"
-          >
-            Exit
-          </button>
-        </div>
-      );
-    }
-    
     // In independent mode, show split screen with different routes per player
     if (isIndependentMode) {
       return (
-        <div className="fixed inset-0 bg-black overflow-hidden">
-          {/* Split screen - Player 1 on left, Player 2 on right */}
-          <div className="absolute inset-0 flex">
-            {/* Player 1 side - left half */}
-            <div className="w-1/2 h-full relative border-r border-white/20">
-              <img
-                src={player1ImageUrl}
-                alt="Route P1"
-                className={`w-full h-full object-contain transition-opacity duration-150 ${
-                  player1.isTransitioning ? 'opacity-50' : 'opacity-100'
-                }`}
-                style={{ transform: 'rotate(180deg)' }}
-              />
-              
-              {/* Player 1 buttons - horizontal layout, rotated for opposite viewing */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4 z-20" style={{ transform: 'translateX(-50%) rotate(180deg)' }}>
-                <button
-                  onClick={() => handlePlayerAnswer(1, 'left')}
-                  disabled={player1.isTransitioning}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player1.isTransitioning ? 'opacity-40' : ''}`}
-                  style={{ backgroundColor: `${RED_COLOR}CC` }}
-                >
-                  <ArrowLeft className="h-8 w-8 text-white" />
-                </button>
-                <button
-                  onClick={() => handlePlayerAnswer(1, 'right')}
-                  disabled={player1.isTransitioning}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player1.isTransitioning ? 'opacity-40' : ''}`}
-                  style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-                >
-                  <ArrowRight className="h-8 w-8 text-white" />
-                </button>
-              </div>
-              
-              {/* Player 1 result indicator */}
-              {player1.showResult && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30" style={{ transform: 'translate(-50%, -50%) rotate(180deg)' }}>
-                  <span className={`text-6xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
-                    {player1.showResult === 'win' ? '✓' : '✗'}
-                  </span>
-                </div>
-              )}
-              
-              {/* Player 1 score overlay */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30" style={{ transform: 'translateX(-50%) rotate(180deg)' }}>
-                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1">
-                  <span className="text-red-500 font-bold text-lg">
-                    P1: {player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Player 2 side - right half */}
-            <div className="w-1/2 h-full relative">
-              <img
-                src={player2ImageUrl}
-                alt="Route P2"
-                className={`w-full h-full object-contain transition-opacity duration-150 ${
-                  player2.isTransitioning ? 'opacity-50' : 'opacity-100'
-                }`}
-              />
-              
-              {/* Player 2 buttons - horizontal layout */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4 z-20">
-                <button
-                  onClick={() => handlePlayerAnswer(2, 'left')}
-                  disabled={player2.isTransitioning}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player2.isTransitioning ? 'opacity-40' : ''}`}
-                  style={{ backgroundColor: `${RED_COLOR}CC` }}
-                >
-                  <ArrowLeft className="h-8 w-8 text-white" />
-                </button>
-                <button
-                  onClick={() => handlePlayerAnswer(2, 'right')}
-                  disabled={player2.isTransitioning}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player2.isTransitioning ? 'opacity-40' : ''}`}
-                  style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-                >
-                  <ArrowRight className="h-8 w-8 text-white" />
-                </button>
-              </div>
-              
-              {/* Player 2 result indicator */}
-              {player2.showResult && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
-                  <span className={`text-6xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
-                    {player2.showResult === 'win' ? '✓' : '✗'}
-                  </span>
-                </div>
-              )}
-              
-              {/* Player 2 score overlay */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
-                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1">
-                  <span className="text-blue-500 font-bold text-lg">
-                    P2: {player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Center timer */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-            <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
-              <div className="text-white font-mono font-bold text-xl">
-                {gameTimeRemaining !== null ? (
-                  <span className={gameTimeRemaining < 10 ? 'text-red-400 animate-pulse' : ''}>
-                    {Math.floor(gameTimeRemaining / 60)}:{String(Math.floor(gameTimeRemaining % 60)).padStart(2, '0')}
-                  </span>
-                ) : (
-                  <span>Speed Race</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Exit button */}
-          <button 
-            onClick={onExit}
-            className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 text-white px-4 py-2 rounded-full text-sm"
-          >
-            Exit
-          </button>
-        </div>
+        <MobileDuelIndependentView
+          routes={routes}
+          player1={{
+            score: player1.score,
+            currentRouteIndex: player1.currentRouteIndex,
+            isTransitioning: player1.isTransitioning,
+            showResult: player1.showResult,
+          }}
+          player2={{
+            score: player2.score,
+            currentRouteIndex: player2.currentRouteIndex,
+            isTransitioning: player2.isTransitioning,
+            showResult: player2.showResult,
+          }}
+          gameTimeRemaining={gameTimeRemaining}
+          onPlayerAnswer={handlePlayerAnswer}
+          onExit={onExit}
+        />
       );
     }
     
-    // Synchronized mode - single shared image
+    // Synchronized mode - single shared image with quadrant touch zones
     return (
-      <div className="fixed inset-0 bg-black overflow-hidden">
-        {/* Fullscreen Route Image */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          {isImageLoaded ? (
-            <img
-              src={currentImageUrl}
-              alt="Route"
-              className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
-                isTransitioning ? 'opacity-50' : 'opacity-100'
-              }`}
-            />
-          ) : (
-            <div className="w-full h-full bg-muted/20 animate-pulse" />
-          )}
-        </div>
-
-        {/* Player 1 - LEFT HALF of screen (top-left = red/left, bottom-left = blue/right) */}
-        {/* Red zone - top-left quarter */}
-        <button
-          onClick={() => handlePlayerAnswer(1, 'left')}
-          disabled={isTransitioning || player1.hasAnswered}
-          className="absolute top-0 left-0 w-1/4 h-1/2 z-20"
-          style={{ 
-            background: `linear-gradient(135deg, ${RED_COLOR}40 0%, transparent 70%)`,
-            borderRight: `2px solid ${RED_COLOR}30`,
-            borderBottom: `2px solid ${RED_COLOR}30`
-          }}
-        >
-          <div className="absolute top-4 left-4" style={{ transform: 'rotate(-90deg)' }}>
-            <div 
-              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${player1.hasAnswered ? 'opacity-40' : ''}`}
-              style={{ backgroundColor: `${RED_COLOR}CC` }}
-            >
-              <ArrowLeft className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </button>
-        
-        {/* Blue zone - bottom-left quarter */}
-        <button
-          onClick={() => handlePlayerAnswer(1, 'right')}
-          disabled={isTransitioning || player1.hasAnswered}
-          className="absolute bottom-0 left-0 w-1/4 h-1/2 z-20"
-          style={{ 
-            background: `linear-gradient(225deg, ${BLUE_COLOR}40 0%, transparent 70%)`,
-            borderRight: `2px solid ${BLUE_COLOR}30`,
-            borderTop: `2px solid ${BLUE_COLOR}30`
-          }}
-        >
-          <div className="absolute bottom-4 left-4" style={{ transform: 'rotate(-90deg)' }}>
-            <div 
-              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${player1.hasAnswered ? 'opacity-40' : ''}`}
-              style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-            >
-              <ArrowRight className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </button>
-
-        {/* Player 1 result indicator */}
-        {player1.showResult && (
-          <div className="absolute left-8 top-1/2 -translate-y-1/2 z-30" style={{ transform: 'translateY(-50%) rotate(-90deg)' }}>
-            <span className={`text-4xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
-              {player1.showResult === 'win' ? '✓' : '✗'}
-            </span>
-          </div>
-        )}
-        {player1.hasAnswered && !player1.showResult && (
-          <div className="absolute left-12 top-1/2 z-30" style={{ transform: 'translateY(-50%) rotate(-90deg)' }}>
-            <span className="text-white/50 text-sm">Wait</span>
-          </div>
-        )}
-
-        {/* Player 2 - RIGHT HALF of screen (top-right = red/left, bottom-right = blue/right) */}
-        {/* Red zone - top-right quarter */}
-        <button
-          onClick={() => handlePlayerAnswer(2, 'left')}
-          disabled={isTransitioning || player2.hasAnswered}
-          className="absolute top-0 right-0 w-1/4 h-1/2 z-20"
-          style={{ 
-            background: `linear-gradient(45deg, transparent 30%, ${RED_COLOR}40 100%)`,
-            borderLeft: `2px solid ${RED_COLOR}30`,
-            borderBottom: `2px solid ${RED_COLOR}30`
-          }}
-        >
-          <div className="absolute top-4 right-4" style={{ transform: 'rotate(90deg)' }}>
-            <div 
-              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${player2.hasAnswered ? 'opacity-40' : ''}`}
-              style={{ backgroundColor: `${RED_COLOR}CC` }}
-            >
-              <ArrowLeft className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </button>
-        
-        {/* Blue zone - bottom-right quarter */}
-        <button
-          onClick={() => handlePlayerAnswer(2, 'right')}
-          disabled={isTransitioning || player2.hasAnswered}
-          className="absolute bottom-0 right-0 w-1/4 h-1/2 z-20"
-          style={{ 
-            background: `linear-gradient(315deg, transparent 30%, ${BLUE_COLOR}40 100%)`,
-            borderLeft: `2px solid ${BLUE_COLOR}30`,
-            borderTop: `2px solid ${BLUE_COLOR}30`
-          }}
-        >
-          <div className="absolute bottom-4 right-4" style={{ transform: 'rotate(90deg)' }}>
-            <div 
-              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${player2.hasAnswered ? 'opacity-40' : ''}`}
-              style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-            >
-              <ArrowRight className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </button>
-
-        {/* Player 2 result indicator */}
-        {player2.showResult && (
-          <div className="absolute right-8 top-1/2 z-30" style={{ transform: 'translateY(-50%) rotate(90deg)' }}>
-            <span className={`text-4xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
-              {player2.showResult === 'win' ? '✓' : '✗'}
-            </span>
-          </div>
-        )}
-        {player2.hasAnswered && !player2.showResult && (
-          <div className="absolute right-12 top-1/2 z-30" style={{ transform: 'translateY(-50%) rotate(90deg)' }}>
-            <span className="text-white/50 text-sm">Wait</span>
-          </div>
-        )}
-
-        {/* Center HUD - Timer/Progress and Scores */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-          <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center gap-4">
-            <div className="text-red-500 font-bold text-lg">
-              P1: {player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}
-            </div>
-            <div className="text-white font-mono font-bold text-xl">
-              {isTimedMode && gameTimeRemaining !== null ? (
-                <span className={gameTimeRemaining < 10 ? 'text-red-400 animate-pulse' : ''}>
-                  {Math.floor(gameTimeRemaining / 60)}:{String(Math.floor(gameTimeRemaining % 60)).padStart(2, '0')}
-                </span>
-              ) : (
-                <span>{routesCompleted + 1}/{totalRoutes}</span>
-              )}
-            </div>
-            <div className="text-blue-500 font-bold text-lg">
-              P2: {player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}
-            </div>
-          </div>
-        </div>
-
-        {/* Exit button */}
-        <button 
-          onClick={onExit}
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 text-white px-4 py-2 rounded-full text-sm"
-        >
-          Exit
-        </button>
-      </div>
+      <MobileDuelView
+        currentRoute={currentRoute}
+        player1={{
+          score: player1.score,
+          hasAnswered: player1.hasAnswered,
+          showResult: player1.showResult,
+          isTransitioning: player1.isTransitioning,
+        }}
+        player2={{
+          score: player2.score,
+          hasAnswered: player2.hasAnswered,
+          showResult: player2.showResult,
+          isTransitioning: player2.isTransitioning,
+        }}
+        isImageLoaded={isImageLoaded}
+        isTransitioning={isTransitioning}
+        gameTimeRemaining={gameTimeRemaining}
+        isTimedMode={isTimedMode}
+        routesCompleted={routesCompleted}
+        totalRoutes={totalRoutes}
+        onPlayerAnswer={handlePlayerAnswer}
+        onExit={onExit}
+      />
     );
   }
 
