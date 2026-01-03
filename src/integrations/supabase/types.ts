@@ -270,6 +270,74 @@ export type Database = {
         }
         Relationships: []
       }
+      route_images: {
+        Row: {
+          alt_route_length: number | null
+          aspect_ratio: string
+          candidate_index: number
+          created_at: string
+          id: string
+          image_path: string
+          main_route_length: number | null
+          map_id: string
+          shortest_side: string
+        }
+        Insert: {
+          alt_route_length?: number | null
+          aspect_ratio: string
+          candidate_index: number
+          created_at?: string
+          id?: string
+          image_path: string
+          main_route_length?: number | null
+          map_id: string
+          shortest_side: string
+        }
+        Update: {
+          alt_route_length?: number | null
+          aspect_ratio?: string
+          candidate_index?: number
+          created_at?: string
+          id?: string
+          image_path?: string
+          main_route_length?: number | null
+          map_id?: string
+          shortest_side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_images_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "route_maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_maps: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_map_stats: {
         Row: {
           accuracy: number | null
