@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';
@@ -5,6 +7,7 @@ export interface RouteData {
   mainRouteLength: number;
   altRouteLength: number;
   mapName?: string;
+  imagePath?: string;
 }
 
 export interface MapSource {
@@ -16,21 +19,23 @@ export interface MapSource {
   mapImagePath?: string;
   description?: string;
   folderName?: string;
-  namingScheme?: 'candidate' | 'route'; // 'candidate' = candidate_1.png, 'route' = route_0.png
+  namingScheme?: 'candidate' | 'route';
 }
 
-// Known map folders - the system will try to find CSVs in these folders
-// To add a new map, just add the folder name here
+// Supabase storage URL for route images
+const STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/route-images`;
+
+// Fallback local map folders (used when database is empty)
 const MAP_FOLDER_NAMES = ['Rotondella', 'Matera'];
 
-// Try different CSV naming patterns
+// Try different CSV naming patterns (for fallback)
 const getCSVPatterns = (folderName: string): string[] => [
   `/maps/${folderName}/${folderName}.csv`,
   `/maps/${folderName}/${folderName.toLowerCase()}.csv`,
   `/maps/${folderName}/${folderName.toUpperCase()}.csv`,
 ];
 
-// Find the working CSV path for a map folder
+// Find the working CSV path for a map folder (fallback)
 const findCSVPath = async (folderName: string): Promise<string | null> => {
   const patterns = getCSVPatterns(folderName);
   
@@ -47,17 +52,15 @@ const findCSVPath = async (folderName: string): Promise<string | null> => {
   return null;
 };
 
-// Detect which naming scheme a map folder uses
+// Detect which naming scheme a map folder uses (fallback)
 const detectNamingScheme = async (folderName: string, aspect: '16:9' | '9:16'): Promise<'candidate' | 'route' | null> => {
   const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
   
-  // Try candidate_1.png first (old scheme)
   try {
     const candidateResponse = await fetch(`/maps/${folderName}/${aspectFolder}/candidate_1.png`, { method: 'HEAD' });
     if (candidateResponse.ok) return 'candidate';
   } catch {}
   
-  // Try route_0.png (new scheme)
   try {
     const routeResponse = await fetch(`/maps/${folderName}/${aspectFolder}/route_0.png`, { method: 'HEAD' });
     if (routeResponse.ok) return 'route';
@@ -66,57 +69,118 @@ const detectNamingScheme = async (folderName: string, aspect: '16:9' | '9:16'): 
   return null;
 };
 
-// Generate map sources for all available maps
+// Fetch maps from database first, fallback to local files
 export const getAvailableMaps = async (): Promise<MapSource[]> => {
   try {
-    const mapSources: MapSource[] = [];
-    
-    for (const folderName of MAP_FOLDER_NAMES) {
-      const csvPath = await findCSVPath(folderName);
-      if (!csvPath) {
-        console.warn(`No CSV found for map: ${folderName}`);
-        continue;
+    // Try database first
+    const { data: dbMaps, error } = await supabase
+      .from('route_maps')
+      .select('id, name, description');
+
+    if (!error && dbMaps && dbMaps.length > 0) {
+      console.log(`Found ${dbMaps.length} maps in database`);
+      const mapSources: MapSource[] = [];
+
+      for (const dbMap of dbMaps) {
+        // Check if routes exist for this map in both aspects
+        const { data: routes16_9 } = await supabase
+          .from('route_images')
+          .select('id')
+          .eq('map_id', dbMap.id)
+          .eq('aspect_ratio', '16:9')
+          .limit(1);
+
+        const { data: routes9_16 } = await supabase
+          .from('route_images')
+          .select('id')
+          .eq('map_id', dbMap.id)
+          .eq('aspect_ratio', '9:16')
+          .limit(1);
+
+        if (routes16_9 && routes16_9.length > 0) {
+          mapSources.push({
+            id: `${dbMap.id}-landscape`,
+            name: dbMap.name,
+            aspect: '16:9',
+            csvPath: '', // Not used for database routes
+            imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/16_9/candidate_`,
+            folderName: dbMap.name,
+            description: dbMap.description || undefined,
+          });
+        }
+
+        if (routes9_16 && routes9_16.length > 0) {
+          mapSources.push({
+            id: `${dbMap.id}-portrait`,
+            name: dbMap.name,
+            aspect: '9:16',
+            csvPath: '',
+            imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/9_16/candidate_`,
+            folderName: dbMap.name,
+            description: dbMap.description || undefined,
+          });
+        }
       }
-      
-      // Check landscape
-      const landscapeScheme = await detectNamingScheme(folderName, '16:9');
-      if (landscapeScheme) {
-        const prefix = landscapeScheme === 'candidate' ? 'candidate_' : 'route_';
-        cacheNamingScheme(folderName, '16:9', landscapeScheme);
-        mapSources.push({
-          id: `${folderName.toLowerCase()}-landscape`,
-          name: folderName,
-          aspect: '16:9',
-          csvPath,
-          imagePathPrefix: `/maps/${folderName}/16_9/${prefix}`,
-          folderName,
-          namingScheme: landscapeScheme,
-        });
-      }
-      
-      // Check portrait
-      const portraitScheme = await detectNamingScheme(folderName, '9:16');
-      if (portraitScheme) {
-        const prefix = portraitScheme === 'candidate' ? 'candidate_' : 'route_';
-        cacheNamingScheme(folderName, '9:16', portraitScheme);
-        mapSources.push({
-          id: `${folderName.toLowerCase()}-portrait`,
-          name: folderName,
-          aspect: '9:16',
-          csvPath,
-          imagePathPrefix: `/maps/${folderName}/9_16/${prefix}`,
-          folderName,
-          namingScheme: portraitScheme,
-        });
+
+      if (mapSources.length > 0) {
+        console.log(`Generated ${mapSources.length} map sources from database`);
+        return mapSources;
       }
     }
 
-    console.log(`Found ${mapSources.length} valid map sources`);
-    return mapSources;
+    // Fallback to local files
+    console.log('No maps in database, falling back to local files');
+    return getLocalMaps();
   } catch (error) {
-    console.error('Error loading available maps:', error);
-    return [];
+    console.error('Error loading maps from database:', error);
+    return getLocalMaps();
   }
+};
+
+// Fallback: Load maps from local public folder
+const getLocalMaps = async (): Promise<MapSource[]> => {
+  const mapSources: MapSource[] = [];
+  
+  for (const folderName of MAP_FOLDER_NAMES) {
+    const csvPath = await findCSVPath(folderName);
+    if (!csvPath) {
+      console.warn(`No CSV found for map: ${folderName}`);
+      continue;
+    }
+    
+    const landscapeScheme = await detectNamingScheme(folderName, '16:9');
+    if (landscapeScheme) {
+      const prefix = landscapeScheme === 'candidate' ? 'candidate_' : 'route_';
+      cacheNamingScheme(folderName, '16:9', landscapeScheme);
+      mapSources.push({
+        id: `${folderName.toLowerCase()}-landscape`,
+        name: folderName,
+        aspect: '16:9',
+        csvPath,
+        imagePathPrefix: `/maps/${folderName}/16_9/${prefix}`,
+        folderName,
+        namingScheme: landscapeScheme,
+      });
+    }
+    
+    const portraitScheme = await detectNamingScheme(folderName, '9:16');
+    if (portraitScheme) {
+      const prefix = portraitScheme === 'candidate' ? 'candidate_' : 'route_';
+      cacheNamingScheme(folderName, '9:16', portraitScheme);
+      mapSources.push({
+        id: `${folderName.toLowerCase()}-portrait`,
+        name: folderName,
+        aspect: '9:16',
+        csvPath,
+        imagePathPrefix: `/maps/${folderName}/9_16/${prefix}`,
+        folderName,
+        namingScheme: portraitScheme,
+      });
+    }
+  }
+
+  console.log(`Found ${mapSources.length} local map sources`);
+  return mapSources;
 };
 
 // Detect CSV format based on header
@@ -196,11 +260,10 @@ const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
     .filter(item => item !== null) as RouteData[];
 };
 
-// Check if a specific route image exists (tries both naming schemes)
+// Check if a specific route image exists (tries both naming schemes) - for local fallback
 const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16:9' | '9:16', namingScheme?: 'candidate' | 'route'): Promise<boolean> => {
   const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
   
-  // If we know the scheme, use it directly
   if (namingScheme === 'route') {
     const imagePath = `/maps/${mapName}/${aspectFolder}/route_${candidateIndex}.png`;
     try {
@@ -209,7 +272,6 @@ const checkImageExists = async (mapName: string, candidateIndex: number, aspect:
     } catch { return false; }
   }
   
-  // Default: try candidate scheme
   const imagePath = `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
   try {
     const response = await fetch(imagePath, { method: 'HEAD' });
@@ -217,10 +279,44 @@ const checkImageExists = async (mapName: string, candidateIndex: number, aspect:
   } catch { return false; }
 };
 
-// Fetch route data from a specific map source, validating each image exists
+// Fetch route data from database or local CSV
 export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
   try {
-    console.log(`Fetching routes from: ${mapSource.csvPath} (scheme: ${mapSource.namingScheme})`);
+    // Try database first if mapSource.id contains a UUID (database map)
+    const isDbMap = mapSource.id.length > 20 && mapSource.id.includes('-');
+    
+    if (isDbMap) {
+      const mapId = mapSource.id.replace('-landscape', '').replace('-portrait', '');
+      
+      const { data: dbRoutes, error } = await supabase
+        .from('route_images')
+        .select('candidate_index, shortest_side, main_route_length, alt_route_length, image_path')
+        .eq('map_id', mapId)
+        .eq('aspect_ratio', mapSource.aspect)
+        .order('candidate_index');
+
+      if (!error && dbRoutes && dbRoutes.length > 0) {
+        console.log(`Loaded ${dbRoutes.length} routes from database for ${mapSource.name} (${mapSource.aspect})`);
+        
+        return dbRoutes.map(route => ({
+          candidateIndex: route.candidate_index,
+          shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
+          shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
+          mainRouteLength: Number(route.main_route_length) || 0,
+          altRouteLength: Number(route.alt_route_length) || 0,
+          mapName: mapSource.name,
+          imagePath: `${STORAGE_URL}/${route.image_path}`,
+        }));
+      }
+    }
+
+    // Fallback to local CSV
+    if (!mapSource.csvPath) {
+      console.warn(`No CSV path for ${mapSource.name}`);
+      return [];
+    }
+
+    console.log(`Fetching routes from local CSV: ${mapSource.csvPath}`);
     const response = await fetch(mapSource.csvPath);
     if (!response.ok) {
       throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
@@ -240,15 +336,13 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
     for (const { route, exists } of results) {
       if (exists) {
         validatedRoutes.push(route);
-      } else {
-        console.log(`Skipping route ${route.candidateIndex} for ${mapSource.name} (${mapSource.aspect}) - image not found`);
       }
     }
     
     console.log(`Loaded ${validatedRoutes.length}/${data.length} routes for map ${mapSource.name} (${mapSource.aspect})`);
     return validatedRoutes.sort((a, b) => a.candidateIndex - b.candidateIndex);
   } catch (error) {
-    console.error('Error fetching or parsing CSV:', error);
+    console.error('Error fetching route data:', error);
     return [];
   }
 };
@@ -283,20 +377,36 @@ export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: R
 // Cache for detected naming schemes per map
 const namingSchemeCache: Map<string, 'candidate' | 'route'> = new Map();
 
+// Cache for database maps (to know if we should use storage URL)
+const dbMapCache: Set<string> = new Set();
+
+// Mark a map as coming from database
+export const markAsDbMap = (mapName: string): void => {
+  dbMapCache.add(mapName.toLowerCase());
+};
+
 // Helper to get image URL by map name
-// Uses cached scheme if available, otherwise defaults based on known map configurations
-export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean): string => {
+export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean, imagePath?: string): string => {
+  // If imagePath is provided (from database), use it directly
+  if (imagePath) {
+    return imagePath;
+  }
+
   const aspectFolder = isMobile ? '9_16' : '16_9';
+  
+  // Check if this is a database map
+  if (dbMapCache.has(mapName.toLowerCase())) {
+    return `${STORAGE_URL}/${mapName.toLowerCase()}/${aspectFolder}/candidate_${candidateIndex}.webp`;
+  }
+
+  // Fallback to local files
   const cacheKey = `${mapName}-${aspectFolder}`;
   const cachedScheme = namingSchemeCache.get(cacheKey);
   
-  // Use cached scheme, or determine default based on map name
-  // Rotondella uses 'route_' prefix, others use 'candidate_'
   let prefix: string;
   if (cachedScheme) {
     prefix = cachedScheme === 'route' ? 'route_' : 'candidate_';
   } else {
-    // Fallback: Rotondella uses route_ prefix, others use candidate_
     prefix = mapName.toLowerCase() === 'rotondella' ? 'route_' : 'candidate_';
   }
   
