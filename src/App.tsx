@@ -20,6 +20,7 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import UserProfile from "./pages/UserProfile";
 import ClubsPage from "./pages/ClubsPage";
 import AdminClubRequests from "./pages/AdminClubRequests";
+import UploadMaps from "./pages/admin/UploadMaps";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 import { NetworkProvider } from "./context/NetworkContext";
@@ -61,6 +62,7 @@ const App: React.FC = () => {
                     <Route path="/user/:userId" element={<Layout><UserProfile /></Layout>} />
                     <Route path="/clubs" element={<Layout><ClubsPage /></Layout>} />
                     <Route path="/admin/club-requests" element={<Layout><AdminClubRequests /></Layout>} />
+                    <Route path="/admin/upload-maps" element={<UploadMaps />} />
                     <Route path="*" element={<Layout><NotFound /></Layout>} />
                   </Routes>
                 </BrowserRouter>
