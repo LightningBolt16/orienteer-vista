@@ -96,6 +96,47 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
         <p className="text-muted-foreground">Choose your battleground</p>
       </div>
 
+      {/* Play Mode Selection - Online/Local */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Play Mode</CardTitle>
+          <CardDescription>Choose how you want to duel</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => {}}
+              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-border bg-card transition-all hover:border-primary/50"
+            >
+              <Users className="h-8 w-8 mb-2 text-primary" />
+              <span className="font-medium text-sm">Local</span>
+              <span className="text-xs text-muted-foreground">Same device</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
+                const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
+                onStartOnline({
+                  mapId: selectedMapId,
+                  gameType,
+                  routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
+                  gameDuration: gameType === 'timed' ? gameDuration : undefined,
+                  gameMode,
+                  timeLimit,
+                  isOnline: true,
+                });
+              }}
+              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-primary bg-primary/10 transition-all hover:border-primary"
+            >
+              <Wifi className="h-8 w-8 mb-2 text-green-500" />
+              <span className="font-medium text-sm">Online</span>
+              <span className="text-xs text-muted-foreground">Play remotely</span>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Map Selection */}
       <Card>
         <CardHeader>
@@ -375,40 +416,17 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-4">
-          <Button variant="outline" onClick={onBack} className="flex-1">
-            Back
-          </Button>
-          <Button 
-            onClick={handleStart} 
-            className="flex-1" 
-            disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
-          >
-            <Users className="h-5 w-5 mr-2" />
-            Local Duel
-          </Button>
-        </div>
+      <div className="flex gap-4">
+        <Button variant="outline" onClick={onBack} className="flex-1">
+          Back
+        </Button>
         <Button 
-          onClick={() => {
-            const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
-            const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
-            onStartOnline({
-              mapId: selectedMapId,
-              gameType,
-              routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
-              gameDuration: gameType === 'timed' ? gameDuration : undefined,
-              gameMode,
-              timeLimit,
-              isOnline: true,
-            });
-          }}
-          variant="outline"
-          className="w-full border-primary/50 text-primary hover:bg-primary/10"
+          onClick={handleStart} 
+          className="flex-1" 
           disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
         >
-          <Wifi className="h-5 w-5 mr-2" />
-          Online Duel
+          <Users className="h-5 w-5 mr-2" />
+          Start Local Duel
         </Button>
       </div>
     </div>
