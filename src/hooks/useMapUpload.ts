@@ -263,7 +263,7 @@ export const useMapUpload = () => {
           map_id: mapId,
           candidate_index: route.candidateIndex,
           aspect_ratio: '16:9',
-          shortest_side: route.mainSide,
+          shortest_side: route.mainSide.toLowerCase(),
           main_route_length: route.mainLength,
           alt_route_length: route.altLength,
           image_path: `${folderName}/16_9/candidate_${route.candidateIndex}.webp`
@@ -272,7 +272,7 @@ export const useMapUpload = () => {
           map_id: mapId,
           candidate_index: route.candidateIndex,
           aspect_ratio: '9:16',
-          shortest_side: route.mainSide,
+          shortest_side: route.mainSide.toLowerCase(),
           main_route_length: route.mainLength,
           alt_route_length: route.altLength,
           image_path: `${folderName}/9_16/candidate_${route.candidateIndex}.webp`
