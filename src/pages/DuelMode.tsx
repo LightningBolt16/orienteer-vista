@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRouteCache } from '../context/RouteCache';
 import { RouteData } from '../utils/routeDataUtils';
 import DuelIntro from '../components/duel/DuelIntro';
 import DuelSetup, { DuelSettings } from '../components/duel/DuelSetup';
 import DuelGame from '../components/duel/DuelGame';
+import OnlineDuelLobby from '../components/duel/OnlineDuelLobby';
+import { OnlineDuelRoom } from '../hooks/useOnlineDuel';
 
-type DuelPhase = 'intro' | 'setup' | 'playing';
+type DuelPhase = 'intro' | 'setup' | 'playing' | 'online-lobby';
 
 const DuelMode: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +22,15 @@ const DuelMode: React.FC = () => {
     gameMode: 'speed',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [onlineRoom, setOnlineRoom] = useState<OnlineDuelRoom | null>(null);
+
+  // Preload routes when entering setup phase for faster game start
+  useEffect(() => {
+    if (phase === 'setup') {
+      // Preload default routes in background
+      getRoutesForMap('all', true).catch(console.error);
+    }
+  }, [phase, getRoutesForMap]);
 
   useEffect(() => {
     const hasSeenIntro = localStorage.getItem('duel-intro-seen');
@@ -51,6 +62,17 @@ const DuelMode: React.FC = () => {
     setIsLoading(false);
   };
 
+  const handleStartOnline = (newSettings: DuelSettings) => {
+    setSettings(newSettings);
+    setPhase('online-lobby');
+  };
+
+  const handleOnlineGameStart = useCallback((routes: RouteData[], room: OnlineDuelRoom) => {
+    setGameRoutes(routes);
+    setOnlineRoom(room);
+    setPhase('playing');
+  }, []);
+
   const handleExit = () => {
     navigate('/');
   };
@@ -72,13 +94,17 @@ const DuelMode: React.FC = () => {
   };
 
   const handleBackToSetup = () => {
+    setOnlineRoom(null);
     setPhase('setup');
   };
 
   if (isLoading || isPreloading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading routes...</p>
+        </div>
       </div>
     );
   }
@@ -92,7 +118,16 @@ const DuelMode: React.FC = () => {
       {phase === 'setup' && (
         <DuelSetup 
           onStart={handleSetupComplete}
+          onStartOnline={handleStartOnline}
           onBack={handleExit}
+        />
+      )}
+
+      {phase === 'online-lobby' && (
+        <OnlineDuelLobby
+          settings={settings}
+          onGameStart={handleOnlineGameStart}
+          onBack={handleBackToSetup}
         />
       )}
       
