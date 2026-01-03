@@ -21,7 +21,7 @@ export interface MapSource {
 
 // Known map folders - the system will try to find CSVs in these folders
 // To add a new map, just add the folder name here
-const MAP_FOLDER_NAMES = ['Rotondella', 'Knivsta', 'Geel', 'Matera', 'Ekeby'];
+const MAP_FOLDER_NAMES = ['Rotondella', 'Matera'];
 
 // Try different CSV naming patterns
 const getCSVPatterns = (folderName: string): string[] => [
