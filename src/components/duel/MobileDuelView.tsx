@@ -69,26 +69,10 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             className="flex-1 h-full relative transition-all active:scale-[0.98]"
             style={{
               background: player2.hasAnswered 
-                ? 'linear-gradient(180deg, rgba(239,68,68,0.2) 0%, transparent 70%)'
-                : 'linear-gradient(180deg, rgba(239,68,68,0.35) 0%, rgba(239,68,68,0.1) 50%, transparent 80%)',
-              borderRight: '1px solid rgba(239,68,68,0.3)',
+                ? 'linear-gradient(180deg, rgba(239,68,68,0.15) 0%, transparent 60%)'
+                : 'linear-gradient(180deg, rgba(239,68,68,0.4) 0%, rgba(239,68,68,0.15) 40%, transparent 70%)',
             }}
-          >
-            {/* Visual indicator */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2">
-              <div 
-                className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 ${
-                  player2.hasAnswered ? 'opacity-30' : 'opacity-90'
-                }`}
-                style={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  borderColor: 'rgb(239,68,68)'
-                }}
-              >
-                <span className="text-2xl font-bold" style={{ color: 'rgb(239,68,68)' }}>L</span>
-              </div>
-            </div>
-          </button>
+          />
           
           {/* Player 2 RIGHT zone */}
           <button
@@ -97,29 +81,14 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             className="flex-1 h-full relative transition-all active:scale-[0.98]"
             style={{
               background: player2.hasAnswered 
-                ? 'linear-gradient(180deg, rgba(59,130,246,0.2) 0%, transparent 70%)'
-                : 'linear-gradient(180deg, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.1) 50%, transparent 80%)',
-              borderLeft: '1px solid rgba(59,130,246,0.3)',
+                ? 'linear-gradient(180deg, rgba(59,130,246,0.15) 0%, transparent 60%)'
+                : 'linear-gradient(180deg, rgba(59,130,246,0.4) 0%, rgba(59,130,246,0.15) 40%, transparent 70%)',
             }}
-          >
-            <div className="absolute top-4 left-1/2 -translate-x-1/2">
-              <div 
-                className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 ${
-                  player2.hasAnswered ? 'opacity-30' : 'opacity-90'
-                }`}
-                style={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  borderColor: 'rgb(59,130,246)'
-                }}
-              >
-                <span className="text-2xl font-bold" style={{ color: 'rgb(59,130,246)' }}>R</span>
-              </div>
-            </div>
-          </button>
+          />
         </div>
 
-        {/* Player 2 score */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20">
+        {/* Player 2 score - at bottom of their view (top when rotated back) */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-background/90 backdrop-blur-sm rounded-full px-4 py-1.5 border border-border shadow-sm">
             <span className="text-primary font-bold text-sm">P2: {player2.score.toFixed(1)}</span>
           </div>
@@ -143,10 +112,10 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
         )}
       </div>
 
-      {/* Center HUD - Timer/Progress */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
-        <div className="bg-background/90 backdrop-blur-sm rounded-xl px-4 py-2 border border-border shadow-lg">
-          <div className="text-foreground font-mono font-bold text-xl text-center">
+      {/* Route counter - left side */}
+      <div className="absolute top-1/2 left-2 -translate-y-1/2 z-40 pointer-events-none">
+        <div className="bg-background/90 backdrop-blur-sm rounded-lg px-3 py-2 border border-border shadow-lg">
+          <div className="text-foreground font-mono font-bold text-lg text-center">
             {isTimedMode && gameTimeRemaining !== null ? (
               <span className={gameTimeRemaining < 10 ? 'text-destructive animate-pulse' : ''}>
                 {Math.floor(gameTimeRemaining / 60)}:{String(Math.floor(gameTimeRemaining % 60)).padStart(2, '0')}
@@ -158,7 +127,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
         </div>
       </div>
 
-      {/* Exit button - center */}
+      {/* Exit button - right side */}
       <button 
         onClick={onExit}
         className="absolute top-1/2 right-2 -translate-y-1/2 z-50 bg-background/80 backdrop-blur-sm text-foreground px-3 py-2 rounded-full text-xs border border-border shadow-sm"
@@ -176,26 +145,10 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             className="flex-1 h-full relative transition-all active:scale-[0.98]"
             style={{
               background: player1.hasAnswered 
-                ? 'linear-gradient(0deg, rgba(239,68,68,0.2) 0%, transparent 70%)'
-                : 'linear-gradient(0deg, rgba(239,68,68,0.35) 0%, rgba(239,68,68,0.1) 50%, transparent 80%)',
-              borderRight: '1px solid rgba(239,68,68,0.3)',
+                ? 'linear-gradient(0deg, rgba(239,68,68,0.15) 0%, transparent 60%)'
+                : 'linear-gradient(0deg, rgba(239,68,68,0.4) 0%, rgba(239,68,68,0.15) 40%, transparent 70%)',
             }}
-          >
-            {/* Visual indicator at bottom */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-              <div 
-                className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 ${
-                  player1.hasAnswered ? 'opacity-30' : 'opacity-90'
-                }`}
-                style={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  borderColor: 'rgb(239,68,68)'
-                }}
-              >
-                <span className="text-2xl font-bold" style={{ color: 'rgb(239,68,68)' }}>L</span>
-              </div>
-            </div>
-          </button>
+          />
           
           {/* Player 1 RIGHT zone */}
           <button
@@ -204,29 +157,14 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             className="flex-1 h-full relative transition-all active:scale-[0.98]"
             style={{
               background: player1.hasAnswered 
-                ? 'linear-gradient(0deg, rgba(59,130,246,0.2) 0%, transparent 70%)'
-                : 'linear-gradient(0deg, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.1) 50%, transparent 80%)',
-              borderLeft: '1px solid rgba(59,130,246,0.3)',
+                ? 'linear-gradient(0deg, rgba(59,130,246,0.15) 0%, transparent 60%)'
+                : 'linear-gradient(0deg, rgba(59,130,246,0.4) 0%, rgba(59,130,246,0.15) 40%, transparent 70%)',
             }}
-          >
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-              <div 
-                className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg border-2 ${
-                  player1.hasAnswered ? 'opacity-30' : 'opacity-90'
-                }`}
-                style={{ 
-                  backgroundColor: 'hsl(var(--background))',
-                  borderColor: 'rgb(59,130,246)'
-                }}
-              >
-                <span className="text-2xl font-bold" style={{ color: 'rgb(59,130,246)' }}>R</span>
-              </div>
-            </div>
-          </button>
+          />
         </div>
 
-        {/* Player 1 score */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20">
+        {/* Player 1 score - at bottom of their view */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-background/90 backdrop-blur-sm rounded-full px-4 py-1.5 border border-border shadow-sm">
             <span className="text-primary font-bold text-sm">P1: {player1.score.toFixed(1)}</span>
           </div>
