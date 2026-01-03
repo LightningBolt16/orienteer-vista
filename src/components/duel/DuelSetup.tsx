@@ -126,8 +126,10 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
               {uniqueMapNames.map(mapName => {
                 const isPwt = isPwtMap(mapName);
                 const isKnivsta = mapName.toLowerCase().includes('knivsta');
+                const isEkeby = mapName.toLowerCase().includes('ekeby');
                 const isBelgien = mapName.toLowerCase().includes('belgien');
-                const countryFlag = isPwt ? flagItaly : isKnivsta ? flagSweden : isBelgien ? flagBelgium : null;
+                const isGeel = mapName.toLowerCase().includes('geel');
+                const countryFlag = isPwt ? flagItaly : (isKnivsta || isEkeby) ? flagSweden : (isBelgien || isGeel) ? flagBelgium : null;
                 
                 return (
                   <button
@@ -148,7 +150,7 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onBack }) => {
                     )}
                     {isPwt ? (
                       <PwtAttribution variant="badge" className="mb-2" />
-                    ) : isKnivsta ? (
+                    ) : (isKnivsta || isEkeby) ? (
                       <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
                     ) : (
                       <Map className="h-8 w-8 mb-2 text-muted-foreground" />

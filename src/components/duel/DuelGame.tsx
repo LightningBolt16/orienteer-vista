@@ -22,7 +22,9 @@ interface PlayerState {
   showResult: 'win' | 'lose' | null;
   resultMessage: string;
   answerTime: number | null;
-  currentRouteIndex: number; // For independent continuation
+  currentRouteIndex: number; // For independent progression in speed+timed mode
+  routeStartTime: number; // Individual route timing for independent mode
+  isTransitioning: boolean; // Individual transition state
 }
 
 const SPEED_BONUS = 0.5;
@@ -39,6 +41,9 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [isMobile, setIsMobile] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   
+  // Independent mode: speed + timed = each player progresses independently
+  const isIndependentMode = settings.gameMode === 'speed' && settings.gameType === 'timed';
+  
   const [player1, setPlayer1] = useState<PlayerState>({
     score: 0,
     pendingScore: 0,
@@ -48,6 +53,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     resultMessage: '',
     answerTime: null,
     currentRouteIndex: 0,
+    routeStartTime: Date.now(),
+    isTransitioning: false,
   });
   
   const [player2, setPlayer2] = useState<PlayerState>({
@@ -59,6 +66,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     resultMessage: '',
     answerTime: null,
     currentRouteIndex: 0,
+    routeStartTime: Date.now(),
+    isTransitioning: false,
   });
 
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -66,9 +75,26 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const gameTimerInterval = useRef<number | null>(null);
 
   const currentRoute = routes[currentRouteIndex % routes.length];
+  
+  // Per-player routes for independent mode
+  const player1Route = isIndependentMode 
+    ? routes[player1.currentRouteIndex % routes.length]
+    : currentRoute;
+  const player2Route = isIndependentMode 
+    ? routes[player2.currentRouteIndex % routes.length]
+    : currentRoute;
+  
   // Use 16:9 for desktop, 16:9 landscape for mobile too (better for fullscreen)
   const currentImageUrl = currentRoute 
     ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, false)
+    : '';
+    
+  // Per-player image URLs for independent mode
+  const player1ImageUrl = player1Route 
+    ? getImageUrlByMapName(player1Route.mapName || '', player1Route.candidateIndex, false)
+    : '';
+  const player2ImageUrl = player2Route 
+    ? getImageUrlByMapName(player2Route.mapName || '', player2Route.candidateIndex, false)
     : '';
 
   const isTimedMode = settings.gameType === 'timed';
@@ -169,28 +195,74 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     };
   }, [currentRouteIndex, routes, currentRoute, currentImageUrl]);
 
-  // Handle player answer - DELAYED scoring
+  // Handle player answer - Independent mode processes immediately, otherwise delayed
   const handlePlayerAnswer = useCallback((player: 1 | 2, direction: 'left' | 'right') => {
-    if (isTransitioning || gameOver) return;
+    if (gameOver) return;
     
     const setPlayer = player === 1 ? setPlayer1 : setPlayer2;
     const playerState = player === 1 ? player1 : player2;
     
-    if (playerState.hasAnswered) return;
+    // In independent mode, check per-player transition state
+    if (isIndependentMode) {
+      if (playerState.isTransitioning || playerState.hasAnswered) return;
+    } else {
+      if (isTransitioning || playerState.hasAnswered) return;
+    }
     
-    const answerTime = Date.now() - routeStartTime;
+    const playerRoute = isIndependentMode 
+      ? routes[playerState.currentRouteIndex % routes.length]
+      : currentRoute;
     
-    // Just mark as answered - don't update score yet!
-    setPlayer(prev => ({
-      ...prev,
-      hasAnswered: true,
-      lastAnswer: direction,
-      answerTime,
-    }));
-  }, [isTransitioning, gameOver, player1, player2, routeStartTime]);
+    const answerTime = isIndependentMode 
+      ? Date.now() - playerState.routeStartTime
+      : Date.now() - routeStartTime;
+    
+    if (isIndependentMode && playerRoute) {
+      // INDEPENDENT MODE: Process answer immediately
+      const isCorrect = direction === playerRoute.shortestSide;
+      let scoreChange = isCorrect ? 1 : WRONG_PENALTY;
+      
+      setPlayer(prev => ({
+        ...prev,
+        hasAnswered: true,
+        lastAnswer: direction,
+        answerTime,
+        showResult: isCorrect ? 'win' : 'lose',
+        resultMessage: isCorrect ? 'Correct!' : 'Wrong!',
+        score: prev.score + scoreChange,
+        pendingScore: prev.score + scoreChange,
+        isTransitioning: true,
+      }));
+      
+      // Immediately move to next route for this player (short delay for feedback)
+      setTimeout(() => {
+        setPlayer(prev => ({
+          ...prev,
+          currentRouteIndex: prev.currentRouteIndex + 1,
+          hasAnswered: false,
+          lastAnswer: null,
+          showResult: null,
+          resultMessage: '',
+          answerTime: null,
+          routeStartTime: Date.now(),
+          isTransitioning: false,
+        }));
+      }, 300);
+    } else {
+      // SYNCHRONIZED MODE: Just mark as answered
+      setPlayer(prev => ({
+        ...prev,
+        hasAnswered: true,
+        lastAnswer: direction,
+        answerTime,
+      }));
+    }
+  }, [isTransitioning, gameOver, player1, player2, routeStartTime, routes, currentRoute, isIndependentMode]);
 
-  // Process round results - ONLY called when both players have answered
+  // Process round results - ONLY for synchronized mode
   const processRoundResults = useCallback(() => {
+    if (isIndependentMode) return; // Independent mode processes in handlePlayerAnswer
+    
     const p1Correct = player1.lastAnswer === currentRoute?.shortestSide;
     const p2Correct = player2.lastAnswer === currentRoute?.shortestSide;
     
@@ -264,17 +336,17 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       }
       setIsTransitioning(false);
     }, isTimedMode ? 500 : 1000);
-  }, [player1, player2, currentRoute, currentRouteIndex, totalRoutes, settings.gameMode, isTimedMode]);
+  }, [player1, player2, currentRoute, currentRouteIndex, totalRoutes, settings.gameMode, isTimedMode, isIndependentMode]);
 
-  // Check if round should end - ONLY when BOTH players answered
+  // Check if round should end - ONLY when BOTH players answered (synchronized mode only)
   useEffect(() => {
-    if (isTransitioning) return;
+    if (isTransitioning || isIndependentMode) return;
     
     // Round ends ONLY when both players have answered
     if (player1.hasAnswered && player2.hasAnswered && !player1.showResult) {
       processRoundResults();
     }
-  }, [player1.hasAnswered, player2.hasAnswered, player1.showResult, isTransitioning, processRoundResults]);
+  }, [player1.hasAnswered, player2.hasAnswered, player1.showResult, isTransitioning, processRoundResults, isIndependentMode]);
 
   // Keyboard controls (desktop only)
   useEffect(() => {
@@ -322,7 +394,12 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
           </h2>
           
           {isTimedMode && (
-            <p className="text-muted-foreground">{routesCompleted} routes completed</p>
+            <p className="text-muted-foreground">
+              {isIndependentMode 
+                ? `P1: ${player1.currentRouteIndex} routes | P2: ${player2.currentRouteIndex} routes`
+                : `${routesCompleted} routes completed`
+              }
+            </p>
           )}
           
           <div className="flex justify-center gap-8 text-2xl font-bold">
@@ -378,6 +455,139 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       );
     }
     
+    // In independent mode, show split screen with different routes per player
+    if (isIndependentMode) {
+      return (
+        <div className="fixed inset-0 bg-black overflow-hidden">
+          {/* Split screen - Player 1 on left, Player 2 on right */}
+          <div className="absolute inset-0 flex">
+            {/* Player 1 side - left half */}
+            <div className="w-1/2 h-full relative border-r border-white/20">
+              <img
+                src={player1ImageUrl}
+                alt="Route P1"
+                className={`w-full h-full object-contain transition-opacity duration-150 ${
+                  player1.isTransitioning ? 'opacity-50' : 'opacity-100'
+                }`}
+                style={{ transform: 'rotate(180deg)' }}
+              />
+              
+              {/* Player 1 buttons - horizontal layout, rotated for opposite viewing */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4 z-20" style={{ transform: 'translateX(-50%) rotate(180deg)' }}>
+                <button
+                  onClick={() => handlePlayerAnswer(1, 'left')}
+                  disabled={player1.isTransitioning}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player1.isTransitioning ? 'opacity-40' : ''}`}
+                  style={{ backgroundColor: `${RED_COLOR}CC` }}
+                >
+                  <ArrowLeft className="h-8 w-8 text-white" />
+                </button>
+                <button
+                  onClick={() => handlePlayerAnswer(1, 'right')}
+                  disabled={player1.isTransitioning}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player1.isTransitioning ? 'opacity-40' : ''}`}
+                  style={{ backgroundColor: `${BLUE_COLOR}CC` }}
+                >
+                  <ArrowRight className="h-8 w-8 text-white" />
+                </button>
+              </div>
+              
+              {/* Player 1 result indicator */}
+              {player1.showResult && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30" style={{ transform: 'translate(-50%, -50%) rotate(180deg)' }}>
+                  <span className={`text-6xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                    {player1.showResult === 'win' ? '✓' : '✗'}
+                  </span>
+                </div>
+              )}
+              
+              {/* Player 1 score overlay */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30" style={{ transform: 'translateX(-50%) rotate(180deg)' }}>
+                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1">
+                  <span className="text-red-500 font-bold text-lg">
+                    P1: {player1.score % 1 === 0 ? player1.score : player1.score.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Player 2 side - right half */}
+            <div className="w-1/2 h-full relative">
+              <img
+                src={player2ImageUrl}
+                alt="Route P2"
+                className={`w-full h-full object-contain transition-opacity duration-150 ${
+                  player2.isTransitioning ? 'opacity-50' : 'opacity-100'
+                }`}
+              />
+              
+              {/* Player 2 buttons - horizontal layout */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4 z-20">
+                <button
+                  onClick={() => handlePlayerAnswer(2, 'left')}
+                  disabled={player2.isTransitioning}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player2.isTransitioning ? 'opacity-40' : ''}`}
+                  style={{ backgroundColor: `${RED_COLOR}CC` }}
+                >
+                  <ArrowLeft className="h-8 w-8 text-white" />
+                </button>
+                <button
+                  onClick={() => handlePlayerAnswer(2, 'right')}
+                  disabled={player2.isTransitioning}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${player2.isTransitioning ? 'opacity-40' : ''}`}
+                  style={{ backgroundColor: `${BLUE_COLOR}CC` }}
+                >
+                  <ArrowRight className="h-8 w-8 text-white" />
+                </button>
+              </div>
+              
+              {/* Player 2 result indicator */}
+              {player2.showResult && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+                  <span className={`text-6xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                    {player2.showResult === 'win' ? '✓' : '✗'}
+                  </span>
+                </div>
+              )}
+              
+              {/* Player 2 score overlay */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
+                <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1">
+                  <span className="text-blue-500 font-bold text-lg">
+                    P2: {player2.score % 1 === 0 ? player2.score : player2.score.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center timer */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
+              <div className="text-white font-mono font-bold text-xl">
+                {gameTimeRemaining !== null ? (
+                  <span className={gameTimeRemaining < 10 ? 'text-red-400 animate-pulse' : ''}>
+                    {Math.floor(gameTimeRemaining / 60)}:{String(Math.floor(gameTimeRemaining % 60)).padStart(2, '0')}
+                  </span>
+                ) : (
+                  <span>Speed Race</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Exit button */}
+          <button 
+            onClick={onExit}
+            className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 bg-black/60 text-white px-4 py-2 rounded-full text-sm"
+          >
+            Exit
+          </button>
+        </div>
+      );
+    }
+    
+    // Synchronized mode - single shared image
     return (
       <div className="fixed inset-0 bg-black overflow-hidden">
         {/* Fullscreen Route Image */}
@@ -563,26 +773,26 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       <div className="flex-1 flex gap-2 p-2 min-h-0">
         <DuelPlayerPanel
           playerNumber={1}
-          imageUrl={currentImageUrl}
+          imageUrl={isIndependentMode ? player1ImageUrl : currentImageUrl}
           isImageLoaded={isImageLoaded}
           showResult={player1.showResult}
           resultMessage={player1.resultMessage}
-          isTransitioning={isTransitioning}
+          isTransitioning={isIndependentMode ? player1.isTransitioning : isTransitioning}
           onSelectDirection={(dir) => handlePlayerAnswer(1, dir)}
-          disabled={isTransitioning || player1.hasAnswered}
-          hasAnswered={player1.hasAnswered && !player1.showResult}
+          disabled={isIndependentMode ? player1.isTransitioning : (isTransitioning || player1.hasAnswered)}
+          hasAnswered={!isIndependentMode && player1.hasAnswered && !player1.showResult}
         />
         
         <DuelPlayerPanel
           playerNumber={2}
-          imageUrl={currentImageUrl}
+          imageUrl={isIndependentMode ? player2ImageUrl : currentImageUrl}
           isImageLoaded={isImageLoaded}
           showResult={player2.showResult}
           resultMessage={player2.resultMessage}
-          isTransitioning={isTransitioning}
+          isTransitioning={isIndependentMode ? player2.isTransitioning : isTransitioning}
           onSelectDirection={(dir) => handlePlayerAnswer(2, dir)}
-          disabled={isTransitioning || player2.hasAnswered}
-          hasAnswered={player2.hasAnswered && !player2.showResult}
+          disabled={isIndependentMode ? player2.isTransitioning : (isTransitioning || player2.hasAnswered)}
+          hasAnswered={!isIndependentMode && player2.hasAnswered && !player2.showResult}
         />
       </div>
 
