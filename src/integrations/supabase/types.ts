@@ -316,23 +316,32 @@ export type Database = {
       }
       route_maps: {
         Row: {
+          country_code: string | null
           created_at: string
           description: string | null
           id: string
+          logo_path: string | null
+          map_type: string | null
           name: string
           updated_at: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          logo_path?: string | null
+          map_type?: string | null
           name: string
           updated_at?: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          logo_path?: string | null
+          map_type?: string | null
           name?: string
           updated_at?: string
         }
