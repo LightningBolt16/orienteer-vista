@@ -8,6 +8,7 @@ import { MapSource, getUniqueMapNames } from '../../utils/routeDataUtils';
 import { Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, Wifi, Users } from 'lucide-react';
 import { isPwtMap } from '../PwtAttribution';
 import PwtAttribution from '../PwtAttribution';
+import ScoringInfoDialog from './ScoringInfoDialog';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
 import flagSweden from '@/assets/flag-sweden.png';
@@ -251,7 +252,10 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
       {/* Game Mode Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Game Mode</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Game Mode
+            <ScoringInfoDialog gameMode={gameMode} gameType={gameType} isOnline={playMode === 'online'} />
+          </CardTitle>
           <CardDescription>How do you want to compete?</CardDescription>
         </CardHeader>
         <CardContent>
