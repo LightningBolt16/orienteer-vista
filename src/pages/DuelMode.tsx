@@ -6,7 +6,7 @@ import DuelIntro from '../components/duel/DuelIntro';
 import DuelSetup, { DuelSettings } from '../components/duel/DuelSetup';
 import DuelGame from '../components/duel/DuelGame';
 import OnlineDuelLobby from '../components/duel/OnlineDuelLobby';
-import { OnlineDuelRoom } from '../hooks/useOnlineDuel';
+import { useOnlineDuel, OnlineDuelRoom } from '../hooks/useOnlineDuel';
 
 type DuelPhase = 'intro' | 'setup' | 'playing' | 'online-lobby' | 'online-join';
 
@@ -22,8 +22,21 @@ const DuelMode: React.FC = () => {
     gameMode: 'speed',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [onlineRoom, setOnlineRoom] = useState<OnlineDuelRoom | null>(null);
   const [playerName, setPlayerName] = useState<string>('');
+
+  // Centralized online duel hook - persists across lobby and game phases
+  const onlineDuel = useOnlineDuel({
+    onGameStart: () => {
+      // When host starts game, both players transition to playing
+      if (onlineDuel.room?.routes) {
+        setGameRoutes(onlineDuel.room.routes as RouteData[]);
+        setPhase('playing');
+      }
+    },
+    onGameEnd: () => {
+      // Game ended - handled in OnlineDuelGameView
+    },
+  });
 
   // Preload routes when entering setup phase for faster game start
   useEffect(() => {
@@ -78,7 +91,6 @@ const DuelMode: React.FC = () => {
 
   const handleOnlineGameStart = useCallback((routes: RouteData[], room: OnlineDuelRoom) => {
     setGameRoutes(routes);
-    setOnlineRoom(room);
     setPhase('playing');
   }, []);
 
@@ -102,8 +114,8 @@ const DuelMode: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleBackToSetup = () => {
-    setOnlineRoom(null);
+  const handleBackToSetup = async () => {
+    await onlineDuel.leaveRoom();
     setPhase('setup');
   };
 
@@ -140,6 +152,7 @@ const DuelMode: React.FC = () => {
           onBack={handleBackToSetup}
           playerName={playerName}
           joinMode={true}
+          onlineDuel={onlineDuel}
         />
       )}
 
@@ -150,6 +163,7 @@ const DuelMode: React.FC = () => {
           onBack={handleBackToSetup}
           playerName={playerName}
           joinMode={false}
+          onlineDuel={onlineDuel}
         />
       )}
       
@@ -160,7 +174,7 @@ const DuelMode: React.FC = () => {
           settings={settings}
           onExit={handleBackToSetup}
           onRestart={handleRestart}
-          onlineRoom={onlineRoom}
+          onlineDuel={settings.isOnline ? onlineDuel : undefined}
         />
       )}
     </>

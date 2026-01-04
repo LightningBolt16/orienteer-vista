@@ -10,8 +10,9 @@ interface OnlineDuelGameViewProps {
   room: OnlineDuelRoom;
   isHost: boolean;
   isMobile: boolean;
-  onAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => void;
+  onAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => Promise<void>;
   onExit: () => void;
+  onFinishGame: () => Promise<void>;
 }
 
 const PRELOAD_AHEAD_COUNT = 5;
@@ -23,6 +24,7 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   isMobile,
   onAnswer,
   onExit,
+  onFinishGame,
 }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -46,12 +48,21 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
     return route.imagePath || '';
   };
 
-  // Check game over
+  // Check game over from server status
   useEffect(() => {
     if (room.status === 'finished') {
       setGameOver(true);
     }
   }, [room.status]);
+
+  // Check if all routes completed locally
+  useEffect(() => {
+    if (currentRouteIndex >= routes.length && !gameOver) {
+      // Mark game as finished
+      onFinishGame();
+      setGameOver(true);
+    }
+  }, [currentRouteIndex, routes.length, gameOver, onFinishGame]);
 
   // Preload current and upcoming images
   useEffect(() => {
