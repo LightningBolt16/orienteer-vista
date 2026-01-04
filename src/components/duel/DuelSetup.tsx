@@ -122,7 +122,7 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
           <CardTitle>Play Mode</CardTitle>
           <CardDescription>Choose how you want to duel</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setPlayMode('local')}
@@ -150,42 +150,31 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
               <span className="text-xs text-muted-foreground">Play remotely</span>
             </button>
           </div>
+
+          {/* Online Mode: Name Input and Join Room Option - integrated */}
+          {playMode === 'online' && (
+            <div className="space-y-3 pt-2 border-t border-border">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Your Name</label>
+                <Input 
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  className="text-center"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={handleJoinRoom}
+                className="w-full"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Join Existing Room
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Online Mode: Name Input and Join Room Option */}
-      {playMode === 'online' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Name</CardTitle>
-            <CardDescription>Enter your display name for the duel</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input 
-              placeholder="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="text-center text-lg"
-            />
-            <Button 
-              variant="outline" 
-              onClick={handleJoinRoom}
-              className="w-full"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Join Existing Room
-            </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">or create a room below</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Map Selection */}
       <Card>
