@@ -282,8 +282,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     let p1Score = p1Correct ? 1 : 0;
     let p2Score = p2Correct ? 1 : 0;
     
-    // Speed bonus in speed mode
-    if (settings.gameMode === 'speed' && p1Correct && p2Correct) {
+    // Speed bonus applies in BOTH modes when both are correct - faster player gets bonus
+    if (p1Correct && p2Correct) {
       if (player1.answerTime && player2.answerTime) {
         if (player1.answerTime < player2.answerTime) {
           p1Score += SPEED_BONUS;

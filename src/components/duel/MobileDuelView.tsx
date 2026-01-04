@@ -23,7 +23,7 @@ interface MobileDuelViewProps {
 }
 
 // Portrait mode: Player 1 at bottom (charging port), Player 2 at top (notch)
-// Full quadrant overlays with red/blue tints that cover the route image
+// Single shared route image with 4 quadrant button overlays (L/R per player)
 const MobileDuelView: React.FC<MobileDuelViewProps> = ({
   currentRoute,
   player1,
@@ -37,15 +37,16 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
   onPlayerAnswer,
   onExit,
 }) => {
+  // Use imagePath from database if available, otherwise construct URL
   const currentImageUrl = currentRoute 
-    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, true)
+    ? (currentRoute.imagePath || getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, true))
     : '';
 
   return (
-    <div className="fixed inset-0 bg-background overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-background overflow-hidden">
       {/* Full screen route image as background */}
       <div className="absolute inset-0 flex items-center justify-center z-0">
-        {isImageLoaded ? (
+        {isImageLoaded && currentImageUrl ? (
           <img
             src={currentImageUrl}
             alt="Route"
@@ -58,29 +59,47 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
         )}
       </div>
 
-      {/* Player 2 area - TOP half (for person with notch at their end) */}
-      {/* Rotated 180 degrees so they can read/interact normally */}
-      <div className="relative h-1/2 z-10" style={{ transform: 'rotate(180deg)' }}>
-        {/* Touch zone covering entire half */}
-        <button
-          onClick={() => onPlayerAnswer(2, 'left')}
-          disabled={isTransitioning || player2.hasAnswered}
-          className="absolute inset-0 w-full h-full"
-          style={{
-            background: player2.hasAnswered 
-              ? 'linear-gradient(180deg, rgba(59,130,246,0.1) 0%, transparent 50%)'
-              : 'linear-gradient(180deg, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0.1) 30%, transparent 60%)',
-          }}
-        />
+      {/* Player 2 area - TOP half (rotated 180 for person at notch end) */}
+      <div className="absolute top-0 left-0 right-0 h-1/2 z-10" style={{ transform: 'rotate(180deg)' }}>
+        {/* Left/Right button quadrants for P2 */}
+        <div className="absolute inset-0 flex">
+          {/* P2 Left button */}
+          <button
+            onClick={() => onPlayerAnswer(2, 'left')}
+            disabled={isTransitioning || player2.hasAnswered}
+            className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/30 transition-colors"
+            style={{
+              background: player2.hasAnswered 
+                ? 'rgba(59,130,246,0.1)'
+                : 'linear-gradient(180deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 50%, transparent 100%)',
+            }}
+          >
+            <span className="text-blue-400 text-4xl font-bold opacity-60">L</span>
+          </button>
+          
+          {/* P2 Right button */}
+          <button
+            onClick={() => onPlayerAnswer(2, 'right')}
+            disabled={isTransitioning || player2.hasAnswered}
+            className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/30 transition-colors"
+            style={{
+              background: player2.hasAnswered 
+                ? 'rgba(59,130,246,0.1)'
+                : 'linear-gradient(180deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 50%, transparent 100%)',
+            }}
+          >
+            <span className="text-blue-400 text-4xl font-bold opacity-60">R</span>
+          </button>
+        </div>
 
-        {/* Player 2 score - at their bottom (appears at top of screen after rotation) */}
+        {/* P2 Score - at their bottom (appears at top of screen after rotation) */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-blue-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
             <span className="text-white font-bold text-lg">P2: {player2.score.toFixed(1)}</span>
           </div>
         </div>
 
-        {/* Player 2 result indicator */}
+        {/* P2 Result indicator */}
         {player2.showResult && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
             <span className={`text-7xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-destructive'}`}>
@@ -120,27 +139,46 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
       </div>
 
       {/* Player 1 area - BOTTOM half (for person with charging port at their end) */}
-      <div className="relative h-1/2 z-10">
-        {/* Touch zone covering entire half */}
-        <button
-          onClick={() => onPlayerAnswer(1, 'left')}
-          disabled={isTransitioning || player1.hasAnswered}
-          className="absolute inset-0 w-full h-full"
-          style={{
-            background: player1.hasAnswered 
-              ? 'linear-gradient(0deg, rgba(239,68,68,0.1) 0%, transparent 50%)'
-              : 'linear-gradient(0deg, rgba(239,68,68,0.25) 0%, rgba(239,68,68,0.1) 30%, transparent 60%)',
-          }}
-        />
+      <div className="absolute bottom-0 left-0 right-0 h-1/2 z-10">
+        {/* Left/Right button quadrants for P1 */}
+        <div className="absolute inset-0 flex">
+          {/* P1 Left button */}
+          <button
+            onClick={() => onPlayerAnswer(1, 'left')}
+            disabled={isTransitioning || player1.hasAnswered}
+            className="w-1/2 h-full flex items-center justify-center active:bg-red-500/30 transition-colors"
+            style={{
+              background: player1.hasAnswered 
+                ? 'rgba(239,68,68,0.1)'
+                : 'linear-gradient(0deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.1) 50%, transparent 100%)',
+            }}
+          >
+            <span className="text-red-400 text-4xl font-bold opacity-60">L</span>
+          </button>
+          
+          {/* P1 Right button */}
+          <button
+            onClick={() => onPlayerAnswer(1, 'right')}
+            disabled={isTransitioning || player1.hasAnswered}
+            className="w-1/2 h-full flex items-center justify-center active:bg-red-500/30 transition-colors"
+            style={{
+              background: player1.hasAnswered 
+                ? 'rgba(239,68,68,0.1)'
+                : 'linear-gradient(0deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.1) 50%, transparent 100%)',
+            }}
+          >
+            <span className="text-red-400 text-4xl font-bold opacity-60">R</span>
+          </button>
+        </div>
 
-        {/* Player 1 score - at bottom */}
+        {/* P1 Score - at bottom */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-red-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
             <span className="text-white font-bold text-lg">P1: {player1.score.toFixed(1)}</span>
           </div>
         </div>
 
-        {/* Player 1 result indicator */}
+        {/* P1 Result indicator */}
         {player1.showResult && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
             <span className={`text-7xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-destructive'}`}>
