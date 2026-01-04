@@ -37,13 +37,24 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Get current user
+  // Generate guest ID for non-authenticated users
+  const generateGuestId = () => `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Get current user with auth state subscription
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    // Get initial user
+    supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id || null);
-    };
-    getUser();
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUserId(session?.user?.id || null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Generate unique room code
@@ -58,14 +69,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Create a new room
   const createRoom = useCallback(async (settings: any, routes: RouteData[], hostName?: string) => {
-    if (!userId) {
-      toast({
-        title: 'Not signed in',
-        description: 'Please sign in to create an online duel',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    const playerId = userId || generateGuestId();
 
     setIsConnecting(true);
     try {
@@ -75,7 +79,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
         .from('duel_rooms')
         .insert({
           room_code: roomCode,
-          host_id: userId,
+          host_id: playerId,
           host_name: hostName || null,
           settings,
           routes: routes as any,
@@ -113,14 +117,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Join an existing room
   const joinRoom = useCallback(async (roomCode: string, guestName?: string) => {
-    if (!userId) {
-      toast({
-        title: 'Not signed in',
-        description: 'Please sign in to join an online duel',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    const playerId = userId || generateGuestId();
 
     setIsConnecting(true);
     try {
@@ -145,7 +142,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       // Join the room
       const { data, error } = await supabase
         .from('duel_rooms')
-        .update({ guest_id: userId, guest_name: guestName || null })
+        .update({ guest_id: playerId, guest_name: guestName || null })
         .eq('id', roomData.id)
         .select()
         .single();

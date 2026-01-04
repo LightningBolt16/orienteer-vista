@@ -108,37 +108,8 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
 
   const handleBack = () => {
     leaveRoom();
-    if (mode !== 'choose') {
-      setMode('choose');
-    } else {
-      onBack();
-    }
+    onBack();
   };
-
-  // No user logged in
-  if (!userId) {
-    return (
-      <div className="max-w-md mx-auto p-4 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <WifiOff className="h-5 w-5 text-destructive" />
-              Sign In Required
-            </CardTitle>
-            <CardDescription>
-              You need to be signed in to play online duels
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={onBack} variant="outline" className="w-full">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   // Room created - waiting for opponent
   if (room && mode === 'create') {
@@ -286,7 +257,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
           />
           
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setMode('choose')} className="flex-1">
+            <Button variant="outline" onClick={handleBack} className="flex-1">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
