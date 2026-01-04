@@ -21,11 +21,13 @@ export interface DuelSettings {
   gameMode: 'speed' | 'wait';
   timeLimit?: number; // seconds per route, undefined means no limit
   isOnline?: boolean; // true for online multiplayer
+  playerName?: string; // player name for online mode
 }
 
 interface DuelSetupProps {
   onStart: (settings: DuelSettings) => void;
   onStartOnline: (settings: DuelSettings) => void;
+  onJoinRoom: (playerName: string) => void;
   onBack: () => void;
 }
 
@@ -46,9 +48,11 @@ const GAME_DURATION_OPTIONS = [
   { label: '10 min', value: 600 },
 ];
 
-const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack }) => {
+const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoom, onBack }) => {
   const { t } = useLanguage();
   const { mobileCache, isPreloading } = useRouteCache();
+  const [playMode, setPlayMode] = useState<'local' | 'online' | null>(null);
+  const [playerName, setPlayerName] = useState('');
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
   const [gameType, setGameType] = useState<'routes' | 'timed'>('routes');
   const [selectedRouteCount, setSelectedRouteCount] = useState<number>(10);
@@ -63,17 +67,33 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
   const availableMaps = mobileCache?.maps || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
 
-  const handleStart = () => {
+  const buildSettings = (): DuelSettings => {
     const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
     const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
-    onStart({
+    return {
       mapId: selectedMapId,
       gameType,
       routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
       gameDuration: gameType === 'timed' ? gameDuration : undefined,
       gameMode,
       timeLimit,
+      playerName: playerName.trim() || undefined,
+    };
+  };
+
+  const handleStart = () => {
+    onStart(buildSettings());
+  };
+
+  const handleStartOnlineRoom = () => {
+    onStartOnline({
+      ...buildSettings(),
+      isOnline: true,
     });
+  };
+
+  const handleJoinRoom = () => {
+    onJoinRoom(playerName.trim() || 'Player');
   };
 
   const handleRouteCountSelect = (count: number) => {
@@ -105,8 +125,12 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => {}}
-              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-border bg-card transition-all hover:border-primary/50"
+              onClick={() => setPlayMode('local')}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                playMode === 'local'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
             >
               <Users className="h-8 w-8 mb-2 text-primary" />
               <span className="font-medium text-sm">Local</span>
@@ -114,20 +138,12 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
             </button>
             
             <button
-              onClick={() => {
-                const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
-                const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
-                onStartOnline({
-                  mapId: selectedMapId,
-                  gameType,
-                  routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
-                  gameDuration: gameType === 'timed' ? gameDuration : undefined,
-                  gameMode,
-                  timeLimit,
-                  isOnline: true,
-                });
-              }}
-              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-primary bg-primary/10 transition-all hover:border-primary"
+              onClick={() => setPlayMode('online')}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                playMode === 'online'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
             >
               <Wifi className="h-8 w-8 mb-2 text-green-500" />
               <span className="font-medium text-sm">Online</span>
@@ -136,6 +152,40 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
           </div>
         </CardContent>
       </Card>
+
+      {/* Online Mode: Name Input and Join Room Option */}
+      {playMode === 'online' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Name</CardTitle>
+            <CardDescription>Enter your display name for the duel</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input 
+              placeholder="Enter your name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="text-center text-lg"
+            />
+            <Button 
+              variant="outline" 
+              onClick={handleJoinRoom}
+              className="w-full"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Join Existing Room
+            </Button>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">or create a room below</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Map Selection */}
       <Card>
@@ -416,19 +466,39 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onBack })
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex gap-4">
-        <Button variant="outline" onClick={onBack} className="flex-1">
+      {playMode && (
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={onBack} className="flex-1">
+            Back
+          </Button>
+          {playMode === 'local' ? (
+            <Button 
+              onClick={handleStart} 
+              className="flex-1" 
+              disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
+            >
+              <Users className="h-5 w-5 mr-2" />
+              Start Local Duel
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleStartOnlineRoom} 
+              className="flex-1" 
+              disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
+            >
+              <Wifi className="h-5 w-5 mr-2" />
+              Create Online Room
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Show Back button when no mode selected */}
+      {!playMode && (
+        <Button variant="outline" onClick={onBack} className="w-full">
           Back
         </Button>
-        <Button 
-          onClick={handleStart} 
-          className="flex-1" 
-          disabled={isPreloading || (gameType === 'routes' && isCustomRoutes && !customRouteCount) || (gameType === 'timed' && isCustomDuration && !customDuration)}
-        >
-          <Users className="h-5 w-5 mr-2" />
-          Start Local Duel
-        </Button>
-      </div>
+      )}
     </div>
   );
 };

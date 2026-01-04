@@ -44,6 +44,10 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
 
   // Get image URL for a route (handles both single map and all maps mode)
   const getImageForRoute = (route: RouteData): string => {
+    // If route has imagePath from database, use it directly
+    if (route.imagePath) {
+      return route.imagePath;
+    }
     const mapName = route.mapName || mapSource?.name || '';
     return getImageUrlByMapName(mapName, route.candidateIndex, true);
   };

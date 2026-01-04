@@ -5,8 +5,11 @@ import DuelPlayerPanel from './DuelPlayerPanel';
 import DuelScoreBar from './DuelScoreBar';
 import MobileDuelView from './MobileDuelView';
 import MobileDuelIndependentView from './MobileDuelIndependentView';
+import OnlineDuelGameView from './OnlineDuelGameView';
 import { Trophy, RotateCcw, Home } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
+import { OnlineDuelRoom } from '@/hooks/useOnlineDuel';
+import { useOnlineDuel } from '@/hooks/useOnlineDuel';
 
 interface DuelGameProps {
   routes: RouteData[];
@@ -14,6 +17,7 @@ interface DuelGameProps {
   settings: DuelSettings;
   onExit: () => void;
   onRestart: () => void;
+  onlineRoom?: OnlineDuelRoom | null;
 }
 
 interface PlayerState {
@@ -32,7 +36,7 @@ interface PlayerState {
 const SPEED_BONUS = 0.5;
 const WRONG_PENALTY = -0.5;
 
-const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart }) => {
+const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart, onlineRoom }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [routesCompleted, setRoutesCompleted] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -42,8 +46,13 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
   const [isMobile, setIsMobile] = useState(false);
   
+  // Online duel hook for submitting answers
+  const { submitAnswer, room: liveRoom, isHost } = useOnlineDuel({});
+  const activeRoom = liveRoom || onlineRoom;
+  
   // Independent mode: speed + timed = each player progresses independently
   const isIndependentMode = settings.gameMode === 'speed' && settings.gameType === 'timed';
+  const isOnlineMode = settings.isOnline && activeRoom;
   
   const [player1, setPlayer1] = useState<PlayerState>({
     score: 0,
@@ -85,18 +94,19 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     ? routes[player2.currentRouteIndex % routes.length]
     : currentRoute;
   
+  // Get image URL - prefer imagePath from database, fallback to constructed URL
+  const getImageUrl = (route: RouteData | undefined): string => {
+    if (!route) return '';
+    if (route.imagePath) return route.imagePath;
+    return getImageUrlByMapName(route.mapName || '', route.candidateIndex, isMobile);
+  };
+    
   // Use portrait (9:16) images for mobile, landscape (16:9) for desktop
-  const currentImageUrl = currentRoute 
-    ? getImageUrlByMapName(currentRoute.mapName || '', currentRoute.candidateIndex, isMobile)
-    : '';
+  const currentImageUrl = getImageUrl(currentRoute);
     
   // Per-player image URLs for independent mode
-  const player1ImageUrl = player1Route 
-    ? getImageUrlByMapName(player1Route.mapName || '', player1Route.candidateIndex, isMobile)
-    : '';
-  const player2ImageUrl = player2Route 
-    ? getImageUrlByMapName(player2Route.mapName || '', player2Route.candidateIndex, isMobile)
-    : '';
+  const player1ImageUrl = getImageUrl(player1Route);
+  const player2ImageUrl = getImageUrl(player2Route);
 
   const isTimedMode = settings.gameType === 'timed';
 
@@ -162,7 +172,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     for (let i = 1; i <= 3; i++) {
       const nextIndex = (currentRouteIndex + i) % routes.length;
       const nextRoute = routes[nextIndex];
-      const nextUrl = getImageUrlByMapName(nextRoute.mapName || '', nextRoute.candidateIndex, false);
+      const nextUrl = getImageUrl(nextRoute);
       if (!preloadedImages.current.has(nextUrl)) {
         const img = new Image();
         img.src = nextUrl;
@@ -407,8 +417,18 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     );
   }
 
-  if (!currentRoute) {
-    return <div className="flex justify-center items-center h-64 text-foreground">Loading routes...</div>;
+  // Online Mode - Use single-player style interface
+  if (isOnlineMode && activeRoom) {
+    return (
+      <OnlineDuelGameView
+        routes={routes}
+        room={activeRoom}
+        isHost={isHost}
+        isMobile={isMobile}
+        onAnswer={submitAnswer}
+        onExit={onExit}
+      />
+    );
   }
 
   // Mobile Mode - Portrait with full quadrant touch overlays

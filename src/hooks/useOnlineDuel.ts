@@ -19,6 +19,8 @@ export interface OnlineDuelRoom {
   guest_ready: boolean;
   game_started_at: string | null;
   game_ends_at: string | null;
+  host_name: string | null;
+  guest_name: string | null;
 }
 
 interface UseOnlineDuelProps {
@@ -55,7 +57,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   };
 
   // Create a new room
-  const createRoom = useCallback(async (settings: any, routes: RouteData[]) => {
+  const createRoom = useCallback(async (settings: any, routes: RouteData[], hostName?: string) => {
     if (!userId) {
       toast({
         title: 'Not signed in',
@@ -74,6 +76,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
         .insert({
           room_code: roomCode,
           host_id: userId,
+          host_name: hostName || null,
           settings,
           routes: routes as any,
           status: 'waiting',
@@ -109,7 +112,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   }, [userId, toast]);
 
   // Join an existing room
-  const joinRoom = useCallback(async (roomCode: string) => {
+  const joinRoom = useCallback(async (roomCode: string, guestName?: string) => {
     if (!userId) {
       toast({
         title: 'Not signed in',
@@ -142,7 +145,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       // Join the room
       const { data, error } = await supabase
         .from('duel_rooms')
-        .update({ guest_id: userId })
+        .update({ guest_id: userId, guest_name: guestName || null })
         .eq('id', roomData.id)
         .select()
         .single();
