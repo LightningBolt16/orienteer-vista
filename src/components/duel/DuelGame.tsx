@@ -6,6 +6,7 @@ import DuelScoreBar from './DuelScoreBar';
 import MobileDuelView from './MobileDuelView';
 import MobileDuelIndependentView from './MobileDuelIndependentView';
 import OnlineDuelGameView from './OnlineDuelGameView';
+import DuelCountdown from './DuelCountdown';
 import { Trophy, RotateCcw, Home } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
 import { OnlineDuelRoom } from '@/hooks/useOnlineDuel';
@@ -52,13 +53,14 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(true);
   
   // Online mode uses passed hook from parent
   const activeRoom = onlineDuel?.room;
   const isHost = onlineDuel?.isHost ?? false;
   
-  // Independent mode: speed + timed = each player progresses independently
-  const isIndependentMode = settings.gameMode === 'speed' && settings.gameType === 'timed';
+  // Speed mode is ALWAYS independent (each player progresses on their own)
+  const isIndependentMode = settings.gameMode === 'speed';
   const isOnlineMode = settings.isOnline && activeRoom;
   
   const [player1, setPlayer1] = useState<PlayerState>({
@@ -132,8 +134,10 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     };
   }, []);
 
-  // Game timer countdown (for timed mode)
+  // Game timer countdown (for timed mode) - only start after countdown completes
   useEffect(() => {
+    if (showCountdown) return; // Don't start timer during countdown
+    
     if (isTimedMode && settings.gameDuration && !gameOver) {
       gameTimerInterval.current = window.setInterval(() => {
         setGameTimeRemaining(prev => {
@@ -149,7 +153,19 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         if (gameTimerInterval.current) clearInterval(gameTimerInterval.current);
       };
     }
-  }, [isTimedMode, settings.gameDuration, gameOver]);
+  }, [isTimedMode, settings.gameDuration, gameOver, showCountdown]);
+
+  // Check if BOTH players finished all routes in fixed-routes speed mode
+  useEffect(() => {
+    if (isIndependentMode && settings.gameType === 'routes' && !gameOver) {
+      const p1Done = player1.currentRouteIndex >= totalRoutes;
+      const p2Done = player2.currentRouteIndex >= totalRoutes;
+      
+      if (p1Done && p2Done) {
+        setGameOver(true);
+      }
+    }
+  }, [player1.currentRouteIndex, player2.currentRouteIndex, totalRoutes, isIndependentMode, settings.gameType, gameOver]);
 
   // Reset timer on new route
   useEffect(() => {
@@ -375,6 +391,11 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlayerAnswer, gameOver, isMobile]);
 
+  // Countdown before game starts
+  if (showCountdown) {
+    return <DuelCountdown onComplete={() => setShowCountdown(false)} />;
+  }
+
   // Game Over Screen
   if (gameOver) {
     const winner = player1.score > player2.score ? 1 : player2.score > player1.score ? 2 : 0;
@@ -509,6 +530,8 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
           gameTimeRemaining={gameTimeRemaining}
           isTimedMode={isTimedMode}
           routesCompleted={routesCompleted}
+          gameMode={settings.gameMode}
+          isOnline={settings.isOnline}
         />
       </div>
       

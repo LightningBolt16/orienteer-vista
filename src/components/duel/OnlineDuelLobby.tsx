@@ -44,6 +44,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
   const [copied, setCopied] = useState(false);
   const [loadedRoutes, setLoadedRoutes] = useState<RouteData[]>([]);
   const [displayName] = useState(initialPlayerName || 'Player');
+  const [isStarting, setIsStarting] = useState(false);
 
   const { room, isHost, isConnecting, createRoom, joinRoom, startGame, leaveRoom } = onlineDuel;
 
@@ -98,15 +99,21 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
     }
   };
 
-  const handleStartGame = () => {
-    if (room?.guest_id) {
-      startGame();
-    } else {
-      toast({
-        title: 'Waiting for opponent',
-        description: 'Share the room code to invite someone',
-      });
+  const handleStartGame = async () => {
+    if (!room?.guest_id || isStarting) {
+      if (!room?.guest_id) {
+        toast({
+          title: 'Waiting for opponent',
+          description: 'Share the room code to invite someone',
+        });
+      }
+      return;
     }
+    
+    setIsStarting(true);
+    console.log('[OnlineDuelLobby] Starting game...');
+    await startGame();
+    // Don't reset isStarting - game should transition
   };
 
   const handleBack = () => {
@@ -173,10 +180,14 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
               <Button 
                 onClick={handleStartGame} 
                 className="flex-1"
-                disabled={!room.guest_id}
+                disabled={!room.guest_id || isStarting}
               >
-                <Play className="h-4 w-4 mr-2" />
-                Start Game
+                {isStarting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                {isStarting ? 'Starting...' : 'Start Game'}
               </Button>
             </div>
           </CardContent>

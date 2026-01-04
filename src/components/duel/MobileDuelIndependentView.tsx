@@ -97,8 +97,8 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
           </button>
         </div>
 
-        {/* P2 Score */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20">
+        {/* P2 Score - use top-2 which appears at top of P2's view after 180° rotation */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-background/90 backdrop-blur-sm rounded-full px-3 py-1 border border-border">
             <span className="text-primary font-bold text-xs">P2: {player2.score.toFixed(1)}</span>
           </div>

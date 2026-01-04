@@ -204,6 +204,8 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Subscribe to room updates
   const subscribeToRoom = useCallback((roomId: string) => {
+    console.log('[OnlineDuel] Subscribing to room:', roomId);
+    
     const newChannel = supabase
       .channel(`room-${roomId}`)
       .on(
@@ -215,16 +217,21 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           filter: `id=eq.${roomId}`,
         },
         (payload) => {
-          console.log('Room update:', payload);
+          console.log('[OnlineDuel] Room update received:', payload.eventType, payload.new);
           if (payload.new) {
             const newRoom = payload.new as unknown as OnlineDuelRoom;
+            const oldRoom = payload.old as any;
+            
             setRoom(newRoom);
             
-            if (newRoom.status === 'playing' && payload.old && (payload.old as any).status === 'waiting') {
+            // Only trigger for guest (host triggers manually in startGame)
+            if (newRoom.status === 'playing' && oldRoom?.status === 'waiting') {
+              console.log('[OnlineDuel] Game started - transitioning to playing');
               onGameStart?.(newRoom);
             }
             
-            if (newRoom.status === 'finished' && payload.old && (payload.old as any).status === 'playing') {
+            if (newRoom.status === 'finished' && oldRoom?.status === 'playing') {
+              console.log('[OnlineDuel] Game ended');
               onGameEnd?.();
             }
           }
@@ -239,7 +246,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log('Answer received:', payload);
+          console.log('[OnlineDuel] Answer received:', payload);
           if (payload.new) {
             const answer = payload.new as any;
             // Only notify about opponent's answers
@@ -249,7 +256,9 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[OnlineDuel] Subscription status:', status);
+      });
 
     setChannel(newChannel);
   }, [playerId, onGameStart, onOpponentAnswer, onGameEnd]);
@@ -272,24 +281,59 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Start the game (host only)
   const startGame = useCallback(async () => {
-    if (!room || !isHost) return;
+    console.log('[OnlineDuel] startGame called', { roomId: room?.id, isHost, hasGuest: !!room?.guest_id });
+    
+    if (!room || !isHost) {
+      console.log('[OnlineDuel] Cannot start - not host or no room');
+      return;
+    }
 
-    const { error } = await supabase
-      .from('duel_rooms')
-      .update({ 
-        status: 'playing',
-        game_started_at: new Date().toISOString(),
-      })
-      .eq('id', room.id);
+    if (!room.guest_id) {
+      console.log('[OnlineDuel] Cannot start - no guest joined');
+      toast({
+        title: 'Waiting for opponent',
+        description: 'Share the room code to invite someone',
+      });
+      return;
+    }
 
-    if (error) {
-      console.error('Error starting game:', error);
+    try {
+      const { data, error } = await supabase
+        .from('duel_rooms')
+        .update({ 
+          status: 'playing',
+          game_started_at: new Date().toISOString(),
+        })
+        .eq('id', room.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[OnlineDuel] Error starting game:', error);
+        toast({
+          title: 'Failed to start game',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      console.log('[OnlineDuel] Game started successfully', data);
+      
+      // Update local room state immediately for host
+      const updatedRoom = data as unknown as OnlineDuelRoom;
+      setRoom(updatedRoom);
+      
+      // Manually trigger onGameStart for host (don't wait for realtime)
+      onGameStart?.(updatedRoom);
+      
+    } catch (err) {
+      console.error('[OnlineDuel] Exception starting game:', err);
       toast({
         title: 'Failed to start game',
         variant: 'destructive',
       });
     }
-  }, [room, isHost, toast]);
+  }, [room, isHost, toast, onGameStart]);
 
   // Submit an answer
   const submitAnswer = useCallback(async (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => {

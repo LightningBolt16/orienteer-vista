@@ -1,5 +1,6 @@
 import React from 'react';
 import { Timer } from 'lucide-react';
+import ScoringInfoDialog from './ScoringInfoDialog';
 
 interface DuelScoreBarProps {
   player1Score: number;
@@ -12,6 +13,8 @@ interface DuelScoreBarProps {
   isTimedMode?: boolean;
   routesCompleted?: number;
   roundTimeRemaining?: number | null;
+  gameMode?: 'speed' | 'wait';
+  isOnline?: boolean;
 }
 
 const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
@@ -25,6 +28,8 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
   isTimedMode,
   routesCompleted = 0,
   roundTimeRemaining,
+  gameMode = 'speed',
+  isOnline = false,
 }) => {
   // Show pending scores (before both players answered) or confirmed scores
   const displayP1 = player1PendingScore;
@@ -53,6 +58,11 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
             <span className="text-muted-foreground">
               {routesCompleted} routes completed
             </span>
+            <ScoringInfoDialog 
+              gameMode={gameMode} 
+              gameType="timed" 
+              isOnline={isOnline} 
+            />
           </div>
         ) : (
           <div className="flex items-center gap-4">
@@ -63,6 +73,11 @@ const DuelScoreBar: React.FC<DuelScoreBarProps> = ({
                 {roundTimeRemaining}s
               </span>
             )}
+            <ScoringInfoDialog 
+              gameMode={gameMode} 
+              gameType="routes" 
+              isOnline={isOnline} 
+            />
           </div>
         )}
       </div>

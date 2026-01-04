@@ -87,8 +87,8 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
           />
         </div>
 
-        {/* Player 2 score - at bottom of their view (top when rotated back) */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
+        {/* Player 2 score - use bottom-3 which appears at top after 180° rotation */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-background/90 backdrop-blur-sm rounded-full px-4 py-1.5 border border-border shadow-sm">
             <span className="text-primary font-bold text-sm">P2: {player2.score.toFixed(1)}</span>
           </div>
