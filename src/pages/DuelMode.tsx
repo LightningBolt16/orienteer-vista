@@ -26,10 +26,11 @@ const DuelMode: React.FC = () => {
 
   // Centralized online duel hook - persists across lobby and game phases
   const onlineDuel = useOnlineDuel({
-    onGameStart: () => {
+    onGameStart: (room) => {
       // When host starts game, both players transition to playing
-      if (onlineDuel.room?.routes) {
-        setGameRoutes(onlineDuel.room.routes as RouteData[]);
+      // Use the room passed directly to avoid stale closure
+      if (room?.routes) {
+        setGameRoutes(room.routes as RouteData[]);
         setPhase('playing');
       }
     },

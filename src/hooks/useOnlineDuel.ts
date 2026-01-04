@@ -24,7 +24,7 @@ export interface OnlineDuelRoom {
 }
 
 interface UseOnlineDuelProps {
-  onGameStart?: () => void;
+  onGameStart?: (room: OnlineDuelRoom) => void;
   onOpponentAnswer?: (routeIndex: number, answer: 'left' | 'right') => void;
   onGameEnd?: () => void;
 }
@@ -221,7 +221,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
             setRoom(newRoom);
             
             if (newRoom.status === 'playing' && payload.old && (payload.old as any).status === 'waiting') {
-              onGameStart?.();
+              onGameStart?.(newRoom);
             }
             
             if (newRoom.status === 'finished' && payload.old && (payload.old as any).status === 'playing') {
