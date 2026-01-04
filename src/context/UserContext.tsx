@@ -288,8 +288,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Update user performance with offline support and per-map stats
   const updatePerformance = async (isCorrect: boolean, responseTime: number, mapName?: string) => {
+    // Skip DB updates for guest users - just don't save their stats
     if (!user || !session) {
-      console.warn('Cannot update performance: No authenticated user');
+      console.log('Guest mode: Performance not saved (sign in to save progress)');
       return;
     }
     
