@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RouteData } from '@/utils/routeDataUtils';
@@ -202,6 +202,20 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     }
   }, [playerId, toast]);
 
+  // Store callbacks in refs to avoid stale closure issues
+  const onGameStartRef = React.useRef(onGameStart);
+  const onOpponentAnswerRef = React.useRef(onOpponentAnswer);
+  const onGameEndRef = React.useRef(onGameEnd);
+  const playerIdRef = React.useRef(playerId);
+
+  // Keep refs up to date
+  useEffect(() => {
+    onGameStartRef.current = onGameStart;
+    onOpponentAnswerRef.current = onOpponentAnswer;
+    onGameEndRef.current = onGameEnd;
+    playerIdRef.current = playerId;
+  }, [onGameStart, onOpponentAnswer, onGameEnd, playerId]);
+
   // Subscribe to room updates
   const subscribeToRoom = useCallback((roomId: string) => {
     console.log('[OnlineDuel] Subscribing to room:', roomId);
@@ -227,12 +241,12 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
             // Only trigger for guest (host triggers manually in startGame)
             if (newRoom.status === 'playing' && oldRoom?.status === 'waiting') {
               console.log('[OnlineDuel] Game started - transitioning to playing');
-              onGameStart?.(newRoom);
+              onGameStartRef.current?.(newRoom);
             }
             
             if (newRoom.status === 'finished' && oldRoom?.status === 'playing') {
               console.log('[OnlineDuel] Game ended');
-              onGameEnd?.();
+              onGameEndRef.current?.();
             }
           }
         }
@@ -250,8 +264,8 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           if (payload.new) {
             const answer = payload.new as any;
             // Only notify about opponent's answers
-            if (answer.player_id !== playerId) {
-              onOpponentAnswer?.(answer.route_index, answer.answer);
+            if (answer.player_id !== playerIdRef.current) {
+              onOpponentAnswerRef.current?.(answer.route_index, answer.answer);
             }
           }
         }
@@ -261,7 +275,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       });
 
     setChannel(newChannel);
-  }, [playerId, onGameStart, onOpponentAnswer, onGameEnd]);
+  }, []);
 
   // Set ready status
   const setReady = useCallback(async (ready: boolean) => {

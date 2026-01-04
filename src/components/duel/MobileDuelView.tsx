@@ -61,40 +61,40 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
 
       {/* Player 2 area - TOP half (rotated 180 for person at notch end) */}
       <div className="absolute top-0 left-0 right-0 h-1/2 z-10" style={{ transform: 'rotate(180deg)' }}>
-        {/* Left/Right button quadrants for P2 */}
+        {/* Left/Right button quadrants for P2 - red on left, blue on right */}
         <div className="absolute inset-0 flex">
-          {/* P2 Left button */}
+          {/* P2 Left button (red) */}
           <button
             onClick={() => onPlayerAnswer(2, 'left')}
             disabled={isTransitioning || player2.hasAnswered}
-            className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/30 transition-colors"
+            className="w-1/2 h-full flex items-center justify-center active:bg-red-500/40 transition-colors"
             style={{
               background: player2.hasAnswered 
-                ? 'rgba(59,130,246,0.1)'
-                : 'linear-gradient(180deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 50%, transparent 100%)',
+                ? 'rgba(239,68,68,0.1)'
+                : 'linear-gradient(180deg, rgba(239,68,68,0.4) 0%, rgba(239,68,68,0.15) 50%, transparent 100%)',
             }}
           >
-            <span className="text-blue-400 text-4xl font-bold opacity-60">L</span>
+            <span className="text-red-400 text-4xl font-bold opacity-70">L</span>
           </button>
           
-          {/* P2 Right button */}
+          {/* P2 Right button (blue) */}
           <button
             onClick={() => onPlayerAnswer(2, 'right')}
             disabled={isTransitioning || player2.hasAnswered}
-            className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/30 transition-colors"
+            className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/40 transition-colors"
             style={{
               background: player2.hasAnswered 
                 ? 'rgba(59,130,246,0.1)'
-                : 'linear-gradient(180deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 50%, transparent 100%)',
+                : 'linear-gradient(180deg, rgba(59,130,246,0.4) 0%, rgba(59,130,246,0.15) 50%, transparent 100%)',
             }}
           >
-            <span className="text-blue-400 text-4xl font-bold opacity-60">R</span>
+            <span className="text-blue-400 text-4xl font-bold opacity-70">R</span>
           </button>
         </div>
 
         {/* P2 Score - at their bottom (appears at top of screen after rotation) */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-blue-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
+          <div className="bg-purple-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
             <span className="text-white font-bold text-lg">P2: {player2.score.toFixed(1)}</span>
           </div>
         </div>
@@ -140,40 +140,40 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
 
       {/* Player 1 area - BOTTOM half (for person with charging port at their end) */}
       <div className="absolute bottom-0 left-0 right-0 h-1/2 z-10">
-        {/* Left/Right button quadrants for P1 */}
+        {/* Left/Right button quadrants for P1 - red on left, blue on right */}
         <div className="absolute inset-0 flex">
-          {/* P1 Left button */}
+          {/* P1 Left button (red) */}
           <button
             onClick={() => onPlayerAnswer(1, 'left')}
             disabled={isTransitioning || player1.hasAnswered}
-            className="w-1/2 h-full flex items-center justify-center active:bg-red-500/30 transition-colors"
+            className="w-1/2 h-full flex items-center justify-center active:bg-red-500/40 transition-colors"
             style={{
               background: player1.hasAnswered 
                 ? 'rgba(239,68,68,0.1)'
-                : 'linear-gradient(0deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.1) 50%, transparent 100%)',
+                : 'linear-gradient(0deg, rgba(239,68,68,0.4) 0%, rgba(239,68,68,0.15) 50%, transparent 100%)',
             }}
           >
-            <span className="text-red-400 text-4xl font-bold opacity-60">L</span>
+            <span className="text-red-400 text-4xl font-bold opacity-70">L</span>
           </button>
           
-          {/* P1 Right button */}
+          {/* P1 Right button (blue) */}
           <button
             onClick={() => onPlayerAnswer(1, 'right')}
             disabled={isTransitioning || player1.hasAnswered}
-            className="w-1/2 h-full flex items-center justify-center active:bg-red-500/30 transition-colors"
+            className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/40 transition-colors"
             style={{
               background: player1.hasAnswered 
-                ? 'rgba(239,68,68,0.1)'
-                : 'linear-gradient(0deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.1) 50%, transparent 100%)',
+                ? 'rgba(59,130,246,0.1)'
+                : 'linear-gradient(0deg, rgba(59,130,246,0.4) 0%, rgba(59,130,246,0.15) 50%, transparent 100%)',
             }}
           >
-            <span className="text-red-400 text-4xl font-bold opacity-60">R</span>
+            <span className="text-blue-400 text-4xl font-bold opacity-70">R</span>
           </button>
         </div>
 
         {/* P1 Score - at bottom */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-red-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
+          <div className="bg-green-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
             <span className="text-white font-bold text-lg">P1: {player1.score.toFixed(1)}</span>
           </div>
         </div>
