@@ -44,15 +44,24 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
     },
   });
 
-  // Load routes when creating a room
+  // Load routes when creating a room (not when joining)
   useEffect(() => {
+    if (joinMode) return; // Don't load routes when joining - host provides them
+    
     const loadRoutes = async () => {
       const { routes } = await getRoutesForMap(settings.mapId, true);
       const selectedRoutes = routes.slice(0, settings.routeCount || 10);
       setLoadedRoutes(selectedRoutes);
     };
     loadRoutes();
-  }, [settings, getRoutesForMap]);
+  }, [settings, getRoutesForMap, joinMode]);
+
+  // Auto-create room when entering in create mode
+  useEffect(() => {
+    if (!joinMode && mode === 'choose' && loadedRoutes.length > 0) {
+      handleCreateRoom();
+    }
+  }, [joinMode, mode, loadedRoutes]);
 
   const handleCreateRoom = async () => {
     if (loadedRoutes.length === 0) {
@@ -236,57 +245,20 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
       </div>
     );
   }
-
-  // Mode selection
+  // Loading state while creating room
   if (mode === 'choose') {
     return (
       <div className="max-w-md mx-auto p-4 space-y-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Online Duel
+              <Wifi className="h-5 w-5 text-primary" />
+              Creating Room...
             </CardTitle>
-            <CardDescription>
-              Play against someone on another device
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={handleCreateRoom} 
-              className="w-full h-16 text-lg"
-              disabled={isConnecting}
-            >
-              {isConnecting ? (
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              ) : (
-                <Wifi className="h-5 w-5 mr-2" />
-              )}
-              Create Room
-            </Button>
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">or</span>
-              </div>
-            </div>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setMode('join')}
-              className="w-full h-16 text-lg"
-            >
-              <Users className="h-5 w-5 mr-2" />
-              Join Room
-            </Button>
-            
-            <Button variant="ghost" onClick={onBack} className="w-full">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
+          <CardContent className="flex flex-col items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Setting up your duel room</p>
           </CardContent>
         </Card>
       </div>
