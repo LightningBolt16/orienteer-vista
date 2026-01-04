@@ -153,16 +153,13 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
 
           {/* Online Mode: Name Input and Join Room Option - integrated */}
           {playMode === 'online' && (
-            <div className="space-y-3 pt-2 border-t border-border">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Your Name</label>
-                <Input 
-                  placeholder="Enter your name"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  className="text-center"
-                />
-              </div>
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Input 
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="text-center"
+              />
               <Button 
                 variant="outline" 
                 onClick={handleJoinRoom}
