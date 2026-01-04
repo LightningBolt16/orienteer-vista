@@ -62,8 +62,21 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
   const [selectedDuration, setSelectedDuration] = useState<number>(60);
   const [customDuration, setCustomDuration] = useState<string>('');
   const [isCustomDuration, setIsCustomDuration] = useState(false);
-  const [gameMode, setGameMode] = useState<'speed' | 'wait'>('speed');
+  const [gameMode, setGameMode] = useState<'speed' | 'wait'>('wait'); // Default to wait for mobile compatibility
   const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
+  
+  // Detect mobile device
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+  
+  // Speed race is disabled for mobile + Local mode (only one screen, can't show two routes)
+  const isSpeedRaceDisabled = isMobile && playMode === 'local';
+  
+  // Auto-switch to wait mode if speed race becomes disabled
+  React.useEffect(() => {
+    if (isSpeedRaceDisabled && gameMode === 'speed') {
+      setGameMode('wait');
+    }
+  }, [isSpeedRaceDisabled, gameMode]);
 
   const availableMaps = mobileCache?.maps || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
@@ -261,16 +274,21 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => setGameMode('speed')}
-              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                gameMode === 'speed'
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border bg-card'
+              onClick={() => !isSpeedRaceDisabled && setGameMode('speed')}
+              disabled={isSpeedRaceDisabled}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all relative ${
+                isSpeedRaceDisabled
+                  ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
+                  : gameMode === 'speed'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-card hover:border-primary/50'
               }`}
             >
               <Zap className="h-8 w-8 mb-2 text-yellow-500" />
               <span className="font-medium text-sm">Speed Race</span>
-              <span className="text-xs text-muted-foreground text-center">Fastest answer wins bonus points</span>
+              <span className="text-xs text-muted-foreground text-center">
+                {isSpeedRaceDisabled ? 'Not available on mobile Local' : 'Fastest answer wins bonus points'}
+              </span>
             </button>
             
             <button
