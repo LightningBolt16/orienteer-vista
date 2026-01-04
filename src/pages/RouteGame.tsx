@@ -15,36 +15,17 @@ import { toast } from '../components/ui/use-toast';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
+import flagItaly from '@/assets/flag-italy.png';
+import flagSweden from '@/assets/flag-sweden.png';
+import flagBelgium from '@/assets/flag-belgium.png';
 
 type MapSelection = 'all' | string;
 
-// Country code to flag emoji mapping
-const COUNTRY_FLAGS: Record<string, string> = {
-  IT: '🇮🇹',
-  SE: '🇸🇪',
-  BE: '🇧🇪',
-  NO: '🇳🇴',
-  FI: '🇫🇮',
-  CH: '🇨🇭',
-  FR: '🇫🇷',
-  DE: '🇩🇪',
-  ES: '🇪🇸',
-  PT: '🇵🇹',
-  DK: '🇩🇰',
-  CZ: '🇨🇿',
-  PL: '🇵🇱',
-  GB: '🇬🇧',
-  US: '🇺🇸',
-  AU: '🇦🇺',
-  NZ: '🇳🇿',
-  JP: '🇯🇵',
-  AT: '🇦🇹',
-  HU: '🇭🇺',
-  RU: '🇷🇺',
-  UA: '🇺🇦',
-  EE: '🇪🇪',
-  LV: '🇱🇻',
-  LT: '🇱🇹',
+// Country code to flag image mapping for reliable cross-platform display
+const COUNTRY_FLAG_IMAGES: Record<string, string> = {
+  IT: flagItaly,
+  SE: flagSweden,
+  BE: flagBelgium,
 };
 
 // Storage URL for map logos
@@ -151,38 +132,11 @@ const RouteGame: React.FC = () => {
     setSelectedMapId(mapName);
   };
 
-  // Show login prompt if not authenticated
+  // Show loading spinner while checking auth
   if (userLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="pb-20 flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md mx-auto text-center">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-center gap-2">
-              <LogIn className="h-6 w-6" />
-              {t('loginRequired')}
-            </CardTitle>
-            <CardDescription>
-              {t('loginToPlayRouteGame')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              onClick={() => navigate('/auth')}
-              className="bg-orienteering hover:bg-orienteering/90"
-            >
-              <LogIn className="h-4 w-4 mr-2" />
-              {t('signIn')}
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -194,6 +148,29 @@ const RouteGame: React.FC = () => {
       {showTutorial && (
         <RouteGameTutorial isMobile={isMobile} onClose={closeTutorial} />
       )}
+      
+      {/* Guest Mode Banner */}
+      {!user && (
+        <section className="max-w-4xl mx-auto">
+          <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+            <CardContent className="flex items-center justify-between py-3 px-4">
+              <span className="text-sm text-amber-800 dark:text-amber-200">
+                {t('signInToSaveProgress') || 'Sign in to save your progress and appear on the leaderboard'}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/auth')}
+                className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900"
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                {t('signIn')}
+              </Button>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+      
       {/* Map Selection */}
       <section className="max-w-4xl mx-auto">
         <Card>
@@ -233,8 +210,8 @@ const RouteGame: React.FC = () => {
                   const isKnivsta = mapName.toLowerCase().includes('knivsta');
                   const isEkeby = mapName.toLowerCase().includes('ekeby');
                   
-                  // Use emoji flag from country code, or fallback to legacy logic
-                  const countryFlag = countryCode ? COUNTRY_FLAGS[countryCode] : null;
+                  // Use flag image for reliable cross-platform display
+                  const flagImage = countryCode ? COUNTRY_FLAG_IMAGES[countryCode] : null;
                   
                   // Determine which logo to show
                   const showKartkompanietLogo = isKnivsta || isEkeby;
@@ -250,10 +227,12 @@ const RouteGame: React.FC = () => {
                           : 'border-border bg-card'
                       }`}
                     >
-                      {countryFlag && (
-                        <span className="absolute top-1 right-1 text-lg">
-                          {countryFlag}
-                        </span>
+                      {flagImage && (
+                        <img 
+                          src={flagImage} 
+                          alt={countryCode}
+                          className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm"
+                        />
                       )}
                       {isPwt ? (
                         <PwtAttribution variant="badge" className="mb-2" />
