@@ -160,9 +160,11 @@ export type Database = {
           game_ends_at: string | null
           game_started_at: string | null
           guest_id: string | null
+          guest_name: string | null
           guest_ready: boolean | null
           guest_score: number | null
           host_id: string
+          host_name: string | null
           host_ready: boolean | null
           host_score: number | null
           id: string
@@ -178,9 +180,11 @@ export type Database = {
           game_ends_at?: string | null
           game_started_at?: string | null
           guest_id?: string | null
+          guest_name?: string | null
           guest_ready?: boolean | null
           guest_score?: number | null
           host_id: string
+          host_name?: string | null
           host_ready?: boolean | null
           host_score?: number | null
           id?: string
@@ -196,9 +200,11 @@ export type Database = {
           game_ends_at?: string | null
           game_started_at?: string | null
           guest_id?: string | null
+          guest_name?: string | null
           guest_ready?: boolean | null
           guest_score?: number | null
           host_id?: string
+          host_name?: string | null
           host_ready?: boolean | null
           host_score?: number | null
           id?: string

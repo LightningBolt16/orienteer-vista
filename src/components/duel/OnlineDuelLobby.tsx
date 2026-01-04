@@ -13,15 +13,18 @@ interface OnlineDuelLobbyProps {
   settings: DuelSettings;
   onGameStart: (routes: RouteData[], room: OnlineDuelRoom) => void;
   onBack: () => void;
+  playerName?: string;
+  joinMode?: boolean;
 }
 
-const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart, onBack }) => {
+const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart, onBack, playerName: initialPlayerName = '', joinMode = false }) => {
   const { toast } = useToast();
   const { getRoutesForMap } = useRouteCache();
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
+  const [mode, setMode] = useState<'choose' | 'create' | 'join'>(joinMode ? 'join' : 'choose');
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [loadedRoutes, setLoadedRoutes] = useState<RouteData[]>([]);
+  const [displayName] = useState(initialPlayerName || 'Player');
 
   const {
     room,
@@ -59,7 +62,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
       });
       return;
     }
-    await createRoom(settings, loadedRoutes);
+    await createRoom(settings, loadedRoutes, displayName);
     setMode('create');
   };
 
@@ -72,7 +75,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
       });
       return;
     }
-    await joinRoom(joinCode);
+    await joinRoom(joinCode, displayName);
   };
 
   const handleCopyCode = () => {
@@ -157,17 +160,17 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
             <div className="space-y-2">
               <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="font-medium">You (Host)</span>
+                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">P1</div>
+                  <span className="font-medium">{room.host_name || 'Host'}</span>
                 </div>
                 <Check className="h-4 w-4 text-green-500" />
               </div>
               
               <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${room.guest_id ? 'bg-green-500' : 'bg-muted-foreground animate-pulse'}`} />
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${room.guest_id ? 'bg-blue-500' : 'bg-muted-foreground'}`}>P2</div>
                   <span className="font-medium">
-                    {room.guest_id ? 'Opponent joined!' : 'Waiting for opponent...'}
+                    {room.guest_id ? (room.guest_name || 'Opponent') : 'Waiting...'}
                   </span>
                 </div>
                 {room.guest_id ? (
