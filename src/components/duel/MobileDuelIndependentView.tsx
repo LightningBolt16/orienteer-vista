@@ -1,5 +1,6 @@
 import React from 'react';
 import { RouteData, getImageUrlByMapName } from '../../utils/routeDataUtils';
+import ScoringInfoDialog from './ScoringInfoDialog';
 
 interface PlayerState {
   score: number;
@@ -13,6 +14,7 @@ interface MobileDuelIndependentViewProps {
   player1: PlayerState;
   player2: PlayerState;
   gameTimeRemaining: number | null;
+  totalRoutes: number;
   onPlayerAnswer: (player: 1 | 2, direction: 'left' | 'right') => void;
   onExit: () => void;
 }
@@ -24,6 +26,7 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
   player1,
   player2,
   gameTimeRemaining,
+  totalRoutes,
   onPlayerAnswer,
   onExit,
 }) => {
@@ -136,6 +139,15 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
       >
         Exit
       </button>
+
+      {/* Scoring info button */}
+      <div className="absolute top-1/2 left-2 translate-y-8 z-40">
+        <ScoringInfoDialog 
+          gameMode="speed" 
+          gameType={gameTimeRemaining !== null ? 'timed' : 'routes'} 
+          isOnline={false} 
+        />
+      </div>
 
       {/* Player 1 area - BOTTOM half */}
       <div className="relative h-1/2 border-t border-border">

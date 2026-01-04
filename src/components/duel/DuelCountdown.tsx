@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface DuelCountdownProps {
   onComplete: () => void;
@@ -8,13 +8,19 @@ interface DuelCountdownProps {
 const DuelCountdown: React.FC<DuelCountdownProps> = ({ onComplete, duration = 3 }) => {
   const [count, setCount] = useState(duration);
   const [showGo, setShowGo] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep ref updated
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     if (count <= 0 && !showGo) {
       setShowGo(true);
       // Show "GO!" briefly then complete
       const goTimer = setTimeout(() => {
-        onComplete();
+        onCompleteRef.current();
       }, 500);
       return () => clearTimeout(goTimer);
     }
@@ -23,7 +29,7 @@ const DuelCountdown: React.FC<DuelCountdownProps> = ({ onComplete, duration = 3 
       const timer = setTimeout(() => setCount(count - 1), 1000);
       return () => clearTimeout(timer);
     }
-  }, [count, showGo, onComplete]);
+  }, [count, showGo]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">

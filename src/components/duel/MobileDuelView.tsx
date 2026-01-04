@@ -1,5 +1,6 @@
 import React from 'react';
 import { RouteData, getImageUrlByMapName } from '../../utils/routeDataUtils';
+import ScoringInfoDialog from './ScoringInfoDialog';
 
 interface PlayerState {
   score: number;
@@ -18,6 +19,7 @@ interface MobileDuelViewProps {
   isTimedMode: boolean;
   routesCompleted: number;
   totalRoutes: number;
+  gameMode: 'speed' | 'wait';
   onPlayerAnswer: (player: 1 | 2, direction: 'left' | 'right') => void;
   onExit: () => void;
 }
@@ -34,6 +36,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
   isTimedMode,
   routesCompleted,
   totalRoutes,
+  gameMode,
   onPlayerAnswer,
   onExit,
 }) => {
@@ -134,6 +137,15 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
       >
         Exit
       </button>
+
+      {/* Scoring info button - left side below route counter */}
+      <div className="absolute top-1/2 left-14 -translate-y-1/2 z-40">
+        <ScoringInfoDialog 
+          gameMode={gameMode} 
+          gameType={isTimedMode ? 'timed' : 'routes'} 
+          isOnline={false} 
+        />
+      </div>
 
       {/* Player 1 area - BOTTOM half (for person with charging port at their end) */}
       <div className="relative h-1/2 z-10">

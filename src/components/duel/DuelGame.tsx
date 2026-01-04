@@ -481,6 +481,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
             showResult: player2.showResult,
           }}
           gameTimeRemaining={gameTimeRemaining}
+          totalRoutes={totalRoutes}
           onPlayerAnswer={handlePlayerAnswer}
           onExit={onExit}
         />
@@ -509,6 +510,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         isTimedMode={isTimedMode}
         routesCompleted={routesCompleted}
         totalRoutes={totalRoutes}
+        gameMode={settings.gameMode}
         onPlayerAnswer={handlePlayerAnswer}
         onExit={onExit}
       />
