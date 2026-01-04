@@ -9,7 +9,14 @@ import OnlineDuelGameView from './OnlineDuelGameView';
 import { Trophy, RotateCcw, Home } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
 import { OnlineDuelRoom } from '@/hooks/useOnlineDuel';
-import { useOnlineDuel } from '@/hooks/useOnlineDuel';
+
+interface OnlineDuelHook {
+  room: OnlineDuelRoom | null;
+  isHost: boolean;
+  playerId: string | null;
+  submitAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => Promise<void>;
+  finishGame: () => Promise<void>;
+}
 
 interface DuelGameProps {
   routes: RouteData[];
@@ -17,7 +24,7 @@ interface DuelGameProps {
   settings: DuelSettings;
   onExit: () => void;
   onRestart: () => void;
-  onlineRoom?: OnlineDuelRoom | null;
+  onlineDuel?: OnlineDuelHook;
 }
 
 interface PlayerState {
@@ -36,7 +43,7 @@ interface PlayerState {
 const SPEED_BONUS = 0.5;
 const WRONG_PENALTY = -0.5;
 
-const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart, onlineRoom }) => {
+const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onExit, onRestart, onlineDuel }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [routesCompleted, setRoutesCompleted] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -46,9 +53,9 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
   const [isMobile, setIsMobile] = useState(false);
   
-  // Online duel hook for submitting answers
-  const { submitAnswer, room: liveRoom, isHost } = useOnlineDuel({});
-  const activeRoom = liveRoom || onlineRoom;
+  // Online mode uses passed hook from parent
+  const activeRoom = onlineDuel?.room;
+  const isHost = onlineDuel?.isHost ?? false;
   
   // Independent mode: speed + timed = each player progresses independently
   const isIndependentMode = settings.gameMode === 'speed' && settings.gameType === 'timed';
@@ -418,15 +425,16 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   }
 
   // Online Mode - Use single-player style interface
-  if (isOnlineMode && activeRoom) {
+  if (isOnlineMode && activeRoom && onlineDuel) {
     return (
       <OnlineDuelGameView
         routes={routes}
         room={activeRoom}
         isHost={isHost}
         isMobile={isMobile}
-        onAnswer={submitAnswer}
+        onAnswer={onlineDuel.submitAnswer}
         onExit={onExit}
+        onFinishGame={onlineDuel.finishGame}
       />
     );
   }

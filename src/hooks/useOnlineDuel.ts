@@ -35,22 +35,44 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   const [isHost, setIsHost] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
 
-  // Generate guest ID for non-authenticated users
-  const generateGuestId = () => `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-  // Get current user with auth state subscription
+  // Get or create persistent player ID (supports guests via sessionStorage)
   useEffect(() => {
-    // Get initial user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserId(user?.id || null);
-    });
+    const initPlayerId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user?.id) {
+        setPlayerId(user.id);
+        // Clear guest ID if user logs in
+        sessionStorage.removeItem('duel-guest-id');
+      } else {
+        // Use existing guest ID or create new one
+        let guestId = sessionStorage.getItem('duel-guest-id');
+        if (!guestId) {
+          guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          sessionStorage.setItem('duel-guest-id', guestId);
+        }
+        setPlayerId(guestId);
+      }
+    };
+    
+    initPlayerId();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setUserId(session?.user?.id || null);
+        if (session?.user?.id) {
+          setPlayerId(session.user.id);
+          sessionStorage.removeItem('duel-guest-id');
+        } else {
+          let guestId = sessionStorage.getItem('duel-guest-id');
+          if (!guestId) {
+            guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            sessionStorage.setItem('duel-guest-id', guestId);
+          }
+          setPlayerId(guestId);
+        }
       }
     );
 
@@ -69,7 +91,10 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Create a new room
   const createRoom = useCallback(async (settings: any, routes: RouteData[], hostName?: string) => {
-    const playerId = userId || generateGuestId();
+    if (!playerId) {
+      toast({ title: 'Not ready', description: 'Please wait...', variant: 'destructive' });
+      return null;
+    }
 
     setIsConnecting(true);
     try {
@@ -113,11 +138,14 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     } finally {
       setIsConnecting(false);
     }
-  }, [userId, toast]);
+  }, [playerId, toast]);
 
   // Join an existing room
   const joinRoom = useCallback(async (roomCode: string, guestName?: string) => {
-    const playerId = userId || generateGuestId();
+    if (!playerId) {
+      toast({ title: 'Not ready', description: 'Please wait...', variant: 'destructive' });
+      return null;
+    }
 
     setIsConnecting(true);
     try {
@@ -172,7 +200,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     } finally {
       setIsConnecting(false);
     }
-  }, [userId, toast]);
+  }, [playerId, toast]);
 
   // Subscribe to room updates
   const subscribeToRoom = useCallback((roomId: string) => {
@@ -215,7 +243,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           if (payload.new) {
             const answer = payload.new as any;
             // Only notify about opponent's answers
-            if (answer.player_id !== userId) {
+            if (answer.player_id !== playerId) {
               onOpponentAnswer?.(answer.route_index, answer.answer);
             }
           }
@@ -224,7 +252,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       .subscribe();
 
     setChannel(newChannel);
-  }, [userId, onGameStart, onOpponentAnswer, onGameEnd]);
+  }, [playerId, onGameStart, onOpponentAnswer, onGameEnd]);
 
   // Set ready status
   const setReady = useCallback(async (ready: boolean) => {
@@ -265,13 +293,13 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Submit an answer
   const submitAnswer = useCallback(async (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => {
-    if (!room || !userId) return;
+    if (!room || !playerId) return;
 
     const { error } = await supabase
       .from('duel_answers')
       .insert({
         room_id: room.id,
-        player_id: userId,
+        player_id: playerId,
         route_index: routeIndex,
         answer,
         answer_time_ms: answerTimeMs,
@@ -292,7 +320,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
         [scoreField]: (isHost ? room.host_score : room.guest_score) + scoreChange 
       })
       .eq('id', room.id);
-  }, [room, userId, isHost]);
+  }, [room, playerId, isHost]);
 
   // Leave/delete room
   const leaveRoom = useCallback(async () => {
@@ -324,16 +352,28 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     };
   }, [channel]);
 
+  // Finish the game
+  const finishGame = useCallback(async () => {
+    if (!room) return;
+
+    await supabase
+      .from('duel_rooms')
+      .update({ status: 'finished' })
+      .eq('id', room.id);
+  }, [room]);
+
   return {
     room,
     isHost,
     isConnecting,
-    userId,
+    playerId,
     createRoom,
     joinRoom,
     setReady,
     startGame,
     submitAnswer,
     leaveRoom,
+    finishGame,
+    subscribeToRoom,
   };
 };

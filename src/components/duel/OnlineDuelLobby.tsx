@@ -2,12 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { useOnlineDuel, OnlineDuelRoom } from '@/hooks/useOnlineDuel';
+import { OnlineDuelRoom } from '@/hooks/useOnlineDuel';
 import { useRouteCache } from '@/context/RouteCache';
 import { DuelSettings } from './DuelSetup';
 import { RouteData } from '@/utils/routeDataUtils';
 import { Users, Copy, Check, Wifi, WifiOff, Loader2, ArrowLeft, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+interface OnlineDuelHook {
+  room: OnlineDuelRoom | null;
+  isHost: boolean;
+  isConnecting: boolean;
+  playerId: string | null;
+  createRoom: (settings: any, routes: RouteData[], hostName?: string) => Promise<OnlineDuelRoom | null>;
+  joinRoom: (roomCode: string, guestName?: string) => Promise<OnlineDuelRoom | null>;
+  startGame: () => Promise<void>;
+  leaveRoom: () => Promise<void>;
+}
 
 interface OnlineDuelLobbyProps {
   settings: DuelSettings;
@@ -15,9 +26,17 @@ interface OnlineDuelLobbyProps {
   onBack: () => void;
   playerName?: string;
   joinMode?: boolean;
+  onlineDuel: OnlineDuelHook;
 }
 
-const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart, onBack, playerName: initialPlayerName = '', joinMode = false }) => {
+const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ 
+  settings, 
+  onGameStart, 
+  onBack, 
+  playerName: initialPlayerName = '', 
+  joinMode = false,
+  onlineDuel 
+}) => {
   const { toast } = useToast();
   const { getRoutesForMap } = useRouteCache();
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>(joinMode ? 'join' : 'choose');
@@ -26,23 +45,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ settings, onGameStart
   const [loadedRoutes, setLoadedRoutes] = useState<RouteData[]>([]);
   const [displayName] = useState(initialPlayerName || 'Player');
 
-  const {
-    room,
-    isHost,
-    isConnecting,
-    userId,
-    createRoom,
-    joinRoom,
-    setReady,
-    startGame,
-    leaveRoom,
-  } = useOnlineDuel({
-    onGameStart: () => {
-      if (room?.routes) {
-        onGameStart(room.routes as RouteData[], room);
-      }
-    },
-  });
+  const { room, isHost, isConnecting, createRoom, joinRoom, startGame, leaveRoom } = onlineDuel;
 
   // Load routes when creating a room (not when joining)
   useEffect(() => {
