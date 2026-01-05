@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.notify-club-approved]
 verify_jwt = false
+
+[functions.map-processing-webhook]
+verify_jwt = false
