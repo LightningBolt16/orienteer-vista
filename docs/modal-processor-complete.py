@@ -30,6 +30,7 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
     "scikit-learn",
     "scipy",
     "requests",
+    "fastapi",
 )
 
 # =============================================================================
@@ -776,7 +777,7 @@ def process_map(job_payload: dict):
 # WEB ENDPOINT - Receives jobs from Lovable
 # =============================================================================
 @app.function(image=image)
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def trigger(payload: dict):
     """
     Web endpoint that receives job requests from Lovable.
