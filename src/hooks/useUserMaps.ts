@@ -2,6 +2,9 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { toast } from '@/components/ui/use-toast';
+import { uploadLargeFile } from '@/utils/resumableUpload';
+
+const CHUNK_THRESHOLD = 50 * 1024 * 1024; // 50MB - use resumable upload above this
 
 export interface UserMap {
   id: string;
@@ -124,24 +127,44 @@ export function useUserMaps() {
       const bwPath = `${user.id}/${sanitizedName}/bw.tif`;
 
       // Upload color TIF
-      const { error: colorError } = await supabase.storage
-        .from('user-map-sources')
-        .upload(colorPath, data.colorTifFile, {
-          cacheControl: '3600',
-          upsert: true,
+      if (data.colorTifFile.size > CHUNK_THRESHOLD) {
+        console.log('Using resumable upload for color TIF:', data.colorTifFile.size);
+        const result = await uploadLargeFile({
+          bucketName: 'user-map-sources',
+          fileName: colorPath,
+          file: data.colorTifFile,
+          onProgress: (pct) => console.log(`Color TIF upload: ${pct}%`),
         });
-
-      if (colorError) throw new Error(`Failed to upload color TIF: ${colorError.message}`);
+        if ('error' in result) throw new Error(`Failed to upload color TIF: ${result.error.message}`);
+      } else {
+        const { error: colorError } = await supabase.storage
+          .from('user-map-sources')
+          .upload(colorPath, data.colorTifFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+        if (colorError) throw new Error(`Failed to upload color TIF: ${colorError.message}`);
+      }
 
       // Upload B&W TIF
-      const { error: bwError } = await supabase.storage
-        .from('user-map-sources')
-        .upload(bwPath, data.bwTifFile, {
-          cacheControl: '3600',
-          upsert: true,
+      if (data.bwTifFile.size > CHUNK_THRESHOLD) {
+        console.log('Using resumable upload for B&W TIF:', data.bwTifFile.size);
+        const result = await uploadLargeFile({
+          bucketName: 'user-map-sources',
+          fileName: bwPath,
+          file: data.bwTifFile,
+          onProgress: (pct) => console.log(`B&W TIF upload: ${pct}%`),
         });
-
-      if (bwError) throw new Error(`Failed to upload B&W TIF: ${bwError.message}`);
+        if ('error' in result) throw new Error(`Failed to upload B&W TIF: ${result.error.message}`);
+      } else {
+        const { error: bwError } = await supabase.storage
+          .from('user-map-sources')
+          .upload(bwPath, data.bwTifFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+        if (bwError) throw new Error(`Failed to upload B&W TIF: ${bwError.message}`);
+      }
 
       // Create database record using any to bypass strict typing for new table
       const insertData = {
