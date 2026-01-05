@@ -79,8 +79,8 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'complete') {
       // Mark processing as complete and create route_maps entry
       const body = await req.json()
-      const { map_id, route_data } = body
-      console.log('Completing map processing:', map_id)
+      const { map_id, route_count, csv_data } = body
+      console.log('Completing map processing:', map_id, 'routes:', route_count)
 
       // Get the user_map details
       const { data: userMap, error: fetchError } = await supabase
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
           user_id: userMap.user_id,
           source_map_id: map_id,
           is_public: false,
-          description: `Custom map uploaded by user`,
+          description: `Custom map with ${route_count || 0} generated routes`,
           map_type: 'forest',
         })
         .select()
@@ -119,24 +119,45 @@ Deno.serve(async (req) => {
         )
       }
 
-      // Insert route images if provided
-      if (route_data && Array.isArray(route_data)) {
-        const routeImages = route_data.map((route: any, index: number) => ({
-          map_id: routeMap.id,
-          candidate_index: index,
-          main_route_length: route.main_route_length || null,
-          alt_route_length: route.alt_route_length || null,
-          aspect_ratio: route.aspect_ratio || '16_9',
-          shortest_side: route.shortest_side || 'main',
-          image_path: route.image_path,
-        }))
+      // Insert route images from csv_data (sent by Modal script)
+      if (csv_data && Array.isArray(csv_data)) {
+        const routeImages: any[] = []
+        
+        for (const route of csv_data) {
+          // Create entries for both 16:9 and 9:16 versions
+          const basePath = `${userMap.user_id}/${map_id}`
+          
+          routeImages.push({
+            map_id: routeMap.id,
+            candidate_index: route.id,
+            main_route_length: route.main_length || null,
+            alt_route_length: route.alt_length || null,
+            aspect_ratio: '16_9',
+            shortest_side: route.main_side?.toLowerCase() || 'left',
+            image_path: `${basePath}/16_9/candidate_${route.id}.webp`,
+          })
+          
+          routeImages.push({
+            map_id: routeMap.id,
+            candidate_index: route.id,
+            main_route_length: route.main_length || null,
+            alt_route_length: route.alt_length || null,
+            aspect_ratio: '9_16',
+            shortest_side: route.main_side?.toLowerCase() || 'left',
+            image_path: `${basePath}/9_16/candidate_${route.id}.webp`,
+          })
+        }
 
-        const { error: imagesError } = await supabase
-          .from('route_images')
-          .insert(routeImages)
+        if (routeImages.length > 0) {
+          const { error: imagesError } = await supabase
+            .from('route_images')
+            .insert(routeImages)
 
-        if (imagesError) {
-          console.error('Error inserting route images:', imagesError)
+          if (imagesError) {
+            console.error('Error inserting route images:', imagesError)
+          } else {
+            console.log(`Inserted ${routeImages.length} route image records`)
+          }
         }
       }
 
@@ -151,7 +172,7 @@ Deno.serve(async (req) => {
 
       console.log('Map processing completed successfully')
       return new Response(
-        JSON.stringify({ success: true, route_map_id: routeMap.id }),
+        JSON.stringify({ success: true, route_map_id: routeMap.id, route_count }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -198,17 +219,57 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === 'POST' && action === 'upload-image') {
-      // Handle image upload from processing service
-      const formData = await req.formData()
-      const mapId = formData.get('map_id') as string
-      const imageName = formData.get('image_name') as string
-      const imageFile = formData.get('image') as File
+      // Handle image upload from processing service (supports both FormData and base64 JSON)
+      const contentType = req.headers.get('content-type') || ''
+      
+      let mapId: string
+      let storagePath: string
+      let imageData: Uint8Array
+      let routeIndex: number
+      let aspectRatio: string
+      let mimeType = 'image/webp'
 
-      if (!mapId || !imageName || !imageFile) {
-        return new Response(
-          JSON.stringify({ error: 'Missing required fields' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      if (contentType.includes('application/json')) {
+        // Base64 JSON format (from Modal Python script)
+        const body = await req.json()
+        mapId = body.map_id
+        storagePath = body.storage_path
+        routeIndex = body.route_index || 0
+        aspectRatio = body.aspect_ratio || '16_9'
+        mimeType = body.content_type || 'image/webp'
+        
+        if (!mapId || !storagePath || !body.image_data) {
+          return new Response(
+            JSON.stringify({ error: 'Missing required fields: map_id, storage_path, image_data' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        // Decode base64 to Uint8Array
+        const binaryString = atob(body.image_data)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        imageData = bytes
+      } else {
+        // FormData format (legacy)
+        const formData = await req.formData()
+        mapId = formData.get('map_id') as string
+        const imageName = formData.get('image_name') as string
+        const imageFile = formData.get('image') as File
+        routeIndex = parseInt(formData.get('route_index') as string || '0', 10)
+        aspectRatio = formData.get('aspect_ratio') as string || '16_9'
+
+        if (!mapId || !imageName || !imageFile) {
+          return new Response(
+            JSON.stringify({ error: 'Missing required fields' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        storagePath = imageName
+        imageData = new Uint8Array(await imageFile.arrayBuffer())
       }
 
       // Get user_id from map
@@ -225,11 +286,12 @@ Deno.serve(async (req) => {
         )
       }
 
-      const filePath = `${userMap.user_id}/${userMap.name}/${imageName}`
+      const filePath = `${userMap.user_id}/${mapId}/${storagePath}`
       
       const { error: uploadError } = await supabase.storage
         .from('user-route-images')
-        .upload(filePath, imageFile, {
+        .upload(filePath, imageData, {
+          contentType: mimeType,
           cacheControl: '3600',
           upsert: true,
         })
@@ -237,14 +299,14 @@ Deno.serve(async (req) => {
       if (uploadError) {
         console.error('Error uploading image:', uploadError)
         return new Response(
-          JSON.stringify({ error: 'Failed to upload image' }),
+          JSON.stringify({ error: 'Failed to upload image', details: uploadError.message }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      console.log('Image uploaded successfully:', filePath)
+      console.log('Image uploaded successfully:', filePath, 'route:', routeIndex, 'aspect:', aspectRatio)
       return new Response(
-        JSON.stringify({ success: true, path: filePath }),
+        JSON.stringify({ success: true, path: filePath, route_index: routeIndex, aspect_ratio: aspectRatio }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
