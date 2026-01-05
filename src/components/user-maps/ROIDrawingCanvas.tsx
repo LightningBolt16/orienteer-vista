@@ -30,11 +30,14 @@ const ROIDrawingCanvas: React.FC<ROIDrawingCanvasProps> = ({
   // Load image
   useEffect(() => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       imageRef.current = img;
       setImageDimensions({ width: img.width, height: img.height });
       setImageLoaded(true);
+    };
+    img.onerror = () => {
+      console.error('Failed to load image');
+      setImageLoaded(false);
     };
     img.src = imageUrl;
   }, [imageUrl]);

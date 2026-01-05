@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
 import Leaderboard from '../components/Leaderboard';
@@ -9,10 +9,10 @@ import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useRouteCache } from '../context/RouteCache';
 import { useUser } from '../context/UserContext';
-import { MapSource, RouteData, getUniqueMapNames } from '../utils/routeDataUtils';
+import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
@@ -34,10 +34,15 @@ const LOGO_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object
 const RouteGame: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { user, loading: userLoading } = useUser();
   const { desktopCache, mobileCache, isPreloading, getRoutesForMap } = useRouteCache();
   const { showTutorial, closeTutorial } = useRouteGameTutorial();
+  
+  // Check for user map parameter
+  const userMapId = searchParams.get('map');
+  const isUserMapMode = !!userMapId;
   
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedMapId, setSelectedMapId] = useState<MapSelection>('all');
@@ -46,6 +51,7 @@ const RouteGame: React.FC = () => {
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [allMapsForRoutes, setAllMapsForRoutes] = useState<MapSource[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [userMapName, setUserMapName] = useState<string>('');
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
   // Get available maps from cache
@@ -86,8 +92,46 @@ const RouteGame: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [isMobile]);
   
-  // Load route data based on selection - uses cache
+  // Load user map routes if in user map mode
   useEffect(() => {
+    if (!isUserMapMode || !userMapId) return;
+    
+    const loadUserRoutes = async () => {
+      setIsLoading(true);
+      try {
+        const { routes, map, userMapName: mapName } = await loadUserMapRoutes(userMapId, isMobile);
+        setRouteData(routes);
+        setSelectedMap(map);
+        setUserMapName(mapName);
+        if (map) {
+          setAllMapsForRoutes([map]);
+        }
+        
+        if (routes.length === 0 && mapName) {
+          toast({
+            title: 'No routes available',
+            description: 'This map has no routes generated yet, or processing is still in progress.',
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load user map routes:', error);
+        toast({
+          title: t('error'),
+          description: 'Failed to load routes for this map.',
+          variant: "destructive"
+        });
+      }
+      setIsLoading(false);
+    };
+    
+    loadUserRoutes();
+  }, [userMapId, isUserMapMode, isMobile, t]);
+
+  // Load route data based on selection - uses cache (skip if in user map mode)
+  useEffect(() => {
+    if (isUserMapMode) return; // Skip for user map mode
+    
     const loadRoutes = async () => {
       if (isPreloading) return;
       
@@ -126,10 +170,14 @@ const RouteGame: React.FC = () => {
     };
     
     loadRoutes();
-  }, [selectedMapId, isMobile, isPreloading, getRoutesForMap, t]);
+  }, [selectedMapId, isMobile, isPreloading, getRoutesForMap, t, isUserMapMode]);
   
   const handleMapSelect = (mapName: MapSelection) => {
     setSelectedMapId(mapName);
+  };
+
+  const handleBackToPublicMaps = () => {
+    navigate('/route-game');
   };
 
   // Show loading spinner while checking auth
@@ -171,95 +219,121 @@ const RouteGame: React.FC = () => {
         </section>
       )}
       
-      {/* Map Selection */}
-      <section className="max-w-4xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('selectMap')}</CardTitle>
-            <CardDescription>{t('selectMapDescription')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isPreloading ? (
-              <div className="flex items-center p-4 text-sm text-muted-foreground">
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary mr-2"></div>
-                {t('loadingMaps')}
-              </div>
-            ) : uniqueMapNames.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {/* All Maps Option */}
-                <button
-                  onClick={() => handleMapSelect('all')}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                    selectedMapId === 'all'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-card'
-                  }`}
+      {/* User Map Mode Header */}
+      {isUserMapMode && (
+        <section className="max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="flex items-center justify-between py-4">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBackToPublicMaps}
                 >
-                  <Shuffle className="h-8 w-8 mb-2 text-primary" />
-                  <span className="font-medium text-sm">All Maps</span>
-                  <span className="text-xs text-muted-foreground">Random mix</span>
-                </button>
-                
-                {/* Individual Map Options */}
-                {uniqueMapNames.map(mapName => {
-                  // Find the map source to get metadata
-                  const mapSource = availableMaps.find(m => m.name === mapName);
-                  const countryCode = mapSource?.countryCode;
-                  const logoPath = mapSource?.logoPath;
-                  const isPwt = isPwtMap(mapName);
-                  const isKnivsta = mapName.toLowerCase().includes('knivsta');
-                  const isEkeby = mapName.toLowerCase().includes('ekeby');
-                  
-                  // Use flag image for reliable cross-platform display
-                  const flagImage = countryCode ? COUNTRY_FLAG_IMAGES[countryCode] : null;
-                  
-                  // Determine which logo to show
-                  const showKartkompanietLogo = isKnivsta || isEkeby;
-                  const customLogoUrl = logoPath ? `${LOGO_STORAGE_URL}/${logoPath}` : null;
-                  
-                  return (
-                    <button
-                      key={mapName}
-                      onClick={() => handleMapSelect(mapName)}
-                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                        selectedMapId === mapName
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border bg-card'
-                      }`}
-                    >
-                      {flagImage && (
-                        <img 
-                          src={flagImage} 
-                          alt={countryCode}
-                          className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm"
-                        />
-                      )}
-                      {isPwt ? (
-                        <PwtAttribution variant="badge" className="mb-2" />
-                      ) : customLogoUrl ? (
-                        <img src={customLogoUrl} alt={`${mapName} logo`} className="h-8 w-8 mb-2 object-contain rounded" />
-                      ) : showKartkompanietLogo ? (
-                        <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
-                      ) : (
-                        <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                      )}
-                      <span className="font-medium text-sm">{mapName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {mapSource?.description || 'Orienteering map'}
-                      </span>
-                    </button>
-                  );
-                })}
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+                <div>
+                  <h2 className="font-semibold">{userMapName || 'Your Map'}</h2>
+                  <p className="text-sm text-muted-foreground">Playing on your uploaded map</p>
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
-                <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-                <span>{t('noMapsAvailable')}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+      
+      {/* Map Selection - Only show for public maps */}
+      {!isUserMapMode && (
+        <section className="max-w-4xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('selectMap')}</CardTitle>
+              <CardDescription>{t('selectMapDescription')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isPreloading ? (
+                <div className="flex items-center p-4 text-sm text-muted-foreground">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary mr-2"></div>
+                  {t('loadingMaps')}
+                </div>
+              ) : uniqueMapNames.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {/* All Maps Option */}
+                  <button
+                    onClick={() => handleMapSelect('all')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                      selectedMapId === 'all'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border bg-card'
+                    }`}
+                  >
+                    <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                    <span className="font-medium text-sm">All Maps</span>
+                    <span className="text-xs text-muted-foreground">Random mix</span>
+                  </button>
+                  
+                  {/* Individual Map Options */}
+                  {uniqueMapNames.map(mapName => {
+                    // Find the map source to get metadata
+                    const mapSource = availableMaps.find(m => m.name === mapName);
+                    const countryCode = mapSource?.countryCode;
+                    const logoPath = mapSource?.logoPath;
+                    const isPwt = isPwtMap(mapName);
+                    const isKnivsta = mapName.toLowerCase().includes('knivsta');
+                    const isEkeby = mapName.toLowerCase().includes('ekeby');
+                    
+                    // Use flag image for reliable cross-platform display
+                    const flagImage = countryCode ? COUNTRY_FLAG_IMAGES[countryCode] : null;
+                    
+                    // Determine which logo to show
+                    const showKartkompanietLogo = isKnivsta || isEkeby;
+                    const customLogoUrl = logoPath ? `${LOGO_STORAGE_URL}/${logoPath}` : null;
+                    
+                    return (
+                      <button
+                        key={mapName}
+                        onClick={() => handleMapSelect(mapName)}
+                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                          selectedMapId === mapName
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border bg-card'
+                        }`}
+                      >
+                        {flagImage && (
+                          <img 
+                            src={flagImage} 
+                            alt={countryCode}
+                            className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm"
+                          />
+                        )}
+                        {isPwt ? (
+                          <PwtAttribution variant="badge" className="mb-2" />
+                        ) : customLogoUrl ? (
+                          <img src={customLogoUrl} alt={`${mapName} logo`} className="h-8 w-8 mb-2 object-contain rounded" />
+                        ) : showKartkompanietLogo ? (
+                          <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
+                        ) : (
+                          <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                        )}
+                        <span className="font-medium text-sm">{mapName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {mapSource?.description || 'Orienteering map'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">
+                  <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                  <span>{t('noMapsAvailable')}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
       
       {/* Route Selector Section */}
       {showLoadingSpinner ? (

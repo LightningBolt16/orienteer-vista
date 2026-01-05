@@ -142,6 +142,19 @@ const Header: React.FC = () => {
                   <span>{t('routeGame')}</span>
                 </Link>
                 
+                {isAuthenticated && (
+                  <Link 
+                    to="/my-maps"
+                    className={`p-3 rounded-md flex items-center space-x-2 ${
+                      isCurrentPath('/my-maps') ? 'bg-muted text-orienteering' : ''
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <FolderOpen className="h-5 w-5" />
+                    <span>{t('myMaps')}</span>
+                  </Link>
+                )}
+
                 <Link 
                   to="/profile"
                   className="p-3 rounded-md flex items-center space-x-2"
@@ -243,6 +256,14 @@ const Header: React.FC = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/profile">{t('profile')}</Link>
                   </DropdownMenuItem>
+                  {isAuthenticated && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/my-maps">
+                        <FolderOpen className="h-4 w-4 mr-2" />
+                        {t('myMaps')}
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {isAdmin && (
                     <>
                       <DropdownMenuItem asChild>
