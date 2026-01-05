@@ -1,0 +1,240 @@
+import React from 'react';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
+
+interface ProcessingParametersFormProps {
+  parameters: ProcessingParameters;
+  onChange: (parameters: ProcessingParameters) => void;
+}
+
+const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
+  parameters,
+  onChange,
+}) => {
+  const updateParam = <K extends keyof ProcessingParameters>(
+    key: K,
+    value: ProcessingParameters[K]
+  ) => {
+    onChange({ ...parameters, [key]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="point-generation">
+          <AccordionTrigger>Point Generation</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="num_random_points">
+                Random Points: {parameters.num_random_points}
+              </Label>
+              <Slider
+                id="num_random_points"
+                min={100}
+                max={5000}
+                step={100}
+                value={[parameters.num_random_points || DEFAULT_PROCESSING_PARAMETERS.num_random_points!]}
+                onValueChange={([v]) => updateParam('num_random_points', v)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of random points to generate for route finding
+              </p>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="candidate-selection">
+          <AccordionTrigger>Candidate Selection</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="candidate_min_dist">
+                Min Distance: {parameters.candidate_min_dist}m
+              </Label>
+              <Slider
+                id="candidate_min_dist"
+                min={100}
+                max={1000}
+                step={50}
+                value={[parameters.candidate_min_dist || DEFAULT_PROCESSING_PARAMETERS.candidate_min_dist!]}
+                onValueChange={([v]) => updateParam('candidate_min_dist', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="candidate_max_dist">
+                Max Distance: {parameters.candidate_max_dist}m
+              </Label>
+              <Slider
+                id="candidate_max_dist"
+                min={500}
+                max={5000}
+                step={100}
+                value={[parameters.candidate_max_dist || DEFAULT_PROCESSING_PARAMETERS.candidate_max_dist!]}
+                onValueChange={([v]) => updateParam('candidate_max_dist', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="max_candidate_pairs">Max Candidate Pairs</Label>
+              <Input
+                id="max_candidate_pairs"
+                type="number"
+                min={1000}
+                max={50000}
+                value={parameters.max_candidate_pairs || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs}
+                onChange={(e) => updateParam('max_candidate_pairs', parseInt(e.target.value) || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs)}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="output">
+          <AccordionTrigger>Output Settings</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="num_output_routes">
+                Number of Routes: {parameters.num_output_routes}
+              </Label>
+              <Slider
+                id="num_output_routes"
+                min={10}
+                max={200}
+                step={10}
+                value={[parameters.num_output_routes || DEFAULT_PROCESSING_PARAMETERS.num_output_routes!]}
+                onValueChange={([v]) => updateParam('num_output_routes', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="max_overlap_percent">
+                Max Overlap: {Math.round((parameters.max_overlap_percent || 0.2) * 100)}%
+              </Label>
+              <Slider
+                id="max_overlap_percent"
+                min={5}
+                max={50}
+                step={5}
+                value={[Math.round((parameters.max_overlap_percent || DEFAULT_PROCESSING_PARAMETERS.max_overlap_percent!) * 100)]}
+                onValueChange={([v]) => updateParam('max_overlap_percent', v / 100)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Maximum overlap between routes to ensure variety
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="batch_size">Batch Size</Label>
+              <Input
+                id="batch_size"
+                type="number"
+                min={5}
+                max={100}
+                value={parameters.batch_size || DEFAULT_PROCESSING_PARAMETERS.batch_size}
+                onChange={(e) => updateParam('batch_size', parseInt(e.target.value) || DEFAULT_PROCESSING_PARAMETERS.batch_size)}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="visuals">
+          <AccordionTrigger>Visual Settings</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="zoom_margin">Zoom Margin: {parameters.zoom_margin}px</Label>
+              <Slider
+                id="zoom_margin"
+                min={20}
+                max={200}
+                step={10}
+                value={[parameters.zoom_margin || DEFAULT_PROCESSING_PARAMETERS.zoom_margin!]}
+                onValueChange={([v]) => updateParam('zoom_margin', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="marker_radius">Marker Radius: {parameters.marker_radius}px</Label>
+              <Slider
+                id="marker_radius"
+                min={20}
+                max={100}
+                step={5}
+                value={[parameters.marker_radius || DEFAULT_PROCESSING_PARAMETERS.marker_radius!]}
+                onValueChange={([v]) => updateParam('marker_radius', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="line_width">Line Width: {parameters.line_width}px</Label>
+              <Slider
+                id="line_width"
+                min={2}
+                max={20}
+                step={1}
+                value={[parameters.line_width || DEFAULT_PROCESSING_PARAMETERS.line_width!]}
+                onValueChange={([v]) => updateParam('line_width', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="line_alpha">Line Opacity: {Math.round((parameters.line_alpha || 0.6) * 100)}%</Label>
+              <Slider
+                id="line_alpha"
+                min={20}
+                max={100}
+                step={10}
+                value={[Math.round((parameters.line_alpha || DEFAULT_PROCESSING_PARAMETERS.line_alpha!) * 100)]}
+                onValueChange={([v]) => updateParam('line_alpha', v / 100)}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="corridor">
+          <AccordionTrigger>Corridor Settings</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="corridor_base_width">Base Width: {parameters.corridor_base_width}px</Label>
+              <Slider
+                id="corridor_base_width"
+                min={20}
+                max={150}
+                step={10}
+                value={[parameters.corridor_base_width || DEFAULT_PROCESSING_PARAMETERS.corridor_base_width!]}
+                onValueChange={([v]) => updateParam('corridor_base_width', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="corridor_scale_factor">Scale Factor: {parameters.corridor_scale_factor}</Label>
+              <Slider
+                id="corridor_scale_factor"
+                min={0.1}
+                max={1}
+                step={0.1}
+                value={[parameters.corridor_scale_factor || DEFAULT_PROCESSING_PARAMETERS.corridor_scale_factor!]}
+                onValueChange={([v]) => updateParam('corridor_scale_factor', v)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="smoothing_window">Smoothing Window</Label>
+              <Input
+                id="smoothing_window"
+                type="number"
+                min={1}
+                max={20}
+                value={parameters.smoothing_window || DEFAULT_PROCESSING_PARAMETERS.smoothing_window}
+                onChange={(e) => updateParam('smoothing_window', parseInt(e.target.value) || DEFAULT_PROCESSING_PARAMETERS.smoothing_window)}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+};
+
+export default ProcessingParametersForm;
