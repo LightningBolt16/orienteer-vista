@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
 import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +25,45 @@ const UserMaps: React.FC = () => {
   const { userMaps, loading, fetchUserMaps, deleteUserMap } = useUserMaps();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
   const [deleteMapId, setDeleteMapId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchUserMaps();
     }
   }, [user, fetchUserMaps]);
+
+  // Subscribe to realtime updates for user_maps
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('user-maps-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_maps',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refetch maps when any change occurs
+          fetchUserMaps();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchUserMaps]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchUserMaps();
+    setRefreshing(false);
+  }, [fetchUserMaps]);
 
   if (userLoading) {
     return (
@@ -101,10 +135,16 @@ const UserMaps: React.FC = () => {
           <h1 className="text-2xl font-bold">My Custom Maps</h1>
           <p className="text-muted-foreground">Upload and manage your orienteering maps</p>
         </div>
-        <Button onClick={() => setShowUploadWizard(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Upload Map
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={() => setShowUploadWizard(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Upload Map
+          </Button>
+        </div>
       </div>
 
       {loading ? (
