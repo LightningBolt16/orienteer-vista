@@ -48,11 +48,11 @@ const TifFileUploader: React.FC<TifFileUploaderProps> = ({
       return false;
     }
 
-    // Max 200MB
-    if (file.size > 200 * 1024 * 1024) {
+    // Max 500MB (increased for large orienteering maps)
+    if (file.size > 500 * 1024 * 1024) {
       toast({
         title: 'File too large',
-        description: 'Maximum file size is 200MB',
+        description: 'Maximum file size is 500MB',
         variant: 'destructive',
       });
       return false;

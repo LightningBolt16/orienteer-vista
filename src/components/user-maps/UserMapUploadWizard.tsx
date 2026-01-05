@@ -175,7 +175,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>Both files must be TIF/TIFF format</li>
                 <li>Both files should have the same dimensions</li>
-                <li>Maximum file size: 200MB each</li>
+                <li>Maximum file size: 500MB each</li>
                 <li>The impassable features map should show barriers/obstacles in black</li>
               </ul>
             </div>
