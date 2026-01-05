@@ -442,3 +442,103 @@ export const getRouteData = (): RouteData[] => {
     { candidateIndex: 3, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 959.73, altRouteLength: 975.09 },
   ];
 };
+
+// Storage URL for user-uploaded route images
+const USER_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object`;
+
+/**
+ * Load routes for a user's private map (from user_maps table).
+ * These routes are stored in route_maps with source_map_id pointing to user_maps.
+ */
+export async function loadUserMapRoutes(
+  userMapId: string,
+  isMobile: boolean
+): Promise<{ routes: RouteData[]; map: MapSource | null; userMapName: string }> {
+  try {
+    // First, get the user map details
+    const { data: userMap, error: userMapError } = await supabase
+      .from('user_maps')
+      .select('id, name, status')
+      .eq('id', userMapId)
+      .single();
+
+    if (userMapError || !userMap) {
+      console.error('User map not found:', userMapError);
+      return { routes: [], map: null, userMapName: '' };
+    }
+
+    if (userMap.status !== 'completed') {
+      console.log('User map is not yet completed:', userMap.status);
+      return { routes: [], map: null, userMapName: userMap.name };
+    }
+
+    const aspect = isMobile ? '9:16' : '16:9';
+
+    // Find the route_maps entry for this user map
+    const { data: routeMap, error: routeMapError } = await supabase
+      .from('route_maps')
+      .select('id, name, description')
+      .eq('source_map_id', userMapId)
+      .single();
+
+    if (routeMapError || !routeMap) {
+      console.error('Route map not found for user map:', routeMapError);
+      return { routes: [], map: null, userMapName: userMap.name };
+    }
+
+    // Fetch route images for this map
+    const { data: routeImages, error: routeImagesError } = await supabase
+      .from('route_images')
+      .select('candidate_index, shortest_side, main_route_length, alt_route_length, image_path')
+      .eq('map_id', routeMap.id)
+      .eq('aspect_ratio', aspect)
+      .order('candidate_index');
+
+    if (routeImagesError || !routeImages || routeImages.length === 0) {
+      console.error('No route images found:', routeImagesError);
+      return { routes: [], map: null, userMapName: userMap.name };
+    }
+
+    // Check if images are in user-route-images (private) or route-images (public)
+    const firstImagePath = routeImages[0].image_path;
+    const isPrivateStorage = firstImagePath.startsWith('user-route-images/') || !firstImagePath.includes('/');
+    const bucketName = isPrivateStorage ? 'user-route-images' : 'route-images';
+
+    // Build routes with proper image URLs
+    const routes: RouteData[] = routeImages.map(route => {
+      // For private bucket, we need to construct signed URL or use public URL if bucket is public
+      const imagePath = route.image_path.startsWith(bucketName) 
+        ? route.image_path.replace(`${bucketName}/`, '')
+        : route.image_path;
+      
+      const imageUrl = `${USER_STORAGE_URL}/public/${bucketName}/${imagePath}`;
+      
+      return {
+        candidateIndex: route.candidate_index,
+        shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
+        shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
+        mainRouteLength: Number(route.main_route_length) || 0,
+        altRouteLength: Number(route.alt_route_length) || 0,
+        mapName: userMap.name,
+        imagePath: imageUrl,
+      };
+    });
+
+    // Create a MapSource for compatibility
+    const mapSource: MapSource = {
+      id: routeMap.id,
+      name: userMap.name,
+      aspect: aspect,
+      csvPath: '',
+      imagePathPrefix: '',
+      description: routeMap.description || 'User uploaded map',
+      folderName: userMap.name,
+    };
+
+    console.log(`Loaded ${routes.length} routes for user map: ${userMap.name}`);
+    return { routes, map: mapSource, userMapName: userMap.name };
+  } catch (error) {
+    console.error('Error loading user map routes:', error);
+    return { routes: [], map: null, userMapName: '' };
+  }
+}

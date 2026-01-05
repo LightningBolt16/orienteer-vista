@@ -7,7 +7,6 @@ const corsHeaders = {
 
 interface TriggerRequest {
   map_id: string;
-  modal_endpoint?: string;
 }
 
 Deno.serve(async (req) => {
@@ -43,7 +42,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { map_id, modal_endpoint }: TriggerRequest = await req.json();
+    const { map_id }: TriggerRequest = await req.json();
+    const modal_endpoint = Deno.env.get('MODAL_ENDPOINT_URL');
 
     if (!map_id) {
       return new Response(
@@ -104,9 +104,10 @@ Deno.serve(async (req) => {
 
     console.log('Job payload prepared for map:', map_id);
 
-    // If a Modal endpoint is provided, trigger it
+    // Trigger Modal processing if endpoint is configured
     if (modal_endpoint) {
       try {
+        console.log('Triggering Modal processing at:', modal_endpoint);
         const modalResponse = await fetch(modal_endpoint, {
           method: 'POST',
           headers: {
@@ -117,14 +118,14 @@ Deno.serve(async (req) => {
 
         if (!modalResponse.ok) {
           console.error('Modal trigger failed:', await modalResponse.text());
-          // Don't fail the request, just log the error
         } else {
           console.log('Modal processing triggered successfully');
         }
       } catch (modalError) {
         console.error('Failed to trigger Modal:', modalError);
-        // Don't fail the request, Modal can poll for jobs instead
       }
+    } else {
+      console.log('No MODAL_ENDPOINT_URL configured, skipping auto-trigger');
     }
 
     return new Response(

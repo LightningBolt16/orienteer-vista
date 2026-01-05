@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { supabase } from '@/integrations/supabase/client';
+import { convertTifToDataUrl } from '@/utils/tifUtils';
 
 type WizardStep = 'upload' | 'roi' | 'parameters' | 'submit';
 
@@ -36,13 +37,33 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [roiCoordinates, setRoiCoordinates] = useState<Point[]>([]);
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [colorTifPreviewUrl, setColorTifPreviewUrl] = useState<string | null>(null);
+  const [isConvertingTif, setIsConvertingTif] = useState(false);
+  const [tifConversionError, setTifConversionError] = useState<string | null>(null);
 
-  // Create object URL for color TIF preview
-  const colorTifPreviewUrl = useMemo(() => {
-    if (colorTifFile) {
-      return URL.createObjectURL(colorTifFile);
-    }
-    return null;
+  // Convert TIF to displayable image when file is selected
+  useEffect(() => {
+    const convertTif = async () => {
+      if (!colorTifFile) {
+        setColorTifPreviewUrl(null);
+        return;
+      }
+      
+      setIsConvertingTif(true);
+      setTifConversionError(null);
+      
+      try {
+        const dataUrl = await convertTifToDataUrl(colorTifFile);
+        setColorTifPreviewUrl(dataUrl);
+      } catch (error) {
+        console.error('Failed to convert TIF:', error);
+        setTifConversionError('Failed to preview TIF file. The file may be corrupted or in an unsupported format.');
+      } finally {
+        setIsConvertingTif(false);
+      }
+    };
+    
+    convertTif();
   }, [colorTifFile]);
 
   const steps: { key: WizardStep; label: string }[] = [
@@ -164,7 +185,16 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       case 'roi':
         return (
           <div className="space-y-4">
-            {colorTifPreviewUrl ? (
+            {isConvertingTif ? (
+              <div className="flex flex-col items-center justify-center h-64 bg-muted rounded-lg">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                <p className="text-muted-foreground">Converting TIF for preview...</p>
+              </div>
+            ) : tifConversionError ? (
+              <div className="flex flex-col items-center justify-center h-64 bg-destructive/10 rounded-lg p-4">
+                <p className="text-destructive text-center">{tifConversionError}</p>
+              </div>
+            ) : colorTifPreviewUrl ? (
               <ROIDrawingCanvas
                 imageUrl={colorTifPreviewUrl}
                 onComplete={setRoiCoordinates}
