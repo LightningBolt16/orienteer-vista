@@ -9,6 +9,7 @@ import TifFileUploader from './TifFileUploader';
 import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
+import { supabase } from '@/integrations/supabase/client';
 
 type WizardStep = 'upload' | 'roi' | 'parameters' | 'submit';
 
@@ -95,6 +96,20 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
     });
 
     if (result) {
+      // Trigger processing via edge function
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.functions.invoke('trigger-map-processing', {
+            body: { map_id: result.id },
+          });
+          console.log('Processing triggered for map:', result.id);
+        }
+      } catch (triggerError) {
+        console.error('Failed to trigger processing:', triggerError);
+        // Don't fail the upload, processing can be triggered manually or via polling
+      }
+
       setIsSubmitted(true);
       setTimeout(() => {
         onComplete?.();
