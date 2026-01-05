@@ -21,11 +21,11 @@ export async function uploadLargeFile({
     return { error: new Error('Not authenticated') };
   }
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
   return new Promise((resolve, reject) => {
     const upload = new tus.Upload(file, {
-      endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+      endpoint: `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`,
       retryDelays: [0, 3000, 5000, 10000, 20000],
       headers: {
         authorization: `Bearer ${accessToken}`,
