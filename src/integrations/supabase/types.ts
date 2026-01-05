@@ -326,32 +326,49 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_public: boolean | null
           logo_path: string | null
           map_type: string | null
           name: string
+          source_map_id: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           country_code?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean | null
           logo_path?: string | null
           map_type?: string | null
           name: string
+          source_map_id?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           country_code?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean | null
           logo_path?: string | null
           map_type?: string | null
           name?: string
+          source_map_id?: string | null
           updated_at?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_route_maps_source_map"
+            columns: ["source_map_id"]
+            isOneToOne: false
+            referencedRelation: "user_maps"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_map_stats: {
         Row: {
@@ -396,6 +413,48 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      user_maps: {
+        Row: {
+          bw_tif_path: string
+          color_tif_path: string
+          created_at: string
+          error_message: string | null
+          id: string
+          name: string
+          processing_parameters: Json | null
+          roi_coordinates: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bw_tif_path: string
+          color_tif_path: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          name: string
+          processing_parameters?: Json | null
+          roi_coordinates: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bw_tif_path?: string
+          color_tif_path?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          name?: string
+          processing_parameters?: Json | null
+          roi_coordinates?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_profiles: {
         Row: {
