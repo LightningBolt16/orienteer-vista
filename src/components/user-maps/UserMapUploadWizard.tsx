@@ -4,13 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Upload, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, Check, Loader2, HelpCircle } from 'lucide-react';
 import TifFileUploader from './TifFileUploader';
 import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
+import OCADInstructionsDialog from './OCADInstructionsDialog';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { supabase } from '@/integrations/supabase/client';
 import { convertTifToDataUrl } from '@/utils/tifUtils';
+
+const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
 type WizardStep = 'upload' | 'roi' | 'parameters' | 'submit';
 
@@ -40,6 +43,19 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [colorTifPreviewUrl, setColorTifPreviewUrl] = useState<string | null>(null);
   const [isConvertingTif, setIsConvertingTif] = useState(false);
   const [tifConversionError, setTifConversionError] = useState<string | null>(null);
+  const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
+
+  // Show instructions dialog for first-time users
+  useEffect(() => {
+    const hasSeenInstructions = localStorage.getItem(INSTRUCTIONS_SEEN_KEY);
+    if (!hasSeenInstructions) {
+      setShowInstructionsDialog(true);
+    }
+  }, []);
+
+  const handleInstructionsConfirm = () => {
+    localStorage.setItem(INSTRUCTIONS_SEEN_KEY, 'true');
+  };
 
   // Convert TIF to displayable image when file is selected
   useEffect(() => {
@@ -143,6 +159,19 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       case 'upload':
         return (
           <div className="space-y-6">
+            {/* Help Button */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowInstructionsDialog(true)}
+                className="gap-2"
+              >
+                <HelpCircle className="h-4 w-4" />
+                How to get TIF files from OCAD
+              </Button>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="mapName">Map Name</Label>
               <Input
@@ -173,10 +202,10 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
             <div className="text-sm text-muted-foreground bg-muted p-4 rounded-lg">
               <p className="font-medium mb-2">File Requirements:</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Both files must be TIF/TIFF format</li>
-                <li>Both files should have the same dimensions</li>
+                <li>Both files must be TIF/TIFF format exported from OCAD</li>
+                <li>Both files must be exported at <strong>508 dpi</strong> resolution</li>
+                <li>Both files should cover the same area ("Entire Map")</li>
                 <li>Maximum file size: 500MB each</li>
-                <li>The impassable features map should show barriers/obstacles in black</li>
               </ul>
             </div>
           </div>
@@ -302,13 +331,19 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   };
 
   return (
-    <Card className="w-full max-w-3xl mx-auto">
-      <CardHeader>
-        <CardTitle>Upload Custom Map</CardTitle>
-        <CardDescription>
-          Upload your orienteering map files and configure route generation
-        </CardDescription>
-      </CardHeader>
+    <>
+      <OCADInstructionsDialog
+        open={showInstructionsDialog}
+        onOpenChange={setShowInstructionsDialog}
+        onConfirm={handleInstructionsConfirm}
+      />
+      <Card className="w-full max-w-3xl mx-auto">
+        <CardHeader>
+          <CardTitle>Upload Custom Map</CardTitle>
+          <CardDescription>
+            Upload your orienteering map files and configure route generation
+          </CardDescription>
+        </CardHeader>
       <CardContent className="space-y-6">
         {/* Progress */}
         <div className="space-y-2">
@@ -349,6 +384,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
         )}
       </CardContent>
     </Card>
+    </>
   );
 };
 
