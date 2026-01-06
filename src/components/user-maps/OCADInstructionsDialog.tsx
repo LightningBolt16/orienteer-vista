@@ -86,6 +86,7 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
           </div>
 
           {/* Impassable TIF Instructions */}
+          {/* Impassable TIF Instructions */}
           <div className="space-y-3">
             <h3 className="font-semibold flex items-center gap-2">
               <span className="h-6 w-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center">2</span>
@@ -96,11 +97,7 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
                 <li>Open your map in <strong>OCAD</strong></li>
                 <li>Go to <strong>Map → Show Impassable Features</strong></li>
                 <li>The map will now display only impassable elements</li>
-                <li>Go to <strong>File → Export</strong> (or press Ctrl+E)</li>
-                <li>Select <strong>TIFF</strong> as the export format</li>
-                <li>Set <strong>Resolution to 508 dpi</strong></li>
-                <li>Select <strong>"Entire Map"</strong> for the export area</li>
-                <li>Click <strong>Export</strong> and save the file</li>
+                <li>Click <strong>Save As</strong> - this automatically saves as TIF with 508 dpi and the entire map</li>
               </ol>
             </div>
             <Button variant="outline" size="sm" onClick={handleDownloadImpassableGuide} className="gap-2">
