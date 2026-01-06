@@ -13,7 +13,7 @@ export interface RouteData {
 export interface MapSource {
   id: string;
   name: string;
-  aspect: '16:9' | '9:16';
+  aspect: '16_9' | '9_16';
   csvPath: string;
   imagePathPrefix: string;
   mapImagePath?: string;
@@ -56,8 +56,8 @@ const findCSVPath = async (folderName: string): Promise<string | null> => {
 };
 
 // Detect which naming scheme a map folder uses (fallback)
-const detectNamingScheme = async (folderName: string, aspect: '16:9' | '9:16'): Promise<'candidate' | 'route' | null> => {
-  const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
+const detectNamingScheme = async (folderName: string, aspect: '16_9' | '9_16'): Promise<'candidate' | 'route' | null> => {
+  const aspectFolder = aspect;
   
   try {
     const candidateResponse = await fetch(`/maps/${folderName}/${aspectFolder}/candidate_1.png`, { method: 'HEAD' });
@@ -86,25 +86,25 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
 
       for (const dbMap of dbMaps) {
         // Check if routes exist for this map in both aspects
-        const { data: routes16_9 } = await supabase
-          .from('route_images')
-          .select('id')
-          .eq('map_id', dbMap.id)
-          .eq('aspect_ratio', '16:9')
-          .limit(1);
+      const { data: routes16_9 } = await supabase
+        .from('route_images')
+        .select('id')
+        .eq('map_id', dbMap.id)
+        .eq('aspect_ratio', '16_9')
+        .limit(1);
 
-        const { data: routes9_16 } = await supabase
-          .from('route_images')
-          .select('id')
-          .eq('map_id', dbMap.id)
-          .eq('aspect_ratio', '9:16')
-          .limit(1);
+      const { data: routes9_16 } = await supabase
+        .from('route_images')
+        .select('id')
+        .eq('map_id', dbMap.id)
+        .eq('aspect_ratio', '9_16')
+        .limit(1);
 
-        if (routes16_9 && routes16_9.length > 0) {
+      if (routes16_9 && routes16_9.length > 0) {
           mapSources.push({
             id: `${dbMap.id}-landscape`,
             name: dbMap.name,
-            aspect: '16:9',
+            aspect: '16_9',
             csvPath: '', // Not used for database routes
             imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/16_9/candidate_`,
             folderName: dbMap.name,
@@ -115,11 +115,11 @@ export const getAvailableMaps = async (): Promise<MapSource[]> => {
           });
         }
 
-        if (routes9_16 && routes9_16.length > 0) {
+      if (routes9_16 && routes9_16.length > 0) {
           mapSources.push({
             id: `${dbMap.id}-portrait`,
             name: dbMap.name,
-            aspect: '9:16',
+            aspect: '9_16',
             csvPath: '',
             imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/9_16/candidate_`,
             folderName: dbMap.name,
@@ -157,14 +157,14 @@ const getLocalMaps = async (): Promise<MapSource[]> => {
       continue;
     }
     
-    const landscapeScheme = await detectNamingScheme(folderName, '16:9');
+    const landscapeScheme = await detectNamingScheme(folderName, '16_9');
     if (landscapeScheme) {
       const prefix = landscapeScheme === 'candidate' ? 'candidate_' : 'route_';
-      cacheNamingScheme(folderName, '16:9', landscapeScheme);
+      cacheNamingScheme(folderName, '16_9', landscapeScheme);
       mapSources.push({
         id: `${folderName.toLowerCase()}-landscape`,
         name: folderName,
-        aspect: '16:9',
+        aspect: '16_9',
         csvPath,
         imagePathPrefix: `/maps/${folderName}/16_9/${prefix}`,
         folderName,
@@ -172,14 +172,14 @@ const getLocalMaps = async (): Promise<MapSource[]> => {
       });
     }
     
-    const portraitScheme = await detectNamingScheme(folderName, '9:16');
+    const portraitScheme = await detectNamingScheme(folderName, '9_16');
     if (portraitScheme) {
       const prefix = portraitScheme === 'candidate' ? 'candidate_' : 'route_';
-      cacheNamingScheme(folderName, '9:16', portraitScheme);
+      cacheNamingScheme(folderName, '9_16', portraitScheme);
       mapSources.push({
         id: `${folderName.toLowerCase()}-portrait`,
         name: folderName,
-        aspect: '9:16',
+        aspect: '9_16',
         csvPath,
         imagePathPrefix: `/maps/${folderName}/9_16/${prefix}`,
         folderName,
@@ -270,8 +270,8 @@ const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
 };
 
 // Check if a specific route image exists (tries both naming schemes) - for local fallback
-const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16:9' | '9:16', namingScheme?: 'candidate' | 'route'): Promise<boolean> => {
-  const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
+const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16_9' | '9_16', namingScheme?: 'candidate' | 'route'): Promise<boolean> => {
+  const aspectFolder = aspect;
   
   if (namingScheme === 'route') {
     const imagePath = `/maps/${mapName}/${aspectFolder}/route_${candidateIndex}.png`;
@@ -360,7 +360,7 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
 export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: RouteData[]; maps: MapSource[] }> => {
   try {
     const allMaps = await getAvailableMaps();
-    const aspect = isMobile ? '9:16' : '16:9';
+    const aspect = isMobile ? '9_16' : '16_9';
     const filteredMaps = allMaps.filter(map => map.aspect === aspect);
     
     console.log(`Fetching all routes for ${filteredMaps.length} maps`);
@@ -423,9 +423,8 @@ export const getImageUrlByMapName = (mapName: string, candidateIndex: number, is
 };
 
 // Initialize naming scheme cache for a map
-export const cacheNamingScheme = (mapName: string, aspect: '16:9' | '9:16', scheme: 'candidate' | 'route'): void => {
-  const aspectFolder = aspect === '16:9' ? '16_9' : '9_16';
-  namingSchemeCache.set(`${mapName}-${aspectFolder}`, scheme);
+export const cacheNamingScheme = (mapName: string, aspect: '16_9' | '9_16', scheme: 'candidate' | 'route'): void => {
+  namingSchemeCache.set(`${mapName}-${aspect}`, scheme);
 };
 
 // Get unique map names from available maps
@@ -472,7 +471,7 @@ export async function loadUserMapRoutes(
       return { routes: [], map: null, userMapName: userMap.name };
     }
 
-    const aspect = isMobile ? '9:16' : '16:9';
+    const aspect = isMobile ? '9_16' : '16_9';
 
     // Find the route_maps entry for this user map
     const { data: routeMap, error: routeMapError } = await supabase

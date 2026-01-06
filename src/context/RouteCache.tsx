@@ -31,7 +31,7 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const allMaps = await getAvailableMaps();
         
         // Load desktop routes (16:9)
-        const desktopMaps = allMaps.filter(map => map.aspect === '16:9');
+        const desktopMaps = allMaps.filter(map => map.aspect === '16_9');
         const desktopRoutes: RouteData[] = [];
         for (const mapSource of desktopMaps) {
           const routes = await fetchRouteDataForMap(mapSource);
@@ -45,7 +45,7 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.log(`Preloaded ${desktopRoutes.length} desktop routes`);
 
         // Load mobile routes (9:16)
-        const mobileMaps = allMaps.filter(map => map.aspect === '9:16');
+        const mobileMaps = allMaps.filter(map => map.aspect === '9_16');
         const mobileRoutes: RouteData[] = [];
         for (const mapSource of mobileMaps) {
           const routes = await fetchRouteDataForMap(mapSource);
@@ -77,7 +77,7 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!cache) {
       // If cache not ready, fetch directly
       const allMaps = await getAvailableMaps();
-      const aspect = isMobile ? '9:16' : '16:9';
+      const aspect = isMobile ? '9_16' : '16_9';
       const filteredMaps = allMaps.filter(map => map.aspect === aspect);
       
       const allRoutes: RouteData[] = [];
