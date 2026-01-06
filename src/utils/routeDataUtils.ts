@@ -27,6 +27,7 @@ export interface MapSource {
 
 // Supabase storage URL for route images
 const STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/route-images`;
+const USER_ROUTE_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/user-route-images`;
 
 // Fallback local map folders (used when database is empty)
 const MAP_FOLDER_NAMES = ['Rotondella', 'Matera'];
@@ -307,15 +308,22 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
       if (!error && dbRoutes && dbRoutes.length > 0) {
         console.log(`Loaded ${dbRoutes.length} routes from database for ${mapSource.name} (${mapSource.aspect})`);
         
-        return dbRoutes.map(route => ({
-          candidateIndex: route.candidate_index,
-          shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
-          shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
-          mainRouteLength: Number(route.main_route_length) || 0,
-          altRouteLength: Number(route.alt_route_length) || 0,
-          mapName: mapSource.name,
-          imagePath: `${STORAGE_URL}/${route.image_path}`,
-        }));
+        return dbRoutes.map(route => {
+          // User maps have paths like "userId/mapId/aspect/file.webp"
+          // Admin maps have paths like "mapname/aspect/file.webp"
+          const isUserMap = route.image_path.split('/').length > 3;
+          const baseUrl = isUserMap ? USER_ROUTE_STORAGE_URL : STORAGE_URL;
+          
+          return {
+            candidateIndex: route.candidate_index,
+            shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
+            shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
+            mainRouteLength: Number(route.main_route_length) || 0,
+            altRouteLength: Number(route.alt_route_length) || 0,
+            mapName: mapSource.name,
+            imagePath: `${baseUrl}/${route.image_path}`,
+          };
+        });
       }
     }
 
