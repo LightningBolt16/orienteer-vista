@@ -143,7 +143,7 @@ const RouteGame: React.FC = () => {
         setAllMapsForRoutes(maps);
         
         if (selectedMapId !== 'all') {
-          const aspect = isMobile ? '9:16' : '16:9';
+          const aspect = isMobile ? '9_16' : '16_9';
           const mapSource = maps.find(m => m.name === selectedMapId && m.aspect === aspect);
           setSelectedMap(mapSource || null);
         } else {
