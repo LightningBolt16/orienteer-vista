@@ -110,7 +110,7 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 };
 
-export const useRouteCache = () => {
+export const useRouteCache = (): RouteCacheContextType => {
   const context = useContext(RouteCacheContext);
   if (context === undefined) {
     throw new Error('useRouteCache must be used within a RouteCacheProvider');
