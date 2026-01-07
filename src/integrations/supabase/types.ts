@@ -422,6 +422,7 @@ export type Database = {
           error_message: string | null
           id: string
           is_tiled: boolean | null
+          last_activity_at: string | null
           name: string
           processing_parameters: Json | null
           roi_coordinates: Json
@@ -437,6 +438,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           is_tiled?: boolean | null
+          last_activity_at?: string | null
           name: string
           processing_parameters?: Json | null
           roi_coordinates: Json
@@ -452,6 +454,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           is_tiled?: boolean | null
+          last_activity_at?: string | null
           name?: string
           processing_parameters?: Json | null
           roi_coordinates?: Json
