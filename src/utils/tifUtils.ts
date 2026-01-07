@@ -77,13 +77,9 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
   
   const width = image.getWidth();
   const height = image.getHeight();
+  const samplesPerPixel = image.getSamplesPerPixel();
   
-  // Use readRGB() - automatically handles palette, CMYK, YCbCr, CIELab, etc.
-  const rgb = await image.readRGB({ interleave: true }) as Uint8Array;
-  
-  if (!rgb || rgb.length === 0) {
-    throw new Error('Failed to read TIF pixel data - file may be corrupted or unsupported');
-  }
+  console.log(`TIF: ${width}x${height}, ${samplesPerPixel} samples/pixel`);
   
   // Create an offscreen canvas
   const canvas = document.createElement('canvas');
@@ -95,21 +91,65 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
     throw new Error('Could not get canvas context');
   }
   
-  // Create ImageData
+  // Try readRGB first, fall back to readRasters if it fails
+  try {
+    const rgb = await image.readRGB({ interleave: true }) as Uint8Array;
+    
+    if (rgb && rgb.length > 0) {
+      const imageData = ctx.createImageData(width, height);
+      const data = imageData.data;
+      
+      for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
+        data[j] = rgb[i];
+        data[j + 1] = rgb[i + 1];
+        data[j + 2] = rgb[i + 2];
+        data[j + 3] = 255;
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+      console.log('TIF loaded via geotiff.js readRGB');
+      return canvas.toDataURL('image/jpeg', 0.9);
+    }
+  } catch (rgbError) {
+    console.warn('readRGB failed, trying readRasters:', rgbError);
+  }
+  
+  // Fallback: Use readRasters which is more lenient
+  const rasters = await image.readRasters({ interleave: true }) as Uint8Array;
+  
+  if (!rasters || rasters.length === 0) {
+    throw new Error('Failed to read TIF pixel data - file may be corrupted or unsupported');
+  }
+  
   const imageData = ctx.createImageData(width, height);
   const data = imageData.data;
+  const pixelCount = width * height;
   
-  // RGB data is interleaved: [R,G,B,R,G,B,...]
-  for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
-    data[j] = rgb[i];         // R
-    data[j + 1] = rgb[i + 1]; // G
-    data[j + 2] = rgb[i + 2]; // B
-    data[j + 3] = 255;        // A
+  if (samplesPerPixel >= 3) {
+    // RGB or RGBA
+    for (let i = 0; i < pixelCount; i++) {
+      const srcIdx = i * samplesPerPixel;
+      const dstIdx = i * 4;
+      data[dstIdx] = rasters[srcIdx];
+      data[dstIdx + 1] = rasters[srcIdx + 1];
+      data[dstIdx + 2] = rasters[srcIdx + 2];
+      data[dstIdx + 3] = samplesPerPixel >= 4 ? rasters[srcIdx + 3] : 255;
+    }
+  } else if (samplesPerPixel === 1) {
+    // Grayscale
+    for (let i = 0; i < pixelCount; i++) {
+      const val = rasters[i];
+      const dstIdx = i * 4;
+      data[dstIdx] = val;
+      data[dstIdx + 1] = val;
+      data[dstIdx + 2] = val;
+      data[dstIdx + 3] = 255;
+    }
+  } else {
+    throw new Error(`Unsupported samples per pixel: ${samplesPerPixel}`);
   }
   
   ctx.putImageData(imageData, 0, 0);
-  
-  console.log('TIF loaded via geotiff.js');
-  // Convert to data URL (use JPEG for smaller size with photos/maps)
+  console.log('TIF loaded via geotiff.js readRasters');
   return canvas.toDataURL('image/jpeg', 0.9);
 }
