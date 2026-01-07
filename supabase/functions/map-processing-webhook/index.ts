@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { Resend } from 'npm:resend@2.0.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,76 @@ interface ProcessingUpdate {
   status: 'processing' | 'completed' | 'failed'
   error_message?: string
   route_count?: number
+}
+
+// Helper function to send email notification
+async function sendMapProcessingEmail(
+  userEmail: string,
+  userName: string,
+  mapName: string,
+  status: 'completed' | 'failed',
+  routeCount?: number,
+  errorMessage?: string
+) {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY')
+  if (!resendApiKey) {
+    console.log('RESEND_API_KEY not configured, skipping email notification')
+    return
+  }
+
+  const resend = new Resend(resendApiKey)
+
+  const isSuccess = status === 'completed'
+  const subject = isSuccess 
+    ? `Your map "${mapName}" is ready!` 
+    : `Map processing failed for "${mapName}"`
+
+  const html = isSuccess
+    ? `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #16a34a;">🎉 Your Map is Ready!</h1>
+        <p>Hi ${userName},</p>
+        <p>Great news! Your map <strong>"${mapName}"</strong> has been processed successfully.</p>
+        <p><strong>${routeCount || 0} route choices</strong> have been generated and are ready for practice.</p>
+        <p>
+          <a href="https://ljungdell.uk/route-game" 
+             style="display: inline-block; background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
+            Start Practicing
+          </a>
+        </p>
+        <p style="margin-top: 24px; color: #666;">Happy orienteering!</p>
+        <p style="color: #666;">— The Ljungdell.uk Team</p>
+      </div>
+    `
+    : `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #dc2626;">⚠️ Map Processing Failed</h1>
+        <p>Hi ${userName},</p>
+        <p>Unfortunately, we encountered an issue processing your map <strong>"${mapName}"</strong>.</p>
+        ${errorMessage ? `<p style="background-color: #fef2f2; padding: 12px; border-radius: 6px; color: #991b1b;">${errorMessage}</p>` : ''}
+        <p>Please try uploading your map again. Make sure the TIF files are valid OCAD exports with proper color and black/white versions.</p>
+        <p>
+          <a href="https://ljungdell.uk/my-maps" 
+             style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
+            Try Again
+          </a>
+        </p>
+        <p style="margin-top: 24px; color: #666;">If the problem persists, please contact support.</p>
+        <p style="color: #666;">— The Ljungdell.uk Team</p>
+      </div>
+    `
+
+  try {
+    const emailResponse = await resend.emails.send({
+      from: 'Ljungdell.uk <noreply@ljungdell.uk>',
+      to: [userEmail],
+      subject,
+      html,
+    })
+    console.log('Email notification sent:', emailResponse)
+  } catch (error) {
+    console.error('Failed to send email notification:', error)
+  }
 }
 
 Deno.serve(async (req) => {
@@ -170,9 +241,85 @@ Deno.serve(async (req) => {
         })
         .eq('id', map_id)
 
+      // Get user email for notification
+      const { data: authUser } = await supabase.auth.admin.getUserById(userMap.user_id)
+      if (authUser?.user?.email) {
+        // Get user profile for name
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('name')
+          .eq('user_id', userMap.user_id)
+          .single()
+        
+        await sendMapProcessingEmail(
+          authUser.user.email,
+          profile?.name || 'Orienteer',
+          userMap.name,
+          'completed',
+          route_count
+        )
+      }
+
       console.log('Map processing completed successfully')
       return new Response(
         JSON.stringify({ success: true, route_map_id: routeMap.id, route_count }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (req.method === 'POST' && action === 'failed') {
+      // Handle failed processing and send notification
+      const body = await req.json()
+      const { map_id, error_message } = body
+      console.log('Map processing failed:', map_id, error_message)
+
+      // Get the user_map details
+      const { data: userMap, error: fetchError } = await supabase
+        .from('user_maps')
+        .select('*')
+        .eq('id', map_id)
+        .single()
+
+      if (fetchError || !userMap) {
+        console.error('Error fetching user map:', fetchError)
+        return new Response(
+          JSON.stringify({ error: 'Map not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Update status to failed
+      await supabase
+        .from('user_maps')
+        .update({
+          status: 'failed',
+          error_message: error_message || 'Unknown error',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', map_id)
+
+      // Get user email for notification
+      const { data: authUser } = await supabase.auth.admin.getUserById(userMap.user_id)
+      if (authUser?.user?.email) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('name')
+          .eq('user_id', userMap.user_id)
+          .single()
+        
+        await sendMapProcessingEmail(
+          authUser.user.email,
+          profile?.name || 'Orienteer',
+          userMap.name,
+          'failed',
+          undefined,
+          error_message
+        )
+      }
+
+      console.log('Map processing failure recorded')
+      return new Response(
+        JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
