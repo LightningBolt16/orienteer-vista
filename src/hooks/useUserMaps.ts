@@ -2,9 +2,9 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { toast } from '@/components/ui/use-toast';
-import { uploadLargeFile } from '@/utils/resumableUpload';
+import { calculateTileGrid, splitTifIntoTiles, needsSplitting, TileConfig } from '@/utils/tifSplitter';
 
-const CHUNK_THRESHOLD = 50 * 1024 * 1024; // 50MB - use resumable upload above this
+const TILE_THRESHOLD = 50 * 1024 * 1024; // 50MB - split into tiles above this
 
 export interface UserMap {
   id: string;
@@ -16,6 +16,8 @@ export interface UserMap {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error_message: string | null;
   processing_parameters: ProcessingParameters;
+  is_tiled?: boolean;
+  tile_grid?: TileConfig | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +62,7 @@ interface UploadData {
   bwTifFile: File;
   roiCoordinates: { x: number; y: number }[];
   processingParameters?: ProcessingParameters;
+  dimensions?: { width: number; height: number };
 }
 
 export function useUserMaps() {
@@ -123,20 +126,70 @@ export function useUserMaps() {
     setUploading(true);
     try {
       const sanitizedName = data.name.replace(/[^a-zA-Z0-9-_]/g, '_');
-      const colorPath = `${user.id}/${sanitizedName}/color.tif`;
-      const bwPath = `${user.id}/${sanitizedName}/bw.tif`;
+      const basePath = `${user.id}/${sanitizedName}`;
+      
+      // Check if files need to be split into tiles
+      const maxFileSize = Math.max(data.colorTifFile.size, data.bwTifFile.size);
+      const shouldSplit = needsSplitting(maxFileSize);
+      
+      let colorPath = `${basePath}/color.tif`;
+      let bwPath = `${basePath}/bw.tif`;
+      let tileGrid: TileConfig | null = null;
 
-      // Upload color TIF
-      if (data.colorTifFile.size > CHUNK_THRESHOLD) {
-        console.log('Using resumable upload for color TIF:', data.colorTifFile.size);
-        const result = await uploadLargeFile({
-          bucketName: 'user-map-sources',
-          fileName: colorPath,
-          file: data.colorTifFile,
-          onProgress: (pct) => console.log(`Color TIF upload: ${pct}%`),
-        });
-        if ('error' in result) throw new Error(`Failed to upload color TIF: ${result.error.message}`);
-      } else {
+      if (shouldSplit && data.dimensions) {
+        // Calculate tile grid - SAME config for both files!
+        tileGrid = calculateTileGrid(
+          data.dimensions.width,
+          data.dimensions.height,
+          maxFileSize
+        );
+
+        if (tileGrid) {
+          console.log(`Splitting files into ${tileGrid.rows}x${tileGrid.cols} tiles`);
+          
+          // Split and upload color tiles
+          console.log('Splitting color TIF...');
+          const colorTiles = await splitTifIntoTiles(data.colorTifFile, tileGrid, (current, total) => {
+            console.log(`Color tile ${current}/${total}`);
+          });
+
+          console.log('Uploading color tiles...');
+          for (const tile of colorTiles) {
+            const tilePath = `${basePath}/color_tile_${tile.row}_${tile.col}.png`;
+            const { error } = await supabase.storage
+              .from('user-map-sources')
+              .upload(tilePath, tile.blob, {
+                cacheControl: '3600',
+                upsert: true,
+              });
+            if (error) throw new Error(`Failed to upload color tile ${tile.row}_${tile.col}: ${error.message}`);
+          }
+          colorPath = `${basePath}/color_tiles`; // Directory marker
+
+          // Split and upload B&W tiles using SAME config
+          console.log('Splitting B&W TIF...');
+          const bwTiles = await splitTifIntoTiles(data.bwTifFile, tileGrid, (current, total) => {
+            console.log(`B&W tile ${current}/${total}`);
+          });
+
+          console.log('Uploading B&W tiles...');
+          for (const tile of bwTiles) {
+            const tilePath = `${basePath}/bw_tile_${tile.row}_${tile.col}.png`;
+            const { error } = await supabase.storage
+              .from('user-map-sources')
+              .upload(tilePath, tile.blob, {
+                cacheControl: '3600',
+                upsert: true,
+              });
+            if (error) throw new Error(`Failed to upload B&W tile ${tile.row}_${tile.col}: ${error.message}`);
+          }
+          bwPath = `${basePath}/bw_tiles`; // Directory marker
+        }
+      }
+      
+      // Non-tiled upload (files under threshold)
+      if (!tileGrid) {
+        // Upload color TIF
         const { error: colorError } = await supabase.storage
           .from('user-map-sources')
           .upload(colorPath, data.colorTifFile, {
@@ -144,19 +197,8 @@ export function useUserMaps() {
             upsert: true,
           });
         if (colorError) throw new Error(`Failed to upload color TIF: ${colorError.message}`);
-      }
 
-      // Upload B&W TIF
-      if (data.bwTifFile.size > CHUNK_THRESHOLD) {
-        console.log('Using resumable upload for B&W TIF:', data.bwTifFile.size);
-        const result = await uploadLargeFile({
-          bucketName: 'user-map-sources',
-          fileName: bwPath,
-          file: data.bwTifFile,
-          onProgress: (pct) => console.log(`B&W TIF upload: ${pct}%`),
-        });
-        if ('error' in result) throw new Error(`Failed to upload B&W TIF: ${result.error.message}`);
-      } else {
+        // Upload B&W TIF
         const { error: bwError } = await supabase.storage
           .from('user-map-sources')
           .upload(bwPath, data.bwTifFile, {
@@ -166,7 +208,7 @@ export function useUserMaps() {
         if (bwError) throw new Error(`Failed to upload B&W TIF: ${bwError.message}`);
       }
 
-      // Create database record using any to bypass strict typing for new table
+      // Create database record
       const insertData = {
         user_id: user.id,
         name: data.name,
@@ -175,6 +217,8 @@ export function useUserMaps() {
         roi_coordinates: data.roiCoordinates as unknown,
         processing_parameters: (data.processingParameters || DEFAULT_PROCESSING_PARAMETERS) as unknown,
         status: 'pending',
+        is_tiled: tileGrid !== null,
+        tile_grid: tileGrid as unknown,
       };
 
       const { data: mapRecord, error: dbError } = await supabase
@@ -195,6 +239,8 @@ export function useUserMaps() {
         processing_parameters: mapRecord.processing_parameters as ProcessingParameters,
         status: mapRecord.status as UserMap['status'],
         error_message: mapRecord.error_message,
+        is_tiled: mapRecord.is_tiled,
+        tile_grid: mapRecord.tile_grid as TileConfig | null,
         created_at: mapRecord.created_at,
         updated_at: mapRecord.updated_at,
       };
@@ -203,7 +249,9 @@ export function useUserMaps() {
       
       toast({
         title: 'Success',
-        description: 'Map uploaded successfully! Processing will begin shortly.',
+        description: tileGrid 
+          ? `Map uploaded in ${tileGrid.rows * tileGrid.cols} tiles! Processing will begin shortly.`
+          : 'Map uploaded successfully! Processing will begin shortly.',
       });
 
       return userMap;

@@ -421,10 +421,12 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          is_tiled: boolean | null
           name: string
           processing_parameters: Json | null
           roi_coordinates: Json
           status: string
+          tile_grid: Json | null
           updated_at: string
           user_id: string
         }
@@ -434,10 +436,12 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          is_tiled?: boolean | null
           name: string
           processing_parameters?: Json | null
           roi_coordinates: Json
           status?: string
+          tile_grid?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -447,10 +451,12 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          is_tiled?: boolean | null
           name?: string
           processing_parameters?: Json | null
           roi_coordinates?: Json
           status?: string
+          tile_grid?: Json | null
           updated_at?: string
           user_id?: string
         }

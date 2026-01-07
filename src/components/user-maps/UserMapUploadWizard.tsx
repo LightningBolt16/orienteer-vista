@@ -4,14 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Upload, Check, Loader2, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Upload, Check, Loader2, HelpCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import TifFileUploader from './TifFileUploader';
 import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
 import OCADInstructionsDialog from './OCADInstructionsDialog';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { supabase } from '@/integrations/supabase/client';
-import { convertTifToDataUrl } from '@/utils/tifUtils';
+import { convertTifToDataUrl, getTifDimensions } from '@/utils/tifUtils';
+import { needsSplitting } from '@/utils/tifSplitter';
 
 const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
@@ -20,6 +21,11 @@ type WizardStep = 'upload' | 'roi' | 'parameters' | 'submit';
 interface Point {
   x: number;
   y: number;
+}
+
+interface TifDimensions {
+  width: number;
+  height: number;
 }
 
 interface UserMapUploadWizardProps {
@@ -45,6 +51,12 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [tifConversionError, setTifConversionError] = useState<string | null>(null);
   const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
 
+  // Dimension validation state
+  const [colorDimensions, setColorDimensions] = useState<TifDimensions | null>(null);
+  const [bwDimensions, setBwDimensions] = useState<TifDimensions | null>(null);
+  const [isValidatingDimensions, setIsValidatingDimensions] = useState(false);
+  const [dimensionMismatch, setDimensionMismatch] = useState<string | null>(null);
+
   // Show instructions dialog for first-time users
   useEffect(() => {
     const hasSeenInstructions = localStorage.getItem(INSTRUCTIONS_SEEN_KEY);
@@ -56,6 +68,44 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const handleInstructionsConfirm = () => {
     localStorage.setItem(INSTRUCTIONS_SEEN_KEY, 'true');
   };
+
+  // Validate dimensions when both files are selected
+  useEffect(() => {
+    const validateDimensions = async () => {
+      if (!colorTifFile || !bwTifFile) {
+        setDimensionMismatch(null);
+        setColorDimensions(null);
+        setBwDimensions(null);
+        return;
+      }
+
+      setIsValidatingDimensions(true);
+      setDimensionMismatch(null);
+
+      try {
+        const [colorDims, bwDims] = await Promise.all([
+          getTifDimensions(colorTifFile),
+          getTifDimensions(bwTifFile),
+        ]);
+
+        setColorDimensions(colorDims);
+        setBwDimensions(bwDims);
+
+        if (colorDims.width !== bwDims.width || colorDims.height !== bwDims.height) {
+          setDimensionMismatch(
+            `Dimension mismatch! Color: ${colorDims.width}×${colorDims.height}, B&W: ${bwDims.width}×${bwDims.height}. Files must have identical pixel dimensions.`
+          );
+        }
+      } catch (error) {
+        console.error('Failed to validate dimensions:', error);
+        setDimensionMismatch('Failed to read file dimensions. Please check your TIF files.');
+      } finally {
+        setIsValidatingDimensions(false);
+      }
+    };
+
+    validateDimensions();
+  }, [colorTifFile, bwTifFile]);
 
   // Convert TIF to displayable image when file is selected
   useEffect(() => {
@@ -95,7 +145,15 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const canProceed = () => {
     switch (step) {
       case 'upload':
-        return mapName.trim().length > 0 && colorTifFile && bwTifFile;
+        return (
+          mapName.trim().length > 0 &&
+          colorTifFile &&
+          bwTifFile &&
+          !isValidatingDimensions &&
+          !dimensionMismatch &&
+          colorDimensions !== null &&
+          bwDimensions !== null
+        );
       case 'roi':
         return roiCoordinates.length >= 3;
       case 'parameters':
@@ -122,7 +180,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!colorTifFile || !bwTifFile || roiCoordinates.length < 3) return;
+    if (!colorTifFile || !bwTifFile || roiCoordinates.length < 3 || !colorDimensions) return;
 
     const result = await uploadUserMap({
       name: mapName,
@@ -130,6 +188,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       bwTifFile,
       roiCoordinates,
       processingParameters: parameters,
+      dimensions: colorDimensions,
     });
 
     if (result) {
@@ -199,12 +258,54 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
               />
             </div>
 
+            {/* Dimension Validation Status */}
+            {colorTifFile && bwTifFile && (
+              <div className={`p-4 rounded-lg border ${
+                isValidatingDimensions 
+                  ? 'bg-muted border-border'
+                  : dimensionMismatch 
+                    ? 'bg-destructive/10 border-destructive/30'
+                    : 'bg-green-500/10 border-green-500/30'
+              }`}>
+                {isValidatingDimensions ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Validating dimensions...</span>
+                  </div>
+                ) : dimensionMismatch ? (
+                  <div className="flex items-start gap-2 text-destructive">
+                    <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Dimension Mismatch</p>
+                      <p className="text-xs mt-1">{dimensionMismatch}</p>
+                    </div>
+                  </div>
+                ) : colorDimensions ? (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <div>
+                      <p className="text-sm font-medium">Dimensions Validated</p>
+                      <p className="text-xs mt-0.5">
+                        Both files: {colorDimensions.width.toLocaleString()} × {colorDimensions.height.toLocaleString()} pixels
+                        {needsSplitting(Math.max(colorTifFile.size, bwTifFile.size)) && (
+                          <span className="ml-2 text-amber-600 dark:text-amber-400">
+                            (Files will be split into tiles for upload)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             <div className="text-sm text-muted-foreground bg-muted p-4 rounded-lg">
               <p className="font-medium mb-2">File Requirements:</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>Both files must be TIF/TIFF format exported from OCAD</li>
                 <li>Both files must be exported at <strong>508 dpi</strong> resolution</li>
                 <li>Both files should cover the same area ("Entire Map")</li>
+                <li><strong>Both files must have identical pixel dimensions</strong></li>
                 <li>Maximum file size: 500MB each</li>
               </ul>
             </div>

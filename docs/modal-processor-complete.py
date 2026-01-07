@@ -95,6 +95,48 @@ def process_map(job_payload: dict):
         print(f"Downloaded {local_path}")
         return local_path
     
+    def download_and_stitch_tiles(tile_urls: list, grid_config: dict, output_path: str) -> str:
+        """
+        Download tiles and stitch them back into a single image.
+        Uses identical grid configuration that was used for splitting.
+        """
+        rows = grid_config["rows"]
+        cols = grid_config["cols"]
+        tile_w = grid_config["tileWidth"]
+        tile_h = grid_config["tileHeight"]
+        orig_w = grid_config["originalWidth"]
+        orig_h = grid_config["originalHeight"]
+        
+        print(f"Stitching {len(tile_urls)} tiles into {orig_w}x{orig_h} image...")
+        
+        # Create empty canvas at original dimensions
+        result = Image.new("RGB", (orig_w, orig_h))
+        
+        # Create temp directory for tiles
+        os.makedirs("/tmp/tiles", exist_ok=True)
+        
+        # Download and paste each tile in row-major order
+        idx = 0
+        for row in range(rows):
+            for col in range(cols):
+                tile_path = f"/tmp/tiles/tile_{row}_{col}.png"
+                download_file(tile_urls[idx], tile_path)
+                tile_img = Image.open(tile_path).convert("RGB")
+                
+                x = col * tile_w
+                y = row * tile_h
+                result.paste(tile_img, (x, y))
+                
+                # Clean up tile after pasting
+                os.remove(tile_path)
+                idx += 1
+        
+        # Save stitched result
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        result.save(output_path)
+        print(f"Stitched image saved to {output_path}")
+        return output_path
+    
     def update_status(status: str, message: str = None, error: str = None):
         """Send status update to webhook."""
         webhook_url = job_payload["webhook_url"]
@@ -187,10 +229,30 @@ def process_map(job_payload: dict):
     
     try:
         # =============================================================================
-        # DOWNLOAD FILES
+        # DOWNLOAD FILES (with tile stitching support)
         # =============================================================================
-        color_image_path = download_file(job_payload["color_tif_url"], "/tmp/input/color.tif")
-        bw_image_path = download_file(job_payload["bw_tif_url"], "/tmp/input/bw.tif")
+        is_tiled = job_payload.get("is_tiled", False)
+        
+        if is_tiled:
+            # Tiled upload - download and stitch tiles
+            tile_grid = job_payload["tile_grid"]
+            print(f"Processing tiled upload: {tile_grid['rows']}x{tile_grid['cols']} grid")
+            update_status("processing", "Downloading and stitching color tiles...")
+            color_image_path = download_and_stitch_tiles(
+                job_payload["color_tile_urls"],
+                tile_grid,
+                "/tmp/input/color.tif"
+            )
+            update_status("processing", "Downloading and stitching B&W tiles...")
+            bw_image_path = download_and_stitch_tiles(
+                job_payload["bw_tile_urls"],
+                tile_grid,
+                "/tmp/input/bw.tif"
+            )
+        else:
+            # Single file upload - direct download
+            color_image_path = download_file(job_payload["color_tif_url"], "/tmp/input/color.tif")
+            bw_image_path = download_file(job_payload["bw_tif_url"], "/tmp/input/bw.tif")
         
         # =============================================================================
         # CONVERT ROI FROM JSON TO NUMPY ARRAY
