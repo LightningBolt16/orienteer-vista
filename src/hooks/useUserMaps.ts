@@ -2,9 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { toast } from '@/components/ui/use-toast';
-import { calculateTileGrid, splitTifIntoTiles, needsSplitting, TileConfig } from '@/utils/tifSplitter';
-
-const TILE_THRESHOLD = 50 * 1024 * 1024; // 50MB - split into tiles above this
+import { uploadMapFilesToR2 } from '@/utils/r2Upload';
 
 export interface UserMap {
   id: string;
@@ -16,8 +14,9 @@ export interface UserMap {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error_message: string | null;
   processing_parameters: ProcessingParameters;
-  is_tiled?: boolean;
-  tile_grid?: TileConfig | null;
+  storage_provider?: 'supabase' | 'r2';
+  r2_color_key?: string | null;
+  r2_bw_key?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,18 +55,14 @@ export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
   corridor_scale_factor: 0.5,
 };
 
-interface UploadData {
+interface UploadDataR2 {
   name: string;
-  colorTifFile?: File;
-  bwTifFile?: File;
-  // New: support pre-cropped blobs
-  colorBlob?: Blob;
-  bwBlob?: Blob;
+  colorTifFile: File;
+  bwTifFile: File;
   roiCoordinates: { x: number; y: number }[];
   processingParameters?: ProcessingParameters;
-  dimensions?: { width: number; height: number };
-  // Crop info for transforming coordinates
-  cropBounds?: { x: number; y: number; width: number; height: number };
+  dimensions: { width: number; height: number };
+  onProgress?: (colorPercent: number, bwPercent: number) => void;
 }
 
 export function useUserMaps() {
@@ -99,6 +94,9 @@ export function useUserMaps() {
         processing_parameters: map.processing_parameters as ProcessingParameters,
         status: map.status as UserMap['status'],
         error_message: map.error_message,
+        storage_provider: map.storage_provider,
+        r2_color_key: map.r2_color_key,
+        r2_bw_key: map.r2_bw_key,
         created_at: map.created_at,
         updated_at: map.updated_at,
       }));
@@ -118,7 +116,11 @@ export function useUserMaps() {
     }
   }, [user]);
 
-  const uploadUserMap = useCallback(async (data: UploadData): Promise<UserMap | null> => {
+  /**
+   * Upload map files directly to R2 using presigned URLs
+   * This bypasses Supabase storage limits
+   */
+  const uploadUserMapR2 = useCallback(async (data: UploadDataR2): Promise<UserMap | null> => {
     if (!user) {
       toast({
         title: 'Error',
@@ -130,133 +132,32 @@ export function useUserMaps() {
 
     setUploading(true);
     try {
-      const sanitizedName = data.name.replace(/[^a-zA-Z0-9-_]/g, '_');
-      const basePath = `${user.id}/${sanitizedName}`;
-      
-      // Determine which upload method to use
-      const useCroppedBlobs = data.colorBlob && data.bwBlob;
-      
-      let colorPath = `${basePath}/color.png`;
-      let bwPath = `${basePath}/bw.png`;
-      let tileGrid: TileConfig | null = null;
+      // Step 1: Upload files directly to R2
+      console.log('Uploading files to R2...');
+      const r2Result = await uploadMapFilesToR2(
+        user.id,
+        data.name,
+        data.colorTifFile,
+        data.bwTifFile,
+        data.onProgress
+      );
 
-      if (useCroppedBlobs) {
-        // NEW: Upload pre-cropped blobs (already in PNG format from canvas)
-        console.log('Uploading pre-cropped images...');
-        
-        const { error: colorError } = await supabase.storage
-          .from('user-map-sources')
-          .upload(colorPath, data.colorBlob, {
-            contentType: 'image/png',
-            cacheControl: '3600',
-            upsert: true,
-          });
-        if (colorError) throw new Error(`Failed to upload color image: ${colorError.message}`);
+      console.log('R2 upload complete:', r2Result);
 
-        const { error: bwError } = await supabase.storage
-          .from('user-map-sources')
-          .upload(bwPath, data.bwBlob, {
-            contentType: 'image/png',
-            cacheControl: '3600',
-            upsert: true,
-          });
-        if (bwError) throw new Error(`Failed to upload B&W image: ${bwError.message}`);
-
-        console.log('Pre-cropped images uploaded successfully');
-      } else if (data.colorTifFile && data.bwTifFile) {
-        // LEGACY: Handle raw TIF files (with tiling if needed)
-        const maxFileSize = Math.max(data.colorTifFile.size, data.bwTifFile.size);
-        const shouldSplit = needsSplitting(maxFileSize);
-        
-        colorPath = `${basePath}/color.tif`;
-        bwPath = `${basePath}/bw.tif`;
-
-        if (shouldSplit && data.dimensions) {
-          // Calculate tile grid - SAME config for both files!
-          tileGrid = calculateTileGrid(
-            data.dimensions.width,
-            data.dimensions.height,
-            maxFileSize
-          );
-
-          if (tileGrid) {
-            console.log(`Splitting files into ${tileGrid.rows}x${tileGrid.cols} tiles`);
-            
-            // Split and upload color tiles
-            console.log('Splitting color TIF...');
-            const colorTiles = await splitTifIntoTiles(data.colorTifFile, tileGrid, (current, total) => {
-              console.log(`Color tile ${current}/${total}`);
-            });
-
-            console.log('Uploading color tiles...');
-            for (const tile of colorTiles) {
-              const tilePath = `${basePath}/color_tile_${tile.row}_${tile.col}.png`;
-              const { error } = await supabase.storage
-                .from('user-map-sources')
-                .upload(tilePath, tile.blob, {
-                  cacheControl: '3600',
-                  upsert: true,
-                });
-              if (error) throw new Error(`Failed to upload color tile ${tile.row}_${tile.col}: ${error.message}`);
-            }
-            colorPath = `${basePath}/color_tiles`; // Directory marker
-
-            // Split and upload B&W tiles using SAME config
-            console.log('Splitting B&W TIF...');
-            const bwTiles = await splitTifIntoTiles(data.bwTifFile, tileGrid, (current, total) => {
-              console.log(`B&W tile ${current}/${total}`);
-            });
-
-            console.log('Uploading B&W tiles...');
-            for (const tile of bwTiles) {
-              const tilePath = `${basePath}/bw_tile_${tile.row}_${tile.col}.png`;
-              const { error } = await supabase.storage
-                .from('user-map-sources')
-                .upload(tilePath, tile.blob, {
-                  cacheControl: '3600',
-                  upsert: true,
-                });
-              if (error) throw new Error(`Failed to upload B&W tile ${tile.row}_${tile.col}: ${error.message}`);
-            }
-            bwPath = `${basePath}/bw_tiles`; // Directory marker
-          }
-        }
-        
-        // Non-tiled upload (files under threshold)
-        if (!tileGrid) {
-          // Upload color TIF
-          const { error: colorError } = await supabase.storage
-            .from('user-map-sources')
-            .upload(colorPath, data.colorTifFile, {
-              cacheControl: '3600',
-              upsert: true,
-            });
-          if (colorError) throw new Error(`Failed to upload color TIF: ${colorError.message}`);
-
-          // Upload B&W TIF
-          const { error: bwError } = await supabase.storage
-            .from('user-map-sources')
-            .upload(bwPath, data.bwTifFile, {
-              cacheControl: '3600',
-              upsert: true,
-            });
-          if (bwError) throw new Error(`Failed to upload B&W TIF: ${bwError.message}`);
-        }
-      } else {
-        throw new Error('Either colorBlob/bwBlob or colorTifFile/bwTifFile must be provided');
-      }
-
-      // Create database record
+      // Step 2: Create database record with R2 paths
       const insertData = {
         user_id: user.id,
         name: data.name,
-        color_tif_path: colorPath,
-        bw_tif_path: bwPath,
+        color_tif_path: r2Result.colorKey, // Store R2 key as path
+        bw_tif_path: r2Result.bwKey,
         roi_coordinates: data.roiCoordinates as unknown,
         processing_parameters: (data.processingParameters || DEFAULT_PROCESSING_PARAMETERS) as unknown,
         status: 'pending',
-        is_tiled: tileGrid !== null,
-        tile_grid: tileGrid as unknown,
+        storage_provider: 'r2',
+        r2_color_key: r2Result.colorKey,
+        r2_bw_key: r2Result.bwKey,
+        is_tiled: false,
+        tile_grid: null,
       };
 
       const { data: mapRecord, error: dbError } = await supabase
@@ -277,8 +178,9 @@ export function useUserMaps() {
         processing_parameters: mapRecord.processing_parameters as ProcessingParameters,
         status: mapRecord.status as UserMap['status'],
         error_message: mapRecord.error_message,
-        is_tiled: mapRecord.is_tiled,
-        tile_grid: mapRecord.tile_grid as TileConfig | null,
+        storage_provider: mapRecord.storage_provider,
+        r2_color_key: mapRecord.r2_color_key,
+        r2_bw_key: mapRecord.r2_bw_key,
         created_at: mapRecord.created_at,
         updated_at: mapRecord.updated_at,
       };
@@ -287,9 +189,7 @@ export function useUserMaps() {
       
       toast({
         title: 'Success',
-        description: tileGrid 
-          ? `Map uploaded in ${tileGrid.rows * tileGrid.cols} tiles! Processing will begin shortly.`
-          : 'Map uploaded successfully! Processing will begin shortly.',
+        description: 'Map uploaded successfully! Processing will begin shortly.',
       });
 
       return userMap;
@@ -313,10 +213,13 @@ export function useUserMaps() {
       const mapToDelete = userMaps.find(m => m.id === mapId);
       if (!mapToDelete) return false;
 
-      // Delete storage files
-      await supabase.storage
-        .from('user-map-sources')
-        .remove([mapToDelete.color_tif_path, mapToDelete.bw_tif_path]);
+      // For Supabase storage, delete files
+      if (mapToDelete.storage_provider !== 'r2') {
+        await supabase.storage
+          .from('user-map-sources')
+          .remove([mapToDelete.color_tif_path, mapToDelete.bw_tif_path]);
+      }
+      // Note: R2 files would need to be deleted via a separate endpoint/function
 
       // Delete database record
       const { error } = await supabase
@@ -350,7 +253,7 @@ export function useUserMaps() {
     loading,
     uploading,
     fetchUserMaps,
-    uploadUserMap,
+    uploadUserMapR2,
     deleteUserMap,
   };
 }

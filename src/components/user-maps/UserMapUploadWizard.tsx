@@ -12,8 +12,7 @@ import OCADInstructionsDialog from './OCADInstructionsDialog';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { supabase } from '@/integrations/supabase/client';
 import { convertTifToDataUrl, getTifDimensions } from '@/utils/tifUtils';
-import { needsSplitting } from '@/utils/tifSplitter';
-import { calculateROIBounds, cropImageFromDataUrl, transformROIToCropSpace, getImageDimensionsFromDataUrl } from '@/utils/tifCropper';
+import { uploadMapFilesToR2 } from '@/utils/r2Upload';
 
 const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
@@ -38,7 +37,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   onComplete,
   onCancel,
 }) => {
-  const { uploadUserMap, uploading } = useUserMaps();
+  const { uploadUserMapR2, uploading } = useUserMaps();
   
   const [step, setStep] = useState<WizardStep>('upload');
   const [mapName, setMapName] = useState('');
@@ -48,10 +47,10 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [colorTifPreviewUrl, setColorTifPreviewUrl] = useState<string | null>(null);
-  const [bwTifPreviewUrl, setBwTifPreviewUrl] = useState<string | null>(null);
   const [isConvertingTif, setIsConvertingTif] = useState(false);
   const [tifConversionError, setTifConversionError] = useState<string | null>(null);
   const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ color: number; bw: number }>({ color: 0, bw: 0 });
 
   // Dimension validation state
   const [colorDimensions, setColorDimensions] = useState<TifDimensions | null>(null);
@@ -109,12 +108,11 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
     validateDimensions();
   }, [colorTifFile, bwTifFile]);
 
-  // Convert TIF to displayable image when files are selected
+  // Convert TIF to displayable image when color file is selected
   useEffect(() => {
-    const convertTifs = async () => {
-      if (!colorTifFile || !bwTifFile) {
+    const convertTif = async () => {
+      if (!colorTifFile) {
         setColorTifPreviewUrl(null);
-        setBwTifPreviewUrl(null);
         return;
       }
       
@@ -122,12 +120,8 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       setTifConversionError(null);
       
       try {
-        const [colorUrl, bwUrl] = await Promise.all([
-          convertTifToDataUrl(colorTifFile),
-          convertTifToDataUrl(bwTifFile),
-        ]);
+        const colorUrl = await convertTifToDataUrl(colorTifFile);
         setColorTifPreviewUrl(colorUrl);
-        setBwTifPreviewUrl(bwUrl);
       } catch (error) {
         console.error('Failed to convert TIF:', error);
         setTifConversionError('Failed to preview TIF file. The file may be corrupted or in an unsupported format.');
@@ -136,8 +130,8 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       }
     };
     
-    convertTifs();
-  }, [colorTifFile, bwTifFile]);
+    convertTif();
+  }, [colorTifFile]);
 
   const steps: { key: WizardStep; label: string }[] = [
     { key: 'upload', label: 'Upload Files' },
@@ -187,34 +181,17 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!colorTifPreviewUrl || !bwTifPreviewUrl || roiCoordinates.length < 3) return;
+    if (!colorTifFile || !bwTifFile || roiCoordinates.length < 3 || !colorDimensions) return;
 
     try {
-      // Get image dimensions from the preview
-      const imageDims = await getImageDimensionsFromDataUrl(colorTifPreviewUrl);
-      
-      // Calculate crop bounds from ROI
-      const cropBounds = calculateROIBounds(roiCoordinates, imageDims.width, imageDims.height, 0.05);
-      
-      // Transform ROI coordinates to crop space
-      const transformedROI = transformROIToCropSpace(roiCoordinates, cropBounds);
-      
-      // Crop both images to ROI bounds
-      const [colorBlob, bwBlob] = await Promise.all([
-        cropImageFromDataUrl(colorTifPreviewUrl, cropBounds),
-        cropImageFromDataUrl(bwTifPreviewUrl, cropBounds),
-      ]);
-
-      console.log(`Cropped images: ${colorBlob.size} bytes, ${bwBlob.size} bytes`);
-
-      const result = await uploadUserMap({
+      const result = await uploadUserMapR2({
         name: mapName,
-        colorBlob,
-        bwBlob,
-        roiCoordinates: transformedROI,
+        colorTifFile,
+        bwTifFile,
+        roiCoordinates,
         processingParameters: parameters,
-        dimensions: { width: cropBounds.width, height: cropBounds.height },
-        cropBounds,
+        dimensions: colorDimensions,
+        onProgress: (color, bw) => setUploadProgress({ color, bw }),
       });
 
       if (result) {
@@ -239,6 +216,13 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
     } catch (error) {
       console.error('Submit error:', error);
     }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const renderStepContent = () => {
@@ -315,9 +299,9 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                       <p className="text-sm font-medium">Dimensions Validated</p>
                       <p className="text-xs mt-0.5">
                         Both files: {colorDimensions.width.toLocaleString()} × {colorDimensions.height.toLocaleString()} pixels
-                        {needsSplitting(Math.max(colorTifFile.size, bwTifFile.size)) && (
-                          <span className="ml-2 text-amber-600 dark:text-amber-400">
-                            (Files will be split into tiles for upload)
+                        {colorTifFile && bwTifFile && (
+                          <span className="ml-2">
+                            ({formatFileSize(colorTifFile.size)} + {formatFileSize(bwTifFile.size)})
                           </span>
                         )}
                       </p>
@@ -334,7 +318,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                 <li>Both files must be exported at <strong>508 dpi</strong> resolution</li>
                 <li>Both files should cover the same area ("Entire Map")</li>
                 <li><strong>Both files must have identical pixel dimensions</strong></li>
-                <li>Maximum file size: 500MB each</li>
+                <li>No file size limit - files upload directly to cloud storage</li>
               </ul>
             </div>
           </div>
@@ -424,6 +408,25 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                   </div>
                 </div>
 
+                {/* Upload Progress */}
+                {uploading && (
+                  <div className="space-y-3 bg-muted rounded-lg p-4">
+                    <p className="text-sm font-medium">Uploading files...</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs w-16">Color:</span>
+                        <Progress value={uploadProgress.color} className="flex-1" />
+                        <span className="text-xs w-10">{uploadProgress.color}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs w-16">B&W:</span>
+                        <Progress value={uploadProgress.bw} className="flex-1" />
+                        <span className="text-xs w-10">{uploadProgress.bw}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
                     <strong>Note:</strong> Route processing may take several minutes depending on map size and parameters. 
@@ -440,7 +443,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                   {uploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
+                      Uploading to cloud...
                     </>
                   ) : (
                     <>
@@ -466,53 +469,63 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
         onOpenChange={setShowInstructionsDialog}
         onConfirm={handleInstructionsConfirm}
       />
-      <Card className="w-full max-w-3xl mx-auto">
+      
+      <Card className="w-full max-w-4xl mx-auto">
         <CardHeader>
-          <CardTitle>Upload Custom Map</CardTitle>
+          <CardTitle>Upload Your Map</CardTitle>
           <CardDescription>
-            Upload your orienteering map files and configure route generation
+            Upload TIF files exported from OCAD to generate routes for your map.
           </CardDescription>
         </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            {steps.map((s, index) => (
-              <span
-                key={s.key}
-                className={index <= currentStepIndex ? 'text-primary font-medium' : 'text-muted-foreground'}
+        <CardContent className="space-y-6">
+          {/* Progress Steps */}
+          <div className="space-y-2">
+            <Progress value={progressPercent} className="h-2" />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              {steps.map((s, i) => (
+                <span
+                  key={s.key}
+                  className={`${i <= currentStepIndex ? 'text-primary font-medium' : ''}`}
+                >
+                  {s.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Step Content */}
+          {renderStepContent()}
+
+          {/* Navigation */}
+          {step !== 'submit' && (
+            <div className="flex justify-between pt-4">
+              <Button
+                variant="outline"
+                onClick={step === 'upload' ? onCancel : handleBack}
               >
-                {s.label}
-              </span>
-            ))}
-          </div>
-          <Progress value={progressPercent} className="h-2" />
-        </div>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {step === 'upload' ? 'Cancel' : 'Back'}
+              </Button>
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed()}
+              >
+                Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          )}
 
-        {/* Step Content */}
-        {renderStepContent()}
-
-        {/* Navigation */}
-        {!isSubmitted && step !== 'submit' && (
-          <div className="flex justify-between pt-4">
-            <Button
-              variant="outline"
-              onClick={currentStepIndex === 0 ? onCancel : handleBack}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {currentStepIndex === 0 ? 'Cancel' : 'Back'}
-            </Button>
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-            >
-              Next
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {step === 'submit' && !isSubmitted && !uploading && (
+            <div className="flex justify-start pt-4">
+              <Button variant="outline" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 };

@@ -425,8 +425,11 @@ export type Database = {
           last_activity_at: string | null
           name: string
           processing_parameters: Json | null
+          r2_bw_key: string | null
+          r2_color_key: string | null
           roi_coordinates: Json
           status: string
+          storage_provider: string | null
           tile_grid: Json | null
           updated_at: string
           user_id: string
@@ -441,8 +444,11 @@ export type Database = {
           last_activity_at?: string | null
           name: string
           processing_parameters?: Json | null
+          r2_bw_key?: string | null
+          r2_color_key?: string | null
           roi_coordinates: Json
           status?: string
+          storage_provider?: string | null
           tile_grid?: Json | null
           updated_at?: string
           user_id: string
@@ -457,8 +463,11 @@ export type Database = {
           last_activity_at?: string | null
           name?: string
           processing_parameters?: Json | null
+          r2_bw_key?: string | null
+          r2_color_key?: string | null
           roi_coordinates?: Json
           status?: string
+          storage_provider?: string | null
           tile_grid?: Json | null
           updated_at?: string
           user_id?: string
