@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
@@ -9,9 +8,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Compass, AlertCircle, Mail, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Compass, AlertCircle, Mail, CheckCircle2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
 // Validation schemas
 const loginSchema = z.object({
@@ -37,6 +37,13 @@ const registerSchema = z.object({
     .max(72, 'Password too long')
 });
 
+const emailSchema = z.object({
+  email: z.string()
+    .trim()
+    .email('Invalid email format')
+    .max(255, 'Email too long'),
+});
+
 const AuthPage: React.FC = () => {
   const { signIn, signUp, loading } = useUser();
   const { t } = useLanguage();
@@ -45,6 +52,9 @@ const AuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('login');
   const [error, setError] = useState<string | null>(null);
   const [registrationSuccess, setRegistrationSuccess] = useState<boolean>(false);
+  const [showForgotPassword, setShowForgotPassword] = useState<boolean>(false);
+  const [resetEmailSent, setResetEmailSent] = useState<boolean>(false);
+  const [resetLoading, setResetLoading] = useState<boolean>(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -56,6 +66,9 @@ const AuthPage: React.FC = () => {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  
+  // Forgot password form state
+  const [forgotEmail, setForgotEmail] = useState('');
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,12 +116,143 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    
+    const result = emailSchema.safeParse({ email: forgotEmail });
+    if (!result.success) {
+      setError(result.error.errors[0].message);
+      return;
+    }
+    
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(result.data.email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        setResetEmailSent(true);
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to send reset email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   // Clear error and success when switching tabs
   const handleTabChange = (value: string) => {
     setError(null);
     setRegistrationSuccess(false);
+    setShowForgotPassword(false);
+    setResetEmailSent(false);
     setActiveTab(value);
   };
+
+  // Show password reset email sent screen
+  if (resetEmailSent) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1 flex flex-col items-center">
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+              <Mail className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl text-center">{t('checkYourEmail')}</CardTitle>
+            <CardDescription className="text-center">
+              {t('resetEmailSent')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert className="border-primary/20 bg-primary/5">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-sm">
+                {t('resetEmailInstructions')}
+              </AlertDescription>
+            </Alert>
+            <p className="text-sm text-muted-foreground text-center">
+              {t('verificationEmailNote')}
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => {
+                setResetEmailSent(false);
+                setShowForgotPassword(false);
+                setForgotEmail('');
+              }}
+            >
+              {t('backToLogin')}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show forgot password form
+  if (showForgotPassword) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1 flex flex-col items-center">
+            <div className="flex items-center space-x-2 mb-4">
+              <Compass className="h-10 w-10 text-orienteering" />
+              <span className="text-2xl font-bold">Ljungdell.uk</span>
+            </div>
+            <CardTitle className="text-2xl">{t('forgotPassword')}</CardTitle>
+            <CardDescription>
+              {t('forgotPasswordDescription')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">{t('email')}</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="example@example.com"
+                  required
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={resetLoading}>
+                {resetLoading ? t('sendingResetEmail') : t('sendResetEmail')}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button 
+              variant="ghost" 
+              className="text-sm"
+              onClick={() => {
+                setShowForgotPassword(false);
+                setError(null);
+              }}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {t('backToLogin')}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   // Show email verification success screen
   if (registrationSuccess) {
@@ -195,6 +339,13 @@ const AuthPage: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="login-password">{t('password')}</Label>
+                    <button
+                      type="button"
+                      className="text-sm text-primary hover:underline"
+                      onClick={() => setShowForgotPassword(true)}
+                    >
+                      {t('forgotPassword')}
+                    </button>
                   </div>
                   <div className="relative">
                     <Input
