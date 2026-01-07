@@ -451,9 +451,145 @@ Deno.serve(async (req) => {
         )
       }
 
+      // Update last_activity_at for this map to track progress
+      await supabase
+        .from('user_maps')
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq('id', mapId)
+
       console.log('Image uploaded successfully:', filePath, 'route:', routeIndex, 'aspect:', aspectRatio)
       return new Response(
         JSON.stringify({ success: true, path: filePath, route_index: routeIndex, aspect_ratio: aspectRatio }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (req.method === 'POST' && action === 'check-stale') {
+      // Check for stale processing jobs and auto-complete or fail them
+      const STALE_TIMEOUT_MINUTES = 5
+      
+      const { data: staleMaps, error: staleError } = await supabase
+        .from('user_maps')
+        .select('*')
+        .eq('status', 'processing')
+        .lt('last_activity_at', new Date(Date.now() - STALE_TIMEOUT_MINUTES * 60 * 1000).toISOString())
+
+      if (staleError) {
+        console.error('Error checking stale maps:', staleError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to check stale maps' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const results: any[] = []
+
+      for (const map of staleMaps || []) {
+        // Count images uploaded for this map
+        const { data: files } = await supabase.storage
+          .from('user-route-images')
+          .list(`${map.user_id}/${map.id}/16_9`)
+
+        const imageCount = files?.length || 0
+        console.log(`Stale map ${map.id} has ${imageCount} images uploaded`)
+
+        if (imageCount > 0) {
+          // Has some images - mark as completed with partial data
+          // Create route_maps entry
+          const { data: routeMap } = await supabase
+            .from('route_maps')
+            .insert({
+              name: map.name,
+              user_id: map.user_id,
+              source_map_id: map.id,
+              is_public: false,
+              description: `Custom map with ${imageCount} routes (partial - processing timed out)`,
+              map_type: 'forest',
+            })
+            .select()
+            .single()
+
+          if (routeMap) {
+            // Create route_images entries for found files
+            const routeImages = (files || []).map((file: any, index: number) => ({
+              map_id: routeMap.id,
+              candidate_index: index,
+              aspect_ratio: '16_9',
+              shortest_side: 'left',
+              image_path: `${map.user_id}/${map.id}/16_9/${file.name}`,
+            }))
+
+            await supabase.from('route_images').insert(routeImages)
+          }
+
+          await supabase
+            .from('user_maps')
+            .update({
+              status: 'completed',
+              error_message: `Completed with ${imageCount} routes (processing timed out)`,
+            })
+            .eq('id', map.id)
+
+          results.push({ map_id: map.id, action: 'completed', images: imageCount })
+        } else {
+          // No images - mark as failed
+          await supabase
+            .from('user_maps')
+            .update({
+              status: 'failed',
+              error_message: 'Processing timed out with no routes generated',
+            })
+            .eq('id', map.id)
+
+          results.push({ map_id: map.id, action: 'failed' })
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, processed: results.length, results }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (req.method === 'GET' && action === 'check-map-status') {
+      // Check status of a specific map and count its uploaded images
+      const mapId = url.searchParams.get('map_id')
+      if (!mapId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing map_id parameter' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const { data: map, error: mapError } = await supabase
+        .from('user_maps')
+        .select('*')
+        .eq('id', mapId)
+        .single()
+
+      if (mapError || !map) {
+        return new Response(
+          JSON.stringify({ error: 'Map not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Count uploaded images
+      const { data: files } = await supabase.storage
+        .from('user-route-images')
+        .list(`${map.user_id}/${map.id}/16_9`)
+
+      const imageCount = files?.length || 0
+      const lastActivity = map.last_activity_at
+
+      return new Response(
+        JSON.stringify({
+          map_id: mapId,
+          status: map.status,
+          image_count: imageCount,
+          last_activity_at: lastActivity,
+          created_at: map.created_at,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

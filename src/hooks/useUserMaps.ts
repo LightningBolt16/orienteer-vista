@@ -58,11 +58,16 @@ export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
 
 interface UploadData {
   name: string;
-  colorTifFile: File;
-  bwTifFile: File;
+  colorTifFile?: File;
+  bwTifFile?: File;
+  // New: support pre-cropped blobs
+  colorBlob?: Blob;
+  bwBlob?: Blob;
   roiCoordinates: { x: number; y: number }[];
   processingParameters?: ProcessingParameters;
   dimensions?: { width: number; height: number };
+  // Crop info for transforming coordinates
+  cropBounds?: { x: number; y: number; width: number; height: number };
 }
 
 export function useUserMaps() {
@@ -128,84 +133,117 @@ export function useUserMaps() {
       const sanitizedName = data.name.replace(/[^a-zA-Z0-9-_]/g, '_');
       const basePath = `${user.id}/${sanitizedName}`;
       
-      // Check if files need to be split into tiles
-      const maxFileSize = Math.max(data.colorTifFile.size, data.bwTifFile.size);
-      const shouldSplit = needsSplitting(maxFileSize);
+      // Determine which upload method to use
+      const useCroppedBlobs = data.colorBlob && data.bwBlob;
       
-      let colorPath = `${basePath}/color.tif`;
-      let bwPath = `${basePath}/bw.tif`;
+      let colorPath = `${basePath}/color.png`;
+      let bwPath = `${basePath}/bw.png`;
       let tileGrid: TileConfig | null = null;
 
-      if (shouldSplit && data.dimensions) {
-        // Calculate tile grid - SAME config for both files!
-        tileGrid = calculateTileGrid(
-          data.dimensions.width,
-          data.dimensions.height,
-          maxFileSize
-        );
-
-        if (tileGrid) {
-          console.log(`Splitting files into ${tileGrid.rows}x${tileGrid.cols} tiles`);
-          
-          // Split and upload color tiles
-          console.log('Splitting color TIF...');
-          const colorTiles = await splitTifIntoTiles(data.colorTifFile, tileGrid, (current, total) => {
-            console.log(`Color tile ${current}/${total}`);
-          });
-
-          console.log('Uploading color tiles...');
-          for (const tile of colorTiles) {
-            const tilePath = `${basePath}/color_tile_${tile.row}_${tile.col}.png`;
-            const { error } = await supabase.storage
-              .from('user-map-sources')
-              .upload(tilePath, tile.blob, {
-                cacheControl: '3600',
-                upsert: true,
-              });
-            if (error) throw new Error(`Failed to upload color tile ${tile.row}_${tile.col}: ${error.message}`);
-          }
-          colorPath = `${basePath}/color_tiles`; // Directory marker
-
-          // Split and upload B&W tiles using SAME config
-          console.log('Splitting B&W TIF...');
-          const bwTiles = await splitTifIntoTiles(data.bwTifFile, tileGrid, (current, total) => {
-            console.log(`B&W tile ${current}/${total}`);
-          });
-
-          console.log('Uploading B&W tiles...');
-          for (const tile of bwTiles) {
-            const tilePath = `${basePath}/bw_tile_${tile.row}_${tile.col}.png`;
-            const { error } = await supabase.storage
-              .from('user-map-sources')
-              .upload(tilePath, tile.blob, {
-                cacheControl: '3600',
-                upsert: true,
-              });
-            if (error) throw new Error(`Failed to upload B&W tile ${tile.row}_${tile.col}: ${error.message}`);
-          }
-          bwPath = `${basePath}/bw_tiles`; // Directory marker
-        }
-      }
-      
-      // Non-tiled upload (files under threshold)
-      if (!tileGrid) {
-        // Upload color TIF
+      if (useCroppedBlobs) {
+        // NEW: Upload pre-cropped blobs (already in PNG format from canvas)
+        console.log('Uploading pre-cropped images...');
+        
         const { error: colorError } = await supabase.storage
           .from('user-map-sources')
-          .upload(colorPath, data.colorTifFile, {
+          .upload(colorPath, data.colorBlob, {
+            contentType: 'image/png',
             cacheControl: '3600',
             upsert: true,
           });
-        if (colorError) throw new Error(`Failed to upload color TIF: ${colorError.message}`);
+        if (colorError) throw new Error(`Failed to upload color image: ${colorError.message}`);
 
-        // Upload B&W TIF
         const { error: bwError } = await supabase.storage
           .from('user-map-sources')
-          .upload(bwPath, data.bwTifFile, {
+          .upload(bwPath, data.bwBlob, {
+            contentType: 'image/png',
             cacheControl: '3600',
             upsert: true,
           });
-        if (bwError) throw new Error(`Failed to upload B&W TIF: ${bwError.message}`);
+        if (bwError) throw new Error(`Failed to upload B&W image: ${bwError.message}`);
+
+        console.log('Pre-cropped images uploaded successfully');
+      } else if (data.colorTifFile && data.bwTifFile) {
+        // LEGACY: Handle raw TIF files (with tiling if needed)
+        const maxFileSize = Math.max(data.colorTifFile.size, data.bwTifFile.size);
+        const shouldSplit = needsSplitting(maxFileSize);
+        
+        colorPath = `${basePath}/color.tif`;
+        bwPath = `${basePath}/bw.tif`;
+
+        if (shouldSplit && data.dimensions) {
+          // Calculate tile grid - SAME config for both files!
+          tileGrid = calculateTileGrid(
+            data.dimensions.width,
+            data.dimensions.height,
+            maxFileSize
+          );
+
+          if (tileGrid) {
+            console.log(`Splitting files into ${tileGrid.rows}x${tileGrid.cols} tiles`);
+            
+            // Split and upload color tiles
+            console.log('Splitting color TIF...');
+            const colorTiles = await splitTifIntoTiles(data.colorTifFile, tileGrid, (current, total) => {
+              console.log(`Color tile ${current}/${total}`);
+            });
+
+            console.log('Uploading color tiles...');
+            for (const tile of colorTiles) {
+              const tilePath = `${basePath}/color_tile_${tile.row}_${tile.col}.png`;
+              const { error } = await supabase.storage
+                .from('user-map-sources')
+                .upload(tilePath, tile.blob, {
+                  cacheControl: '3600',
+                  upsert: true,
+                });
+              if (error) throw new Error(`Failed to upload color tile ${tile.row}_${tile.col}: ${error.message}`);
+            }
+            colorPath = `${basePath}/color_tiles`; // Directory marker
+
+            // Split and upload B&W tiles using SAME config
+            console.log('Splitting B&W TIF...');
+            const bwTiles = await splitTifIntoTiles(data.bwTifFile, tileGrid, (current, total) => {
+              console.log(`B&W tile ${current}/${total}`);
+            });
+
+            console.log('Uploading B&W tiles...');
+            for (const tile of bwTiles) {
+              const tilePath = `${basePath}/bw_tile_${tile.row}_${tile.col}.png`;
+              const { error } = await supabase.storage
+                .from('user-map-sources')
+                .upload(tilePath, tile.blob, {
+                  cacheControl: '3600',
+                  upsert: true,
+                });
+              if (error) throw new Error(`Failed to upload B&W tile ${tile.row}_${tile.col}: ${error.message}`);
+            }
+            bwPath = `${basePath}/bw_tiles`; // Directory marker
+          }
+        }
+        
+        // Non-tiled upload (files under threshold)
+        if (!tileGrid) {
+          // Upload color TIF
+          const { error: colorError } = await supabase.storage
+            .from('user-map-sources')
+            .upload(colorPath, data.colorTifFile, {
+              cacheControl: '3600',
+              upsert: true,
+            });
+          if (colorError) throw new Error(`Failed to upload color TIF: ${colorError.message}`);
+
+          // Upload B&W TIF
+          const { error: bwError } = await supabase.storage
+            .from('user-map-sources')
+            .upload(bwPath, data.bwTifFile, {
+              cacheControl: '3600',
+              upsert: true,
+            });
+          if (bwError) throw new Error(`Failed to upload B&W TIF: ${bwError.message}`);
+        }
+      } else {
+        throw new Error('Either colorBlob/bwBlob or colorTifFile/bwTifFile must be provided');
       }
 
       // Create database record

@@ -13,6 +13,7 @@ import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from
 import { supabase } from '@/integrations/supabase/client';
 import { convertTifToDataUrl, getTifDimensions } from '@/utils/tifUtils';
 import { needsSplitting } from '@/utils/tifSplitter';
+import { calculateROIBounds, cropImageFromDataUrl, transformROIToCropSpace, getImageDimensionsFromDataUrl } from '@/utils/tifCropper';
 
 const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
@@ -47,6 +48,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [colorTifPreviewUrl, setColorTifPreviewUrl] = useState<string | null>(null);
+  const [bwTifPreviewUrl, setBwTifPreviewUrl] = useState<string | null>(null);
   const [isConvertingTif, setIsConvertingTif] = useState(false);
   const [tifConversionError, setTifConversionError] = useState<string | null>(null);
   const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
@@ -107,11 +109,12 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
     validateDimensions();
   }, [colorTifFile, bwTifFile]);
 
-  // Convert TIF to displayable image when file is selected
+  // Convert TIF to displayable image when files are selected
   useEffect(() => {
-    const convertTif = async () => {
-      if (!colorTifFile) {
+    const convertTifs = async () => {
+      if (!colorTifFile || !bwTifFile) {
         setColorTifPreviewUrl(null);
+        setBwTifPreviewUrl(null);
         return;
       }
       
@@ -119,8 +122,12 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       setTifConversionError(null);
       
       try {
-        const dataUrl = await convertTifToDataUrl(colorTifFile);
-        setColorTifPreviewUrl(dataUrl);
+        const [colorUrl, bwUrl] = await Promise.all([
+          convertTifToDataUrl(colorTifFile),
+          convertTifToDataUrl(bwTifFile),
+        ]);
+        setColorTifPreviewUrl(colorUrl);
+        setBwTifPreviewUrl(bwUrl);
       } catch (error) {
         console.error('Failed to convert TIF:', error);
         setTifConversionError('Failed to preview TIF file. The file may be corrupted or in an unsupported format.');
@@ -129,8 +136,8 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       }
     };
     
-    convertTif();
-  }, [colorTifFile]);
+    convertTifs();
+  }, [colorTifFile, bwTifFile]);
 
   const steps: { key: WizardStep; label: string }[] = [
     { key: 'upload', label: 'Upload Files' },
@@ -180,36 +187,57 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!colorTifFile || !bwTifFile || roiCoordinates.length < 3 || !colorDimensions) return;
+    if (!colorTifPreviewUrl || !bwTifPreviewUrl || roiCoordinates.length < 3) return;
 
-    const result = await uploadUserMap({
-      name: mapName,
-      colorTifFile,
-      bwTifFile,
-      roiCoordinates,
-      processingParameters: parameters,
-      dimensions: colorDimensions,
-    });
+    try {
+      // Get image dimensions from the preview
+      const imageDims = await getImageDimensionsFromDataUrl(colorTifPreviewUrl);
+      
+      // Calculate crop bounds from ROI
+      const cropBounds = calculateROIBounds(roiCoordinates, imageDims.width, imageDims.height, 0.05);
+      
+      // Transform ROI coordinates to crop space
+      const transformedROI = transformROIToCropSpace(roiCoordinates, cropBounds);
+      
+      // Crop both images to ROI bounds
+      const [colorBlob, bwBlob] = await Promise.all([
+        cropImageFromDataUrl(colorTifPreviewUrl, cropBounds),
+        cropImageFromDataUrl(bwTifPreviewUrl, cropBounds),
+      ]);
 
-    if (result) {
-      // Trigger processing via edge function
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await supabase.functions.invoke('trigger-map-processing', {
-            body: { map_id: result.id },
-          });
-          console.log('Processing triggered for map:', result.id);
+      console.log(`Cropped images: ${colorBlob.size} bytes, ${bwBlob.size} bytes`);
+
+      const result = await uploadUserMap({
+        name: mapName,
+        colorBlob,
+        bwBlob,
+        roiCoordinates: transformedROI,
+        processingParameters: parameters,
+        dimensions: { width: cropBounds.width, height: cropBounds.height },
+        cropBounds,
+      });
+
+      if (result) {
+        // Trigger processing via edge function
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.functions.invoke('trigger-map-processing', {
+              body: { map_id: result.id },
+            });
+            console.log('Processing triggered for map:', result.id);
+          }
+        } catch (triggerError) {
+          console.error('Failed to trigger processing:', triggerError);
         }
-      } catch (triggerError) {
-        console.error('Failed to trigger processing:', triggerError);
-        // Don't fail the upload, processing can be triggered manually or via polling
-      }
 
-      setIsSubmitted(true);
-      setTimeout(() => {
-        onComplete?.();
-      }, 2000);
+        setIsSubmitted(true);
+        setTimeout(() => {
+          onComplete?.();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Submit error:', error);
     }
   };
 
