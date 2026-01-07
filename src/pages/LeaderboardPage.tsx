@@ -12,6 +12,7 @@ const LeaderboardPage: React.FC = () => {
 
   useEffect(() => {
     const loadMaps = async () => {
+      // Only show public maps in leaderboard - pass no userId to get only public maps
       const maps = await getAvailableMaps();
       const uniqueNames = getUniqueMapNames(maps);
       setAvailableMapNames(uniqueNames);

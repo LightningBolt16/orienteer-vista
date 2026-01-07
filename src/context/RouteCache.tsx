@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { RouteData, MapSource, getAvailableMaps, fetchRouteDataForMap } from '@/utils/routeDataUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CachedRouteData {
   routes: RouteData[];
@@ -28,7 +29,9 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsPreloading(true);
       
       try {
-        const allMaps = await getAvailableMaps();
+        // Get current user to include their private maps
+        const { data: { user } } = await supabase.auth.getUser();
+        const allMaps = await getAvailableMaps(user?.id);
         
         // Load desktop routes (16:9)
         const desktopMaps = allMaps.filter(map => map.aspect === '16_9');

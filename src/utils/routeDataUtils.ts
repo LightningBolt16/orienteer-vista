@@ -74,12 +74,22 @@ const detectNamingScheme = async (folderName: string, aspect: '16_9' | '9_16'): 
 };
 
 // Fetch maps from database first, fallback to local files
-export const getAvailableMaps = async (): Promise<MapSource[]> => {
+// If userId is provided, include that user's private maps; otherwise only public maps
+export const getAvailableMaps = async (userId?: string): Promise<MapSource[]> => {
   try {
-    // Try database first
-    const { data: dbMaps, error } = await supabase
+    // Try database first - filter by public or owned by user
+    let query = supabase
       .from('route_maps')
-      .select('id, name, description, country_code, logo_path, map_type');
+      .select('id, name, description, country_code, logo_path, map_type, is_public, user_id');
+    
+    // Build filter: public maps OR (private maps owned by current user)
+    if (userId) {
+      query = query.or(`is_public.eq.true,user_id.eq.${userId}`);
+    } else {
+      query = query.eq('is_public', true);
+    }
+    
+    const { data: dbMaps, error } = await query;
 
     if (!error && dbMaps && dbMaps.length > 0) {
       console.log(`Found ${dbMaps.length} maps in database`);
