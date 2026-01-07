@@ -68,20 +68,88 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate signed URLs for the TIF files (valid for 1 hour)
-    const { data: colorUrl } = await supabase.storage
-      .from('user-map-sources')
-      .createSignedUrl(mapData.color_tif_path, 3600);
+    // Check if this is a tiled upload
+    const isTiled = mapData.is_tiled === true && mapData.tile_grid !== null;
+    const tileGrid = mapData.tile_grid as { rows: number; cols: number; tileWidth: number; tileHeight: number; originalWidth: number; originalHeight: number } | null;
 
-    const { data: bwUrl } = await supabase.storage
-      .from('user-map-sources')
-      .createSignedUrl(mapData.bw_tif_path, 3600);
+    let jobPayload: Record<string, unknown>;
 
-    if (!colorUrl?.signedUrl || !bwUrl?.signedUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate signed URLs for map files' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (isTiled && tileGrid) {
+      // Generate signed URLs for all tiles
+      const colorTileUrls: string[] = [];
+      const bwTileUrls: string[] = [];
+
+      // Extract base path from the stored path (e.g., "user_id/map_name/color_tiles" -> "user_id/map_name")
+      const basePath = mapData.color_tif_path.replace('/color_tiles', '').replace('/color.tif', '');
+
+      for (let row = 0; row < tileGrid.rows; row++) {
+        for (let col = 0; col < tileGrid.cols; col++) {
+          const colorTilePath = `${basePath}/color_tile_${row}_${col}.png`;
+          const bwTilePath = `${basePath}/bw_tile_${row}_${col}.png`;
+
+          const { data: colorTileUrl } = await supabase.storage
+            .from('user-map-sources')
+            .createSignedUrl(colorTilePath, 3600);
+
+          const { data: bwTileUrl } = await supabase.storage
+            .from('user-map-sources')
+            .createSignedUrl(bwTilePath, 3600);
+
+          if (!colorTileUrl?.signedUrl || !bwTileUrl?.signedUrl) {
+            console.error(`Failed to generate signed URL for tile ${row}_${col}`);
+            return new Response(
+              JSON.stringify({ error: `Failed to generate signed URLs for tile ${row}_${col}` }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          colorTileUrls.push(colorTileUrl.signedUrl);
+          bwTileUrls.push(bwTileUrl.signedUrl);
+        }
+      }
+
+      console.log(`Generated signed URLs for ${colorTileUrls.length} tiles`);
+
+      jobPayload = {
+        map_id: mapData.id,
+        name: mapData.name,
+        is_tiled: true,
+        color_tile_urls: colorTileUrls,
+        bw_tile_urls: bwTileUrls,
+        tile_grid: tileGrid,
+        roi_coordinates: mapData.roi_coordinates,
+        processing_parameters: mapData.processing_parameters,
+        webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
+        webhook_secret: webhookSecret,
+      };
+    } else {
+      // Non-tiled: generate single file URLs
+      const { data: colorUrl } = await supabase.storage
+        .from('user-map-sources')
+        .createSignedUrl(mapData.color_tif_path, 3600);
+
+      const { data: bwUrl } = await supabase.storage
+        .from('user-map-sources')
+        .createSignedUrl(mapData.bw_tif_path, 3600);
+
+      if (!colorUrl?.signedUrl || !bwUrl?.signedUrl) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate signed URLs for map files' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      jobPayload = {
+        map_id: mapData.id,
+        name: mapData.name,
+        is_tiled: false,
+        color_tif_url: colorUrl.signedUrl,
+        bw_tif_url: bwUrl.signedUrl,
+        roi_coordinates: mapData.roi_coordinates,
+        processing_parameters: mapData.processing_parameters,
+        webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
+        webhook_secret: webhookSecret,
+      };
     }
 
     // Update status to processing
@@ -89,18 +157,6 @@ Deno.serve(async (req) => {
       .from('user_maps')
       .update({ status: 'processing' })
       .eq('id', map_id);
-
-    // Prepare the job payload for Modal
-    const jobPayload = {
-      map_id: mapData.id,
-      name: mapData.name,
-      color_tif_url: colorUrl.signedUrl,
-      bw_tif_url: bwUrl.signedUrl,
-      roi_coordinates: mapData.roi_coordinates,
-      processing_parameters: mapData.processing_parameters,
-      webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
-      webhook_secret: webhookSecret,
-    };
 
     console.log('Job payload prepared for map:', map_id);
 

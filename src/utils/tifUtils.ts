@@ -1,6 +1,19 @@
 import * as GeoTIFF from 'geotiff';
 
 /**
+ * Get TIF file dimensions without loading full pixel data.
+ */
+export async function getTifDimensions(file: File): Promise<{ width: number; height: number }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+  const image = await tiff.getImage();
+  return {
+    width: image.getWidth(),
+    height: image.getHeight(),
+  };
+}
+
+/**
  * Convert a TIF/GeoTIFF file to a data URL that can be displayed in <img> or canvas.
  * Uses readRGB() to automatically handle palette, CMYK, YCbCr, CIELab, and other color formats.
  */
