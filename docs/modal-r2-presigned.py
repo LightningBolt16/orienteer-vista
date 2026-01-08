@@ -20,7 +20,7 @@ from typing import Optional
 
 app = modal.App("r2-presigned-urls")
 
-image = modal.Image.debian_slim(python_version="3.11").pip_install("boto3")
+image = modal.Image.debian_slim(python_version="3.11").pip_install("boto3", "fastapi")
 
 
 class PresignedUrlRequest(BaseModel):
