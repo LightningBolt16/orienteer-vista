@@ -9,6 +9,15 @@ interface TriggerRequest {
   map_id: string;
 }
 
+interface TileGrid {
+  rows: number;
+  cols: number;
+  tileWidth: number;
+  tileHeight: number;
+  originalWidth: number;
+  originalHeight: number;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -68,88 +77,109 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if this is a tiled upload
-    const isTiled = mapData.is_tiled === true && mapData.tile_grid !== null;
-    const tileGrid = mapData.tile_grid as { rows: number; cols: number; tileWidth: number; tileHeight: number; originalWidth: number; originalHeight: number } | null;
-
     let jobPayload: Record<string, unknown>;
+    const storageProvider = mapData.storage_provider || 'supabase';
 
-    if (isTiled && tileGrid) {
-      // Generate signed URLs for all tiles
-      const colorTileUrls: string[] = [];
-      const bwTileUrls: string[] = [];
-
-      // Extract base path from the stored path (e.g., "user_id/map_name/color_tiles" -> "user_id/map_name")
-      const basePath = mapData.color_tif_path.replace('/color_tiles', '').replace('/color.tif', '');
-
-      for (let row = 0; row < tileGrid.rows; row++) {
-        for (let col = 0; col < tileGrid.cols; col++) {
-          const colorTilePath = `${basePath}/color_tile_${row}_${col}.png`;
-          const bwTilePath = `${basePath}/bw_tile_${row}_${col}.png`;
-
-          const { data: colorTileUrl } = await supabase.storage
-            .from('user-map-sources')
-            .createSignedUrl(colorTilePath, 3600);
-
-          const { data: bwTileUrl } = await supabase.storage
-            .from('user-map-sources')
-            .createSignedUrl(bwTilePath, 3600);
-
-          if (!colorTileUrl?.signedUrl || !bwTileUrl?.signedUrl) {
-            console.error(`Failed to generate signed URL for tile ${row}_${col}`);
-            return new Response(
-              JSON.stringify({ error: `Failed to generate signed URLs for tile ${row}_${col}` }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          colorTileUrls.push(colorTileUrl.signedUrl);
-          bwTileUrls.push(bwTileUrl.signedUrl);
-        }
-      }
-
-      console.log(`Generated signed URLs for ${colorTileUrls.length} tiles`);
-
+    if (storageProvider === 'r2') {
+      // R2 storage - pass R2 keys directly to Modal
+      // Modal will download using its own R2 credentials
+      console.log('Using R2 storage for map:', map_id);
+      
       jobPayload = {
         map_id: mapData.id,
         name: mapData.name,
-        is_tiled: true,
-        color_tile_urls: colorTileUrls,
-        bw_tile_urls: bwTileUrls,
-        tile_grid: tileGrid,
+        storage_provider: 'r2',
+        r2_color_key: mapData.r2_color_key,
+        r2_bw_key: mapData.r2_bw_key,
         roi_coordinates: mapData.roi_coordinates,
         processing_parameters: mapData.processing_parameters,
         webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
         webhook_secret: webhookSecret,
       };
     } else {
-      // Non-tiled: generate single file URLs
-      const { data: colorUrl } = await supabase.storage
-        .from('user-map-sources')
-        .createSignedUrl(mapData.color_tif_path, 3600);
+      // Supabase storage - generate signed URLs
+      const isTiled = mapData.is_tiled === true && mapData.tile_grid !== null;
+      const tileGrid = mapData.tile_grid as TileGrid | null;
 
-      const { data: bwUrl } = await supabase.storage
-        .from('user-map-sources')
-        .createSignedUrl(mapData.bw_tif_path, 3600);
+      if (isTiled && tileGrid) {
+        // Generate signed URLs for all tiles
+        const colorTileUrls: string[] = [];
+        const bwTileUrls: string[] = [];
 
-      if (!colorUrl?.signedUrl || !bwUrl?.signedUrl) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to generate signed URLs for map files' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Extract base path from the stored path
+        const basePath = mapData.color_tif_path.replace('/color_tiles', '').replace('/color.tif', '');
+
+        for (let row = 0; row < tileGrid.rows; row++) {
+          for (let col = 0; col < tileGrid.cols; col++) {
+            const colorTilePath = `${basePath}/color_tile_${row}_${col}.png`;
+            const bwTilePath = `${basePath}/bw_tile_${row}_${col}.png`;
+
+            const { data: colorTileUrl } = await supabase.storage
+              .from('user-map-sources')
+              .createSignedUrl(colorTilePath, 3600);
+
+            const { data: bwTileUrl } = await supabase.storage
+              .from('user-map-sources')
+              .createSignedUrl(bwTilePath, 3600);
+
+            if (!colorTileUrl?.signedUrl || !bwTileUrl?.signedUrl) {
+              console.error(`Failed to generate signed URL for tile ${row}_${col}`);
+              return new Response(
+                JSON.stringify({ error: `Failed to generate signed URLs for tile ${row}_${col}` }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+
+            colorTileUrls.push(colorTileUrl.signedUrl);
+            bwTileUrls.push(bwTileUrl.signedUrl);
+          }
+        }
+
+        console.log(`Generated signed URLs for ${colorTileUrls.length} tiles`);
+
+        jobPayload = {
+          map_id: mapData.id,
+          name: mapData.name,
+          storage_provider: 'supabase',
+          is_tiled: true,
+          color_tile_urls: colorTileUrls,
+          bw_tile_urls: bwTileUrls,
+          tile_grid: tileGrid,
+          roi_coordinates: mapData.roi_coordinates,
+          processing_parameters: mapData.processing_parameters,
+          webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
+          webhook_secret: webhookSecret,
+        };
+      } else {
+        // Non-tiled: generate single file URLs
+        const { data: colorUrl } = await supabase.storage
+          .from('user-map-sources')
+          .createSignedUrl(mapData.color_tif_path, 3600);
+
+        const { data: bwUrl } = await supabase.storage
+          .from('user-map-sources')
+          .createSignedUrl(mapData.bw_tif_path, 3600);
+
+        if (!colorUrl?.signedUrl || !bwUrl?.signedUrl) {
+          return new Response(
+            JSON.stringify({ error: 'Failed to generate signed URLs for map files' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        jobPayload = {
+          map_id: mapData.id,
+          name: mapData.name,
+          storage_provider: 'supabase',
+          is_tiled: false,
+          color_tif_url: colorUrl.signedUrl,
+          bw_tif_url: bwUrl.signedUrl,
+          roi_coordinates: mapData.roi_coordinates,
+          processing_parameters: mapData.processing_parameters,
+          webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
+          webhook_secret: webhookSecret,
+        };
       }
-
-      jobPayload = {
-        map_id: mapData.id,
-        name: mapData.name,
-        is_tiled: false,
-        color_tif_url: colorUrl.signedUrl,
-        bw_tif_url: bwUrl.signedUrl,
-        roi_coordinates: mapData.roi_coordinates,
-        processing_parameters: mapData.processing_parameters,
-        webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
-        webhook_secret: webhookSecret,
-      };
     }
 
     // Update status to processing
@@ -158,7 +188,7 @@ Deno.serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', map_id);
 
-    console.log('Job payload prepared for map:', map_id);
+    console.log('Job payload prepared for map:', map_id, 'storage:', storageProvider);
 
     // Trigger Modal processing if endpoint is configured
     if (modal_endpoint) {
@@ -188,7 +218,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: 'Processing triggered',
-        job: jobPayload,
+        storage_provider: storageProvider,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
