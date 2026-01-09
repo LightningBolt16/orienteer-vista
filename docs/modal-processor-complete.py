@@ -250,7 +250,7 @@ def process_map(job_payload: dict):
     NUM_RANDOM_POINTS = params.get("num_random_points", 1000)
     CANDIDATE_MIN_DIST = params.get("candidate_min_dist", 300)
     CANDIDATE_MAX_DIST = params.get("candidate_max_dist", 1500)
-    MAX_CANDIDATE_PAIRS_TO_CALCULATE = params.get("max_candidate_pairs", 15000)
+    MAX_CANDIDATE_PAIRS_TO_CALCULATE = params.get("max_candidate_pairs", 2000)
     NUM_OUTPUT_ROUTES = params.get("num_output_routes", 50)
     MAX_OVERLAP_PERCENT = params.get("max_overlap_percent", 0.20)
     BATCH_SIZE = params.get("batch_size", 25)
@@ -511,56 +511,41 @@ def process_map(job_payload: dict):
         cost_arr[cost_arr == 1] = 1e9    # huge for non-navigable
         
         def evaluate_pair(pair_data, Gs, cluster_reps, cost_arr, roi_left, roi_top, corridor_base, corridor_scale, batch_size, line_width):
-            """Evaluate a single pair for route hardness."""
+            """Evaluate a single pair for route hardness using graph-only pathfinding."""
             i, j, dist = pair_data
             pA, pB = cluster_reps[i], cluster_reps[j]
             
             try:
-                # Find main route through graph
+                # Find main route using graph pathfinding (fast - uses simplified graph)
                 path_main = nx.shortest_path(Gs, pA, pB, weight='weight')
                 main_length = sum(Gs[path_main[k]][path_main[k+1]]['weight'] for k in range(len(path_main)-1))
                 
                 if main_length < 10:
                     return None
                 
-                # Find alternative route using pixel cost array
-                indices_main, cost_main = route_through_array(
-                    cost_arr, pA, pB, fully_connected=True, geometric=True
-                )
-                
-                # Create corridor mask around main route
-                corridor_width = int(corridor_base + corridor_scale * main_length)
-                mask = np.zeros_like(cost_arr, dtype=bool)
-                for (r, c) in indices_main:
-                    r0 = max(0, r - corridor_width)
-                    r1 = min(cost_arr.shape[0], r + corridor_width + 1)
-                    c0 = max(0, c - corridor_width)
-                    c1 = min(cost_arr.shape[1], c + corridor_width + 1)
-                    mask[r0:r1, c0:c1] = True
-                
-                # Find alt route outside corridor
-                alt_cost_arr = cost_arr.copy()
-                alt_cost_arr[mask] = 1e9
+                # Find alternative route by temporarily removing main path edges from graph
+                temp_Gs = Gs.copy()
+                for k in range(len(path_main) - 1):
+                    u, v = path_main[k], path_main[k+1]
+                    if temp_Gs.has_edge(u, v):
+                        temp_Gs.remove_edge(u, v)
                 
                 try:
-                    indices_alt, cost_alt = route_through_array(
-                        alt_cost_arr, pA, pB, fully_connected=True, geometric=True
-                    )
-                    alt_length = len(indices_alt)
-                except:
-                    return None
+                    path_alt = nx.shortest_path(temp_Gs, pA, pB, weight='weight')
+                    alt_length = sum(temp_Gs[path_alt[k]][path_alt[k+1]]['weight'] for k in range(len(path_alt)-1))
+                except nx.NetworkXNoPath:
+                    # No alternative path exists - this is a highly constrained route (interesting!)
+                    alt_length = main_length * 3  # High hardness score
+                    path_alt = []
                 
-                # Calculate hardness score
-                if alt_length > 0:
-                    hardness = alt_length / main_length
-                else:
-                    hardness = 0
+                # Calculate hardness score (ratio of alternative to main length)
+                hardness = alt_length / main_length if main_length > 0 else 0
                 
                 return {
                     'i': i, 'j': j,
                     'pA': pA, 'pB': pB,
-                    'main_path': indices_main,
-                    'alt_path': indices_alt,
+                    'main_path': list(path_main),      # Graph nodes as list of (row, col)
+                    'alt_path': list(path_alt),        # Graph nodes as list of (row, col)
                     'main_length': main_length,
                     'alt_length': alt_length,
                     'hardness': hardness,
