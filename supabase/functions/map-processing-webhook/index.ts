@@ -161,7 +161,9 @@ Deno.serve(async (req) => {
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      const filePath = `${userMap.user_id}/${mapId}/${storagePath}`
+      // Modal sends storagePath as: mapId/aspect/filename.webp
+      // We prepend userId only: userId/mapId/aspect/filename.webp
+      const filePath = `${userMap.user_id}/${storagePath}`
       const { error: uploadError } = await supabase.storage.from('user-route-images')
         .upload(filePath, imageData, { contentType: mimeType, cacheControl: '3600', upsert: true })
 
