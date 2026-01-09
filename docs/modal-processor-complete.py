@@ -745,7 +745,7 @@ def process_map(job_payload: dict):
 # FASTAPI ENDPOINT TO TRIGGER PROCESSING
 # =============================================================================
 @app.function(image=image)
-@modal.fastapi_endpoint()
+@modal.fastapi_endpoint(method="POST")
 def trigger(payload: dict):
     """
     FastAPI endpoint to receive job payloads and start processing.
