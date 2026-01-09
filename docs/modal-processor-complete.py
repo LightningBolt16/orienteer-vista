@@ -704,29 +704,38 @@ def process_map(job_payload: dict):
                 cand['selection_pass']
             ])
 
-        # Upload CSV
-        csv_path = "/tmp/routes_summary.csv"
-        with open(csv_path, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(csv_data)
-            
+        # Build route records for the complete webhook
+        csv_records = []
+        for row in csv_data[1:]:  # Skip header row
+            csv_records.append({
+                "id": row[0],
+                "main_side": row[1],
+                "main_length": float(row[2]),
+                "alt_length": float(row[3]),
+                "overlap": float(row[4]),
+                "hardness": float(row[5]),
+            })
+
         webhook_url = job_payload["webhook_url"]
         webhook_secret = job_payload["webhook_secret"]
-        
-        with open(csv_path, "rb") as f:
-            csv_content = base64.b64encode(f.read()).decode('utf-8')
-            
-        requests.post(
-            f"{webhook_url}/upload-csv",
+
+        # Call the /complete endpoint to create route_maps and route_images entries
+        complete_response = requests.post(
+            f"{webhook_url}/complete",
             json={
                 "map_id": map_id,
-                "csv_data": csv_content,
-                "storage_path": f"{map_id}/routes_summary.csv",
+                "route_count": len(final_list),
+                "csv_data": csv_records,
             },
             headers={"Content-Type": "application/json", "X-Webhook-Secret": webhook_secret}
         )
-        
-        update_status("completed", f"Generated {len(final_list)} routes successfully!")
+
+        if complete_response.status_code != 200:
+            print(f"Warning: Complete webhook returned {complete_response.status_code}: {complete_response.text}")
+        else:
+            print(f"Complete webhook succeeded - created route_maps and route_images entries")
+
+        print(f"Processing complete! Generated {len(final_list)} routes")
         return {"success": True, "routes_count": len(final_list), "map_id": map_id}
 
     except Exception as e:
