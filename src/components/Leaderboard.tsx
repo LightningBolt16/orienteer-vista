@@ -57,6 +57,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
   const [displayLeaderboard, setDisplayLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   // Fetch leaderboard data based on mapFilter
+  // Only show users with 100+ attempts
+  const MIN_ATTEMPTS_FOR_LEADERBOARD = 100;
+
   useEffect(() => {
     const loadLeaderboard = async () => {
       setIsLoading(true);
@@ -71,7 +74,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
             const { supabase } = await import('../integrations/supabase/client');
             const { data, error } = await (supabase
               .from('user_profiles' as any)
-              .select('user_id, name, accuracy, speed, profile_image, previous_rank')
+              .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total')
+              .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
               .order('accuracy', { ascending: false })
               .order('speed', { ascending: true })
               .limit(50) as any);

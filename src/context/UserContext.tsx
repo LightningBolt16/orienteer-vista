@@ -185,13 +185,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Fetch leaderboard data with retry - now uses weighted scoring with time decay
+  // Only show users with 100+ attempts
+  const MIN_ATTEMPTS_FOR_LEADERBOARD = 100;
+  
   const fetchLeaderboard = async () => {
     try {
       const data = await supabaseManager.executeWithRetry(
         async () => {
           const { data, error } = await (supabase
             .from('user_profiles' as any)
-            .select('user_id, name, accuracy, speed, profile_image, previous_rank')
+            .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total')
+            .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
             .order('accuracy', { ascending: false })
             .order('speed', { ascending: true })
             .limit(50) as any);
