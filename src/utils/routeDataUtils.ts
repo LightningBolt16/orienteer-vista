@@ -516,17 +516,14 @@ export async function loadUserMapRoutes(
       return { routes: [], map: null, userMapName: userMap.name };
     }
 
-    // Check if images are in user-route-images (private) or route-images (public)
-    const firstImagePath = routeImages[0].image_path;
-    const isPrivateStorage = firstImagePath.startsWith('user-route-images/') || !firstImagePath.includes('/');
-    const bucketName = isPrivateStorage ? 'user-route-images' : 'route-images';
+    // User maps always use user-route-images bucket
+    // Paths are in format: userId/mapId/aspect/file.webp (4 segments)
+    const bucketName = 'user-route-images';
 
     // Build routes with proper image URLs
     const routes: RouteData[] = routeImages.map(route => {
-      // For private bucket, we need to construct signed URL or use public URL if bucket is public
-      const imagePath = route.image_path.startsWith(bucketName) 
-        ? route.image_path.replace(`${bucketName}/`, '')
-        : route.image_path;
+      // Image path is stored as userId/mapId/aspect/file.webp
+      const imagePath = route.image_path;
       
       const imageUrl = `${USER_STORAGE_URL}/public/${bucketName}/${imagePath}`;
       
