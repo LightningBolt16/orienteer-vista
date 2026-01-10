@@ -324,15 +324,15 @@ const RouteGame: React.FC = () => {
                     );
                   })}
                   
-                  {/* Upload Your Own Map Link */}
+                  {/* Upload your own map link */}
                   {user && (
                     <button
                       onClick={() => navigate('/my-maps')}
                       className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-primary/40 transition-all hover:border-primary hover:bg-primary/5 bg-card/50"
                     >
                       <Map className="h-8 w-8 mb-2 text-primary" />
-                      <span className="font-medium text-sm text-primary">{t('uploadYourMap') || 'Your Maps'}</span>
-                      <span className="text-xs text-muted-foreground text-center">{t('privateMapHint') || 'Private, only you'}</span>
+                      <span className="font-medium text-sm text-primary">{t('uploadYourMap') || 'Your maps'}</span>
+                      <span className="text-xs text-muted-foreground text-center">{t('privateMapHint') || 'Private — only visible to you'}</span>
                     </button>
                   )}
                 </div>
