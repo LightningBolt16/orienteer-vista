@@ -320,9 +320,21 @@ const RouteGame: React.FC = () => {
                         <span className="text-xs text-muted-foreground">
                           {mapSource?.description || 'Orienteering map'}
                         </span>
-                      </button>
+                    </button>
                     );
                   })}
+                  
+                  {/* Upload Your Own Map Link */}
+                  {user && (
+                    <button
+                      onClick={() => navigate('/my-maps')}
+                      className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-primary/40 transition-all hover:border-primary hover:bg-primary/5 bg-card/50"
+                    >
+                      <Map className="h-8 w-8 mb-2 text-primary" />
+                      <span className="font-medium text-sm text-primary">{t('uploadYourMap') || 'Your Maps'}</span>
+                      <span className="text-xs text-muted-foreground text-center">{t('privateMapHint') || 'Private, only you'}</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">

@@ -471,6 +471,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     
     return (
       <div className="glass-card p-3 animate-fade-in w-full max-w-full overflow-hidden">
+        {/* Qualification notice */}
+        <div className="mb-3 px-2 py-1.5 bg-muted/50 rounded-md flex items-center gap-1.5">
+          <Info className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          <span className="text-[10px] text-muted-foreground">
+            {t('leaderboardQualificationNotice') || 'Requires 100+ route attempts to qualify'}
+          </span>
+        </div>
+        
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center min-w-0">
             <Trophy className="h-4 w-4 text-orienteering mr-1.5 flex-shrink-0" />
@@ -559,6 +567,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
 
   return (
     <div className="glass-card p-6 animate-fade-in">
+      {/* Qualification notice */}
+      <div className="mb-4 px-3 py-2 bg-muted/50 rounded-md flex items-center gap-2">
+        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <span className="text-sm text-muted-foreground">
+          {t('leaderboardQualificationNotice') || 'Requires 100+ route attempts to qualify'}
+        </span>
+      </div>
+      
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <Trophy className="h-5 w-5 text-orienteering mr-2" />
