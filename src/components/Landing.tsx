@@ -38,7 +38,7 @@ const Landing: React.FC = () => {
           <div className="bg-amber-50 text-amber-800 p-4 rounded-md flex items-start gap-3">
             <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
             <div>
-              <h3 className="font-medium mb-1">{t('developmentMode') || "Development Mode"}</h3>
+              <h3 className="font-medium mb-1">{t('developmentMode') || "Development mode"}</h3>
               <p className="text-sm">
                 {t('developmentModeInfo') || "This application is currently in development mode."}
               </p>

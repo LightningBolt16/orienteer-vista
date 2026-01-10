@@ -471,14 +471,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     
     return (
       <div className="glass-card p-3 animate-fade-in w-full max-w-full overflow-hidden">
-        {/* Qualification notice */}
-        <div className="mb-3 px-2 py-1.5 bg-muted/50 rounded-md flex items-center gap-1.5">
-          <Info className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-          <span className="text-[10px] text-muted-foreground">
-            {t('leaderboardQualificationNotice') || 'Requires 100+ route attempts to qualify'}
-          </span>
-        </div>
-        
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center min-w-0">
             <Trophy className="h-4 w-4 text-orienteering mr-1.5 flex-shrink-0" />
@@ -488,7 +480,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
                 <Info className="h-3.5 w-3.5 text-muted-foreground ml-1.5 cursor-pointer flex-shrink-0" />
               </PopoverTrigger>
               <PopoverContent className="max-w-xs">
-                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Attempts older than 30 days start losing value (fully gone after 120 days). Accuracy above 50% gives exponential boost, below 50% gives penalty. Overall score = (1000 ÷ Speed) × Accuracy Multiplier × 100.'}</p>
+                <p className="text-sm mb-2">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Attempts older than 30 days start losing value (fully gone after 120 days). Accuracy above 50% gives exponential boost, below 50% gives penalty. Overall score = (1000 ÷ Speed) × Accuracy Multiplier × 100.'}</p>
+                <p className="text-sm font-medium text-primary">{t('leaderboardQualificationNotice') || 'Requires 100+ route attempts to qualify'}</p>
               </PopoverContent>
             </Popover>
           </div>
@@ -567,14 +560,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
 
   return (
     <div className="glass-card p-6 animate-fade-in">
-      {/* Qualification notice */}
-      <div className="mb-4 px-3 py-2 bg-muted/50 rounded-md flex items-center gap-2">
-        <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <span className="text-sm text-muted-foreground">
-          {t('leaderboardQualificationNotice') || 'Requires 100+ route attempts to qualify'}
-        </span>
-      </div>
-      
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
           <Trophy className="h-5 w-5 text-orienteering mr-2" />
@@ -584,8 +569,9 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
               <TooltipTrigger asChild>
                 <Info className="h-4 w-4 text-muted-foreground ml-2 cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                <p className="text-sm">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Attempts older than 30 days start losing value (fully gone after 120 days). Accuracy above 50% gives exponential boost, below 50% gives penalty. Overall score = (1000 ÷ Speed) × Accuracy Multiplier × 100.'}</p>
+              <TooltipContent className="max-w-sm">
+                <p className="text-sm mb-2">{t('leaderboardTooltip') || 'Only your last 100 route attempts count. Attempts older than 30 days start losing value (fully gone after 120 days). Accuracy above 50% gives exponential boost, below 50% gives penalty. Overall score = (1000 ÷ Speed) × Accuracy Multiplier × 100.'}</p>
+                <p className="text-sm font-medium text-primary">{t('leaderboardQualificationNotice') || 'Requires 100+ route attempts to qualify'}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

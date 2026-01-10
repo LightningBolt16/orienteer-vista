@@ -43,7 +43,7 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <FileText className="h-5 w-5 text-primary" />
-            How to Prepare Your Map Files
+            How to prepare your map files
           </DialogTitle>
           <DialogDescription>
             Please read these instructions carefully before uploading. Incorrect files will cause processing errors.
@@ -51,11 +51,22 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Privacy Notice */}
+          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-primary">Private maps</p>
+              <p className="text-muted-foreground">
+                Maps you upload are completely private and only visible to you. They will not appear on public leaderboards or be shared with other users.
+              </p>
+            </div>
+          </div>
+
           {/* Warning Banner */}
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium text-amber-600 dark:text-amber-400">Important!</p>
+              <p className="font-medium text-amber-600 dark:text-amber-400">Important</p>
               <p className="text-muted-foreground">
                 Both TIF files must be exported from OCAD with the exact settings described below. 
                 Incorrect resolution or format will result in processing failures.
@@ -67,7 +78,7 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
           <div className="space-y-3">
             <h3 className="font-semibold flex items-center gap-2">
               <span className="h-6 w-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center">1</span>
-              Color Map (TIF) - Full Color Export
+              Color map (TIF) - Full color export
             </h3>
             <div className="bg-muted rounded-lg p-4 space-y-2 text-sm">
               <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
@@ -81,16 +92,15 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
             </div>
             <Button variant="outline" size="sm" onClick={handleDownloadColorGuide} className="gap-2">
               <Download className="h-4 w-4" />
-              Download Color Export Guide (PDF)
+              Download color export guide (PDF)
             </Button>
           </div>
 
           {/* Impassable TIF Instructions */}
-          {/* Impassable TIF Instructions */}
           <div className="space-y-3">
             <h3 className="font-semibold flex items-center gap-2">
               <span className="h-6 w-6 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center">2</span>
-              Impassable Features Map (TIF) - B&W Export
+              Impassable features map (TIF) - B&W export
             </h3>
             <div className="bg-muted rounded-lg p-4 space-y-2 text-sm">
               <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
@@ -102,13 +112,13 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
             </div>
             <Button variant="outline" size="sm" onClick={handleDownloadImpassableGuide} className="gap-2">
               <Download className="h-4 w-4" />
-              Download Impassable Export Guide (PDF)
+              Download impassable export guide (PDF)
             </Button>
           </div>
 
           {/* Checklist */}
           <div className="space-y-3">
-            <h3 className="font-semibold">Before Uploading, Verify:</h3>
+            <h3 className="font-semibold">Before uploading, verify:</h3>
             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
               <ul className="space-y-2 text-sm">
                 <li className="flex items-center gap-2">
@@ -137,7 +147,7 @@ const OCADInstructionsDialog: React.FC<OCADInstructionsDialogProps> = ({
             Cancel
           </Button>
           <Button onClick={handleConfirm}>
-            I've Read the Instructions - Continue
+            I've read the instructions - Continue
           </Button>
         </DialogFooter>
       </DialogContent>
