@@ -245,8 +245,16 @@ const Header: React.FC = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="transition-all-300 hover:brightness-110">
-                    <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
-                      <User className="h-5 w-5 text-orienteering" />
+                    <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                      {isAuthenticated && user.profileImage ? (
+                        <img 
+                          src={user.profileImage} 
+                          alt={user.name || 'Profile'} 
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-5 w-5 text-orienteering" />
+                      )}
                     </div>
                   </button>
                 </DropdownMenuTrigger>

@@ -365,6 +365,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       tutorialTip: 'Pro Tip',
       tutorialTipDesc: 'Speed matters! Faster correct answers give you bonus points. Only your last 100 attempts count toward your leaderboard score.',
       tutorialStart: "Let's Go!",
+      
+      // Additional translations
+      allTimeStatistics: 'All-time statistics',
+      uploadYourMap: 'Your maps',
+      privateMapHint: 'Private — only visible to you',
+      loginToViewLeaderboard: 'Log in to view the leaderboard',
+      loginToViewLeaderboardDesc: 'Sign in to see how you rank against other players.',
+      forgotPassword: 'Forgot password?',
+      passwordRequirements: 'Minimum 8 characters',
+      leaderboardQualificationNotice: 'You need at least 100 route attempts to appear on the leaderboard',
+      login: 'Log in',
     },
     sv: {
       // Navigation & Common Elements
@@ -679,6 +690,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       tutorialTip: 'Proffstips',
       tutorialTipDesc: 'Hastighet räknas! Snabbare korrekta svar ger bonuspoäng. Endast dina senaste 100 försök räknas mot din topplista.',
       tutorialStart: 'Kör igång!',
+      
+      // Additional translations
+      allTimeStatistics: 'Statistik totalt',
+      uploadYourMap: 'Dina kartor',
+      privateMapHint: 'Privat — endast synlig för dig',
+      loginToViewLeaderboard: 'Logga in för att se topplistan',
+      loginToViewLeaderboardDesc: 'Logga in för att se hur du rankas mot andra spelare.',
+      forgotPassword: 'Glömt lösenord?',
+      passwordRequirements: 'Minst 8 tecken',
+      leaderboardQualificationNotice: 'Du behöver minst 100 vägvalsförsök för att synas på topplistan',
+      login: 'Logga in',
     },
   };
 
