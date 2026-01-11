@@ -34,7 +34,8 @@ const Header: React.FC = () => {
   
   // Get rank only if leaderboard is loaded
   const currentRank = leaderboard.length > 0 ? getUserRank() : 0;
-  const hasValidRank = user?.attempts?.total !== undefined && user.attempts.total > 0 && currentRank > 0;
+  const hasValidRank = currentRank > 0;
+  const isAuthenticated = user && user.id !== '1';
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -65,7 +66,6 @@ const Header: React.FC = () => {
     return location.pathname === path;
   };
 
-  const isAuthenticated = user && user.id !== '1';
 
   // Connection status check
   const checkConnection = async () => {
@@ -100,10 +100,10 @@ const Header: React.FC = () => {
         {isMobile ? (
           <>
             <div className="flex items-center space-x-4">
-              {hasValidRank && (
+              {isAuthenticated && (
                 <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
-                  {t('rank')} {currentRank}
+                  {hasValidRank ? `#${currentRank}` : t('unranked') || 'Unranked'}
                 </Link>
               )}
               
@@ -233,10 +233,10 @@ const Header: React.FC = () => {
             
             
             <div className="flex items-center space-x-2 ml-4">
-              {hasValidRank && (
+              {isAuthenticated && (
                 <Link to="/leaderboard" className="rounded-full p-2 bg-orienteering/10 text-orienteering flex items-center hover:bg-orienteering/20 transition-colors">
                   <Medal className="h-4 w-4 mr-1" />
-                  {t('rank')} {currentRank}
+                  {hasValidRank ? `#${currentRank}` : t('unranked') || 'Unranked'}
                 </Link>
               )}
               

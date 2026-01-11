@@ -376,6 +376,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       passwordRequirements: 'Minimum 8 characters',
       leaderboardQualificationNotice: 'You need at least 100 route attempts to appear on the leaderboard',
       login: 'Log in',
+      unranked: 'Unranked',
+      viewFullLeaderboard: 'View full leaderboard',
     },
     sv: {
       // Navigation & Common Elements
@@ -701,6 +703,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       passwordRequirements: 'Minst 8 tecken',
       leaderboardQualificationNotice: 'Du behöver minst 100 vägvalsförsök för att synas på topplistan',
       login: 'Logga in',
+      unranked: 'Oplacerad',
+      viewFullLeaderboard: 'Visa hela topplistan',
     },
   };
 

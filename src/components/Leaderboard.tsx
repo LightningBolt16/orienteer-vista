@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Trophy, Users, Zap, Target, ArrowUp, ArrowDown, AlertCircle, Info, TrendingUp, TrendingDown, Minus, RefreshCw, ExternalLink } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { calculateCombinedScore as calcCombinedScore, calculateAccuracyMultiplier } from '../utils/scoringUtils';
@@ -47,14 +47,19 @@ type LeaderboardEntry = {
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = false }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { leaderboard, user, fetchMapLeaderboard } = useUser();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [sortField, setSortField] = useState<SortField>('combined');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [displayLeaderboard, setDisplayLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  const isOnLeaderboardPage = location.pathname === '/leaderboard';
 
   // Fetch leaderboard data based on mapFilter
   // Only show users with 100+ attempts
@@ -169,28 +174,57 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
 
   // Add refresh functionality
   const handleRefresh = async () => {
-    setIsLoading(true);
+    setIsRefreshing(true);
     setHasError(false);
     
     try {
       const { supabase } = await import('../integrations/supabase/client');
       
-      const { error } = await (supabase.from('user_profiles' as any)
-        .select('id')
-        .limit(1) as any);
+      if (mapFilter === 'all') {
+        const { data, error } = await (supabase
+          .from('user_profiles' as any)
+          .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total')
+          .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
+          .order('accuracy', { ascending: false })
+          .order('speed', { ascending: true })
+          .limit(50) as any);
         
-      if (error) {
-        throw error;
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          const calculateScore = (accuracy: number, speed: number) => {
+            return calcCombinedScore(accuracy, speed);
+          };
+          
+          const sortedData = [...data].sort((a: any, b: any) => {
+            const scoreA = calculateScore(a.accuracy || 0, a.speed || 0);
+            const scoreB = calculateScore(b.accuracy || 0, b.speed || 0);
+            return scoreB - scoreA;
+          });
+          
+          const rankedLeaderboard = sortedData.map((entry: any, index: number) => ({
+            id: entry.user_id,
+            name: entry.name || 'User',
+            accuracy: entry.accuracy || 0,
+            speed: entry.speed || 0,
+            rank: index + 1,
+            previousRank: entry.previous_rank || null,
+            profileImage: entry.profile_image
+          }));
+          
+          setDisplayLeaderboard(rankedLeaderboard);
+        }
+      } else {
+        const mapLeaderboard = await fetchMapLeaderboard(mapFilter);
+        setDisplayLeaderboard(mapLeaderboard);
       }
       
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 1000);
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error refreshing leaderboard:', error);
       setHasError(true);
-      setIsLoading(false);
     }
+    setIsRefreshing(false);
   };
   
   // Handle sorting
@@ -485,9 +519,30 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
               </PopoverContent>
             </Popover>
           </div>
-          <div className="flex items-center text-xs text-muted-foreground flex-shrink-0">
-            <Users className="h-3 w-3 mr-1" />
-            <span>{displayLeaderboard.length}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            {!isOnLeaderboardPage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => navigate('/leaderboard')}
+              >
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+            <div className="flex items-center text-xs text-muted-foreground">
+              <Users className="h-3 w-3 mr-1" />
+              <span>{displayLeaderboard.length}</span>
+            </div>
           </div>
         </div>
         
@@ -585,10 +640,21 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
             variant="ghost" 
             size="sm"
             onClick={handleRefresh}
+            disabled={isRefreshing}
             className="ml-2"
           >
-            <ArrowUp className="h-4 w-4 rotate-45" />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
+          {!isOnLeaderboardPage && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/leaderboard')}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              {t('viewFullLeaderboard') || 'View full leaderboard'}
+            </Button>
+          )}
         </div>
       </div>
       
