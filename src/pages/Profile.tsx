@@ -39,7 +39,7 @@ const Profile: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [mapStats, setMapStats] = useState<MapStats[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformanceDataPoint[]>([]);
-  const [timeFilter, setTimeFilter] = useState<'week' | 'month' | 'all'>('week');
+  const [timeFilter, setTimeFilter] = useState<'week' | 'month' | '90days' | 'all'>('month');
   const [loadingStats, setLoadingStats] = useState(true);
   const [cropperOpen, setCropperOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
@@ -104,6 +104,8 @@ const Profile: React.FC = () => {
         startDate = subDays(new Date(), 7);
       } else if (timeFilter === 'month') {
         startDate = subMonths(new Date(), 1);
+      } else if (timeFilter === '90days') {
+        startDate = subDays(new Date(), 90);
       }
 
       let query = supabase
@@ -535,13 +537,14 @@ const Profile: React.FC = () => {
             <TabsContent value="progress">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">{t('performanceOverTime') || 'Performance Over Time'}</h2>
-                <Select value={timeFilter} onValueChange={(value: 'week' | 'month' | 'all') => setTimeFilter(value)}>
-                  <SelectTrigger className="w-32">
+                <Select value={timeFilter} onValueChange={(value: 'week' | 'month' | '90days' | 'all') => setTimeFilter(value)}>
+                  <SelectTrigger className="w-36">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="week">{t('lastWeek') || 'Last Week'}</SelectItem>
-                    <SelectItem value="month">{t('lastMonth') || 'Last Month'}</SelectItem>
+                    <SelectItem value="week">{t('lastWeek') || '7 Days'}</SelectItem>
+                    <SelectItem value="month">{t('lastMonth') || '30 Days'}</SelectItem>
+                    <SelectItem value="90days">{t('last90Days') || '90 Days'}</SelectItem>
                     <SelectItem value="all">{t('allTime') || 'All Time'}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -570,12 +573,12 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="linear" 
+                          type="monotone" 
                           dataKey="accuracy" 
                           stroke="hsl(var(--orienteering))" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(var(--orienteering))', r: 4, strokeWidth: 0 }}
-                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          dot={{ fill: 'hsl(var(--orienteering))', r: 3, strokeWidth: 0 }}
+                          activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
                           name={t('accuracy') || 'Accuracy'}
                         />
@@ -599,12 +602,12 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="linear" 
+                          type="monotone" 
                           dataKey="speed" 
                           stroke="hsl(142, 76%, 36%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(142, 76%, 36%)', r: 4, strokeWidth: 0 }}
-                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          dot={{ fill: 'hsl(142, 76%, 36%)', r: 3, strokeWidth: 0 }}
+                          activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
                           name={t('speed') || 'Speed (ms)'}
                         />
@@ -628,12 +631,12 @@ const Profile: React.FC = () => {
                           }} 
                         />
                         <Line 
-                          type="linear" 
+                          type="monotone" 
                           dataKey="attempts" 
                           stroke="hsl(217, 91%, 60%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(217, 91%, 60%)', r: 4, strokeWidth: 0 }}
-                          activeDot={{ r: 6, strokeWidth: 0 }}
+                          dot={{ fill: 'hsl(217, 91%, 60%)', r: 3, strokeWidth: 0 }}
+                          activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
                           name={t('attempts') || 'Attempts'}
                         />
