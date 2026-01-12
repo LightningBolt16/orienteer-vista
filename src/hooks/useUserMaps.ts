@@ -36,6 +36,7 @@ export interface ProcessingParameters {
   smoothing_window?: number;
   corridor_base_width?: number;
   corridor_scale_factor?: number;
+  num_alternate_routes?: 1 | 2 | 3;
 }
 
 export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
@@ -53,6 +54,7 @@ export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
   smoothing_window: 5,
   corridor_base_width: 50,
   corridor_scale_factor: 0.5,
+  num_alternate_routes: 1,
 };
 
 interface UploadDataR2 {
