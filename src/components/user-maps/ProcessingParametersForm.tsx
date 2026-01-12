@@ -3,17 +3,44 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Lock } from 'lucide-react';
 import { ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+// Regular user limits
+const USER_LIMITS = {
+  maxOutputRoutes: 100,
+  maxCandidatePairs: 50000,
+  maxAlternateRoutes: 1,
+};
+
+// Admin limits (effectively unlimited for practical purposes)
+const ADMIN_LIMITS = {
+  maxOutputRoutes: 500,
+  maxCandidatePairs: 100000,
+  maxAlternateRoutes: 3,
+};
 
 interface ProcessingParametersFormProps {
   parameters: ProcessingParameters;
   onChange: (parameters: ProcessingParameters) => void;
+  isAdmin?: boolean;
 }
 
 const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
   parameters,
   onChange,
+  isAdmin = false,
 }) => {
+  const limits = isAdmin ? ADMIN_LIMITS : USER_LIMITS;
+
   const updateParam = <K extends keyof ProcessingParameters>(
     key: K,
     value: ProcessingParameters[K]
@@ -21,9 +48,64 @@ const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
     onChange({ ...parameters, [key]: value });
   };
 
+  const LimitBadge = ({ locked }: { locked: boolean }) => {
+    if (isAdmin || !locked) return null;
+    return (
+      <Badge variant="secondary" className="ml-2 text-xs">
+        <Lock className="h-3 w-3 mr-1" />
+        Admin Only
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <Accordion type="single" collapsible className="w-full">
+        {/* Alternate Routes - New section for multi-route support */}
+        <AccordionItem value="alternate-routes">
+          <AccordionTrigger>
+            Route Options
+            {!isAdmin && <LimitBadge locked />}
+          </AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="num_alternate_routes">
+                  Alternate Routes per Image
+                </Label>
+                {!isAdmin && (
+                  <Badge variant="outline" className="text-xs">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Locked
+                  </Badge>
+                )}
+              </div>
+              <Select
+                value={String(parameters.num_alternate_routes || 1)}
+                onValueChange={(v) => updateParam('num_alternate_routes', parseInt(v) as 1 | 2 | 3)}
+                disabled={!isAdmin}
+              >
+                <SelectTrigger className={!isAdmin ? 'opacity-60' : ''}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 alternate (2 arrows)</SelectItem>
+                  {isAdmin && (
+                    <>
+                      <SelectItem value="2">2 alternates (3 arrows)</SelectItem>
+                      <SelectItem value="3">3 alternates (4 arrows)</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Number of incorrect route alternatives shown alongside the correct route.
+                {!isAdmin && ' Request admin access to unlock 2-3 alternates.'}
+              </p>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
         <AccordionItem value="point-generation">
           <AccordionTrigger>Point Generation</AccordionTrigger>
           <AccordionContent className="space-y-4 pt-4">
@@ -78,15 +160,28 @@ const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="max_candidate_pairs">Max Candidate Pairs</Label>
-              <Input
+              <div className="flex items-center gap-2">
+                <Label htmlFor="max_candidate_pairs">
+                  Max Candidate Pairs: {parameters.max_candidate_pairs?.toLocaleString()}
+                </Label>
+                {!isAdmin && (parameters.max_candidate_pairs || 0) >= USER_LIMITS.maxCandidatePairs && (
+                  <Badge variant="secondary" className="text-xs">Max</Badge>
+                )}
+              </div>
+              <Slider
                 id="max_candidate_pairs"
-                type="number"
                 min={1000}
-                max={50000}
-                value={parameters.max_candidate_pairs || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs}
-                onChange={(e) => updateParam('max_candidate_pairs', parseInt(e.target.value) || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs)}
+                max={limits.maxCandidatePairs}
+                step={1000}
+                value={[Math.min(parameters.max_candidate_pairs || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs!, limits.maxCandidatePairs)]}
+                onValueChange={([v]) => updateParam('max_candidate_pairs', v)}
               />
+              <p className="text-xs text-muted-foreground">
+                {isAdmin 
+                  ? 'Maximum pairs to evaluate (higher = more options but slower)'
+                  : `Limited to ${USER_LIMITS.maxCandidatePairs.toLocaleString()} for regular users. Request admin for up to ${ADMIN_LIMITS.maxCandidatePairs.toLocaleString()}.`
+                }
+              </p>
             </div>
           </AccordionContent>
         </AccordionItem>
@@ -95,17 +190,28 @@ const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
           <AccordionTrigger>Output Settings</AccordionTrigger>
           <AccordionContent className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="num_output_routes">
-                Number of Routes: {parameters.num_output_routes}
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="num_output_routes">
+                  Number of Routes: {parameters.num_output_routes}
+                </Label>
+                {!isAdmin && (parameters.num_output_routes || 0) >= USER_LIMITS.maxOutputRoutes && (
+                  <Badge variant="secondary" className="text-xs">Max</Badge>
+                )}
+              </div>
               <Slider
                 id="num_output_routes"
                 min={10}
-                max={200}
+                max={limits.maxOutputRoutes}
                 step={10}
-                value={[parameters.num_output_routes || DEFAULT_PROCESSING_PARAMETERS.num_output_routes!]}
+                value={[Math.min(parameters.num_output_routes || DEFAULT_PROCESSING_PARAMETERS.num_output_routes!, limits.maxOutputRoutes)]}
                 onValueChange={([v]) => updateParam('num_output_routes', v)}
               />
+              <p className="text-xs text-muted-foreground">
+                {isAdmin
+                  ? 'Number of route images to generate'
+                  : `Limited to ${USER_LIMITS.maxOutputRoutes} for regular users. Request admin for up to ${ADMIN_LIMITS.maxOutputRoutes}.`
+                }
+              </p>
             </div>
 
             <div className="space-y-2">

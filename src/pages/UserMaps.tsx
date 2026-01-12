@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw, Crown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
+import { useAdmin } from '@/hooks/useAdmin';
 import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
+import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
+import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
@@ -19,11 +22,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+// How long before showing recover button (10 minutes)
+const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+
 const UserMaps: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: userLoading } = useUser();
   const { userMaps, loading, fetchUserMaps, deleteUserMap } = useUserMaps();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
+  const [showAdminRequest, setShowAdminRequest] = useState(false);
   const [deleteMapId, setDeleteMapId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -59,11 +67,31 @@ const UserMaps: React.FC = () => {
     };
   }, [user, fetchUserMaps]);
 
+  // Polling for processing maps (every 30 seconds)
+  useEffect(() => {
+    if (!user) return;
+    
+    const processingMaps = userMaps.filter(m => m.status === 'processing');
+    if (processingMaps.length === 0) return;
+
+    const interval = setInterval(() => {
+      fetchUserMaps();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user, userMaps, fetchUserMaps]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchUserMaps();
     setRefreshing(false);
   }, [fetchUserMaps]);
+
+  const isMapStale = (map: UserMap): boolean => {
+    if (map.status !== 'processing') return false;
+    const lastActivity = new Date(map.updated_at).getTime();
+    return Date.now() - lastActivity > STALE_THRESHOLD_MS;
+  };
 
   if (userLoading) {
     return (
@@ -101,6 +129,7 @@ const UserMaps: React.FC = () => {
             fetchUserMaps();
           }}
           onCancel={() => setShowUploadWizard(false)}
+          isAdmin={isAdmin}
         />
       </div>
     );
@@ -136,6 +165,18 @@ const UserMaps: React.FC = () => {
           <p className="text-muted-foreground">Upload and manage your orienteering maps</p>
         </div>
         <div className="flex items-center gap-2">
+          {!isAdmin && !adminLoading && (
+            <Button variant="outline" onClick={() => setShowAdminRequest(true)}>
+              <Crown className="h-4 w-4 mr-2 text-yellow-500" />
+              Request Admin
+            </Button>
+          )}
+          {isAdmin && (
+            <Badge className="bg-yellow-500 text-black">
+              <Crown className="h-3 w-3 mr-1" />
+              Admin
+            </Badge>
+          )}
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -179,6 +220,13 @@ const UserMaps: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(map.status)}
+                    {isMapStale(map) && user && (
+                      <RecoverMapButton
+                        mapId={map.id}
+                        userId={user.id}
+                        onRecovered={fetchUserMaps}
+                      />
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -230,6 +278,11 @@ const UserMaps: React.FC = () => {
           ))}
         </div>
       )}
+
+      <AdminRequestDialog
+        open={showAdminRequest}
+        onOpenChange={setShowAdminRequest}
+      />
 
       <AlertDialog open={!!deleteMapId} onOpenChange={() => setDeleteMapId(null)}>
         <AlertDialogContent>
