@@ -80,7 +80,7 @@ export function useAdminRequest() {
       setExistingRequest(data as AdminRequest);
       toast({
         title: 'Request Submitted',
-        description: 'Your admin access request has been submitted for review.',
+        description: 'Your pro access request has been submitted for review.',
       });
       return true;
     } catch (error) {

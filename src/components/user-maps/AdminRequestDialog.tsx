@@ -55,10 +55,10 @@ const AdminRequestDialog: React.FC<AdminRequestDialogProps> = ({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-yellow-500" />
-            <DialogTitle>Request Admin Access</DialogTitle>
+            <DialogTitle>Request Pro Access</DialogTitle>
           </div>
           <DialogDescription>
-            Admin access unlocks advanced features for power users.
+            Pro access unlocks advanced features for power users.
           </DialogDescription>
         </DialogHeader>
 
@@ -88,10 +88,10 @@ const AdminRequestDialog: React.FC<AdminRequestDialogProps> = ({
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            <div className="space-y-2 bg-muted p-4 rounded-lg">
+          <div className="space-y-2 bg-muted p-4 rounded-lg">
               <h4 className="font-medium flex items-center gap-2">
                 <Unlock className="h-4 w-4" />
-                Admin Benefits
+                Pro Benefits
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• <strong>Multi-route images:</strong> Generate 2-3 alternate routes per image</li>
@@ -102,7 +102,7 @@ const AdminRequestDialog: React.FC<AdminRequestDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reason">Why do you need admin access? (Optional)</Label>
+              <Label htmlFor="reason">Why do you need pro access? (Optional)</Label>
               <Textarea
                 id="reason"
                 placeholder="e.g., I'm a club coach creating training materials for my team..."
