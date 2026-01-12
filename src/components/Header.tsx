@@ -194,7 +194,15 @@ const Header: React.FC = () => {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Shield className="h-5 w-5" />
-                      <span>{t('admin')}</span>
+                      <span>Club Requests</span>
+                    </Link>
+                    <Link 
+                      to="/admin/pro-requests"
+                      className="p-3 rounded-md flex items-center space-x-2 text-yellow-600"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Shield className="h-5 w-5" />
+                      <span>Pro Requests</span>
                     </Link>
                     <Link 
                       to="/admin/upload-maps"
@@ -277,7 +285,13 @@ const Header: React.FC = () => {
                       <DropdownMenuItem asChild>
                         <Link to="/admin/club-requests" className="text-yellow-600">
                           <Shield className="h-4 w-4 mr-2" />
-                          {t('admin')}
+                          Club Requests
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin/pro-requests" className="text-yellow-600">
+                          <Shield className="h-4 w-4 mr-2" />
+                          Pro Requests
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
