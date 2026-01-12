@@ -8,6 +8,7 @@ import { DuelSettings } from './DuelSetup';
 import { RouteData } from '@/utils/routeDataUtils';
 import { Users, Copy, Check, Wifi, WifiOff, Loader2, ArrowLeft, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnlineDuelHook {
   room: OnlineDuelRoom | null;
@@ -47,6 +48,39 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
   const [isStarting, setIsStarting] = useState(false);
 
   const { room, isHost, isConnecting, createRoom, joinRoom, startGame, leaveRoom } = onlineDuel;
+
+  // Polling fallback for guest - in case realtime subscription misses the status change
+  useEffect(() => {
+    // Only poll when: guest mode, room joined, waiting for host
+    if (!room || isHost || room.status === 'playing') return;
+    
+    console.log('[OnlineDuelLobby] Starting guest polling fallback');
+    
+    const pollInterval = setInterval(async () => {
+      console.log('[OnlineDuelLobby] Polling room status...');
+      const { data, error } = await supabase
+        .from('duel_rooms')
+        .select('*')
+        .eq('id', room.id)
+        .single();
+      
+      if (error) {
+        console.error('[OnlineDuelLobby] Polling error:', error);
+        return;
+      }
+      
+      if (data?.status === 'playing' && data.routes) {
+        console.log('[OnlineDuelLobby] Polling detected game started!');
+        clearInterval(pollInterval);
+        onGameStart(data.routes as unknown as RouteData[], data as unknown as OnlineDuelRoom);
+      }
+    }, 2000);
+    
+    return () => {
+      console.log('[OnlineDuelLobby] Stopping guest polling');
+      clearInterval(pollInterval);
+    };
+  }, [room, isHost, onGameStart]);
 
   // Load routes when creating a room (not when joining)
   useEffect(() => {

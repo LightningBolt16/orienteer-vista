@@ -36,6 +36,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   const [isConnecting, setIsConnecting] = useState(false);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   // Get or create persistent player ID (supports guests via sessionStorage)
   useEffect(() => {
@@ -216,9 +217,37 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     playerIdRef.current = playerId;
   }, [onGameStart, onOpponentAnswer, onGameEnd, playerId]);
 
+  // Refetch room state - used as fallback when subscription might have missed updates
+  const refetchRoom = useCallback(async (roomId: string) => {
+    console.log('[OnlineDuel] Refetching room state:', roomId);
+    const { data, error } = await supabase
+      .from('duel_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+    
+    if (error) {
+      console.error('[OnlineDuel] Error refetching room:', error);
+      return;
+    }
+    
+    if (data) {
+      const fetchedRoom = data as unknown as OnlineDuelRoom;
+      console.log('[OnlineDuel] Refetched room status:', fetchedRoom.status);
+      setRoom(fetchedRoom);
+      
+      // If room is already playing, trigger game start
+      if (fetchedRoom.status === 'playing') {
+        console.log('[OnlineDuel] Room already playing - triggering game start');
+        onGameStartRef.current?.(fetchedRoom);
+      }
+    }
+  }, []);
+
   // Subscribe to room updates
   const subscribeToRoom = useCallback((roomId: string) => {
     console.log('[OnlineDuel] Subscribing to room:', roomId);
+    setIsSubscribed(false);
     
     const newChannel = supabase
       .channel(`room-${roomId}`)
@@ -238,7 +267,8 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
             
             setRoom(newRoom);
             
-            // Only trigger for guest (host triggers manually in startGame)
+            // Trigger game start when status changes to playing
+            // This works for both realtime updates AND when we detect it after subscription
             if (newRoom.status === 'playing' && oldRoom?.status === 'waiting') {
               console.log('[OnlineDuel] Game started - transitioning to playing');
               onGameStartRef.current?.(newRoom);
@@ -272,10 +302,15 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       )
       .subscribe((status) => {
         console.log('[OnlineDuel] Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setIsSubscribed(true);
+          // Immediately refetch room state in case we missed the status change
+          refetchRoom(roomId);
+        }
       });
 
     setChannel(newChannel);
-  }, []);
+  }, [refetchRoom]);
 
   // Set ready status
   const setReady = useCallback(async (ready: boolean) => {
@@ -424,6 +459,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     room,
     isHost,
     isConnecting,
+    isSubscribed,
     playerId,
     createRoom,
     joinRoom,
@@ -433,5 +469,6 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     leaveRoom,
     finishGame,
     subscribeToRoom,
+    refetchRoom,
   };
 };

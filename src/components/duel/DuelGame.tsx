@@ -10,6 +10,7 @@ import DuelCountdown from './DuelCountdown';
 import { Trophy, RotateCcw, Home } from 'lucide-react';
 import { DuelSettings } from './DuelSetup';
 import { OnlineDuelRoom } from '@/hooks/useOnlineDuel';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface OnlineDuelHook {
   room: OnlineDuelRoom | null;
@@ -52,8 +53,10 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
   const [gameOver, setGameOver] = useState(false);
   const [routeStartTime, setRouteStartTime] = useState<number>(Date.now());
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number | null>(settings.gameDuration ?? null);
-  const [isMobile, setIsMobile] = useState(false);
   const [showCountdown, setShowCountdown] = useState(true);
+  
+  // Use consistent mobile detection hook (width-based only, no touch detection)
+  const isMobile = useIsMobile();
   
   // Online mode uses passed hook from parent
   const activeRoom = onlineDuel?.room;
@@ -119,20 +122,6 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
 
   const isTimedMode = settings.gameType === 'timed';
 
-  // Detect mobile (no forced orientation - use portrait naturally)
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth <= 768 || 'ontouchstart' in window;
-      setIsMobile(mobile);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
-  }, []);
 
   // Game timer countdown (for timed mode) - only start after countdown completes
   useEffect(() => {
