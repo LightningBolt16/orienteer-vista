@@ -575,9 +575,9 @@ const Profile: React.FC = () => {
                         <Line 
                           type="monotone" 
                           dataKey="accuracy" 
-                          stroke="hsl(var(--orienteering))" 
+                          stroke="hsl(24, 100%, 50%)" 
                           strokeWidth={2}
-                          dot={{ fill: 'hsl(var(--orienteering))', r: 3, strokeWidth: 0 }}
+                          dot={{ fill: 'hsl(24, 100%, 50%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
                           name={t('accuracy') || 'Accuracy'}
