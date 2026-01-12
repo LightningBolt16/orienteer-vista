@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_requests: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       club_members: {
         Row: {
           club_id: string
@@ -279,6 +309,7 @@ export type Database = {
       route_images: {
         Row: {
           alt_route_length: number | null
+          alt_route_lengths: Json | null
           aspect_ratio: string
           candidate_index: number
           created_at: string
@@ -286,10 +317,12 @@ export type Database = {
           image_path: string
           main_route_length: number | null
           map_id: string
+          num_alternates: number | null
           shortest_side: string
         }
         Insert: {
           alt_route_length?: number | null
+          alt_route_lengths?: Json | null
           aspect_ratio: string
           candidate_index: number
           created_at?: string
@@ -297,10 +330,12 @@ export type Database = {
           image_path: string
           main_route_length?: number | null
           map_id: string
+          num_alternates?: number | null
           shortest_side: string
         }
         Update: {
           alt_route_length?: number | null
+          alt_route_lengths?: Json | null
           aspect_ratio?: string
           candidate_index?: number
           created_at?: string
@@ -308,6 +343,7 @@ export type Database = {
           image_path?: string
           main_route_length?: number | null
           map_id?: string
+          num_alternates?: number | null
           shortest_side?: string
         }
         Relationships: [
