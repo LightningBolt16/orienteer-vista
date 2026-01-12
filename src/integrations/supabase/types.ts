@@ -592,6 +592,7 @@ export type Database = {
     Functions: {
       cleanup_old_duel_rooms: { Args: never; Returns: undefined }
       generate_room_code: { Args: never; Returns: string }
+      has_pro_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
