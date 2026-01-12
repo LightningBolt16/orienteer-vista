@@ -278,6 +278,7 @@ def process_map(job_payload: dict):
     NUM_OUTPUT_ROUTES = params.get("num_output_routes", 50)
     MAX_OVERLAP_PERCENT = params.get("max_overlap_percent", 0.20)
     BATCH_SIZE = params.get("batch_size", 25)
+    NUM_ALTERNATE_ROUTES = params.get("num_alternate_routes", 1)  # 1-3 alternate routes
     
     # Visuals
     ZOOM_MARGIN = params.get("zoom_margin", 50)
@@ -289,6 +290,9 @@ def process_map(job_payload: dict):
     # Adaptive Corridor Logic
     CORRIDOR_BASE_WIDTH = params.get("corridor_base_width", 50)
     CORRIDOR_SCALE_FACTOR = params.get("corridor_scale_factor", 0.5)
+    
+    # Colors for alternate routes
+    ALT_COLORS = ["blue", "green", "purple"]
 
     update_status("processing", "Starting route generation...")
 
@@ -471,11 +475,10 @@ def process_map(job_payload: dict):
 
         pair_scores = []
         
-        # Parallel Execution
-        # Note: We pass Gs and parameters explicitly because eval_pair is now global
+        # Parallel Execution - request up to NUM_ALTERNATE_ROUTES alternates
         with ProcessPoolExecutor() as ex:
-            # We use a constant of 3 for alt_max_alternatives
-            futures = [ex.submit(eval_pair, cp, Gs, MAX_OVERLAP_PERCENT, 3) for cp in candidate_pairs]
+            alt_max = max(3, NUM_ALTERNATE_ROUTES)  # Always find at least 3 potential alternates
+            futures = [ex.submit(eval_pair, cp, Gs, MAX_OVERLAP_PERCENT, alt_max) for cp in candidate_pairs]
             
             for fu in as_completed(futures):
                 try:
@@ -534,38 +537,49 @@ def process_map(job_payload: dict):
                     # 1. Main Pixel Route
                     ind_m_raw, _ = route_through_array(base_cost_map, st, en, fully_connected=True, geometric=True)
                     
-                    # 2. Adaptive Corridor Logic
+                    # 2. Process multiple alternate routes
                     graph_main = cand["main_route_graph"]
                     graph_main_tree = KDTree(graph_main)
-                    r_alt_graph = cand["alt_routes_graph"][0] 
                     
-                    mask_img = Image.new('L', (w_crop, h_crop), 0)
-                    draw = ImageDraw.Draw(mask_img)
+                    alt_pixel_routes = []
+                    alt_lengths = []
                     
-                    for pt in r_alt_graph:
-                        d, _ = graph_main_tree.query(pt)
-                        radius = CORRIDOR_BASE_WIDTH + (d * CORRIDOR_SCALE_FACTOR)
-                        x, y = pt[1], pt[0]
-                        draw.ellipse([x-radius, y-radius, x+radius, y+radius], fill=255)
-                    
-                    corridor_mask = np.array(mask_img) > 0
-                    cost_map_alt = base_cost_map.copy()
-                    cost_map_alt[~corridor_mask] += 50000 
-                    cost_map_alt[st] = 1
-                    cost_map_alt[en] = 1
+                    for alt_idx in range(min(NUM_ALTERNATE_ROUTES, len(cand["alt_routes_graph"]))):
+                        r_alt_graph = cand["alt_routes_graph"][alt_idx]
+                        
+                        mask_img = Image.new('L', (w_crop, h_crop), 0)
+                        draw = ImageDraw.Draw(mask_img)
+                        
+                        for pt in r_alt_graph:
+                            d, _ = graph_main_tree.query(pt)
+                            radius = CORRIDOR_BASE_WIDTH + (d * CORRIDOR_SCALE_FACTOR)
+                            x, y = pt[1], pt[0]
+                            draw.ellipse([x-radius, y-radius, x+radius, y+radius], fill=255)
+                        
+                        corridor_mask = np.array(mask_img) > 0
+                        cost_map_alt = base_cost_map.copy()
+                        cost_map_alt[~corridor_mask] += 50000 
+                        cost_map_alt[st] = 1
+                        cost_map_alt[en] = 1
 
-                    # 3. Alt Pixel Route
-                    ind_a_raw, _ = route_through_array(cost_map_alt, st, en, fully_connected=True, geometric=True)
-
+                        ind_a_raw, _ = route_through_array(cost_map_alt, st, en, fully_connected=True, geometric=True)
+                        ind_a = smooth_path(ind_a_raw)
+                        alt_pixel_routes.append(ind_a)
+                    
                     ind_m = smooth_path(ind_m_raw)
-                    ind_a = smooth_path(ind_a_raw)
                     
-                    ov = get_pixel_overlap(ind_m, ind_a)
+                    # Check overlap with first alternate
+                    if not alt_pixel_routes:
+                        continue
+                    
+                    ov = get_pixel_overlap(ind_m, alt_pixel_routes[0])
                     if ov > MAX_OVERLAP_PERCENT: continue 
                     
                     cand["main_pixel"] = ind_m
-                    cand["alt_pixel"] = ind_a
+                    cand["alt_pixels"] = alt_pixel_routes  # Store all alternates
+                    cand["alt_pixel"] = alt_pixel_routes[0]  # Keep for backward compatibility
                     cand["overlap"] = ov
+                    cand["num_alternates"] = len(alt_pixel_routes)
                     refined_pool.append(cand)
                     
                 except Exception as e:
@@ -632,11 +646,16 @@ def process_map(job_payload: dict):
 
         for i, cand in enumerate(final_list, 1):
             mp = cand["main_pixel"]
-            ap = cand["alt_pixel"]
+            alt_pixels = cand.get("alt_pixels", [cand["alt_pixel"]])
+            num_alts = cand.get("num_alternates", 1)
             
             base = color_crop.copy()
             
-            all_pts = mp + ap
+            # Collect all points for bounding box
+            all_pts = mp[:]
+            for ap in alt_pixels:
+                all_pts.extend(ap)
+            
             rs = [p[0] for p in all_pts]; cs = [p[1] for p in all_pts]
             rmin, rmax = min(rs), max(rs); cmin, cmax = min(cs), max(cs)
             
@@ -650,12 +669,13 @@ def process_map(job_payload: dict):
             img916 = base.crop(b916)
             
             avg_x_m = np.mean([p[1] for p in mp])
-            avg_x_a = np.mean([p[1] for p in ap])
+            avg_x_alts = [np.mean([p[1] for p in ap]) for ap in alt_pixels]
+            avg_x_a = np.mean(avg_x_alts) if avg_x_alts else avg_x_m
             
             if avg_x_m < avg_x_a:
-                side = "Left"; col_m = "red"; col_a = "blue"
+                side = "Left"; col_m = "red"
             else:
-                side = "Right"; col_m = "blue"; col_a = "red"
+                side = "Right"; col_m = "blue"
 
             def plot_save_upload(img, bbox, folder_name, aspect_ratio_str):
                 fig, ax = plt.subplots(figsize=((bbox[2]-bbox[0])/100, (bbox[3]-bbox[1])/100), dpi=100)
@@ -663,11 +683,17 @@ def process_map(job_payload: dict):
                 
                 def off(pt): return (pt[1]-bbox[0], pt[0]-bbox[1])
                 
+                # Draw main route
                 xm = [off(p)[0] for p in mp]; ym = [off(p)[1] for p in mp]
-                xa = [off(p)[0] for p in ap]; ya = [off(p)[1] for p in ap]
-                
                 ax.plot(xm, ym, color=col_m, lw=LINE_WIDTH, alpha=LINE_ALPHA)
-                ax.plot(xa, ya, color=col_a, lw=LINE_WIDTH, alpha=LINE_ALPHA)
+                
+                # Draw alternate routes with different colors
+                for alt_idx, ap in enumerate(alt_pixels):
+                    alt_color = ALT_COLORS[alt_idx % len(ALT_COLORS)]
+                    if side == "Right":
+                        alt_color = "red" if alt_idx == 0 else ALT_COLORS[(alt_idx - 1) % len(ALT_COLORS)]
+                    xa = [off(p)[0] for p in ap]; ya = [off(p)[1] for p in ap]
+                    ax.plot(xa, ya, color=alt_color, lw=LINE_WIDTH, alpha=LINE_ALPHA)
                 
                 s = off(cand["snapped_pair"][0]); e = off(cand["snapped_pair"][1])
                 ax.add_patch(Circle(s, MARKER_RADIUS, ec="magenta", fc="none", lw=4))
@@ -692,16 +718,21 @@ def process_map(job_payload: dict):
             # Generate and Upload 9:16
             plot_save_upload(img916, b916, "9_16", "9:16")
 
-            # CSV Data
+            # CSV Data - calculate lengths for all alternates
             def plen(pth):
                 return sum(math.hypot(pth[k][0]-pth[k+1][0], pth[k][1]-pth[k+1][1]) for k in range(len(pth)-1))
             
-            lm = plen(mp); la = plen(ap)
+            lm = plen(mp)
+            alt_lengths = [plen(ap) for ap in alt_pixels]
+            la = alt_lengths[0] if alt_lengths else 0
+            
             csv_data.append([
                 i, side, f"{lm:.1f}", f"{la:.1f}", 
                 f"{cand['overlap']:.2f}", 
                 f"{cand['hardness_score']:.2f}", 
-                cand['selection_pass']
+                cand['selection_pass'],
+                num_alts,
+                alt_lengths
             ])
 
         # Build route records for the complete webhook
@@ -714,6 +745,8 @@ def process_map(job_payload: dict):
                 "alt_length": float(row[3]),
                 "overlap": float(row[4]),
                 "hardness": float(row[5]),
+                "num_alternates": row[7] if len(row) > 7 else 1,
+                "alt_lengths": row[8] if len(row) > 8 else [],
             })
 
         webhook_url = job_payload["webhook_url"]

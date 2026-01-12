@@ -227,10 +227,17 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
   
   const currentImageUrl = getImageForRoute(currentRoute);
   
+  // Define colors for routes: main route = red (left), alt routes = blue/green/purple (right side or additional)
   const RED_COLOR = '#FF5733';
   const BLUE_COLOR = '#3357FF';
+  const GREEN_COLOR = '#33CC33';
+  const PURPLE_COLOR = '#9933FF';
   
-  // Assign colors consistently: left is always red, right is always blue
+  // Number of alternate routes determines arrow count
+  const numAlternates = currentRoute.numAlternates || 1;
+  const totalRoutes = 1 + numAlternates; // main + alternates
+  
+  // Assign colors consistently: left is always red, right uses blue/green/purple
   const leftButtonColor = RED_COLOR;
   const rightButtonColor = BLUE_COLOR;
 
@@ -281,14 +288,37 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, all
                 <ChevronLeft className="h-8 w-8" />
               </button>
               
-              <button 
-                onClick={() => handleDirectionSelect('right')} 
-                style={{ backgroundColor: `${rightButtonColor}CC` }}
-                className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-                disabled={isTransitioning || isPaused}
-              >
-                <ChevronRight className="h-8 w-8" />
-              </button>
+              {/* Right side - show 1-3 buttons depending on numAlternates */}
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleDirectionSelect('right')} 
+                  style={{ backgroundColor: `${BLUE_COLOR}CC` }}
+                  className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+                  disabled={isTransitioning || isPaused}
+                >
+                  <ChevronRight className="h-8 w-8" />
+                </button>
+                {numAlternates >= 2 && (
+                  <button 
+                    onClick={() => handleDirectionSelect('right')} 
+                    style={{ backgroundColor: `${GREEN_COLOR}CC` }}
+                    className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+                    disabled={isTransitioning || isPaused}
+                  >
+                    <ChevronRight className="h-8 w-8" />
+                  </button>
+                )}
+                {numAlternates >= 3 && (
+                  <button 
+                    onClick={() => handleDirectionSelect('right')} 
+                    style={{ backgroundColor: `${PURPLE_COLOR}CC` }}
+                    className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+                    disabled={isTransitioning || isPaused}
+                  >
+                    <ChevronRight className="h-8 w-8" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

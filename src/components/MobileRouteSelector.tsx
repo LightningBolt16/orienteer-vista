@@ -208,10 +208,16 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({ routeData, ma
   
   const currentImageUrl = getImageForRoute(currentRoute);
   
+  // Define colors for routes
   const RED_COLOR = '#FF5733';
   const BLUE_COLOR = '#3357FF';
+  const GREEN_COLOR = '#33CC33';
+  const PURPLE_COLOR = '#9933FF';
   
-  // Assign colors consistently: left is always red, right is always blue
+  // Number of alternate routes determines arrow count
+  const numAlternates = currentRoute.numAlternates || 1;
+  
+  // Assign colors consistently: left is always red, right uses blue/green/purple
   const leftGlowColor = RED_COLOR;
   const rightGlowColor = BLUE_COLOR;
 
