@@ -6,6 +6,8 @@ export interface RouteData {
   shortestColor: string;
   mainRouteLength: number;
   altRouteLength: number;
+  altRouteLengths?: number[];  // For multi-alternate routes
+  numAlternates?: number;      // Number of alternate routes (1-3)
   mapName?: string;
   imagePath?: string;
 }
@@ -310,7 +312,7 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
       
       const { data: dbRoutes, error } = await supabase
         .from('route_images')
-        .select('candidate_index, shortest_side, main_route_length, alt_route_length, image_path')
+        .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path')
         .eq('map_id', mapId)
         .eq('aspect_ratio', mapSource.aspect)
         .order('candidate_index');
@@ -324,12 +326,20 @@ export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteD
           const isUserMap = route.image_path.split('/').length > 3;
           const baseUrl = isUserMap ? USER_ROUTE_STORAGE_URL : STORAGE_URL;
           
+          // Parse alt_route_lengths from JSON if present
+          let altRouteLengths: number[] | undefined;
+          if (route.alt_route_lengths && Array.isArray(route.alt_route_lengths)) {
+            altRouteLengths = route.alt_route_lengths as number[];
+          }
+          
           return {
             candidateIndex: route.candidate_index,
             shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
             shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
             mainRouteLength: Number(route.main_route_length) || 0,
             altRouteLength: Number(route.alt_route_length) || 0,
+            altRouteLengths,
+            numAlternates: route.num_alternates || 1,
             mapName: mapSource.name,
             imagePath: `${baseUrl}/${route.image_path}`,
           };

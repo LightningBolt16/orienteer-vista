@@ -31,11 +31,13 @@ interface TifDimensions {
 interface UserMapUploadWizardProps {
   onComplete?: () => void;
   onCancel?: () => void;
+  isAdmin?: boolean;
 }
 
 const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   onComplete,
   onCancel,
+  isAdmin = false,
 }) => {
   const { uploadUserMapR2, uploading } = useUserMaps();
   
@@ -359,6 +361,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
             <ProcessingParametersForm
               parameters={parameters}
               onChange={setParameters}
+              isAdmin={isAdmin}
             />
           </div>
         );
