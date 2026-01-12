@@ -74,14 +74,34 @@ Deno.serve(async (req) => {
         const basePath = `${userMap.user_id}/${map_id}`
         
         for (const route of csv_data) {
+          // Parse alt_lengths - Modal sends as JSON string or array
+          let altRouteLengths = null
+          if (route.alt_lengths) {
+            try {
+              altRouteLengths = typeof route.alt_lengths === 'string' 
+                ? JSON.parse(route.alt_lengths) 
+                : route.alt_lengths
+            } catch (e) {
+              console.error('Failed to parse alt_lengths:', e)
+            }
+          }
+          
+          const numAlternates = route.num_alts || 1
+          
           routeImages.push({
             map_id: routeMap.id, candidate_index: route.id,
-            main_route_length: route.main_length || null, alt_route_length: route.alt_length || null,
+            main_route_length: route.main_length || null, 
+            alt_route_length: route.alt_length || null,
+            num_alternates: numAlternates,
+            alt_route_lengths: altRouteLengths,
             aspect_ratio: '16_9', shortest_side: route.main_side?.toLowerCase() || 'left',
             image_path: `${basePath}/16_9/candidate_${route.id}.webp`,
           }, {
             map_id: routeMap.id, candidate_index: route.id,
-            main_route_length: route.main_length || null, alt_route_length: route.alt_length || null,
+            main_route_length: route.main_length || null, 
+            alt_route_length: route.alt_length || null,
+            num_alternates: numAlternates,
+            alt_route_lengths: altRouteLengths,
             aspect_ratio: '9_16', shortest_side: route.main_side?.toLowerCase() || 'left',
             image_path: `${basePath}/9_16/candidate_${route.id}.webp`,
           })
