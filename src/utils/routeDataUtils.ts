@@ -538,6 +538,9 @@ export async function loadUserMapRoutes(
       };
     });
 
+    // Shuffle routes for variety (instead of always starting 1, 2, 3...)
+    const shuffledRoutes = routes.sort(() => Math.random() - 0.5);
+
     // Create a MapSource for compatibility
     const mapSource: MapSource = {
       id: routeMap.id,
@@ -549,8 +552,8 @@ export async function loadUserMapRoutes(
       folderName: userMap.name,
     };
 
-    console.log(`Loaded ${routes.length} routes for user map: ${userMap.name}`);
-    return { routes, map: mapSource, userMapName: userMap.name };
+    console.log(`Loaded ${shuffledRoutes.length} routes for user map: ${userMap.name}`);
+    return { routes: shuffledRoutes, map: mapSource, userMapName: userMap.name };
   } catch (error) {
     console.error('Error loading user map routes:', error);
     return { routes: [], map: null, userMapName: '' };
