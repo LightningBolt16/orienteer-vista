@@ -22,12 +22,12 @@ const USER_LIMITS = {
   maxRandomPoints: 1000,
 };
 
-// Pro/Admin limits (effectively unlimited for practical purposes)
+// Pro/Admin limits
 const PRO_LIMITS = {
-  maxOutputRoutes: 500,
-  maxCandidatePairs: 100000,
+  maxOutputRoutes: 1000,
+  maxCandidatePairs: 1000000,
   maxAlternateRoutes: 3,
-  maxRandomPoints: 5000,
+  maxRandomPoints: 10000,
 };
 
 interface ProcessingParametersFormProps {
@@ -155,24 +155,41 @@ const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="num_random_points">
-                  Random Points: {parameters.num_random_points}
+                  Random Points: {parameters.num_random_points?.toLocaleString()}
                 </Label>
                 {!hasPro && (parameters.num_random_points || 0) >= USER_LIMITS.maxRandomPoints && (
                   <Badge variant="secondary" className="text-xs">Max</Badge>
                 )}
               </div>
-              <Slider
-                id="num_random_points"
-                min={100}
-                max={limits.maxRandomPoints}
-                step={100}
-                value={[Math.min(parameters.num_random_points || DEFAULT_PROCESSING_PARAMETERS.num_random_points!, limits.maxRandomPoints)]}
-                onValueChange={([v]) => updateParam('num_random_points', v)}
-              />
+              {hasPro ? (
+                <Slider
+                  id="num_random_points"
+                  min={100}
+                  max={PRO_LIMITS.maxRandomPoints}
+                  step={100}
+                  value={[parameters.num_random_points || DEFAULT_PROCESSING_PARAMETERS.num_random_points!]}
+                  onValueChange={([v]) => updateParam('num_random_points', v)}
+                />
+              ) : (
+                <div className="relative">
+                  <Slider
+                    id="num_random_points"
+                    min={100}
+                    max={PRO_LIMITS.maxRandomPoints}
+                    step={100}
+                    value={[Math.min(parameters.num_random_points || DEFAULT_PROCESSING_PARAMETERS.num_random_points!, USER_LIMITS.maxRandomPoints)]}
+                    onValueChange={([v]) => updateParam('num_random_points', Math.min(v, USER_LIMITS.maxRandomPoints))}
+                  />
+                  <div 
+                    className="absolute top-0 h-full border-l-2 border-dashed border-primary/60 pointer-events-none"
+                    style={{ left: `${(USER_LIMITS.maxRandomPoints / PRO_LIMITS.maxRandomPoints) * 100}%` }}
+                  />
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {hasPro
                   ? 'Number of random points to generate for route finding'
-                  : `Limited to ${USER_LIMITS.maxRandomPoints.toLocaleString()} for regular users. Request pro for up to ${PRO_LIMITS.maxRandomPoints.toLocaleString()}.`
+                  : `Limited to ${USER_LIMITS.maxRandomPoints.toLocaleString()}. Unlock up to ${PRO_LIMITS.maxRandomPoints.toLocaleString()} with Pro.`
                 }
               </p>
             </div>
@@ -219,18 +236,35 @@ const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
                   <Badge variant="secondary" className="text-xs">Max</Badge>
                 )}
               </div>
-              <Slider
-                id="max_candidate_pairs"
-                min={1000}
-                max={limits.maxCandidatePairs}
-                step={1000}
-                value={[Math.min(parameters.max_candidate_pairs || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs!, limits.maxCandidatePairs)]}
-                onValueChange={([v]) => updateParam('max_candidate_pairs', v)}
-              />
+              {hasPro ? (
+                <Slider
+                  id="max_candidate_pairs"
+                  min={1000}
+                  max={PRO_LIMITS.maxCandidatePairs}
+                  step={10000}
+                  value={[parameters.max_candidate_pairs || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs!]}
+                  onValueChange={([v]) => updateParam('max_candidate_pairs', v)}
+                />
+              ) : (
+                <div className="relative">
+                  <Slider
+                    id="max_candidate_pairs"
+                    min={1000}
+                    max={PRO_LIMITS.maxCandidatePairs}
+                    step={1000}
+                    value={[Math.min(parameters.max_candidate_pairs || DEFAULT_PROCESSING_PARAMETERS.max_candidate_pairs!, USER_LIMITS.maxCandidatePairs)]}
+                    onValueChange={([v]) => updateParam('max_candidate_pairs', Math.min(v, USER_LIMITS.maxCandidatePairs))}
+                  />
+                  <div 
+                    className="absolute top-0 h-full border-l-2 border-dashed border-primary/60 pointer-events-none"
+                    style={{ left: `${(USER_LIMITS.maxCandidatePairs / PRO_LIMITS.maxCandidatePairs) * 100}%` }}
+                  />
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {hasPro 
                   ? 'Maximum pairs to evaluate (higher = more options but slower)'
-                  : `Limited to ${USER_LIMITS.maxCandidatePairs.toLocaleString()} for regular users. Request pro for up to ${PRO_LIMITS.maxCandidatePairs.toLocaleString()}.`
+                  : `Limited to ${USER_LIMITS.maxCandidatePairs.toLocaleString()}. Unlock up to ${PRO_LIMITS.maxCandidatePairs.toLocaleString()} with Pro.`
                 }
               </p>
             </div>
@@ -249,18 +283,35 @@ const ProcessingParametersForm: React.FC<ProcessingParametersFormProps> = ({
                   <Badge variant="secondary" className="text-xs">Max</Badge>
                 )}
               </div>
-              <Slider
-                id="num_output_routes"
-                min={10}
-                max={limits.maxOutputRoutes}
-                step={10}
-                value={[Math.min(parameters.num_output_routes || DEFAULT_PROCESSING_PARAMETERS.num_output_routes!, limits.maxOutputRoutes)]}
-                onValueChange={([v]) => updateParam('num_output_routes', v)}
-              />
+              {hasPro ? (
+                <Slider
+                  id="num_output_routes"
+                  min={10}
+                  max={PRO_LIMITS.maxOutputRoutes}
+                  step={10}
+                  value={[parameters.num_output_routes || DEFAULT_PROCESSING_PARAMETERS.num_output_routes!]}
+                  onValueChange={([v]) => updateParam('num_output_routes', v)}
+                />
+              ) : (
+                <div className="relative">
+                  <Slider
+                    id="num_output_routes"
+                    min={10}
+                    max={PRO_LIMITS.maxOutputRoutes}
+                    step={10}
+                    value={[Math.min(parameters.num_output_routes || DEFAULT_PROCESSING_PARAMETERS.num_output_routes!, USER_LIMITS.maxOutputRoutes)]}
+                    onValueChange={([v]) => updateParam('num_output_routes', Math.min(v, USER_LIMITS.maxOutputRoutes))}
+                  />
+                  <div 
+                    className="absolute top-0 h-full border-l-2 border-dashed border-primary/60 pointer-events-none"
+                    style={{ left: `${(USER_LIMITS.maxOutputRoutes / PRO_LIMITS.maxOutputRoutes) * 100}%` }}
+                  />
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {hasPro
                   ? 'Number of route images to generate'
-                  : `Limited to ${USER_LIMITS.maxOutputRoutes} for regular users. Request pro for up to ${PRO_LIMITS.maxOutputRoutes}.`
+                  : `Limited to ${USER_LIMITS.maxOutputRoutes}. Unlock up to ${PRO_LIMITS.maxOutputRoutes.toLocaleString()} with Pro.`
                 }
               </p>
             </div>
