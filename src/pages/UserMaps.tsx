@@ -129,7 +129,6 @@ const UserMaps: React.FC = () => {
             fetchUserMaps();
           }}
           onCancel={() => setShowUploadWizard(false)}
-          isAdmin={isAdmin}
         />
       </div>
     );

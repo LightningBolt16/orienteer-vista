@@ -10,6 +10,7 @@ import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
 import OCADInstructionsDialog from './OCADInstructionsDialog';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
+import { useProAccess } from '@/hooks/useProAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { convertTifToDataUrl, getTifDimensions } from '@/utils/tifUtils';
 import { uploadMapFilesToR2 } from '@/utils/r2Upload';
@@ -31,15 +32,14 @@ interface TifDimensions {
 interface UserMapUploadWizardProps {
   onComplete?: () => void;
   onCancel?: () => void;
-  isAdmin?: boolean;
 }
 
 const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   onComplete,
   onCancel,
-  isAdmin = false,
 }) => {
   const { uploadUserMapR2, uploading } = useUserMaps();
+  const { hasPro } = useProAccess();
   
   const [step, setStep] = useState<WizardStep>('upload');
   const [mapName, setMapName] = useState('');
@@ -361,7 +361,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
             <ProcessingParametersForm
               parameters={parameters}
               onChange={setParameters}
-              isAdmin={isAdmin}
+              hasPro={hasPro}
             />
           </div>
         );
