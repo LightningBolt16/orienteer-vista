@@ -21,6 +21,8 @@ export interface MapSource {
   routeBasePath?: string;
   flagImage?: string;
   logoPath?: string;
+  countryCode?: string;
+  description?: string;
   namingScheme?: 'new' | 'old';
   isDbMap?: boolean;
   isUserMap?: boolean;
@@ -146,6 +148,8 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
         aspect: '16_9', // Default, will be overridden per route
         logoPath: map.logo_path || undefined,
         flagImage: map.country_code || undefined,
+        countryCode: map.country_code || undefined,
+        description: (map as any).description || undefined,
         isDbMap: true,
         isUserMap: map.user_id !== null && !map.is_public,
       }));
@@ -352,8 +356,13 @@ export async function fetchAllRoutesData(isMobile: boolean = false, userId?: str
 export function getImageUrlByMapName(
   mapName: string,
   candidateIndex: number,
-  aspect: string = '16_9'
+  aspectOrMobile: string | boolean = '16_9'
 ): string {
+  // Support both aspect string and isMobile boolean
+  const aspect = typeof aspectOrMobile === 'boolean' 
+    ? (aspectOrMobile ? '9_16' : '16_9') 
+    : aspectOrMobile;
+  
   // Check if it's a DB map
   if (dbMapCache.has(mapName)) {
     return `${STORAGE_URL}/${mapName}/${aspect}/candidate_${candidateIndex}_ALL.webp`;
@@ -366,19 +375,24 @@ export function getImageUrlByMapName(
   return `${LOCAL_MAPS_BASE}/${mapName}/${aspect}/candidate_${candidateIndex}${suffix}`;
 }
 
+// Get unique map names from a list of map sources
+export function getUniqueMapNames(maps: MapSource[]): string[] {
+  const uniqueNames = new Set<string>();
+  maps.forEach(map => uniqueNames.add(map.name));
+  return Array.from(uniqueNames).sort();
+}
+
 export async function loadUserMapRoutes(
   mapId: string,
-  userId: string,
   isMobile: boolean = false
 ): Promise<{ routes: RouteData[], map: MapSource | null, userMapName: string }> {
   const aspect = isMobile ? '9_16' : '16_9';
   
-  // Get the user map info
+  // Get the user map info - no user_id filter since mapId is unique
   const { data: userMap, error: userMapError } = await supabase
     .from('user_maps')
     .select('id, name, user_id, status')
     .eq('id', mapId)
-    .eq('user_id', userId)
     .single();
 
   if (userMapError || !userMap) {
