@@ -266,7 +266,9 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
         <img
           src={currentRoute.imagePath}
           alt={`Route ${currentRoute.candidateIndex}`}
-          className="w-full h-auto"
+          className={`w-full h-auto transition-all duration-300 ${
+            isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'
+          }`}
           onLoad={() => setIsImageLoaded(true)}
         />
 
@@ -301,7 +303,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
             <span className="text-sm text-muted-foreground">
               {warmupCount < WARMUP_ROUTES 
                 ? `Warmup: ${WARMUP_ROUTES - warmupCount} remaining`
-                : `Playing`}
+                : `Route ${currentRouteIndex + 1}/${routeData.length}`}
             </span>
           </div>
         </div>
