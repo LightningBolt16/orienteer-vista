@@ -1,344 +1,356 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
-import { useUser } from '../context/UserContext';
-import { useLanguage } from '../context/LanguageContext';
-import { RouteData, MapSource, getImageUrlByMapName } from '../utils/routeDataUtils';
-import { useInactivityDetection } from '../hooks/useInactivityDetection';
-import PauseOverlay from './PauseOverlay';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, X } from 'lucide-react';
+import { RouteData, MapSource, getArrowColorForIndex } from '@/utils/routeDataUtils';
+import { PauseOverlay } from './PauseOverlay';
+import { useInactivityDetection } from '@/hooks/useInactivityDetection';
+import { supabase } from '@/integrations/supabase/client';
+import { useUser } from '@/context/UserContext';
 
-const PRELOAD_AHEAD_COUNT = 10;
-
-export interface RouteSelectorProps {
+interface RouteSelectorProps {
   routeData: RouteData[];
   mapSource: MapSource | null;
   allMaps?: MapSource[];
   isFullscreen?: boolean;
 }
 
-const RouteSelector: React.FC<RouteSelectorProps> = ({ routeData, mapSource, allMaps = [], isFullscreen = false }) => {
+export const RouteSelector: React.FC<RouteSelectorProps> = ({
+  routeData,
+  mapSource,
+  allMaps,
+  isFullscreen = false
+}) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [showResult, setShowResult] = useState<'win' | 'lose' | null>(null);
-  const [startTime, setStartTime] = useState<number | null>(null);
+  const [result, setResult] = useState<'win' | 'lose' | 'warmup' | null>(null);
   const [resultMessage, setResultMessage] = useState<string>('');
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
-  const [isWarmUp, setIsWarmUp] = useState(true); // First attempt is warm-up, doesn't count
-  const { updatePerformance } = useUser();
-  const { t } = useLanguage();
-  const resultTimeout = useRef<number | null>(null);
-  const transitionTimeout = useRef<number | null>(null);
+  const [warmupCount, setWarmupCount] = useState(0);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
-  const previousRouteDataRef = useRef<RouteData[]>(routeData);
+  const { user } = useUser();
 
-  // Inactivity detection
-  const { isPaused, pauseReason, resume: baseResume, resetTimer } = useInactivityDetection({
-    inactivityTimeout: 30000, // 30 seconds
+  const WARMUP_ROUTES = 3;
+
+  const { isPaused, resetInactivityTimer, handleResume: baseHandleResume } = useInactivityDetection({
+    timeout: 30000,
+    enabled: routeData.length > 0 && isImageLoaded,
   });
 
-  // Resume and advance to next route so timer restarts fresh
-  const handleResume = () => {
-    setCurrentRouteIndex((prev) => (prev + 1) % routeData.length);
-    baseResume();
-  };
-
-  // Get image URL for a route (handles both single map and all maps mode)
-  const getImageForRoute = (route: RouteData): string => {
-    // If route has imagePath from database, use it directly
-    if (route.imagePath) {
-      return route.imagePath;
-    }
-    const mapName = route.mapName || mapSource?.name || '';
-    return getImageUrlByMapName(mapName, route.candidateIndex, false);
-  };
-
-  // Reset index when routeData changes (map switch)
+  // Reset on route data change
   useEffect(() => {
-    if (routeData !== previousRouteDataRef.current && routeData.length > 0) {
-      setCurrentRouteIndex(0);
-      setIsImageLoaded(false);
-      setShowResult(null);
-      setIsTransitioning(false);
-      setIsWarmUp(true); // Reset warm-up on map switch
-      setStartTime(null);
-      previousRouteDataRef.current = routeData;
-    }
+    setCurrentRouteIndex(0);
+    setIsTransitioning(false);
+    setResult(null);
+    setResultMessage('');
+    setWarmupCount(0);
+    preloadedImages.current.clear();
   }, [routeData]);
 
-  // Preload current image and wait for it to load
+  // Preload images
   useEffect(() => {
     if (routeData.length === 0) return;
-    
-    const currentRoute = routeData[currentRouteIndex];
-    if (!currentRoute) return;
-    
-    const currentImageUrl = getImageForRoute(currentRoute);
-    
-    // Check if already preloaded
-    const existingImg = preloadedImages.current.get(currentImageUrl);
-    if (existingImg?.complete) {
-      setIsImageLoaded(true);
-    } else {
-      setIsImageLoaded(false);
-      const img = new Image();
-      img.onload = () => {
-        setIsImageLoaded(true);
-        preloadedImages.current.set(currentImageUrl, img);
-      };
-      img.src = currentImageUrl;
-    }
-    
-    // Preload upcoming images
-    const currentlyNeededImages = new Set<string>();
-    currentlyNeededImages.add(currentImageUrl);
-    
-    for (let i = 1; i < PRELOAD_AHEAD_COUNT; i++) {
-      const index = (currentRouteIndex + i) % routeData.length;
-      const route = routeData[index];
-      const imageUrl = getImageForRoute(route);
-      currentlyNeededImages.add(imageUrl);
-      
-      if (!preloadedImages.current.has(imageUrl)) {
-        const img = new Image();
-        img.src = imageUrl;
-        preloadedImages.current.set(imageUrl, img);
-      }
-    }
-    
-    preloadedImages.current.forEach((_, key) => {
-      if (!currentlyNeededImages.has(key)) {
-        preloadedImages.current.delete(key);
-      }
-    });
-    
-    return () => {
-      if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
-      if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
-    };
-  }, [currentRouteIndex, routeData, mapSource, allMaps]);
 
-  // Start timer only when image is loaded, not paused, and not transitioning
+    const preloadImage = (index: number) => {
+      if (index >= routeData.length) return;
+      const route = routeData[index];
+      const imageUrl = route.imagePath || '';
+      
+      if (!imageUrl || preloadedImages.current.has(imageUrl)) return;
+
+      const img = new Image();
+      img.src = imageUrl;
+      preloadedImages.current.set(imageUrl, img);
+    };
+
+    // Preload current and next few images
+    for (let i = 0; i < 5; i++) {
+      preloadImage(currentRouteIndex + i);
+    }
+  }, [routeData, currentRouteIndex]);
+
+  // Start timer when image loads
   useEffect(() => {
-    if (!isPaused && isImageLoaded && !isTransitioning) {
+    if (isImageLoaded && !isPaused && !isTransitioning) {
       setStartTime(Date.now());
     }
-  }, [isPaused, isImageLoaded, currentRouteIndex, isTransitioning]);
+  }, [isImageLoaded, isPaused, isTransitioning, currentRouteIndex]);
 
-  const handleDirectionSelect = (direction: 'left' | 'right') => {
+  const recordAttempt = async (isCorrect: boolean, responseTime: number, mapName: string) => {
+    if (!user?.id) return;
+
+    try {
+      await supabase.from('route_attempts').insert({
+        user_id: user.id,
+        is_correct: isCorrect,
+        response_time: responseTime,
+        map_name: mapName,
+      });
+    } catch (error) {
+      console.error('Failed to record attempt:', error);
+    }
+  };
+
+  const handleDirectionSelect = (selectedIndex: number) => {
     if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;
     
     const currentRoute = routeData[currentRouteIndex];
-    const isCorrect = direction === currentRoute.shortestSide;
+    const numAlternates = currentRoute.numAlternates || 1;
+    const totalRoutes = 1 + numAlternates;
+    
+    // Get the correct answer index
+    const correctIndex = currentRoute.mainRouteIndex ?? 
+      (currentRoute.shortestSide === 'left' ? 0 : 1);
+    
+    const isCorrect = selectedIndex === correctIndex;
     const responseTime = Date.now() - startTime;
     const mapName = currentRoute.mapName || mapSource?.name;
     
     // Reset inactivity timer on interaction
-    resetTimer();
-    
-    // Only record performance if not warm-up (first attempt after load/switch doesn't count)
-    if (!isWarmUp) {
-      updatePerformance(isCorrect, responseTime, mapName);
+    resetInactivityTimer();
+
+    // Handle warmup period
+    if (warmupCount < WARMUP_ROUTES) {
+      setWarmupCount(prev => prev + 1);
+      setResult('warmup');
+      setResultMessage(isCorrect ? 'Nice!' : 'Keep practicing!');
     } else {
-      setIsWarmUp(false); // First attempt done, subsequent ones count
-    }
-    
-    if (isWarmUp) {
-      setResultMessage(t('warmUp') || 'Warm-up!');
-    } else if (isCorrect) {
-      if (responseTime < 1000) {
-        setResultMessage(t('excellent'));
-      } else if (responseTime < 2000) {
-        setResultMessage(t('good'));
-      } else {
-        setResultMessage(t('correct'));
+      // Record actual attempt
+      if (mapName) {
+        recordAttempt(isCorrect, responseTime, mapName);
       }
-    } else {
-      setResultMessage(t('wrong'));
+      setResult(isCorrect ? 'win' : 'lose');
+      setResultMessage(isCorrect ? 'Correct!' : 'Wrong!');
     }
-    
-    setShowResult(isCorrect ? 'win' : 'lose');
+
     setIsTransitioning(true);
-    
-    if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
-    if (transitionTimeout.current) window.clearTimeout(transitionTimeout.current);
-    
-    // Set up preload for next image
-    const nextIndex = (currentRouteIndex + 1) % routeData.length;
-    const nextRoute = routeData[nextIndex];
-    const nextImageUrl = getImageForRoute(nextRoute);
-    
-    const preloadNextImage = (): Promise<void> => {
-      return new Promise((resolve) => {
-        const existingImg = preloadedImages.current.get(nextImageUrl);
-        if (existingImg?.complete) {
-          resolve();
-        } else {
-          const img = new Image();
-          img.onload = () => {
-            preloadedImages.current.set(nextImageUrl, img);
-            resolve();
-          };
-          img.onerror = () => resolve(); // Continue even if load fails
-          img.src = nextImageUrl;
-        }
-      });
-    };
-    
-    resultTimeout.current = window.setTimeout(async () => {
-      // Wait for next image to be loaded before transitioning
-      await preloadNextImage();
-      setIsImageLoaded(true);
-      setShowResult(null);
-      transitionTimeout.current = window.setTimeout(() => {
-        setCurrentRouteIndex(nextIndex);
-        setIsTransitioning(false);
-      }, 200);
-    }, 400);
+
+    // Preload next image
+    const nextIndex = currentRouteIndex + 1;
+    if (nextIndex < routeData.length) {
+      const nextRoute = routeData[nextIndex];
+      const nextImageUrl = nextRoute.imagePath || '';
+      if (nextImageUrl && !preloadedImages.current.has(nextImageUrl)) {
+        const img = new Image();
+        img.src = nextImageUrl;
+        preloadedImages.current.set(nextImageUrl, img);
+      }
+    }
+
+    setTimeout(() => {
+      if (currentRouteIndex < routeData.length - 1) {
+        setCurrentRouteIndex(prev => prev + 1);
+      } else {
+        // Loop back to start
+        setCurrentRouteIndex(0);
+      }
+      setResult(null);
+      setResultMessage('');
+      setIsTransitioning(false);
+      setIsImageLoaded(false);
+    }, 800);
   };
 
-  // Keyboard support - use ref to get latest handler without re-registering listener
-  const handleDirectionSelectRef = useRef(handleDirectionSelect);
-  handleDirectionSelectRef.current = handleDirectionSelect;
+  // Legacy handler for left/right
+  const handleLegacyDirectionSelect = (direction: 'left' | 'right') => {
+    const currentRoute = routeData[currentRouteIndex];
+    const numAlternates = currentRoute.numAlternates || 1;
+    
+    if (numAlternates <= 1) {
+      // Traditional 2-route scenario
+      handleDirectionSelect(direction === 'left' ? 0 : 1);
+    }
+  };
 
+  const handleResume = () => {
+    baseHandleResume();
+    setStartTime(Date.now());
+  };
+
+  // Keyboard controls for 2-route scenarios
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        handleDirectionSelectRef.current('left');
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleDirectionSelectRef.current('right');
+      if (isPaused) return;
+      
+      const currentRoute = routeData[currentRouteIndex];
+      if (!currentRoute) return;
+      
+      const numAlternates = currentRoute.numAlternates || 1;
+      const totalRoutes = 1 + numAlternates;
+      
+      if (totalRoutes === 2) {
+        // Traditional left/right
+        if (e.key === 'ArrowLeft') handleDirectionSelect(0);
+        else if (e.key === 'ArrowRight') handleDirectionSelect(1);
+      } else {
+        // Multi-route: use number keys 1-4
+        const keyNum = parseInt(e.key);
+        if (keyNum >= 1 && keyNum <= totalRoutes) {
+          handleDirectionSelect(keyNum - 1);
+        }
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isPaused, currentRouteIndex, routeData]);
 
-  // Show loading if no routes
   if (routeData.length === 0) {
-    return <div className="flex justify-center items-center h-64">Loading routes...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Loading routes...</p>
+      </div>
+    );
   }
-  
-  const currentRoute = routeData[currentRouteIndex];
-  
-  if (!currentRoute) {
-    return <div className="flex justify-center items-center h-64">Loading route data...</div>;
-  }
-  
-  const currentImageUrl = getImageForRoute(currentRoute);
-  
-  // Define colors for routes: main route = red (left), alt routes = blue/green/purple (right side or additional)
-  const RED_COLOR = '#FF5733';
-  const BLUE_COLOR = '#3357FF';
-  const GREEN_COLOR = '#33CC33';
-  const PURPLE_COLOR = '#9933FF';
-  
-  // Number of alternate routes determines arrow count
-  const numAlternates = currentRoute.numAlternates || 1;
-  const totalRoutes = 1 + numAlternates; // main + alternates
-  
-  // Assign colors consistently: left is always red, right uses blue/green/purple
-  const leftButtonColor = RED_COLOR;
-  const rightButtonColor = BLUE_COLOR;
 
-  // Show result overlay while loading next image
-  const showLoadingResult = !isImageLoaded && showResult;
+  const currentRoute = routeData[currentRouteIndex];
+  const numAlternates = currentRoute.numAlternates || 1;
+  const totalRoutes = 1 + numAlternates;
+  const mainRouteIndex = currentRoute.mainRouteIndex ?? (currentRoute.shortestSide === 'left' ? 0 : 1);
+
+  // Define colors for routes
+  const ROUTE_COLORS = ['#FF5733', '#3357FF', '#33CC33', '#9933FF']; // Red, Blue, Green, Purple
+
+  // Build arrow buttons based on total routes
+  const renderArrowButtons = () => {
+    if (totalRoutes === 2) {
+      // Traditional left/right layout
+      return (
+        <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+          <button 
+            onClick={() => handleDirectionSelect(0)} 
+            style={{ backgroundColor: `${ROUTE_COLORS[0]}CC` }}
+            className="pointer-events-auto hover:bg-opacity-100 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+            disabled={isTransitioning || isPaused}
+          >
+            <ChevronLeft className="h-8 w-8" />
+          </button>
+          <button 
+            onClick={() => handleDirectionSelect(1)} 
+            style={{ backgroundColor: `${ROUTE_COLORS[1]}CC` }}
+            className="pointer-events-auto hover:bg-opacity-100 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
+            disabled={isTransitioning || isPaused}
+          >
+            <ChevronRight className="h-8 w-8" />
+          </button>
+        </div>
+      );
+    }
+
+    // Multi-route layout (3-4 routes)
+    // Arrows are positioned left to right matching the route positions
+    const getArrowIcon = (index: number, total: number) => {
+      if (total === 3) {
+        // Left, Up, Right
+        if (index === 0) return <ChevronLeft className="h-8 w-8" />;
+        if (index === 1) return <ChevronUp className="h-8 w-8" />;
+        return <ChevronRight className="h-8 w-8" />;
+      } else {
+        // 4 routes: Left, Up-Left diagonal, Up-Right diagonal, Right
+        if (index === 0) return <ChevronLeft className="h-8 w-8" />;
+        if (index === 1) return <ChevronUp className="h-8 w-8 -rotate-45" />;
+        if (index === 2) return <ChevronUp className="h-8 w-8 rotate-45" />;
+        return <ChevronRight className="h-8 w-8" />;
+      }
+    };
+
+    const getButtonPosition = (index: number, total: number) => {
+      if (total === 3) {
+        // Position: left edge, top center, right edge
+        if (index === 0) return 'left-4 top-1/2 -translate-y-1/2';
+        if (index === 1) return 'left-1/2 top-4 -translate-x-1/2';
+        return 'right-4 top-1/2 -translate-y-1/2';
+      } else {
+        // 4 routes: spread across
+        if (index === 0) return 'left-4 top-1/2 -translate-y-1/2';
+        if (index === 1) return 'left-1/4 top-8';
+        if (index === 2) return 'right-1/4 top-8';
+        return 'right-4 top-1/2 -translate-y-1/2';
+      }
+    };
+
+    return (
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: totalRoutes }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => handleDirectionSelect(i)}
+            style={{ backgroundColor: `${ROUTE_COLORS[i]}CC` }}
+            className={`pointer-events-auto absolute ${getButtonPosition(i, totalRoutes)} hover:bg-opacity-100 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95`}
+            disabled={isTransitioning || isPaused}
+          >
+            {getArrowIcon(i, totalRoutes)}
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   return (
-    <div className={`relative w-full ${isFullscreen ? 'h-full' : ''}`}>
-      <div className={`overflow-hidden ${isFullscreen ? 'h-full bg-black' : 'glass-card'}`}>
-        <div className={`relative overflow-hidden ${isFullscreen ? 'h-full flex items-center justify-center' : 'aspect-[16/9]'}`}>
-          {/* Only show image when loaded and not in loading-result state */}
-          {isImageLoaded && !showLoadingResult && (
-            <img 
-              src={currentImageUrl} 
-              alt="Orienteering route" 
-              className={`transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'} ${!isTransitioning ? 'image-fade-in' : ''} ${isFullscreen ? 'max-w-full max-h-full object-contain' : 'w-full h-full object-contain'}`}
-            />
-          )}
-          
-          {(showResult || showLoadingResult) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-background/80">
-              {(showResult === 'win' || showLoadingResult === 'win') ? (
-                <>
-                  <CheckCircle className="text-green-500 w-32 h-32 animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
-                  <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
-                    {resultMessage}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <XCircle className="text-red-500 w-32 h-32 animate-[lose-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
-                  <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
-                    {resultMessage}
-                  </div>
-                </>
+    <div className={`relative ${isFullscreen ? 'h-screen' : ''}`}>
+      {isPaused && <PauseOverlay onResume={handleResume} />}
+      
+      <div className="relative">
+        {/* Route Image */}
+        <img
+          src={currentRoute.imagePath}
+          alt={`Route ${currentRoute.candidateIndex}`}
+          className="w-full h-auto"
+          onLoad={() => setIsImageLoaded(true)}
+        />
+
+        {/* Result Overlay */}
+        {result && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className={`text-center p-6 rounded-lg ${
+              result === 'win' ? 'bg-green-500/90' : 
+              result === 'lose' ? 'bg-red-500/90' : 
+              'bg-yellow-500/90'
+            }`}>
+              {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
+              {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
+              <p className="text-white text-xl font-bold">{resultMessage}</p>
+              {result === 'warmup' && (
+                <p className="text-white/80 text-sm mt-1">
+                  Warmup {warmupCount}/{WARMUP_ROUTES}
+                </p>
               )}
             </div>
-          )}
-          
-          {isImageLoaded && !showLoadingResult && (
-            <div className="absolute inset-x-0 bottom-0 p-6 flex justify-between">
-              <button 
-                onClick={() => handleDirectionSelect('left')} 
-                style={{ backgroundColor: `${leftButtonColor}CC` }}
-                className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-                disabled={isTransitioning || isPaused}
-              >
-                <ChevronLeft className="h-8 w-8" />
-              </button>
-              
-              {/* Right side - show 1-3 buttons depending on numAlternates */}
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => handleDirectionSelect('right')} 
-                  style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-                  className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-                  disabled={isTransitioning || isPaused}
-                >
-                  <ChevronRight className="h-8 w-8" />
-                </button>
-                {numAlternates >= 2 && (
-                  <button 
-                    onClick={() => handleDirectionSelect('right')} 
-                    style={{ backgroundColor: `${GREEN_COLOR}CC` }}
-                    className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-                    disabled={isTransitioning || isPaused}
-                  >
-                    <ChevronRight className="h-8 w-8" />
-                  </button>
-                )}
-                {numAlternates >= 3 && (
-                  <button 
-                    onClick={() => handleDirectionSelect('right')} 
-                    style={{ backgroundColor: `${PURPLE_COLOR}CC` }}
-                    className="hover:bg-opacity-100 text-foreground p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95"
-                    disabled={isTransitioning || isPaused}
-                  >
-                    <ChevronRight className="h-8 w-8" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
+        )}
 
-          {/* Pause Overlay */}
-          {isPaused && (
-            <PauseOverlay reason={pauseReason} onResume={handleResume} />
-          )}
-        </div>
+        {/* Arrow Buttons */}
+        {!result && isImageLoaded && renderArrowButtons()}
       </div>
 
-      {currentRoute && !isFullscreen && (
-        <div className="mt-4 text-sm text-muted-foreground">
-          <p>
-            {currentRoute.mapName && <span className="font-medium">{currentRoute.mapName} - </span>}
-            Route #{currentRoute.candidateIndex} - Main {currentRoute.mainRouteLength.toFixed(0)}m vs Alt {currentRoute.altRouteLength.toFixed(0)}m
-          </p>
+      {/* Route Info */}
+      {!isFullscreen && (
+        <div className="mt-4 p-4 bg-muted rounded-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">
+              Route {currentRouteIndex + 1} of {routeData.length}
+            </span>
+            <div className="flex gap-2">
+              {Array.from({ length: totalRoutes }, (_, i) => (
+                <div
+                  key={i}
+                  className="w-4 h-4 rounded-full"
+                  style={{ 
+                    backgroundColor: ROUTE_COLORS[i],
+                    border: i === mainRouteIndex ? '2px solid white' : 'none',
+                    boxShadow: i === mainRouteIndex ? '0 0 8px rgba(255,255,255,0.8)' : 'none'
+                  }}
+                  title={i === mainRouteIndex ? 'Correct answer' : `Route ${i + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+          {warmupCount < WARMUP_ROUTES && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Warmup mode: {WARMUP_ROUTES - warmupCount} routes remaining
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 };
-
-export default RouteSelector;

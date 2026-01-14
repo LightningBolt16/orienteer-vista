@@ -2,12 +2,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface RouteData {
   candidateIndex: number;
-  shortestSide: 'left' | 'right';
+  shortestSide: 'left' | 'right';  // Legacy: for 2-route scenarios
   shortestColor: string;
   mainRouteLength: number;
   altRouteLength: number;
   altRouteLengths?: number[];  // For multi-alternate routes
   numAlternates?: number;      // Number of alternate routes (1-3)
+  mainRouteIndex?: number;     // Index of main route in the sorted array (0-based, left to right)
   mapName?: string;
   imagePath?: string;
 }
@@ -15,557 +16,453 @@ export interface RouteData {
 export interface MapSource {
   id: string;
   name: string;
-  aspect: '16_9' | '9_16';
-  csvPath: string;
-  imagePathPrefix: string;
-  mapImagePath?: string;
-  description?: string;
-  folderName?: string;
-  namingScheme?: 'candidate' | 'route';
-  countryCode?: string;
+  aspect: string;
+  csvPath?: string;
+  routeBasePath?: string;
+  flagImage?: string;
   logoPath?: string;
-  mapType?: string;
+  namingScheme?: 'new' | 'old';
+  isDbMap?: boolean;
+  isUserMap?: boolean;
 }
 
-// Supabase storage URL for route images
-const STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/route-images`;
-const USER_ROUTE_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/user-route-images`;
+const STORAGE_URL = 'https://pldlmtuxqxszaajxtufx.supabase.co/storage/v1/object/public/route-images';
+const USER_STORAGE_URL = 'https://pldlmtuxqxszaajxtufx.supabase.co/storage/v1/object';
+const USER_ROUTE_STORAGE_URL = 'https://pldlmtuxqxszaajxtufx.supabase.co/storage/v1/object/public/user-route-images';
+const LOCAL_MAPS_BASE = '/maps';
 
-// Fallback local map folders (used when database is empty)
-const MAP_FOLDER_NAMES = ['Rotondella', 'Matera'];
+// Cache for map data
+const mapCache = new Map<string, MapSource[]>();
+const routeCache = new Map<string, RouteData[]>();
+const dbMapCache = new Set<string>();
+const namingSchemeCache = new Map<string, 'new' | 'old'>();
 
-// Try different CSV naming patterns (for fallback)
-const getCSVPatterns = (folderName: string): string[] => [
-  `/maps/${folderName}/${folderName}.csv`,
-  `/maps/${folderName}/${folderName.toLowerCase()}.csv`,
-  `/maps/${folderName}/${folderName.toUpperCase()}.csv`,
-];
+// Helper to convert main_route_index to arrow color
+export const getArrowColorForIndex = (index: number): string => {
+  const colors = ['#FF5733', '#3357FF', '#33CC33', '#9933FF']; // Red, Blue, Green, Purple
+  return colors[index] || colors[0];
+};
 
-// Find the working CSV path for a map folder (fallback)
-const findCSVPath = async (folderName: string): Promise<string | null> => {
-  const patterns = getCSVPatterns(folderName);
-  
-  for (const path of patterns) {
-    try {
-      const response = await fetch(path, { method: 'HEAD' });
-      if (response.ok) {
-        return path;
-      }
-    } catch {
-      continue;
-    }
+// Helper to get the correct answer index from shortestSide for multi-route scenarios
+export const getMainRouteIndexFromSide = (shortestSide: string, numAlternates: number = 1): number => {
+  // For legacy 2-route scenarios, left=0, right=1
+  if (numAlternates <= 1) {
+    return shortestSide === 'left' ? 0 : 1;
   }
-  return null;
+  
+  // For multi-route scenarios, parse the position
+  const positionMap: Record<string, number> = {
+    'left': 0,
+    'center-left': 1,
+    'center': Math.floor((numAlternates + 1) / 2),
+    'center-right': numAlternates,
+    'right': numAlternates,
+  };
+  
+  return positionMap[shortestSide] ?? 0;
 };
 
-// Detect which naming scheme a map folder uses (fallback)
-const detectNamingScheme = async (folderName: string, aspect: '16_9' | '9_16'): Promise<'candidate' | 'route' | null> => {
-  const aspectFolder = aspect;
-  
+// Check if image exists by testing URL
+async function checkImageExists(url: string): Promise<boolean> {
   try {
-    const candidateResponse = await fetch(`/maps/${folderName}/${aspectFolder}/candidate_1.png`, { method: 'HEAD' });
-    if (candidateResponse.ok) return 'candidate';
-  } catch {}
-  
-  try {
-    const routeResponse = await fetch(`/maps/${folderName}/${aspectFolder}/route_0.png`, { method: 'HEAD' });
-    if (routeResponse.ok) return 'route';
-  } catch {}
-  
-  return null;
-};
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
 
-// Fetch maps from database first, fallback to local files
-// If userId is provided, include that user's private maps; otherwise only public maps
-export const getAvailableMaps = async (userId?: string): Promise<MapSource[]> => {
+// Detect naming scheme for a map
+async function detectNamingScheme(mapName: string): Promise<'new' | 'old'> {
+  if (namingSchemeCache.has(mapName)) {
+    return namingSchemeCache.get(mapName)!;
+  }
+
+  // Try new scheme first
+  const newUrl = `${LOCAL_MAPS_BASE}/${mapName}/16_9/candidate_0_ALL.webp`;
+  const newExists = await checkImageExists(newUrl);
+  
+  if (newExists) {
+    namingSchemeCache.set(mapName, 'new');
+    return 'new';
+  }
+  
+  namingSchemeCache.set(mapName, 'old');
+  return 'old';
+}
+
+// Check if a map exists in the database
+async function isDbMap(mapId: string): Promise<boolean> {
+  if (dbMapCache.has(mapId)) {
+    return true;
+  }
+
+  const { data } = await supabase
+    .from('route_maps')
+    .select('id')
+    .eq('id', mapId)
+    .maybeSingle();
+  
+  if (data) {
+    dbMapCache.add(mapId);
+    return true;
+  }
+  
+  return false;
+}
+
+export async function getAvailableMaps(userId?: string | null): Promise<MapSource[]> {
+  const cacheKey = `maps-${userId || 'public'}`;
+  if (mapCache.has(cacheKey)) {
+    return mapCache.get(cacheKey)!;
+  }
+
   try {
-    // Try database first - filter by public or owned by user
+    // Fetch from database first
     let query = supabase
       .from('route_maps')
-      .select('id, name, description, country_code, logo_path, map_type, is_public, user_id');
+      .select('id, name, logo_path, country_code, is_public, user_id')
+      .order('name');
     
-    // Build filter: public maps OR (private maps owned by current user)
+    // Get public maps OR user's private maps
     if (userId) {
       query = query.or(`is_public.eq.true,user_id.eq.${userId}`);
     } else {
       query = query.eq('is_public', true);
     }
-    
+
     const { data: dbMaps, error } = await query;
 
-    if (!error && dbMaps && dbMaps.length > 0) {
-      console.log(`Found ${dbMaps.length} maps in database`);
-      const mapSources: MapSource[] = [];
-
-      for (const dbMap of dbMaps) {
-        // Check if routes exist for this map in both aspects
-      const { data: routes16_9 } = await supabase
-        .from('route_images')
-        .select('id')
-        .eq('map_id', dbMap.id)
-        .eq('aspect_ratio', '16_9')
-        .limit(1);
-
-      const { data: routes9_16 } = await supabase
-        .from('route_images')
-        .select('id')
-        .eq('map_id', dbMap.id)
-        .eq('aspect_ratio', '9_16')
-        .limit(1);
-
-      if (routes16_9 && routes16_9.length > 0) {
-          mapSources.push({
-            id: `${dbMap.id}-landscape`,
-            name: dbMap.name,
-            aspect: '16_9',
-            csvPath: '', // Not used for database routes
-            imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/16_9/candidate_`,
-            folderName: dbMap.name,
-            description: dbMap.description || undefined,
-            countryCode: dbMap.country_code || undefined,
-            logoPath: dbMap.logo_path || undefined,
-            mapType: dbMap.map_type || undefined,
-          });
-        }
-
-      if (routes9_16 && routes9_16.length > 0) {
-          mapSources.push({
-            id: `${dbMap.id}-portrait`,
-            name: dbMap.name,
-            aspect: '9_16',
-            csvPath: '',
-            imagePathPrefix: `${STORAGE_URL}/${dbMap.name.toLowerCase()}/9_16/candidate_`,
-            folderName: dbMap.name,
-            description: dbMap.description || undefined,
-            countryCode: dbMap.country_code || undefined,
-            logoPath: dbMap.logo_path || undefined,
-            mapType: dbMap.map_type || undefined,
-          });
-        }
-      }
-
-      if (mapSources.length > 0) {
-        console.log(`Generated ${mapSources.length} map sources from database`);
-        return mapSources;
-      }
+    if (error) {
+      console.error('Error fetching maps from database:', error);
     }
 
-    // Fallback to local files
-    console.log('No maps in database, falling back to local files');
+    if (dbMaps && dbMaps.length > 0) {
+      console.log(`Loaded ${dbMaps.length} maps from database`);
+      
+      const maps: MapSource[] = dbMaps.map(map => ({
+        id: map.id,
+        name: map.name,
+        aspect: '16_9', // Default, will be overridden per route
+        logoPath: map.logo_path || undefined,
+        flagImage: map.country_code || undefined,
+        isDbMap: true,
+        isUserMap: map.user_id !== null && !map.is_public,
+      }));
+
+      mapCache.set(cacheKey, maps);
+      return maps;
+    }
+
+    // Fallback to local maps
     return getLocalMaps();
   } catch (error) {
-    console.error('Error loading maps from database:', error);
+    console.error('Error in getAvailableMaps:', error);
     return getLocalMaps();
   }
-};
+}
 
-// Fallback: Load maps from local public folder
-const getLocalMaps = async (): Promise<MapSource[]> => {
-  const mapSources: MapSource[] = [];
+async function getLocalMaps(): Promise<MapSource[]> {
+  // Try to detect local maps
+  const localMaps: MapSource[] = [];
+  const testMapNames = ['Linkoping', 'Angelholm', 'Huskvarna', 'Karlstad'];
   
-  for (const folderName of MAP_FOLDER_NAMES) {
-    const csvPath = await findCSVPath(folderName);
-    if (!csvPath) {
-      console.warn(`No CSV found for map: ${folderName}`);
-      continue;
-    }
-    
-    const landscapeScheme = await detectNamingScheme(folderName, '16_9');
-    if (landscapeScheme) {
-      const prefix = landscapeScheme === 'candidate' ? 'candidate_' : 'route_';
-      cacheNamingScheme(folderName, '16_9', landscapeScheme);
-      mapSources.push({
-        id: `${folderName.toLowerCase()}-landscape`,
-        name: folderName,
-        aspect: '16_9',
-        csvPath,
-        imagePathPrefix: `/maps/${folderName}/16_9/${prefix}`,
-        folderName,
-        namingScheme: landscapeScheme,
-      });
-    }
-    
-    const portraitScheme = await detectNamingScheme(folderName, '9_16');
-    if (portraitScheme) {
-      const prefix = portraitScheme === 'candidate' ? 'candidate_' : 'route_';
-      cacheNamingScheme(folderName, '9_16', portraitScheme);
-      mapSources.push({
-        id: `${folderName.toLowerCase()}-portrait`,
-        name: folderName,
-        aspect: '9_16',
-        csvPath,
-        imagePathPrefix: `/maps/${folderName}/9_16/${prefix}`,
-        folderName,
-        namingScheme: portraitScheme,
-      });
-    }
-  }
-
-  console.log(`Found ${mapSources.length} local map sources`);
-  return mapSources;
-};
-
-// Detect CSV format based on header
-type CSVFormat = 'old' | 'new';
-
-const detectCSVFormat = (headerLine: string): CSVFormat => {
-  const header = headerLine.toLowerCase();
-  // New format: ID, Main_Side, Main_Len, Alt_Len, Overlap_Pct, Hardness, Pass_Num
-  if (header.includes('main_side') || header.includes('main_len')) {
-    return 'new';
-  }
-  // Old format: Candidate_Index, Shortest_Side, Shortest_Color, Main_Route_Length, Alt_Route_Length
-  return 'old';
-};
-
-// Parse CSV text into RouteData array (supports both old and new formats)
-const parseCSV = (csvText: string, mapName?: string): RouteData[] => {
-  const lines = csvText.split('\n');
-  if (lines.length < 2) return [];
-  
-  const headerLine = lines[0];
-  const format = detectCSVFormat(headerLine);
-  
-  // Handle both comma and tab-separated values
-  const splitLine = (line: string): string[] => {
-    if (line.includes('\t')) {
-      return line.split('\t');
-    }
-    return line.split(',');
-  };
-  
-  return lines.slice(1)
-    .filter(line => line.trim() !== '')
-    .map((line) => {
-      const values = splitLine(line);
-      
-      const candidateIndex = parseInt(values[0]);
-      if (isNaN(candidateIndex)) {
-        return null;
-      }
-      
-      if (format === 'new') {
-        // New format: ID, Main_Side, Main_Len, Alt_Len, Overlap_Pct, Hardness, Pass_Num
-        const sideValue = values[1]?.toLowerCase().trim() || '';
-        const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
-        const mainRouteLength = parseFloat(values[2]) || 0;
-        const altRouteLength = parseFloat(values[3]) || 0;
-        // Color is derived from side in new format
-        const shortestColor = shortestSide === 'left' ? 'red' : 'blue';
-        
-        return {
-          candidateIndex,
-          shortestSide,
-          shortestColor,
-          mainRouteLength,
-          altRouteLength,
-          mapName,
-        };
-      } else {
-        // Old format: Candidate_Index, Shortest_Side, Shortest_Color, Main_Route_Length, Alt_Route_Length
-        const sideValue = values[1]?.toLowerCase().trim() || '';
-        const shortestSide = (sideValue === 'left' ? 'left' : 'right') as 'left' | 'right';
-        const colorValue = values[2]?.toLowerCase().trim() || 'red';
-        const mainRouteLength = parseFloat(values[3]) || 0;
-        const altRouteLength = parseFloat(values[4]) || 0;
-        
-        return {
-          candidateIndex,
-          shortestSide,
-          shortestColor: colorValue,
-          mainRouteLength,
-          altRouteLength,
-          mapName,
-        };
-      }
-    })
-    .filter(item => item !== null) as RouteData[];
-};
-
-// Check if a specific route image exists (tries both naming schemes) - for local fallback
-const checkImageExists = async (mapName: string, candidateIndex: number, aspect: '16_9' | '9_16', namingScheme?: 'candidate' | 'route'): Promise<boolean> => {
-  const aspectFolder = aspect;
-  
-  if (namingScheme === 'route') {
-    const imagePath = `/maps/${mapName}/${aspectFolder}/route_${candidateIndex}.png`;
+  for (const mapName of testMapNames) {
+    // Check if CSV exists
+    const csvPath = `${LOCAL_MAPS_BASE}/${mapName}/routes.csv`;
     try {
-      const response = await fetch(imagePath, { method: 'HEAD' });
-      return response.ok;
-    } catch { return false; }
-  }
-  
-  const imagePath = `/maps/${mapName}/${aspectFolder}/candidate_${candidateIndex}.png`;
-  try {
-    const response = await fetch(imagePath, { method: 'HEAD' });
-    return response.ok;
-  } catch { return false; }
-};
-
-// Fetch route data from database or local CSV
-export const fetchRouteDataForMap = async (mapSource: MapSource): Promise<RouteData[]> => {
-  try {
-    // Try database first if mapSource.id contains a UUID (database map)
-    const isDbMap = mapSource.id.length > 20 && mapSource.id.includes('-');
-    
-    if (isDbMap) {
-      const mapId = mapSource.id.replace('-landscape', '').replace('-portrait', '');
-      
-      const { data: dbRoutes, error } = await supabase
-        .from('route_images')
-        .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path')
-        .eq('map_id', mapId)
-        .eq('aspect_ratio', mapSource.aspect)
-        .order('candidate_index');
-
-      if (!error && dbRoutes && dbRoutes.length > 0) {
-        console.log(`Loaded ${dbRoutes.length} routes from database for ${mapSource.name} (${mapSource.aspect})`);
-        
-        return dbRoutes.map(route => {
-          // User maps have paths like "userId/mapId/aspect/file.webp"
-          // Admin maps have paths like "mapname/aspect/file.webp"
-          const isUserMap = route.image_path.split('/').length > 3;
-          const baseUrl = isUserMap ? USER_ROUTE_STORAGE_URL : STORAGE_URL;
-          
-          // Parse alt_route_lengths from JSON if present
-          let altRouteLengths: number[] | undefined;
-          if (route.alt_route_lengths && Array.isArray(route.alt_route_lengths)) {
-            altRouteLengths = route.alt_route_lengths as number[];
-          }
-          
-          return {
-            candidateIndex: route.candidate_index,
-            shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
-            shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
-            mainRouteLength: Number(route.main_route_length) || 0,
-            altRouteLength: Number(route.alt_route_length) || 0,
-            altRouteLengths,
-            numAlternates: route.num_alternates || 1,
-            mapName: mapSource.name,
-            imagePath: `${baseUrl}/${route.image_path}`,
-          };
+      const response = await fetch(csvPath, { method: 'HEAD' });
+      if (response.ok) {
+        const namingScheme = await detectNamingScheme(mapName);
+        localMaps.push({
+          id: mapName,
+          name: mapName,
+          aspect: '16_9',
+          csvPath,
+          routeBasePath: `${LOCAL_MAPS_BASE}/${mapName}`,
+          namingScheme,
         });
       }
+    } catch {
+      // Map doesn't exist locally
     }
+  }
 
-    // Fallback to local CSV
-    if (!mapSource.csvPath) {
-      console.warn(`No CSV path for ${mapSource.name}`);
-      return [];
-    }
+  return localMaps;
+}
 
-    console.log(`Fetching routes from local CSV: ${mapSource.csvPath}`);
-    const response = await fetch(mapSource.csvPath);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
-    }
-    const csvText = await response.text();
-    const data = parseCSV(csvText, mapSource.name);
-    
-    // Validate each route has a corresponding image
-    const validatedRoutes: RouteData[] = [];
-    const imageCheckPromises = data.map(async (route) => {
-      const exists = await checkImageExists(mapSource.name, route.candidateIndex, mapSource.aspect, mapSource.namingScheme);
-      return { route, exists };
+export function parseCSV(csvText: string): RouteData[] {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const header = lines[0].toLowerCase();
+  const isTabSeparated = header.includes('\t');
+  const separator = isTabSeparated ? '\t' : ',';
+  const headers = header.split(separator).map(h => h.trim());
+
+  // Detect format
+  const hasLengths = headers.includes('lengths');
+  const hasMainRouteIndex = headers.includes('main_route_index');
+
+  return lines.slice(1).map(line => {
+    const values = line.split(separator).map(v => v.trim());
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      row[h] = values[i] || '';
     });
-    
-    const results = await Promise.all(imageCheckPromises);
-    
-    for (const { route, exists } of results) {
-      if (exists) {
-        validatedRoutes.push(route);
-      }
-    }
-    
-    console.log(`Loaded ${validatedRoutes.length}/${data.length} routes for map ${mapSource.name} (${mapSource.aspect})`);
-    return validatedRoutes.sort((a, b) => a.candidateIndex - b.candidateIndex);
-  } catch (error) {
-    console.error('Error fetching route data:', error);
-    return [];
-  }
-};
 
-// Fetch route data from ALL maps (for "All" option)
-export const fetchAllRoutesData = async (isMobile: boolean): Promise<{ routes: RouteData[]; maps: MapSource[] }> => {
-  try {
-    const allMaps = await getAvailableMaps();
-    const aspect = isMobile ? '9_16' : '16_9';
-    const filteredMaps = allMaps.filter(map => map.aspect === aspect);
-    
-    console.log(`Fetching all routes for ${filteredMaps.length} maps`);
-    
-    const allRoutes: RouteData[] = [];
-    
-    for (const mapSource of filteredMaps) {
-      const routes = await fetchRouteDataForMap(mapSource);
-      allRoutes.push(...routes);
-    }
-    
-    // Shuffle the routes for variety
-    const shuffledRoutes = allRoutes.sort(() => Math.random() - 0.5);
-    
-    console.log(`Total routes loaded: ${shuffledRoutes.length}`);
-    return { routes: shuffledRoutes, maps: filteredMaps };
-  } catch (error) {
-    console.error('Error fetching all routes:', error);
-    return { routes: [], maps: [] };
-  }
-};
-
-// Cache for detected naming schemes per map
-const namingSchemeCache: Map<string, 'candidate' | 'route'> = new Map();
-
-// Cache for database maps (to know if we should use storage URL)
-const dbMapCache: Set<string> = new Set();
-
-// Mark a map as coming from database
-export const markAsDbMap = (mapName: string): void => {
-  dbMapCache.add(mapName.toLowerCase());
-};
-
-// Helper to get image URL by map name
-export const getImageUrlByMapName = (mapName: string, candidateIndex: number, isMobile: boolean, imagePath?: string): string => {
-  // If imagePath is provided (from database), use it directly
-  if (imagePath) {
-    return imagePath;
-  }
-
-  const aspectFolder = isMobile ? '9_16' : '16_9';
-  
-  // Check if this is a database map
-  if (dbMapCache.has(mapName.toLowerCase())) {
-    return `${STORAGE_URL}/${mapName.toLowerCase()}/${aspectFolder}/candidate_${candidateIndex}.webp`;
-  }
-
-  // Fallback to local files
-  const cacheKey = `${mapName}-${aspectFolder}`;
-  const cachedScheme = namingSchemeCache.get(cacheKey);
-  
-  let prefix: string;
-  if (cachedScheme) {
-    prefix = cachedScheme === 'route' ? 'route_' : 'candidate_';
-  } else {
-    prefix = mapName.toLowerCase() === 'rotondella' ? 'route_' : 'candidate_';
-  }
-  
-  return `/maps/${mapName}/${aspectFolder}/${prefix}${candidateIndex}.png`;
-};
-
-// Initialize naming scheme cache for a map
-export const cacheNamingScheme = (mapName: string, aspect: '16_9' | '9_16', scheme: 'candidate' | 'route'): void => {
-  namingSchemeCache.set(`${mapName}-${aspect}`, scheme);
-};
-
-// Get unique map names from available maps
-export const getUniqueMapNames = (maps: MapSource[]): string[] => {
-  const uniqueNames = new Set(maps.map(m => m.name));
-  return Array.from(uniqueNames);
-};
-
-// Fallback data (for backward compatibility)
-export const getRouteData = (): RouteData[] => {
-  return [
-    { candidateIndex: 1, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1303.79, altRouteLength: 1318.85 },
-    { candidateIndex: 2, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 1157.17, altRouteLength: 1169.77 },
-    { candidateIndex: 3, shortestSide: 'left', shortestColor: 'red', mainRouteLength: 959.73, altRouteLength: 975.09 },
-  ];
-};
-
-// Storage URL for user-uploaded route images
-const USER_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object`;
-
-/**
- * Load routes for a user's private map (from user_maps table).
- * These routes are stored in route_maps with source_map_id pointing to user_maps.
- */
-export async function loadUserMapRoutes(
-  userMapId: string,
-  isMobile: boolean
-): Promise<{ routes: RouteData[]; map: MapSource | null; userMapName: string }> {
-  try {
-    // First, get the user map details
-    const { data: userMap, error: userMapError } = await supabase
-      .from('user_maps')
-      .select('id, name, status')
-      .eq('id', userMapId)
-      .single();
-
-    if (userMapError || !userMap) {
-      console.error('User map not found:', userMapError);
-      return { routes: [], map: null, userMapName: '' };
-    }
-
-    if (userMap.status !== 'completed') {
-      console.log('User map is not yet completed:', userMap.status);
-      return { routes: [], map: null, userMapName: userMap.name };
-    }
-
-    const aspect = isMobile ? '9_16' : '16_9';
-
-    // Find the route_maps entry for this user map
-    const { data: routeMap, error: routeMapError } = await supabase
-      .from('route_maps')
-      .select('id, name, description')
-      .eq('source_map_id', userMapId)
-      .single();
-
-    if (routeMapError || !routeMap) {
-      console.error('Route map not found for user map:', routeMapError);
-      return { routes: [], map: null, userMapName: userMap.name };
-    }
-
-    // Fetch route images for this map
-    const { data: routeImages, error: routeImagesError } = await supabase
-      .from('route_images')
-      .select('candidate_index, shortest_side, main_route_length, alt_route_length, image_path')
-      .eq('map_id', routeMap.id)
-      .eq('aspect_ratio', aspect)
-      .order('candidate_index');
-
-    if (routeImagesError || !routeImages || routeImages.length === 0) {
-      console.error('No route images found:', routeImagesError);
-      return { routes: [], map: null, userMapName: userMap.name };
-    }
-
-    // User maps always use user-route-images bucket
-    // Paths are in format: userId/mapId/aspect/file.webp (4 segments)
-    const bucketName = 'user-route-images';
-
-    // Build routes with proper image URLs
-    const routes: RouteData[] = routeImages.map(route => {
-      // Image path is stored as userId/mapId/aspect/file.webp
-      const imagePath = route.image_path;
-      
-      const imageUrl = `${USER_STORAGE_URL}/public/${bucketName}/${imagePath}`;
+    // New format with lengths array and main_route_index
+    if (hasLengths && hasMainRouteIndex) {
+      const lengths = JSON.parse(row.lengths || '[]') as number[];
+      const mainRouteIndex = parseInt(row.main_route_index || '0', 10);
+      const mainLength = lengths[mainRouteIndex] || 0;
+      const altLengths = lengths.filter((_, i) => i !== mainRouteIndex);
       
       return {
-        candidateIndex: route.candidate_index,
-        shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
-        shortestColor: route.shortest_side === 'left' ? 'red' : 'blue',
-        mainRouteLength: Number(route.main_route_length) || 0,
-        altRouteLength: Number(route.alt_route_length) || 0,
-        mapName: userMap.name,
-        imagePath: imageUrl,
+        candidateIndex: parseInt(row.id || row.candidate_index || '0', 10),
+        shortestSide: mainRouteIndex === 0 ? 'left' : 'right' as 'left' | 'right',
+        shortestColor: getArrowColorForIndex(mainRouteIndex),
+        mainRouteLength: mainLength,
+        altRouteLength: altLengths[0] || 0,
+        altRouteLengths: altLengths,
+        numAlternates: lengths.length - 1,
+        mainRouteIndex,
       };
-    });
+    }
 
-    // Shuffle routes for variety (instead of always starting 1, 2, 3...)
-    const shuffledRoutes = routes.sort(() => Math.random() - 0.5);
-
-    // Create a MapSource for compatibility
-    const mapSource: MapSource = {
-      id: routeMap.id,
-      name: userMap.name,
-      aspect: aspect,
-      csvPath: '',
-      imagePathPrefix: '',
-      description: routeMap.description || 'User uploaded map',
-      folderName: userMap.name,
+    // Legacy format
+    const shortestSide = (row.shortest_side || row.main_side || 'left').toLowerCase() as 'left' | 'right';
+    return {
+      candidateIndex: parseInt(row.id || row.candidate_index || '0', 10),
+      shortestSide: shortestSide === 'left' ? 'left' : 'right',
+      shortestColor: shortestSide === 'left' ? 'red' : 'blue',
+      mainRouteLength: parseFloat(row.main_length || row.main_route_length || '0'),
+      altRouteLength: parseFloat(row.alt_length || row.alt_route_length || '0'),
+      numAlternates: parseInt(row.num_alts || '1', 10),
     };
+  });
+}
 
-    console.log(`Loaded ${shuffledRoutes.length} routes for user map: ${userMap.name}`);
-    return { routes: shuffledRoutes, map: mapSource, userMapName: userMap.name };
-  } catch (error) {
-    console.error('Error loading user map routes:', error);
+export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteData[]> {
+  const cacheKey = `routes-${mapSource.id}-${mapSource.aspect}`;
+  if (routeCache.has(cacheKey)) {
+    return routeCache.get(cacheKey)!;
+  }
+
+  // Try database first for DB maps
+  if (mapSource.isDbMap || await isDbMap(mapSource.id)) {
+    const { data: dbRoutes, error } = await supabase
+      .from('route_images')
+      .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path')
+      .eq('map_id', mapSource.id)
+      .eq('aspect_ratio', mapSource.aspect)
+      .order('candidate_index');
+
+    if (!error && dbRoutes && dbRoutes.length > 0) {
+      console.log(`Loaded ${dbRoutes.length} routes from database for ${mapSource.name} (${mapSource.aspect})`);
+      
+      const routes = dbRoutes.map(route => {
+        // User maps have paths like "userId/mapId/aspect/file.webp"
+        // Admin maps have paths like "mapname/aspect/file.webp"
+        const isUserMap = route.image_path.split('/').length > 3;
+        const baseUrl = isUserMap ? USER_ROUTE_STORAGE_URL : STORAGE_URL;
+        
+        // Parse alt_route_lengths from JSON if present
+        let altRouteLengths: number[] | undefined;
+        if (route.alt_route_lengths && Array.isArray(route.alt_route_lengths)) {
+          altRouteLengths = route.alt_route_lengths as number[];
+        }
+        
+        // Parse shortest_side to get main_route_index for multi-route scenarios
+        const numAlternates = route.num_alternates || 1;
+        const totalRoutes = 1 + numAlternates;
+        const mainRouteIndex = getMainRouteIndexFromSide(route.shortest_side, numAlternates);
+        
+        // For legacy 2-route scenarios, keep left/right
+        // For multi-route, we use the mainRouteIndex
+        const shortestSide: 'left' | 'right' = route.shortest_side === 'left' ? 'left' : 'right';
+        
+        return {
+          candidateIndex: route.candidate_index,
+          shortestSide,
+          shortestColor: getArrowColorForIndex(mainRouteIndex),
+          mainRouteLength: Number(route.main_route_length) || 0,
+          altRouteLength: Number(route.alt_route_length) || 0,
+          altRouteLengths,
+          numAlternates,
+          mainRouteIndex,
+          mapName: mapSource.name,
+          imagePath: `${baseUrl}/${route.image_path}`,
+        };
+      });
+
+      routeCache.set(cacheKey, routes);
+      return routes;
+    }
+  }
+
+  // Fallback to local CSV
+  if (mapSource.csvPath) {
+    try {
+      const response = await fetch(mapSource.csvPath);
+      if (response.ok) {
+        const csvText = await response.text();
+        const routes = parseCSV(csvText);
+        
+        // Add image paths and map name
+        const namingScheme = mapSource.namingScheme || await detectNamingScheme(mapSource.name);
+        routes.forEach(route => {
+          route.mapName = mapSource.name;
+          const suffix = namingScheme === 'new' ? '_ALL.webp' : '.webp';
+          route.imagePath = `${mapSource.routeBasePath}/${mapSource.aspect}/candidate_${route.candidateIndex}${suffix}`;
+        });
+
+        routeCache.set(cacheKey, routes);
+        return routes;
+      }
+    } catch (error) {
+      console.error(`Error loading CSV for ${mapSource.name}:`, error);
+    }
+  }
+
+  return [];
+}
+
+export async function fetchAllRoutesData(isMobile: boolean = false, userId?: string | null): Promise<RouteData[]> {
+  const maps = await getAvailableMaps(userId);
+  const targetAspect = isMobile ? '9_16' : '16_9';
+  
+  const allRoutes: RouteData[] = [];
+  
+  for (const map of maps) {
+    const mapWithAspect = { ...map, aspect: targetAspect };
+    const routes = await fetchRouteDataForMap(mapWithAspect);
+    allRoutes.push(...routes);
+  }
+
+  // Shuffle routes
+  for (let i = allRoutes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allRoutes[i], allRoutes[j]] = [allRoutes[j], allRoutes[i]];
+  }
+
+  return allRoutes;
+}
+
+export function getImageUrlByMapName(
+  mapName: string,
+  candidateIndex: number,
+  aspect: string = '16_9'
+): string {
+  // Check if it's a DB map
+  if (dbMapCache.has(mapName)) {
+    return `${STORAGE_URL}/${mapName}/${aspect}/candidate_${candidateIndex}_ALL.webp`;
+  }
+  
+  // Check naming scheme cache
+  const scheme = namingSchemeCache.get(mapName) || 'new';
+  const suffix = scheme === 'new' ? '_ALL.webp' : '.webp';
+  
+  return `${LOCAL_MAPS_BASE}/${mapName}/${aspect}/candidate_${candidateIndex}${suffix}`;
+}
+
+export async function loadUserMapRoutes(
+  mapId: string,
+  userId: string,
+  isMobile: boolean = false
+): Promise<{ routes: RouteData[], map: MapSource | null, userMapName: string }> {
+  const aspect = isMobile ? '9_16' : '16_9';
+  
+  // Get the user map info
+  const { data: userMap, error: userMapError } = await supabase
+    .from('user_maps')
+    .select('id, name, user_id, status')
+    .eq('id', mapId)
+    .eq('user_id', userId)
+    .single();
+
+  if (userMapError || !userMap) {
+    console.error('User map not found:', userMapError);
     return { routes: [], map: null, userMapName: '' };
   }
+
+  if (userMap.status !== 'completed') {
+    console.error('User map not yet processed:', userMap.status);
+    return { routes: [], map: null, userMapName: userMap.name };
+  }
+
+  // Get the route_maps entry for this user map
+  const { data: routeMap, error: routeMapError } = await supabase
+    .from('route_maps')
+    .select('id, name')
+    .eq('source_map_id', mapId)
+    .single();
+
+  if (routeMapError || !routeMap) {
+    console.error('Route map not found:', routeMapError);
+    return { routes: [], map: null, userMapName: userMap.name };
+  }
+
+  // Get route images
+  const { data: routeImages, error: routeImagesError } = await supabase
+    .from('route_images')
+    .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path')
+    .eq('map_id', routeMap.id)
+    .eq('aspect_ratio', aspect)
+    .order('candidate_index');
+
+  if (routeImagesError || !routeImages || routeImages.length === 0) {
+    console.error('No route images found:', routeImagesError);
+    return { routes: [], map: null, userMapName: userMap.name };
+  }
+
+  // User maps always use user-route-images bucket
+  const bucketName = 'user-route-images';
+
+  // Build routes with proper image URLs
+  const routes: RouteData[] = routeImages.map(route => {
+    const imagePath = route.image_path;
+    const imageUrl = `${USER_STORAGE_URL}/public/${bucketName}/${imagePath}`;
+    
+    // Parse alt_route_lengths
+    let altRouteLengths: number[] | undefined;
+    if (route.alt_route_lengths && Array.isArray(route.alt_route_lengths)) {
+      altRouteLengths = route.alt_route_lengths as number[];
+    }
+    
+    // Calculate mainRouteIndex from shortest_side
+    const numAlternates = route.num_alternates || 1;
+    const mainRouteIndex = getMainRouteIndexFromSide(route.shortest_side, numAlternates);
+    
+    return {
+      candidateIndex: route.candidate_index,
+      shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
+      shortestColor: getArrowColorForIndex(mainRouteIndex),
+      mainRouteLength: Number(route.main_route_length) || 0,
+      altRouteLength: Number(route.alt_route_length) || 0,
+      altRouteLengths,
+      numAlternates,
+      mainRouteIndex,
+      mapName: userMap.name,
+      imagePath: imageUrl,
+    };
+  });
+
+  const mapSource: MapSource = {
+    id: routeMap.id,
+    name: userMap.name,
+    aspect,
+    isDbMap: true,
+    isUserMap: true,
+  };
+
+  return { routes, map: mapSource, userMapName: userMap.name };
+}
+
+// Clear caches (useful for testing or when data changes)
+export function clearRouteCaches(): void {
+  mapCache.clear();
+  routeCache.clear();
+  dbMapCache.clear();
+  namingSchemeCache.clear();
 }
