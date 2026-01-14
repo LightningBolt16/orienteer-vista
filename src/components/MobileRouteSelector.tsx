@@ -281,8 +281,8 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
         <img
           src={currentRoute.imagePath}
           alt={`Route ${currentRoute.candidateIndex}`}
-          className={`w-full h-auto transition-opacity duration-300 ${
-            isTransitioning ? 'opacity-0' : 'opacity-100'
+          className={`w-full h-auto ${
+            isTransitioning ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'
           }`}
           onLoad={() => setIsImageLoaded(true)}
         />
