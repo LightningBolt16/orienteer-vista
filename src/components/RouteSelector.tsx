@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, X } from 'lucide-react';
 import { RouteData, MapSource, getArrowColorForIndex } from '@/utils/routeDataUtils';
-import { PauseOverlay } from './PauseOverlay';
+import PauseOverlay from './PauseOverlay';
 import { useInactivityDetection } from '@/hooks/useInactivityDetection';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
@@ -13,7 +13,7 @@ interface RouteSelectorProps {
   isFullscreen?: boolean;
 }
 
-export const RouteSelector: React.FC<RouteSelectorProps> = ({
+const RouteSelector: React.FC<RouteSelectorProps> = ({
   routeData,
   mapSource,
   allMaps,
@@ -31,9 +31,8 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
 
   const WARMUP_ROUTES = 3;
 
-  const { isPaused, resetInactivityTimer, handleResume: baseHandleResume } = useInactivityDetection({
-    timeout: 30000,
-    enabled: routeData.length > 0 && isImageLoaded,
+  const { isPaused, pauseReason, resume, resetTimer } = useInactivityDetection({
+    inactivityTimeout: 30000,
   });
 
   // Reset on route data change
@@ -106,7 +105,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
     const mapName = currentRoute.mapName || mapSource?.name;
     
     // Reset inactivity timer on interaction
-    resetInactivityTimer();
+    resetTimer();
 
     // Handle warmup period
     if (warmupCount < WARMUP_ROUTES) {
@@ -162,7 +161,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
   };
 
   const handleResume = () => {
-    baseHandleResume();
+    resume();
     setStartTime(Date.now());
   };
 
@@ -287,7 +286,7 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
 
   return (
     <div className={`relative ${isFullscreen ? 'h-screen' : ''}`}>
-      {isPaused && <PauseOverlay onResume={handleResume} />}
+      {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
       
       <div className="relative">
         {/* Route Image */}
@@ -354,3 +353,5 @@ export const RouteSelector: React.FC<RouteSelectorProps> = ({
     </div>
   );
 };
+
+export default RouteSelector;
