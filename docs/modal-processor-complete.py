@@ -1,10 +1,10 @@
 """
-ORIENTEERING ROUTE CHOICE GENERATOR - MODAL VERSION (FINAL)
+ORIENTEERING ROUTE CHOICE GENERATOR - MODAL VERSION (RANDOMIZED COLORS)
 ===========================================================================
 - Infrastructure: Modal, Cloudflare R2, Webhooks
-- Logic: "Smart Divergence" with Strict Count & Overlap Tiers
-- Inputs: Accepts 'num_alternate_routes' from Lovable payload.
-- Visuals: Routes are colored Left-to-Right to anonymize the correct answer.
+- Logic: "Smart Divergence" with Strict Count
+- Visuals: Routes are RANDOMLY shuffled. The correct route is not always Red.
+- Output: Sends 'main_route_index' to identifying the correct color/length.
 """
 
 import modal
@@ -32,7 +32,7 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
 )
 
 # =============================================================================
-# GLOBAL CONSTANTS (Defaults) & HELPER FUNCTIONS
+# GLOBAL HELPER FUNCTIONS
 # =============================================================================
 
 DEFAULT_OVERLAP_TIERS = [0.30, 0.70, 0.85, 0.90]
@@ -121,10 +121,6 @@ def find_alts_smart(original_G, st, en, mainp, requested_alts, overlap_tiers, mi
     return alts
 
 def eval_pair(pair, Gs, num_alts_needed, overlap_tiers, min_sep, max_len_ratio):
-    """
-    Evaluates a single pair.
-    STRICTLY checks if we found the exact number of requested alternates.
-    """
     st, en = pair
     try:
         mainp = nx.astar_path(Gs, st, en, heuristic=euclid, weight="weight")
@@ -132,7 +128,6 @@ def eval_pair(pair, Gs, num_alts_needed, overlap_tiers, min_sep, max_len_ratio):
         Lm = nx.path_weight(Gs, mainp, weight="weight")
     except: return None
     
-    # STRICT COUNT CHECK
     if len(alts) != num_alts_needed:
         return None
     
@@ -180,7 +175,6 @@ def process_map(job_payload: dict):
     import boto3
     from botocore.config import Config
     
-    # --- SAFETY FOR LARGE TIFF FILES ---
     Image.MAX_IMAGE_PIXELS = None
 
     # --- INFRASTRUCTURE HELPERS ---
@@ -260,23 +254,18 @@ def process_map(job_payload: dict):
     map_id = job_payload["map_id"]
     params = job_payload.get("processing_parameters", {})
     
-    # 1. VARIABLE INPUT for Alternate Routes
-    # The script accepts this variable from the input payload.
     NUM_ALTS_PER_CANDIDATE = params.get("num_alternate_routes", 3)
     
-    # Graph / Scoring Params
     OVERLAP_TIERS = params.get("overlap_tiers", DEFAULT_OVERLAP_TIERS)
     MIN_SEPARATION_DIST = params.get("min_separation", DEFAULT_MIN_SEPARATION)
     MAX_LENGTH_RATIO = params.get("max_length_ratio", DEFAULT_MAX_LEN_RATIO)
     
-    # Generation Params
     NUM_RANDOM_POINTS = params.get("num_random_points", 1000)
     CANDIDATE_MIN_DIST = params.get("candidate_min_dist", 300)
     CANDIDATE_MAX_DIST = params.get("candidate_max_dist", 1500)
     NUM_OUTPUT_ROUTES = params.get("num_output_routes", 50)
     BATCH_SIZE = 25
 
-    # Visuals
     ZOOM_MARGIN = params.get("zoom_margin", 50)
     MARKER_RADIUS = params.get("marker_radius", 50)
     LINE_WIDTH = 6
@@ -456,14 +445,12 @@ def process_map(job_payload: dict):
                 try:
                     st, en = cand["snapped_pair"]
                     
-                    # 2. Main Pixel Route
                     ind_m_raw, _ = route_through_array(base_cost_map, st, en, fully_connected=True, geometric=True)
                     ind_m = smooth(ind_m_raw)
                     cand["main_pixel"] = ind_m
                     
                     valid_pixel_alts = []
                     
-                    # 3. Alternate Pixel Routes (with Corridor Masking)
                     for i, r_alt_graph in enumerate(cand["alt_routes_graph"]):
                         tier_idx = min(i, len(OVERLAP_TIERS) - 1)
                         pixel_overlap_limit = OVERLAP_TIERS[tier_idx] + 0.05
@@ -487,11 +474,9 @@ def process_map(job_payload: dict):
                         ind_a_raw, _ = route_through_array(cost_map_alt, st, en, fully_connected=True, geometric=True)
                         ind_a = smooth(ind_a_raw)
                         
-                        # Check vs Main
                         ov = get_pixel_overlap(ind_m, ind_a)
                         if ov > pixel_overlap_limit: continue
                         
-                        # Check vs Existing Alts
                         is_unique_pixel = True
                         for existing in valid_pixel_alts:
                             if get_pixel_overlap(ind_a, existing) > pixel_overlap_limit:
@@ -534,8 +519,7 @@ def process_map(job_payload: dict):
         update_status("processing", f"Uploading {len(final_list)} candidates (ALL VIEW)...")
         
         csv_rows = []
-        # Standard distinct colors (Left->Right)
-        # We ensure standard colors so user can't guess "Red is always Main"
+        # Distinct palette
         COLORS = ['#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00'] 
         
         os.makedirs("/tmp/16_9", exist_ok=True)
@@ -557,24 +541,18 @@ def process_map(job_payload: dict):
             mp = cand["main_pixel"]
             alt_pixels = cand["alt_pixels"]
             
-            # Combine all routes into a single list
-            # We must track which one is the "Main" (fastest) route
+            # Combine all routes
             all_routes = [{"path": mp, "type": "main"}]
             for ap in alt_pixels:
                 all_routes.append({"path": ap, "type": "alt"})
             
-            # SORT ROUTES LEFT-TO-RIGHT based on average X coordinate
-            # This anonymizes the "Main" route's color
-            for r in all_routes:
-                r["avg_x"] = np.mean([p[1] for p in r["path"]])
+            # SHUFFLE ROUTES RANDOMLY
+            # This ensures "Main" can be any color
+            random.shuffle(all_routes)
             
-            all_routes.sort(key=lambda x: x["avg_x"])
-            
-            # Now assign colors based on sorted position
-            # Leftmost = Color[0], Next = Color[1], etc.
+            # Assign colors based on new shuffled index
             for idx, r in enumerate(all_routes):
                 r["color"] = COLORS[idx % len(COLORS)]
-                r["sort_index"] = idx
                 
             # Find which index (0-based) is the Main route for CSV data
             main_route_idx = next(idx for idx, r in enumerate(all_routes) if r["type"] == "main")
@@ -597,12 +575,14 @@ def process_map(job_payload: dict):
                 
                 def off(pt): return (pt[1]-bbox[0], pt[0]-bbox[1])
                 
-                # Draw all routes
+                # Draw all routes in shuffled order
                 for r in all_routes:
                     path = r["path"]
                     col = r["color"]
                     x = [off(p)[0] for p in path]
                     y = [off(p)[1] for p in path]
+                    # Z-order: maybe draw main last? Or random is fine.
+                    # Random order is fine for obfuscation.
                     ax.plot(x, y, color=col, lw=LINE_WIDTH, alpha=LINE_ALPHA)
                 
                 s = off(cand["snapped_pair"][0]); e = off(cand["snapped_pair"][1])
@@ -620,17 +600,20 @@ def process_map(job_payload: dict):
             generate_upload(b169, "16_9", "16:9")
             generate_upload(b916, "9_16", "9:16")
             
-            # Calculate Lengths (sorted order)
+            # Calculate Lengths (in shuffled order)
             sorted_lengths = []
+            colors_list = []
             def plen(pth): return sum(math.hypot(pth[k][0]-pth[k+1][0], pth[k][1]-pth[k+1][1]) for k in range(len(pth)-1))
             
             for r in all_routes:
                 sorted_lengths.append(round(plen(r["path"]), 1))
+                colors_list.append(r["color"])
             
             csv_rows.append({
                 "id": i,
                 "lengths": sorted_lengths,
-                "main_route_index": main_route_idx, # Frontend needs this to know the answer
+                "colors": colors_list,
+                "main_route_index": main_route_idx, # Vital for frontend validation
                 "hardness": float(f"{cand['hardness_score']:.2f}")
             })
             
