@@ -74,36 +74,45 @@ Deno.serve(async (req) => {
         const basePath = `${userMap.user_id}/${map_id}`
         
         for (const route of csv_data) {
-          // Parse alt_lengths - Modal sends as JSON string or array
-          let altRouteLengths = null
-          if (route.alt_lengths) {
-            try {
-              altRouteLengths = typeof route.alt_lengths === 'string' 
-                ? JSON.parse(route.alt_lengths) 
-                : route.alt_lengths
-            } catch (e) {
-              console.error('Failed to parse alt_lengths:', e)
-            }
-          }
+          // NEW FORMAT: Modal sends { id, lengths: [sorted lengths], main_route_index, hardness }
+          // lengths array is sorted left-to-right, main_route_index tells which is the correct answer
           
-          const numAlternates = route.num_alts || 1
+          const lengths = route.lengths || []
+          const mainRouteIndex = route.main_route_index ?? 0
+          const numAlternates = lengths.length > 1 ? lengths.length - 1 : 1
+          
+          // Extract main length and alt lengths from the sorted array
+          const mainLength = lengths[mainRouteIndex] || null
+          const altLengths = lengths.filter((_: number, i: number) => i !== mainRouteIndex)
+          
+          // For backwards compatibility, store first alt as alt_route_length
+          const firstAltLength = altLengths.length > 0 ? altLengths[0] : null
+          
+          // Convert main_route_index to a position indicator (left/center/right based on index)
+          // This tells the frontend which route is the "correct" answer
+          const positionMap = ['left', 'center-left', 'center', 'center-right', 'right']
+          const shortestSide = positionMap[mainRouteIndex] || 'left'
           
           routeImages.push({
-            map_id: routeMap.id, candidate_index: route.id,
-            main_route_length: route.main_length || null, 
-            alt_route_length: route.alt_length || null,
+            map_id: routeMap.id, 
+            candidate_index: route.id,
+            main_route_length: mainLength, 
+            alt_route_length: firstAltLength,
             num_alternates: numAlternates,
-            alt_route_lengths: altRouteLengths,
-            aspect_ratio: '16_9', shortest_side: route.main_side?.toLowerCase() || 'left',
-            image_path: `${basePath}/16_9/candidate_${route.id}.webp`,
+            alt_route_lengths: altLengths.length > 0 ? altLengths : null,
+            aspect_ratio: '16_9', 
+            shortest_side: shortestSide,
+            image_path: `${basePath}/16_9/candidate_${route.id}_ALL.webp`,
           }, {
-            map_id: routeMap.id, candidate_index: route.id,
-            main_route_length: route.main_length || null, 
-            alt_route_length: route.alt_length || null,
+            map_id: routeMap.id, 
+            candidate_index: route.id,
+            main_route_length: mainLength, 
+            alt_route_length: firstAltLength,
             num_alternates: numAlternates,
-            alt_route_lengths: altRouteLengths,
-            aspect_ratio: '9_16', shortest_side: route.main_side?.toLowerCase() || 'left',
-            image_path: `${basePath}/9_16/candidate_${route.id}.webp`,
+            alt_route_lengths: altLengths.length > 0 ? altLengths : null,
+            aspect_ratio: '9_16', 
+            shortest_side: shortestSide,
+            image_path: `${basePath}/9_16/candidate_${route.id}_ALL.webp`,
           })
         }
         if (routeImages.length > 0) {
