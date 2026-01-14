@@ -51,7 +51,7 @@ const GAME_DURATION_OPTIONS = [
 
 const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoom, onBack }) => {
   const { t } = useLanguage();
-  const { mobileCache, isPreloading } = useRouteCache();
+  const { desktopCache, mobileCache, isPreloading } = useRouteCache();
   const [playMode, setPlayMode] = useState<'local' | 'online' | null>(null);
   const [playerName, setPlayerName] = useState('');
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
@@ -78,7 +78,7 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
     }
   }, [isSpeedRaceDisabled, gameMode]);
 
-  const availableMaps = mobileCache?.maps || [];
+  const availableMaps = (isMobile ? mobileCache?.maps : desktopCache?.maps) || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
 
   const buildSettings = (): DuelSettings => {
