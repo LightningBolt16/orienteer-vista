@@ -33,30 +33,32 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const { data: { user } } = await supabase.auth.getUser();
         const allMaps = await getAvailableMaps(user?.id);
         
-        // Load desktop routes (16:9)
-        const desktopMaps = allMaps.filter(map => map.aspect === '16_9');
+        // Load desktop routes (16:9) - include all maps since routes exist in both aspects
         const desktopRoutes: RouteData[] = [];
-        for (const mapSource of desktopMaps) {
+        for (const mapSource of allMaps) {
           const routes = await fetchRouteDataForMap(mapSource);
-          desktopRoutes.push(...routes);
+          // Filter routes by aspect ratio for desktop
+          const filteredRoutes = routes.filter(r => !r.imagePath || r.imagePath.includes('16_9') || !r.imagePath.includes('9_16'));
+          desktopRoutes.push(...filteredRoutes);
         }
         setDesktopCache({
           routes: desktopRoutes,
-          maps: desktopMaps,
+          maps: allMaps,
           lastFetched: Date.now()
         });
         console.log(`Preloaded ${desktopRoutes.length} desktop routes`);
 
-        // Load mobile routes (9:16)
-        const mobileMaps = allMaps.filter(map => map.aspect === '9_16');
+        // Load mobile routes (9:16) - include all maps since routes exist in both aspects
         const mobileRoutes: RouteData[] = [];
-        for (const mapSource of mobileMaps) {
+        for (const mapSource of allMaps) {
           const routes = await fetchRouteDataForMap(mapSource);
-          mobileRoutes.push(...routes);
+          // Filter routes by aspect ratio for mobile
+          const filteredRoutes = routes.filter(r => r.imagePath && r.imagePath.includes('9_16'));
+          mobileRoutes.push(...filteredRoutes);
         }
         setMobileCache({
           routes: mobileRoutes,
-          maps: mobileMaps,
+          maps: allMaps,
           lastFetched: Date.now()
         });
         console.log(`Preloaded ${mobileRoutes.length} mobile routes`);
