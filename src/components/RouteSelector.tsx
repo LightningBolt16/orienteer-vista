@@ -266,8 +266,8 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
         <img
           src={currentRoute.imagePath}
           alt={`Route ${currentRoute.candidateIndex}`}
-          className={`w-full h-auto transition-all duration-300 ${
-            isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'
+          className={`w-full h-auto transition-opacity duration-300 ${
+            isTransitioning ? 'opacity-0' : 'opacity-100'
           }`}
           onLoad={() => setIsImageLoaded(true)}
         />
