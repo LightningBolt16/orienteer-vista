@@ -134,17 +134,14 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     }
 
     setTimeout(() => {
-      if (currentRouteIndex < routeData.length - 1) {
-        setCurrentRouteIndex(prev => prev + 1);
-      } else {
-        // Loop back to start
-        setCurrentRouteIndex(0);
-      }
+      // Random next route instead of sequential
+      const randomIndex = Math.floor(Math.random() * routeData.length);
+      setCurrentRouteIndex(randomIndex);
       setResult(null);
       setResultMessage('');
       setIsTransitioning(false);
       setIsImageLoaded(false);
-    }, 800);
+    }, 350);
   };
 
   const handleResume = () => {
@@ -168,7 +165,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   // Define colors for routes
   const ROUTE_COLORS = ['#FF5733', '#3357FF', '#33CC33', '#9933FF']; // Red, Blue, Green, Purple
 
-  // Render touch zones based on number of routes
+  // Render touch zones: Red=Left, Blue=Right, Green=Up, Purple=Down
   const renderTouchZones = () => {
     if (totalRoutes === 2) {
       // Traditional left/right split
@@ -192,38 +189,10 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
       );
     }
 
-    if (totalRoutes === 3) {
-      // Three zones: left, top-center, right
-      return (
-        <>
-          <div
-            className="absolute left-0 top-1/4 w-1/3 h-1/2 cursor-pointer rounded-r-lg"
-            onClick={() => handleDirectionSelect(0)}
-            style={{ 
-              background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}30 0%, transparent 100%)` 
-            }}
-          />
-          <div
-            className="absolute left-1/3 top-0 w-1/3 h-1/3 cursor-pointer rounded-b-lg"
-            onClick={() => handleDirectionSelect(1)}
-            style={{ 
-              background: `linear-gradient(180deg, ${ROUTE_COLORS[1]}30 0%, transparent 100%)` 
-            }}
-          />
-          <div
-            className="absolute right-0 top-1/4 w-1/3 h-1/2 cursor-pointer rounded-l-lg"
-            onClick={() => handleDirectionSelect(2)}
-            style={{ 
-              background: `linear-gradient(270deg, ${ROUTE_COLORS[2]}30 0%, transparent 100%)` 
-            }}
-          />
-        </>
-      );
-    }
-
-    // 4 routes: quadrant layout
+    // 3-4 routes: Left, Right, Up, (Down)
     return (
       <>
+        {/* Left zone - Red (index 0) */}
         <div
           className="absolute left-0 top-1/4 w-1/4 h-1/2 cursor-pointer rounded-r-lg"
           onClick={() => handleDirectionSelect(0)}
@@ -231,83 +200,66 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
             background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}30 0%, transparent 100%)` 
           }}
         />
+        {/* Right zone - Blue (index 1) */}
         <div
-          className="absolute left-1/4 top-0 w-1/4 h-1/3 cursor-pointer rounded-b-lg"
+          className="absolute right-0 top-1/4 w-1/4 h-1/2 cursor-pointer rounded-l-lg"
           onClick={() => handleDirectionSelect(1)}
           style={{ 
-            background: `linear-gradient(180deg, ${ROUTE_COLORS[1]}30 0%, transparent 100%)` 
+            background: `linear-gradient(270deg, ${ROUTE_COLORS[1]}30 0%, transparent 100%)` 
           }}
         />
+        {/* Up zone - Green (index 2) */}
         <div
-          className="absolute right-1/4 top-0 w-1/4 h-1/3 cursor-pointer rounded-b-lg"
+          className="absolute left-1/4 top-0 w-1/2 h-1/4 cursor-pointer rounded-b-lg"
           onClick={() => handleDirectionSelect(2)}
           style={{ 
             background: `linear-gradient(180deg, ${ROUTE_COLORS[2]}30 0%, transparent 100%)` 
           }}
         />
-        <div
-          className="absolute right-0 top-1/4 w-1/4 h-1/2 cursor-pointer rounded-l-lg"
-          onClick={() => handleDirectionSelect(3)}
-          style={{ 
-            background: `linear-gradient(270deg, ${ROUTE_COLORS[3]}30 0%, transparent 100%)` 
-          }}
-        />
+        {/* Down zone - Purple (index 3) - only for 4 routes */}
+        {totalRoutes >= 4 && (
+          <div
+            className="absolute left-1/4 bottom-0 w-1/2 h-1/4 cursor-pointer rounded-t-lg"
+            onClick={() => handleDirectionSelect(3)}
+            style={{ 
+              background: `linear-gradient(0deg, ${ROUTE_COLORS[3]}30 0%, transparent 100%)` 
+            }}
+          />
+        )}
       </>
     );
   };
 
-  // Render arrow indicators
+  // Render arrow indicators: Red=Left, Blue=Right, Green=Up, Purple=Down
   const renderArrowIndicators = () => {
-    const getArrowStyle = (index: number, total: number) => {
+    const getArrowStyle = (index: number) => {
       const baseStyle = {
         backgroundColor: `${ROUTE_COLORS[index]}CC`,
         padding: '8px',
         borderRadius: '50%',
+        position: 'absolute' as const,
       };
 
-      if (total === 2) {
-        return {
-          ...baseStyle,
-          position: 'absolute' as const,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          ...(index === 0 ? { left: '8px' } : { right: '8px' }),
-        };
-      }
-
-      if (total === 3) {
-        if (index === 0) return { ...baseStyle, position: 'absolute' as const, left: '8px', top: '50%', transform: 'translateY(-50%)' };
-        if (index === 1) return { ...baseStyle, position: 'absolute' as const, left: '50%', top: '8px', transform: 'translateX(-50%)' };
-        return { ...baseStyle, position: 'absolute' as const, right: '8px', top: '50%', transform: 'translateY(-50%)' };
-      }
-
-      // 4 routes
-      if (index === 0) return { ...baseStyle, position: 'absolute' as const, left: '8px', top: '50%', transform: 'translateY(-50%)' };
-      if (index === 1) return { ...baseStyle, position: 'absolute' as const, left: '25%', top: '8px', transform: 'translateX(-50%)' };
-      if (index === 2) return { ...baseStyle, position: 'absolute' as const, right: '25%', top: '8px', transform: 'translateX(50%)' };
-      return { ...baseStyle, position: 'absolute' as const, right: '8px', top: '50%', transform: 'translateY(-50%)' };
+      // Position: 0=Left, 1=Right, 2=Up, 3=Down
+      if (index === 0) return { ...baseStyle, left: '8px', top: '50%', transform: 'translateY(-50%)' };
+      if (index === 1) return { ...baseStyle, right: '8px', top: '50%', transform: 'translateY(-50%)' };
+      if (index === 2) return { ...baseStyle, left: '50%', top: '8px', transform: 'translateX(-50%)' };
+      return { ...baseStyle, left: '50%', bottom: '8px', transform: 'translateX(-50%)' };
     };
 
-    const getArrowRotation = (index: number, total: number) => {
-      if (total === 2) return index === 0 ? 'rotate-180' : '';
-      if (total === 3) {
-        if (index === 0) return 'rotate-180';
-        if (index === 1) return '-rotate-90';
-        return '';
-      }
-      // 4 routes
-      if (index === 0) return 'rotate-180';
-      if (index === 1) return '-rotate-135';
-      if (index === 2) return '-rotate-45';
-      return '';
+    const getArrowRotation = (index: number) => {
+      if (index === 0) return 'rotate-180'; // Left arrow
+      if (index === 1) return ''; // Right arrow
+      if (index === 2) return '-rotate-90'; // Up arrow
+      return 'rotate-90'; // Down arrow
     };
 
     return (
       <>
         {Array.from({ length: totalRoutes }, (_, i) => (
-          <div key={i} style={getArrowStyle(i, totalRoutes)} className="pointer-events-none">
+          <div key={i} style={getArrowStyle(i)} className="pointer-events-none">
             <svg
-              className={`w-6 h-6 text-white ${getArrowRotation(i, totalRoutes)}`}
+              className={`w-6 h-6 text-white ${getArrowRotation(i)}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -360,33 +312,16 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
         )}
       </div>
 
-      {/* Route Info */}
+      {/* Route Info - no colored dots that reveal answer */}
       {!isFullscreen && (
         <div className="mt-4 p-4 bg-muted rounded-lg">
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">
-              Route {currentRouteIndex + 1} of {routeData.length}
+              {warmupCount < WARMUP_ROUTES 
+                ? `Warmup: ${WARMUP_ROUTES - warmupCount} remaining`
+                : `Playing`}
             </span>
-            <div className="flex gap-2">
-              {Array.from({ length: totalRoutes }, (_, i) => (
-                <div
-                  key={i}
-                  className="w-4 h-4 rounded-full"
-                  style={{ 
-                    backgroundColor: ROUTE_COLORS[i],
-                    border: i === mainRouteIndex ? '2px solid white' : 'none',
-                    boxShadow: i === mainRouteIndex ? '0 0 8px rgba(255,255,255,0.8)' : 'none'
-                  }}
-                  title={i === mainRouteIndex ? 'Correct answer' : `Route ${i + 1}`}
-                />
-              ))}
-            </div>
           </div>
-          {warmupCount < WARMUP_ROUTES && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Warmup mode: {WARMUP_ROUTES - warmupCount} routes remaining
-            </p>
-          )}
         </div>
       )}
     </div>

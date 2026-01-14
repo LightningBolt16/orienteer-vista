@@ -136,17 +136,14 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
     }
 
     setTimeout(() => {
-      if (currentRouteIndex < routeData.length - 1) {
-        setCurrentRouteIndex(prev => prev + 1);
-      } else {
-        // Loop back to start
-        setCurrentRouteIndex(0);
-      }
+      // Random next route instead of sequential
+      const randomIndex = Math.floor(Math.random() * routeData.length);
+      setCurrentRouteIndex(randomIndex);
       setResult(null);
       setResultMessage('');
       setIsTransitioning(false);
       setIsImageLoaded(false);
-    }, 800);
+    }, 350);
   };
 
   // Legacy handler for left/right
@@ -165,7 +162,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
     setStartTime(Date.now());
   };
 
-  // Keyboard controls for 2-route scenarios
+  // Keyboard controls - arrows mapped: Left=0(Red), Right=1(Blue), Up=2(Green), Down=3(Purple)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isPaused) return;
@@ -176,17 +173,10 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
       const numAlternates = currentRoute.numAlternates || 1;
       const totalRoutes = 1 + numAlternates;
       
-      if (totalRoutes === 2) {
-        // Traditional left/right
-        if (e.key === 'ArrowLeft') handleDirectionSelect(0);
-        else if (e.key === 'ArrowRight') handleDirectionSelect(1);
-      } else {
-        // Multi-route: use number keys 1-4
-        const keyNum = parseInt(e.key);
-        if (keyNum >= 1 && keyNum <= totalRoutes) {
-          handleDirectionSelect(keyNum - 1);
-        }
-      }
+      if (e.key === 'ArrowLeft') handleDirectionSelect(0);
+      else if (e.key === 'ArrowRight') handleDirectionSelect(1);
+      else if (e.key === 'ArrowUp' && totalRoutes >= 3) handleDirectionSelect(2);
+      else if (e.key === 'ArrowDown' && totalRoutes >= 4) handleDirectionSelect(3);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -235,36 +225,19 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
       );
     }
 
-    // Multi-route layout (3-4 routes)
-    // Arrows are positioned left to right matching the route positions
-    const getArrowIcon = (index: number, total: number) => {
-      if (total === 3) {
-        // Left, Up, Right
-        if (index === 0) return <ChevronLeft className="h-8 w-8" />;
-        if (index === 1) return <ChevronUp className="h-8 w-8" />;
-        return <ChevronRight className="h-8 w-8" />;
-      } else {
-        // 4 routes: Left, Up-Left diagonal, Up-Right diagonal, Right
-        if (index === 0) return <ChevronLeft className="h-8 w-8" />;
-        if (index === 1) return <ChevronUp className="h-8 w-8 -rotate-45" />;
-        if (index === 2) return <ChevronUp className="h-8 w-8 rotate-45" />;
-        return <ChevronRight className="h-8 w-8" />;
-      }
+    // Multi-route layout: Red=Left, Blue=Right, Green=Up, Purple=Down
+    const getArrowIcon = (index: number) => {
+      if (index === 0) return <ChevronLeft className="h-8 w-8" />;
+      if (index === 1) return <ChevronRight className="h-8 w-8" />;
+      if (index === 2) return <ChevronUp className="h-8 w-8" />;
+      return <ChevronDown className="h-8 w-8" />;
     };
 
-    const getButtonPosition = (index: number, total: number) => {
-      if (total === 3) {
-        // Position: left edge, top center, right edge
-        if (index === 0) return 'left-4 top-1/2 -translate-y-1/2';
-        if (index === 1) return 'left-1/2 top-4 -translate-x-1/2';
-        return 'right-4 top-1/2 -translate-y-1/2';
-      } else {
-        // 4 routes: spread across
-        if (index === 0) return 'left-4 top-1/2 -translate-y-1/2';
-        if (index === 1) return 'left-1/4 top-8';
-        if (index === 2) return 'right-1/4 top-8';
-        return 'right-4 top-1/2 -translate-y-1/2';
-      }
+    const getButtonPosition = (index: number) => {
+      if (index === 0) return 'left-4 top-1/2 -translate-y-1/2'; // Left
+      if (index === 1) return 'right-4 top-1/2 -translate-y-1/2'; // Right
+      if (index === 2) return 'left-1/2 top-4 -translate-x-1/2'; // Up
+      return 'left-1/2 bottom-4 -translate-x-1/2'; // Down
     };
 
     return (
@@ -274,10 +247,10 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
             key={i}
             onClick={() => handleDirectionSelect(i)}
             style={{ backgroundColor: `${ROUTE_COLORS[i]}CC` }}
-            className={`pointer-events-auto absolute ${getButtonPosition(i, totalRoutes)} hover:bg-opacity-100 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95`}
+            className={`pointer-events-auto absolute ${getButtonPosition(i)} hover:bg-opacity-100 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95`}
             disabled={isTransitioning || isPaused}
           >
-            {getArrowIcon(i, totalRoutes)}
+            {getArrowIcon(i)}
           </button>
         ))}
       </div>
@@ -321,33 +294,16 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
         {!result && isImageLoaded && renderArrowButtons()}
       </div>
 
-      {/* Route Info */}
+      {/* Route Info - no colored dots that reveal answer */}
       {!isFullscreen && (
         <div className="mt-4 p-4 bg-muted rounded-lg">
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">
-              Route {currentRouteIndex + 1} of {routeData.length}
+              {warmupCount < WARMUP_ROUTES 
+                ? `Warmup: ${WARMUP_ROUTES - warmupCount} remaining`
+                : `Playing`}
             </span>
-            <div className="flex gap-2">
-              {Array.from({ length: totalRoutes }, (_, i) => (
-                <div
-                  key={i}
-                  className="w-4 h-4 rounded-full"
-                  style={{ 
-                    backgroundColor: ROUTE_COLORS[i],
-                    border: i === mainRouteIndex ? '2px solid white' : 'none',
-                    boxShadow: i === mainRouteIndex ? '0 0 8px rgba(255,255,255,0.8)' : 'none'
-                  }}
-                  title={i === mainRouteIndex ? 'Correct answer' : `Route ${i + 1}`}
-                />
-              ))}
-            </div>
           </div>
-          {warmupCount < WARMUP_ROUTES && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Warmup mode: {WARMUP_ROUTES - warmupCount} routes remaining
-            </p>
-          )}
         </div>
       )}
     </div>
