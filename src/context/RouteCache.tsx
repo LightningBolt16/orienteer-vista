@@ -33,13 +33,12 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const { data: { user } } = await supabase.auth.getUser();
         const allMaps = await getAvailableMaps(user?.id);
         
-        // Load desktop routes (16:9) - include all maps since routes exist in both aspects
+        // Load desktop routes (16:9) - set aspect on each map before fetching
         const desktopRoutes: RouteData[] = [];
         for (const mapSource of allMaps) {
-          const routes = await fetchRouteDataForMap(mapSource);
-          // Filter routes by aspect ratio for desktop
-          const filteredRoutes = routes.filter(r => !r.imagePath || r.imagePath.includes('16_9') || !r.imagePath.includes('9_16'));
-          desktopRoutes.push(...filteredRoutes);
+          const mapWithAspect = { ...mapSource, aspect: '16_9' as const };
+          const routes = await fetchRouteDataForMap(mapWithAspect);
+          desktopRoutes.push(...routes);
         }
         setDesktopCache({
           routes: desktopRoutes,
@@ -48,13 +47,12 @@ export const RouteCacheProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
         console.log(`Preloaded ${desktopRoutes.length} desktop routes`);
 
-        // Load mobile routes (9:16) - include all maps since routes exist in both aspects
+        // Load mobile routes (9:16) - set aspect on each map before fetching
         const mobileRoutes: RouteData[] = [];
         for (const mapSource of allMaps) {
-          const routes = await fetchRouteDataForMap(mapSource);
-          // Filter routes by aspect ratio for mobile
-          const filteredRoutes = routes.filter(r => r.imagePath && r.imagePath.includes('9_16'));
-          mobileRoutes.push(...filteredRoutes);
+          const mapWithAspect = { ...mapSource, aspect: '9_16' as const };
+          const routes = await fetchRouteDataForMap(mapWithAspect);
+          mobileRoutes.push(...routes);
         }
         setMobileCache({
           routes: mobileRoutes,
