@@ -529,9 +529,9 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                   </div>
                 )}
 
-                {/* Error Display */}
+                {/* Error Display with Fallback Option */}
                 {submitError && (
-                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-3">
                     <div className="flex items-start gap-2 text-destructive">
                       <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
                       <div>
@@ -539,6 +539,34 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                         <p className="text-xs mt-1">{submitError}</p>
                       </div>
                     </div>
+                    {/* If it's an annotation error, offer fallback */}
+                    {submitError.includes('annotation') && (impassableAreas.length > 0 || impassableLines.length > 0) && (
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-destructive/20">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSubmitError(null)}
+                          className="flex-1"
+                        >
+                          Try Again
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            // Clear annotations and submit without them
+                            setImpassableAreas([]);
+                            setImpassableLines([]);
+                            setSubmitError(null);
+                            // Wait a tick for state to update, then submit
+                            setTimeout(() => handleSubmit(), 100);
+                          }}
+                          className="flex-1"
+                        >
+                          Continue Without Impassable Markings
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 

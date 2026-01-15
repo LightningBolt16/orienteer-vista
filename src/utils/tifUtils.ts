@@ -57,6 +57,74 @@ async function tryBrowserNative(file: File): Promise<string> {
 }
 
 /**
+ * Normalize BitsPerSample in the TIFF file directory to prevent geotiff.js errors.
+ * Some TIFFs have BitsPerSample as a scalar or undefined, but geotiff expects an array.
+ */
+function normalizeTiffMetadata(image: any): void {
+  try {
+    const fd = image.fileDirectory || (typeof image.getFileDirectory === 'function' ? image.getFileDirectory() : null);
+    if (!fd) {
+      console.warn('[TIF] Could not access fileDirectory for normalization');
+      return;
+    }
+    
+    const samplesPerPixel = image.getSamplesPerPixel?.() ?? 1;
+    const rawBps = fd.BitsPerSample;
+    
+    console.log(`[TIF] Normalizing metadata: samplesPerPixel=${samplesPerPixel}, raw BitsPerSample=`, rawBps);
+    
+    // Normalize BitsPerSample to array of correct length
+    if (rawBps === undefined || rawBps === null) {
+      // Default to 8 bits per sample (most common)
+      fd.BitsPerSample = new Array(samplesPerPixel).fill(8);
+    } else if (typeof rawBps === 'number') {
+      // Convert scalar to array
+      fd.BitsPerSample = new Array(samplesPerPixel).fill(rawBps);
+    } else if (Array.isArray(rawBps) && rawBps.length < samplesPerPixel) {
+      // Pad array if too short
+      const lastVal = rawBps[rawBps.length - 1] ?? 8;
+      while (fd.BitsPerSample.length < samplesPerPixel) {
+        fd.BitsPerSample.push(lastVal);
+      }
+    }
+    
+    console.log(`[TIF] Normalized BitsPerSample=`, fd.BitsPerSample);
+  } catch (e) {
+    console.warn('[TIF] Error normalizing metadata (non-fatal):', e);
+  }
+}
+
+/**
+ * Safely extract the first band from readRasters result.
+ * geotiff.js can return either an array of typed arrays or a single typed array.
+ */
+function extractFirstBand(rasters: any): Uint8Array | Uint16Array | Float32Array {
+  if (!rasters) {
+    throw new Error('readRasters returned null/undefined');
+  }
+  
+  // If it's an array of bands, get first band
+  if (Array.isArray(rasters)) {
+    if (rasters.length === 0) {
+      throw new Error('readRasters returned empty array');
+    }
+    return rasters[0] as Uint8Array | Uint16Array | Float32Array;
+  }
+  
+  // If it has a numeric length and isn't an array, it's likely a typed array (single band)
+  if (typeof rasters.length === 'number' && rasters.length > 0) {
+    return rasters as Uint8Array | Uint16Array | Float32Array;
+  }
+  
+  // If it has indexed properties (some geotiff versions return array-like objects)
+  if (rasters[0] !== undefined) {
+    return rasters[0] as Uint8Array | Uint16Array | Float32Array;
+  }
+  
+  throw new Error('Could not extract band data from readRasters result');
+}
+
+/**
  * Convert a TIF/GeoTIFF file to a data URL that can be displayed in <img> or canvas.
  * First tries browser-native loading, then falls back to geotiff.js for complex formats.
  */
@@ -74,6 +142,9 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
   const image = await tiff.getImage();
+  
+  // Normalize metadata to prevent BitsPerSample[0] errors
+  normalizeTiffMetadata(image);
   
   const width = image.getWidth();
   const height = image.getHeight();
@@ -123,7 +194,7 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
     // Grayscale - DON'T use interleave option, it fails for single-band images
     console.log('Processing grayscale TIF without interleave...');
     const rasters = await image.readRasters();
-    const band = rasters[0] as Uint8Array | Uint16Array | Float32Array;
+    const band = extractFirstBand(rasters);
     
     if (!band || band.length === 0) {
       throw new Error('Failed to read grayscale TIF pixel data');
