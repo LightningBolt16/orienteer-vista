@@ -57,6 +57,11 @@ export const DEFAULT_PROCESSING_PARAMETERS: ProcessingParameters = {
   num_alternate_routes: 1,
 };
 
+interface ImpassableAnnotations {
+  areas: Array<{ points: Array<{ x: number; y: number }> }>;
+  lines: Array<{ start: { x: number; y: number }; end: { x: number; y: number } }>;
+}
+
 interface UploadDataR2 {
   name: string;
   colorTifFile: File;
@@ -64,6 +69,7 @@ interface UploadDataR2 {
   roiCoordinates: { x: number; y: number }[];
   processingParameters?: ProcessingParameters;
   dimensions: { width: number; height: number };
+  impassableAnnotations?: ImpassableAnnotations | null;
   onProgress?: (colorPercent: number, bwPercent: number) => void;
 }
 
@@ -160,6 +166,7 @@ export function useUserMaps() {
         r2_bw_key: r2Result.bwKey,
         is_tiled: false,
         tile_grid: null,
+        impassable_annotations: data.impassableAnnotations || null,
       };
 
       const { data: mapRecord, error: dbError } = await supabase

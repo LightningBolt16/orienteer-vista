@@ -290,6 +290,57 @@ def process_map(job_payload: dict):
 
         color_image = Image.open(color_path).convert("RGB")
         bw_image = Image.open(bw_path).convert("L")
+        
+        # --- APPLY IMPASSABLE ANNOTATIONS (server-side compositing) ---
+        impassable = job_payload.get("impassable_annotations")
+        if impassable:
+            from PIL import ImageDraw
+            
+            areas = impassable.get("areas", [])
+            lines = impassable.get("lines", [])
+            print(f"Applying {len(areas)} impassable areas and {len(lines)} lines...")
+            
+            # Composite onto color image (violet with transparency)
+            color_rgba = color_image.convert("RGBA")
+            overlay = Image.new("RGBA", color_rgba.size, (0, 0, 0, 0))
+            color_draw = ImageDraw.Draw(overlay)
+            violet = (205, 11, 206, 128)  # #CD0BCE with 50% alpha
+            violet_solid = (205, 11, 206, 255)
+            
+            for area in areas:
+                points = [(p["x"], p["y"]) for p in area.get("points", [])]
+                if len(points) >= 3:
+                    color_draw.polygon(points, fill=violet, outline=violet_solid)
+            for line in lines:
+                start = line.get("start", {})
+                end = line.get("end", {})
+                if start and end:
+                    color_draw.line(
+                        [(start["x"], start["y"]), (end["x"], end["y"])],
+                        fill=violet_solid, width=8
+                    )
+            
+            color_image = Image.alpha_composite(color_rgba, overlay).convert("RGB")
+            
+            # Composite onto B&W image (black - makes area impassable for routing)
+            bw_draw = ImageDraw.Draw(bw_image)
+            black = 0
+            
+            for area in areas:
+                points = [(p["x"], p["y"]) for p in area.get("points", [])]
+                if len(points) >= 3:
+                    bw_draw.polygon(points, fill=black, outline=black)
+            for line in lines:
+                start = line.get("start", {})
+                end = line.get("end", {})
+                if start and end:
+                    bw_draw.line(
+                        [(start["x"], start["y"]), (end["x"], end["y"])],
+                        fill=black, width=8
+                    )
+            
+            print(f"Impassable annotations applied successfully")
+        
         w_full, h_full = color_image.size
         
         # Load ROI

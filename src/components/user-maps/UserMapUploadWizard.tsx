@@ -13,9 +13,18 @@ import ImpassableDrawingCanvas from './ImpassableDrawingCanvas';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { useProAccess } from '@/hooks/useProAccess';
 import { supabase } from '@/integrations/supabase/client';
-import { convertTifToDataUrl, getTifDimensions, canDecodeTif } from '@/utils/tifUtils';
+import { convertTifToDataUrl, getTifDimensions } from '@/utils/tifUtils';
 import { uploadMapFilesToR2 } from '@/utils/r2Upload';
-import { applyAnnotationsToTif, ImpassableArea, ImpassableLine } from '@/utils/impassableAnnotations';
+
+// Types for impassable annotations (matching Modal's expected format)
+interface ImpassableArea {
+  points: Array<{ x: number; y: number }>;
+}
+
+interface ImpassableLine {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
 
 const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
@@ -197,91 +206,25 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
     setSubmitError(null);
 
     try {
-      let finalColorFile: File = colorTifFile;
-      let finalBwFile: File = bwTifFile;
+      // Prepare impassable annotations for server-side compositing
+      const hasAnnotations = impassableAreas.length > 0 || impassableLines.length > 0;
+      const impassableAnnotations = hasAnnotations 
+        ? { areas: impassableAreas, lines: impassableLines }
+        : null;
 
-      // Apply impassable annotations if any exist
-      if (impassableAreas.length > 0 || impassableLines.length > 0) {
-        setIsApplyingAnnotations(true);
-        try {
-          console.log(`Checking TIFF decodability before applying annotations...`);
-          
-          // Pre-check which files can be decoded
-          const [colorDecodable, bwDecodable] = await Promise.all([
-            canDecodeTif(colorTifFile),
-            canDecodeTif(bwTifFile),
-          ]);
-          
-          console.log('Decodability check:', { colorDecodable, bwDecodable });
-          
-          // If neither can be decoded, show error with fallback option
-          if (!colorDecodable.success && !bwDecodable.success) {
-            setSubmitError(
-              `Cannot apply annotations: ${colorDecodable.error || bwDecodable.error}. ` +
-              `You can continue without impassable markings.`
-            );
-            setIsApplyingAnnotations(false);
-            return;
-          }
-          
-          console.log(`Applying ${impassableAreas.length} areas and ${impassableLines.length} lines to maps...`);
-          console.time('applyAnnotations');
-          
-          // Apply annotations only to decodable files
-          const annotationPromises: Promise<File>[] = [];
-          
-          if (colorDecodable.success) {
-            annotationPromises.push(
-              applyAnnotationsToTif(colorTifFile, impassableAreas, impassableLines, '#CD0BCE')
-            );
-          } else {
-            console.warn('Color TIF cannot be decoded, using original file');
-            annotationPromises.push(Promise.resolve(colorTifFile));
-          }
-          
-          if (bwDecodable.success) {
-            annotationPromises.push(
-              applyAnnotationsToTif(bwTifFile, impassableAreas, impassableLines, '#000000')
-            );
-          } else {
-            console.warn('B&W TIF cannot be decoded, using original file');
-            annotationPromises.push(Promise.resolve(bwTifFile));
-          }
-          
-          const [annotatedColor, annotatedBw] = await Promise.all(annotationPromises);
-          
-          console.timeEnd('applyAnnotations');
-          finalColorFile = annotatedColor;
-          finalBwFile = annotatedBw;
-          
-          // Log which files were annotated
-          const annotatedFiles = [
-            colorDecodable.success ? 'color' : null,
-            bwDecodable.success ? 'B&W' : null,
-          ].filter(Boolean);
-          
-          console.log(`Annotations applied to: ${annotatedFiles.join(', ') || 'none'}`, {
-            colorSize: annotatedColor.size,
-            bwSize: annotatedBw.size,
-          });
-        } catch (annotationError) {
-          console.error('Failed to apply annotations:', annotationError);
-          const errorMessage = annotationError instanceof Error ? annotationError.message : 'Unknown error';
-          setSubmitError(`Failed to apply annotations: ${errorMessage}`);
-          setIsApplyingAnnotations(false);
-          return;
-        } finally {
-          setIsApplyingAnnotations(false);
-        }
+      if (hasAnnotations) {
+        console.log(`Sending ${impassableAreas.length} areas and ${impassableLines.length} lines for server-side compositing`);
       }
 
+      // Upload original TIF files - annotations will be applied server-side by Modal
       const result = await uploadUserMapR2({
         name: mapName,
-        colorTifFile: finalColorFile,
-        bwTifFile: finalBwFile,
+        colorTifFile,
+        bwTifFile,
         roiCoordinates,
         processingParameters: parameters,
         dimensions: colorDimensions,
+        impassableAnnotations,
         onProgress: (color, bw) => setUploadProgress({ color, bw }),
       });
 
