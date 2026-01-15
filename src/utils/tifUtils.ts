@@ -114,31 +114,27 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
     console.warn('readRGB failed, trying readRasters:', rgbError);
   }
   
-  // Fallback: Use readRasters which is more lenient
-  const rasters = await image.readRasters({ interleave: true }) as Uint8Array;
-  
-  if (!rasters || rasters.length === 0) {
-    throw new Error('Failed to read TIF pixel data - file may be corrupted or unsupported');
-  }
-  
+  // Fallback: Use readRasters - handle grayscale differently
   const imageData = ctx.createImageData(width, height);
   const data = imageData.data;
   const pixelCount = width * height;
   
-  if (samplesPerPixel >= 3) {
-    // RGB or RGBA
-    for (let i = 0; i < pixelCount; i++) {
-      const srcIdx = i * samplesPerPixel;
-      const dstIdx = i * 4;
-      data[dstIdx] = rasters[srcIdx];
-      data[dstIdx + 1] = rasters[srcIdx + 1];
-      data[dstIdx + 2] = rasters[srcIdx + 2];
-      data[dstIdx + 3] = samplesPerPixel >= 4 ? rasters[srcIdx + 3] : 255;
+  if (samplesPerPixel === 1) {
+    // Grayscale - DON'T use interleave option, it fails for single-band images
+    console.log('Processing grayscale TIF without interleave...');
+    const rasters = await image.readRasters();
+    const band = rasters[0] as Uint8Array | Uint16Array | Float32Array;
+    
+    if (!band || band.length === 0) {
+      throw new Error('Failed to read grayscale TIF pixel data');
     }
-  } else if (samplesPerPixel === 1) {
-    // Grayscale
+    
+    // Normalize values if they're not 8-bit
+    const maxVal = band instanceof Uint8Array ? 255 : 
+                   band instanceof Uint16Array ? 65535 : 1;
+    
     for (let i = 0; i < pixelCount; i++) {
-      const val = rasters[i];
+      const val = Math.round((band[i] / maxVal) * 255);
       const dstIdx = i * 4;
       data[dstIdx] = val;
       data[dstIdx + 1] = val;
@@ -146,7 +142,25 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
       data[dstIdx + 3] = 255;
     }
   } else {
-    throw new Error(`Unsupported samples per pixel: ${samplesPerPixel}`);
+    // RGB/RGBA - use interleave for efficiency
+    const rasters = await image.readRasters({ interleave: true }) as Uint8Array;
+    
+    if (!rasters || rasters.length === 0) {
+      throw new Error('Failed to read TIF pixel data - file may be corrupted or unsupported');
+    }
+    
+    if (samplesPerPixel >= 3) {
+      for (let i = 0; i < pixelCount; i++) {
+        const srcIdx = i * samplesPerPixel;
+        const dstIdx = i * 4;
+        data[dstIdx] = rasters[srcIdx];
+        data[dstIdx + 1] = rasters[srcIdx + 1];
+        data[dstIdx + 2] = rasters[srcIdx + 2];
+        data[dstIdx + 3] = samplesPerPixel >= 4 ? rasters[srcIdx + 3] : 255;
+      }
+    } else {
+      throw new Error(`Unsupported samples per pixel: ${samplesPerPixel}`);
+    }
   }
   
   ctx.putImageData(imageData, 0, 0);
