@@ -5,6 +5,7 @@ import { MapPin, X, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { usePublicConfig } from '@/hooks/usePublicConfig';
+import orienteeringFlag from '@/assets/orienteering-flag.png';
 
 interface CommunityMap {
   id: string;
@@ -84,30 +85,34 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
       if (!map.current) return;
       
       const isSelected = selectedMapName === cm.name;
+      
+      // Create container element - NO transform on this element!
       const el = document.createElement('div');
       el.className = 'community-map-marker';
-      el.style.cssText = `
-        cursor: pointer;
-        transition: transform 0.2s;
+      el.style.cursor = 'pointer';
+      
+      // Create image element for the flag
+      const img = document.createElement('img');
+      img.src = orienteeringFlag;
+      img.alt = cm.name;
+      img.style.cssText = `
+        width: 32px;
+        height: 32px;
+        transition: transform 0.15s ease-out;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        ${isSelected ? 'outline: 2px solid #22c55e; outline-offset: 2px; border-radius: 4px;' : ''}
       `;
       
-      // Orienteering control flag SVG
-      el.innerHTML = `
-        <svg width="28" height="36" viewBox="0 0 28 36" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
-          <polygon points="4,4 24,4 24,20 4,20" fill="${isSelected ? '#22c55e' : '#FF6600'}" stroke="white" stroke-width="2"/>
-          <polygon points="4,4 14,4 14,12 4,12" fill="white"/>
-          <polygon points="14,12 24,12 24,20 14,20" fill="white"/>
-          <line x1="14" y1="20" x2="14" y2="36" stroke="#555" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-      `;
+      el.appendChild(img);
       
+      // Apply hover effect to the IMAGE, not the container
       el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.15)';
+        img.style.transform = 'scale(1.2)';
         setHoveredMap(cm);
       });
       
       el.addEventListener('mouseleave', () => {
-        el.style.transform = 'scale(1)';
+        img.style.transform = 'scale(1)';
         setHoveredMap(null);
       });
       
@@ -116,7 +121,7 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
         setShowMap(false);
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
         .setLngLat([cm.longitude, cm.latitude])
         .addTo(map.current);
       
