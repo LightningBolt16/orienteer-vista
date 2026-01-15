@@ -45,8 +45,18 @@ Deno.serve(async (req) => {
 
     // COMPLETE PROCESSING
     if (req.method === 'POST' && action === 'complete') {
-      const { map_id, route_count, csv_data } = await req.json()
-      console.log('Completing map:', map_id, 'routes:', route_count)
+      const body = await req.json()
+      const { map_id, route_count, csv_data } = body
+      
+      // Debug logging
+      console.log('Complete request received:', JSON.stringify({
+        map_id,
+        route_count,
+        csv_data_length: csv_data?.length || 0,
+        csv_data_sample: csv_data?.[0] || null,
+        csv_data_type: typeof csv_data,
+        is_array: Array.isArray(csv_data)
+      }))
 
       const { data: userMap } = await supabase.from('user_maps').select('*').eq('id', map_id).single()
       if (!userMap) {
@@ -74,14 +84,14 @@ Deno.serve(async (req) => {
         const basePath = `${userMap.user_id}/${map_id}`
         
         for (const route of csv_data) {
-          // NEW FORMAT: Modal sends { id, lengths: [sorted lengths], main_route_index, hardness }
-          // lengths array is sorted left-to-right, main_route_index tells which is the correct answer
+          // NEW FORMAT: Modal sends { id, lengths: [sorted lengths], colors, main_route_index, hardness }
+          // lengths array is in shuffled order, main_route_index tells which is the correct answer
           
           const lengths = route.lengths || []
           const mainRouteIndex = route.main_route_index ?? 0
           const numAlternates = lengths.length > 1 ? lengths.length - 1 : 1
           
-          // Extract main length and alt lengths from the sorted array
+          // Extract main length and alt lengths from the shuffled array
           const mainLength = lengths[mainRouteIndex] || null
           const altLengths = lengths.filter((_: number, i: number) => i !== mainRouteIndex)
           
@@ -115,9 +125,19 @@ Deno.serve(async (req) => {
             image_path: `${basePath}/9_16/candidate_${route.id}_ALL.webp`,
           })
         }
+        
+        console.log('Route images to insert:', routeImages.length, 'Sample:', JSON.stringify(routeImages[0]))
+        
         if (routeImages.length > 0) {
-          await supabase.from('route_images').insert(routeImages)
+          const { error: insertError } = await supabase.from('route_images').insert(routeImages)
+          if (insertError) {
+            console.error('route_images insert FAILED:', JSON.stringify(insertError))
+          } else {
+            console.log('Successfully inserted', routeImages.length, 'route_images')
+          }
         }
+      } else {
+        console.warn('csv_data is empty or not an array:', csv_data)
       }
 
       await supabase.from('user_maps').update({
