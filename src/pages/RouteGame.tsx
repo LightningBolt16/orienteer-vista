@@ -12,13 +12,14 @@ import { useUser } from '../context/UserContext';
 import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
 import flagSweden from '@/assets/flag-sweden.png';
 import flagBelgium from '@/assets/flag-belgium.png';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
 
 type MapSelection = 'all' | string;
 type MapCategory = 'official' | 'private' | 'community';
@@ -414,19 +415,44 @@ const RouteGame: React.FC = () => {
                           Stats go to map-specific leaderboards, not the public leaderboard.
                         </p>
                       </div>
+                      
+                      {/* Map Browser */}
+                      <div className="mb-4">
+                        <CommunityMapBrowser 
+                          onSelectMap={(mapName) => { 
+                            handleMapSelect(mapName); 
+                            setSelectedMapCategory('community'); 
+                          }}
+                          selectedMapName={selectedMapCategory === 'community' ? (selectedMapId === 'all' ? undefined : selectedMapId) : undefined}
+                        />
+                      </div>
+                      
                       {uniqueCommunityMapNames.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {uniqueCommunityMapNames.map(mapName => (
-                            <button
-                              key={mapName}
-                              onClick={() => navigate(`/route-game?map=${communityMaps.find(m => m.name === mapName)?.id}`)}
-                              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-border bg-card transition-all hover:border-primary/50"
-                            >
-                              <Users className="h-8 w-8 mb-2 text-muted-foreground" />
-                              <span className="font-medium text-sm">{mapName}</span>
-                              <span className="text-xs text-muted-foreground">Community</span>
-                            </button>
-                          ))}
+                          {uniqueCommunityMapNames.map(mapName => {
+                            const mapSource = communityMaps.find(m => m.name === mapName);
+                            const isSelected = selectedMapId === mapName && selectedMapCategory === 'community';
+                            return (
+                              <button
+                                key={mapName}
+                                onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('community'); }}
+                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                                  isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                                }`}
+                              >
+                                <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+                                <span className="font-medium text-sm">{mapName}</span>
+                                {mapSource?.locationName ? (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-full">
+                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{mapSource.locationName.split(',')[0]}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Community</span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground text-center py-4">No community maps available yet.</p>
