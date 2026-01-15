@@ -469,6 +469,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          impassable_annotations: Json | null
           is_tiled: boolean | null
           last_activity_at: string | null
           name: string
@@ -488,6 +489,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          impassable_annotations?: Json | null
           is_tiled?: boolean | null
           last_activity_at?: string | null
           name: string
@@ -507,6 +509,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          impassable_annotations?: Json | null
           is_tiled?: boolean | null
           last_activity_at?: string | null
           name?: string

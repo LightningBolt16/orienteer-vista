@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
         r2_bw_key: mapData.r2_bw_key,
         roi_coordinates: mapData.roi_coordinates,
         processing_parameters: mapData.processing_parameters,
+        impassable_annotations: mapData.impassable_annotations || null,
         webhook_url: `${supabaseUrl}/functions/v1/map-processing-webhook`,
         webhook_secret: webhookSecret,
       };
