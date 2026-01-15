@@ -238,3 +238,26 @@ export async function convertTifToDataUrl(file: File): Promise<string> {
   console.log('TIF loaded via geotiff.js readRasters');
   return canvas.toDataURL('image/jpeg', 0.9);
 }
+
+/**
+ * Check if a TIF file can be decoded for annotation purposes.
+ * Returns success status and optional error message.
+ */
+export async function canDecodeTif(file: File): Promise<{ success: boolean; error?: string }> {
+  try {
+    await convertTifToDataUrl(file);
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Identify specific incompatibility errors
+    if (message.includes('DataView') || message.includes('Offset') || message.includes('bounds')) {
+      return { 
+        success: false, 
+        error: 'This TIFF format uses compression not supported for browser-based editing' 
+      };
+    }
+    
+    return { success: false, error: message };
+  }
+}
