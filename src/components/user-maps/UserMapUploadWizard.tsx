@@ -9,15 +9,17 @@ import TifFileUploader from './TifFileUploader';
 import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
 import OCADInstructionsDialog from './OCADInstructionsDialog';
+import ImpassableDrawingCanvas from './ImpassableDrawingCanvas';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { useProAccess } from '@/hooks/useProAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { convertTifToDataUrl, getTifDimensions } from '@/utils/tifUtils';
 import { uploadMapFilesToR2 } from '@/utils/r2Upload';
+import { applyAnnotationsToTif, ImpassableArea, ImpassableLine } from '@/utils/impassableAnnotations';
 
 const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
-type WizardStep = 'upload' | 'roi' | 'parameters' | 'submit';
+type WizardStep = 'upload' | 'annotations' | 'roi' | 'parameters' | 'submit';
 
 interface Point {
   x: number;
@@ -46,7 +48,10 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [colorTifFile, setColorTifFile] = useState<File | null>(null);
   const [bwTifFile, setBwTifFile] = useState<File | null>(null);
   const [roiCoordinates, setRoiCoordinates] = useState<Point[]>([]);
+  const [impassableAreas, setImpassableAreas] = useState<ImpassableArea[]>([]);
+  const [impassableLines, setImpassableLines] = useState<ImpassableLine[]>([]);
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
+  const [isApplyingAnnotations, setIsApplyingAnnotations] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [colorTifPreviewUrl, setColorTifPreviewUrl] = useState<string | null>(null);
   const [isConvertingTif, setIsConvertingTif] = useState(false);
@@ -137,6 +142,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
 
   const steps: { key: WizardStep; label: string }[] = [
     { key: 'upload', label: 'Upload Files' },
+    { key: 'annotations', label: 'Add Impassable' },
     { key: 'roi', label: 'Draw ROI' },
     { key: 'parameters', label: 'Configure' },
     { key: 'submit', label: 'Submit' },
@@ -157,12 +163,14 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
           colorDimensions !== null &&
           bwDimensions !== null
         );
+      case 'annotations':
+        return true; // Optional step - always allow proceeding
       case 'roi':
         return roiCoordinates.length >= 3;
       case 'parameters':
         return true;
       case 'submit':
-        return !uploading && !isSubmitted;
+        return !uploading && !isSubmitted && !isApplyingAnnotations;
       default:
         return false;
     }
@@ -186,10 +194,36 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
     if (!colorTifFile || !bwTifFile || roiCoordinates.length < 3 || !colorDimensions) return;
 
     try {
+      let finalColorFile = colorTifFile;
+      let finalBwFile = bwTifFile;
+
+      // Apply impassable annotations if any exist
+      if (impassableAreas.length > 0 || impassableLines.length > 0) {
+        setIsApplyingAnnotations(true);
+        try {
+          console.log(`Applying ${impassableAreas.length} areas and ${impassableLines.length} lines to maps...`);
+          
+          // Apply annotations to both files in parallel
+          const [annotatedColor, annotatedBw] = await Promise.all([
+            applyAnnotationsToTif(colorTifFile, impassableAreas, impassableLines, '#CD0BCE'), // Violet
+            applyAnnotationsToTif(bwTifFile, impassableAreas, impassableLines, '#000000'),   // Black
+          ]);
+          
+          finalColorFile = annotatedColor;
+          finalBwFile = annotatedBw;
+          console.log('Annotations applied successfully');
+        } catch (annotationError) {
+          console.error('Failed to apply annotations:', annotationError);
+          throw new Error('Failed to apply impassable annotations to maps');
+        } finally {
+          setIsApplyingAnnotations(false);
+        }
+      }
+
       const result = await uploadUserMapR2({
         name: mapName,
-        colorTifFile,
-        bwTifFile,
+        colorTifFile: finalColorFile,
+        bwTifFile: finalBwFile,
         roiCoordinates,
         processingParameters: parameters,
         dimensions: colorDimensions,
@@ -326,6 +360,40 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
           </div>
         );
 
+      case 'annotations':
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Mark any impassable areas or lines that should be added to the map. 
+              This step is <strong>optional</strong> — click "Next" to skip if not needed.
+            </p>
+            {isConvertingTif ? (
+              <div className="flex flex-col items-center justify-center h-64 bg-muted rounded-lg">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                <p className="text-muted-foreground">Converting TIF for preview...</p>
+              </div>
+            ) : tifConversionError ? (
+              <div className="flex flex-col items-center justify-center h-64 bg-destructive/10 rounded-lg p-4">
+                <p className="text-destructive text-center">{tifConversionError}</p>
+              </div>
+            ) : colorTifPreviewUrl ? (
+              <ImpassableDrawingCanvas
+                imageUrl={colorTifPreviewUrl}
+                onAnnotationsChange={(areas, lines) => {
+                  setImpassableAreas(areas);
+                  setImpassableLines(lines);
+                }}
+                initialAreas={impassableAreas}
+                initialLines={impassableLines}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+                <p className="text-muted-foreground">No image available</p>
+              </div>
+            )}
+          </div>
+        );
+
       case 'roi':
         return (
           <div className="space-y-4">
@@ -383,7 +451,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
               <>
                 <div className="bg-muted rounded-lg p-4 space-y-3">
                   <h4 className="font-medium">Summary</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Map Name</p>
                       <p className="font-medium">{mapName}</p>
@@ -401,6 +469,14 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                       <p className="font-medium truncate">{bwTifFile?.name}</p>
                     </div>
                     <div>
+                      <p className="text-muted-foreground">Impassable Annotations</p>
+                      <p className="font-medium">
+                        {impassableAreas.length + impassableLines.length > 0
+                          ? `${impassableAreas.length} area(s), ${impassableLines.length} line(s)`
+                          : 'None'}
+                      </p>
+                    </div>
+                    <div>
                       <p className="text-muted-foreground">Routes to Generate</p>
                       <p className="font-medium">{parameters.num_output_routes}</p>
                     </div>
@@ -411,8 +487,18 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                   </div>
                 </div>
 
+                {/* Annotation Progress */}
+                {isApplyingAnnotations && (
+                  <div className="space-y-3 bg-muted rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <p className="text-sm font-medium">Applying impassable annotations to maps...</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Upload Progress */}
-                {uploading && (
+                {uploading && !isApplyingAnnotations && (
                   <div className="space-y-3 bg-muted rounded-lg p-4">
                     <p className="text-sm font-medium">Uploading files...</p>
                     <div className="space-y-2">
