@@ -27,6 +27,9 @@ export interface MapSource {
   isDbMap?: boolean;
   isUserMap?: boolean;
   mapCategory?: 'official' | 'private' | 'community';
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
 }
 
 const STORAGE_URL = 'https://pldlmtuxqxszaajxtufx.supabase.co/storage/v1/object/public/route-images';
@@ -124,7 +127,7 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
     // Fetch from database first
     let query = supabase
       .from('route_maps')
-      .select('id, name, logo_path, country_code, is_public, user_id, map_category')
+      .select('id, name, logo_path, country_code, is_public, user_id, map_category, latitude, longitude, location_name, description')
       .order('name');
     
     // Get public maps OR user's private maps
@@ -165,6 +168,9 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
           isDbMap: true,
           isUserMap: map.user_id !== null && !map.is_public,
           mapCategory,
+          latitude: (map as any).latitude ? Number((map as any).latitude) : undefined,
+          longitude: (map as any).longitude ? Number((map as any).longitude) : undefined,
+          locationName: (map as any).location_name || undefined,
         };
       });
 

@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw, Crown } from 'lucide-react';
+import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw, Crown, Globe } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
 import { useAdmin } from '@/hooks/useAdmin';
 import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
 import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
 import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
+import PublishMapDialog from '@/components/user-maps/PublishMapDialog';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
@@ -34,6 +35,7 @@ const UserMaps: React.FC = () => {
   const [showAdminRequest, setShowAdminRequest] = useState(false);
   const [deleteMapId, setDeleteMapId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [publishMapData, setPublishMapData] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -263,12 +265,19 @@ const UserMaps: React.FC = () => {
                   </div>
                 )}
                 {map.status === 'completed' && (
-                  <div className="mt-4">
+                  <div className="mt-4 flex gap-2">
                     <Button
                       variant="outline"
                       onClick={() => navigate(`/route-game?map=${map.id}`)}
                     >
                       Play Routes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setPublishMapData({ id: map.id, name: map.name })}
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      Share to Community
                     </Button>
                   </div>
                 )}
@@ -282,6 +291,19 @@ const UserMaps: React.FC = () => {
         open={showAdminRequest}
         onOpenChange={setShowAdminRequest}
       />
+
+      {publishMapData && (
+        <PublishMapDialog
+          open={!!publishMapData}
+          onOpenChange={(open) => !open && setPublishMapData(null)}
+          mapId={publishMapData.id}
+          mapName={publishMapData.name}
+          onPublished={() => {
+            setPublishMapData(null);
+            fetchUserMaps();
+          }}
+        />
+      )}
 
       <AlertDialog open={!!deleteMapId} onOpenChange={() => setDeleteMapId(null)}>
         <AlertDialogContent>
