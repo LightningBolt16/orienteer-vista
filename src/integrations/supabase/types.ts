@@ -363,7 +363,10 @@ export type Database = {
           description: string | null
           id: string
           is_public: boolean | null
+          latitude: number | null
+          location_name: string | null
           logo_path: string | null
+          longitude: number | null
           map_category: string | null
           map_type: string | null
           name: string
@@ -377,7 +380,10 @@ export type Database = {
           description?: string | null
           id?: string
           is_public?: boolean | null
+          latitude?: number | null
+          location_name?: string | null
           logo_path?: string | null
+          longitude?: number | null
           map_category?: string | null
           map_type?: string | null
           name: string
@@ -391,7 +397,10 @@ export type Database = {
           description?: string | null
           id?: string
           is_public?: boolean | null
+          latitude?: number | null
+          location_name?: string | null
           logo_path?: string | null
+          longitude?: number | null
           map_category?: string | null
           map_type?: string | null
           name?: string
