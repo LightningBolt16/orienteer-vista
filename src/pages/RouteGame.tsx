@@ -39,7 +39,7 @@ const RouteGame: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { user, loading: userLoading } = useUser();
-  const { desktopCache, mobileCache, isPreloading, getRoutesForMap, getUserRoutes, officialMaps, userMaps, communityMaps } = useRouteCache();
+  const { desktopCache, mobileCache, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, officialMaps, userMaps, communityMaps } = useRouteCache();
   const { showTutorial, closeTutorial } = useRouteGameTutorial();
   
   // Check for user map parameter
@@ -145,19 +145,42 @@ const RouteGame: React.FC = () => {
       setIsLoading(true);
       
       try {
-        const { routes, maps } = await getRoutesForMap(selectedMapId, isMobile);
+        let routes: RouteData[] = [];
+        let maps: MapSource[] = [];
+        
+        if (selectedMapCategory === 'private') {
+          // Load private map routes
+          const result = await getUserRoutes(isMobile);
+          routes = result.routes;
+          maps = result.maps;
+          
+          if (selectedMapId !== 'all') {
+            routes = routes.filter(r => r.mapName?.toLowerCase() === selectedMapId.toLowerCase());
+          }
+        } else if (selectedMapCategory === 'community') {
+          // Load community map routes using getCommunityRoutes from context
+          const result = await getCommunityRoutes(selectedMapId, isMobile);
+          routes = result.routes;
+          maps = result.maps;
+        } else {
+          // Load official map routes (default)
+          const result = await getRoutesForMap(selectedMapId, isMobile);
+          routes = result.routes;
+          maps = result.maps;
+        }
+        
         setRouteData(routes);
         setAllMapsForRoutes(maps);
         
         if (selectedMapId !== 'all') {
           const aspect = isMobile ? '9_16' : '16_9';
-          const mapSource = maps.find(m => m.name === selectedMapId && m.aspect === aspect);
+          const mapSource = maps.find(m => m.name === selectedMapId);
           setSelectedMap(mapSource || null);
         } else {
           setSelectedMap(null);
         }
         
-        if (routes.length === 0 && !isPreloading) {
+        if (routes.length === 0 && !isPreloading && selectedMapCategory === 'official') {
           toast({
             title: t('error'),
             description: t('noMapsAvailable'),
@@ -177,7 +200,7 @@ const RouteGame: React.FC = () => {
     };
     
     loadRoutes();
-  }, [selectedMapId, isMobile, isPreloading, getRoutesForMap, t, isUserMapMode]);
+  }, [selectedMapId, selectedMapCategory, isMobile, isPreloading, getRoutesForMap, getUserRoutes, t, isUserMapMode, communityMaps]);
   
   const handleMapSelect = (mapName: MapSelection) => {
     setSelectedMapId(mapName);
@@ -344,17 +367,22 @@ const RouteGame: React.FC = () => {
                           </p>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {uniqueUserMapNames.map(mapName => (
-                            <button
-                              key={mapName}
-                              onClick={() => navigate(`/route-game?map=${userMaps.find(m => m.name === mapName)?.id}`)}
-                              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-border bg-card transition-all hover:border-primary/50"
-                            >
-                              <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                              <span className="font-medium text-sm">{mapName}</span>
-                              <span className="text-xs text-muted-foreground">Private</span>
-                            </button>
-                          ))}
+                          {uniqueUserMapNames.map(mapName => {
+                            const isSelected = selectedMapId === mapName && selectedMapCategory === 'private';
+                            return (
+                              <button
+                                key={mapName}
+                                onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('private'); }}
+                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                                  isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                                }`}
+                              >
+                                <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                                <span className="font-medium text-sm">{mapName}</span>
+                                <span className="text-xs text-muted-foreground">Private</span>
+                              </button>
+                            );
+                          })}
                           <button
                             onClick={() => navigate('/my-maps')}
                             className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-primary/40 transition-all hover:border-primary hover:bg-primary/5"
