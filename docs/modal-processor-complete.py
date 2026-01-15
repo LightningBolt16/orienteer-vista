@@ -300,12 +300,13 @@ def process_map(job_payload: dict):
             lines = impassable.get("lines", [])
             print(f"Applying {len(areas)} impassable areas and {len(lines)} lines...")
             
-            # Composite onto color image (violet with transparency)
+            # Composite onto color image (vivid magenta with transparency)
             color_rgba = color_image.convert("RGBA")
             overlay = Image.new("RGBA", color_rgba.size, (0, 0, 0, 0))
             color_draw = ImageDraw.Draw(overlay)
-            violet = (205, 11, 206, 128)  # #CD0BCE with 50% alpha
-            violet_solid = (205, 11, 206, 255)
+            # More vivid magenta with higher alpha for better visibility
+            violet = (255, 0, 255, 180)  # Pure magenta with 70% alpha
+            violet_solid = (255, 0, 255, 255)  # Full opacity for outlines/lines
             
             for area in areas:
                 points = [(p["x"], p["y"]) for p in area.get("points", [])]
@@ -317,7 +318,7 @@ def process_map(job_payload: dict):
                 if start and end:
                     color_draw.line(
                         [(start["x"], start["y"]), (end["x"], end["y"])],
-                        fill=violet_solid, width=8
+                        fill=violet_solid, width=12  # Thicker lines for visibility
                     )
             
             color_image = Image.alpha_composite(color_rgba, overlay).convert("RGB")
@@ -667,12 +668,18 @@ def process_map(job_payload: dict):
                 "main_route_index": main_route_idx, # Vital for frontend validation
                 "hardness": float(f"{cand['hardness_score']:.2f}")
             })
+        
+        # Debug logging before sending complete webhook
+        print(f"Sending complete webhook with {len(csv_rows)} csv_rows")
+        if csv_rows:
+            print(f"Sample csv_row: {csv_rows[0]}")
             
-        requests.post(
+        response = requests.post(
             f"{job_payload['webhook_url']}/complete",
             json={"map_id": map_id, "route_count": len(final_list), "csv_data": csv_rows},
             headers={"Content-Type": "application/json", "X-Webhook-Secret": job_payload["webhook_secret"]}
         )
+        print(f"Complete webhook response: {response.status_code} - {response.text}")
         
         update_status("completed", f"Done. Generated {len(final_list)} candidates.")
         
