@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, X } from 'lucide-react';
+import { MapPin, X, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { usePublicConfig } from '@/hooks/usePublicConfig';
 
 interface CommunityMap {
   id: string;
@@ -19,8 +20,6 @@ interface CommunityMapBrowserProps {
   selectedMapName?: string;
 }
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
-
 const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({ 
   onSelectMap, 
   selectedMapName 
@@ -31,6 +30,9 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
   const [communityMaps, setCommunityMaps] = useState<CommunityMap[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [hoveredMap, setHoveredMap] = useState<CommunityMap | null>(null);
+  
+  const { config, loading, error, refetch } = usePublicConfig();
+  const mapboxToken = config?.mapboxToken || '';
 
   useEffect(() => {
     fetchCommunityMaps();
@@ -58,9 +60,9 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
   };
 
   useEffect(() => {
-    if (!showMap || !mapContainer.current || !MAPBOX_TOKEN) return;
+    if (!showMap || !mapContainer.current || !mapboxToken) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapboxgl.accessToken = mapboxToken;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -122,10 +124,29 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
       markers.current = [];
       map.current?.remove();
     };
-  }, [showMap, communityMaps, selectedMapName, onSelectMap]);
+  }, [showMap, communityMaps, selectedMapName, onSelectMap, mapboxToken]);
 
-  if (!MAPBOX_TOKEN) {
-    return null;
+  // Don't render if loading or no token
+  if (loading) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">Loading map browser...</p>
+      </div>
+    );
+  }
+
+  if (error || !mapboxToken) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground mb-2">
+          Map browser unavailable
+        </p>
+        <Button variant="outline" size="sm" onClick={refetch}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
   }
 
   if (!showMap) {

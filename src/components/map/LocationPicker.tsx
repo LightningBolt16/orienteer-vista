@@ -1,17 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { usePublicConfig } from '@/hooks/usePublicConfig';
 
 interface LocationPickerProps {
   value?: { lat: number; lng: number; name?: string };
   onChange: (location: { lat: number; lng: number; name: string }) => void;
   className?: string;
 }
-
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, className }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -20,11 +19,16 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, classN
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [locationName, setLocationName] = useState(value?.name || '');
+  const [mapInitialized, setMapInitialized] = useState(false);
+  
+  const { config, loading, error, refetch } = usePublicConfig();
+  const mapboxToken = config?.mapboxToken || '';
 
+  // Initialize map when token becomes available
   useEffect(() => {
-    if (!mapContainer.current || !MAPBOX_TOKEN) return;
+    if (!mapContainer.current || !mapboxToken || mapInitialized) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapboxgl.accessToken = mapboxToken;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -61,14 +65,19 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, classN
       onChange({ lat, lng, name });
     });
 
+    setMapInitialized(true);
+
     return () => {
       map.current?.remove();
+      map.current = null;
+      marker.current = null;
+      setMapInitialized(false);
     };
-  }, []);
+  }, [mapboxToken]);
 
   // Update marker when value changes externally
   useEffect(() => {
-    if (value && map.current) {
+    if (value && map.current && mapInitialized) {
       if (marker.current) {
         marker.current.setLngLat([value.lng, value.lat]);
       } else {
@@ -79,12 +88,14 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, classN
       map.current.flyTo({ center: [value.lng, value.lat], zoom: 8 });
       if (value.name) setLocationName(value.name);
     }
-  }, [value?.lat, value?.lng]);
+  }, [value?.lat, value?.lng, mapInitialized]);
 
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    if (!mapboxToken) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=place,locality,region,country`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=place,locality,region,country`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
@@ -97,12 +108,12 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, classN
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !MAPBOX_TOKEN) return;
+    if (!searchQuery.trim() || !mapboxToken) return;
     
     setSearching(true);
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${MAPBOX_TOKEN}&limit=1`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${mapboxToken}&limit=1`
       );
       const data = await response.json();
       
@@ -134,13 +145,30 @@ const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, classN
     }
   };
 
-  if (!MAPBOX_TOKEN) {
+  // Loading state
+  if (loading) {
+    return (
+      <div className={`bg-muted rounded-lg p-4 text-center ${className}`}>
+        <div className="animate-pulse">
+          <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error or missing token state
+  if (error || !mapboxToken) {
     return (
       <div className={`bg-muted rounded-lg p-4 text-center ${className}`}>
         <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground">
-          Mapbox token not configured. Please add VITE_MAPBOX_TOKEN to enable location picking.
+        <p className="text-sm text-muted-foreground mb-3">
+          {error || 'Map configuration not available. Please contact support.'}
         </p>
+        <Button variant="outline" size="sm" onClick={refetch}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
       </div>
     );
   }
