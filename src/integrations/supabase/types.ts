@@ -364,6 +364,7 @@ export type Database = {
           id: string
           is_public: boolean | null
           logo_path: string | null
+          map_category: string | null
           map_type: string | null
           name: string
           source_map_id: string | null
@@ -377,6 +378,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           logo_path?: string | null
+          map_category?: string | null
           map_type?: string | null
           name: string
           source_map_id?: string | null
@@ -390,6 +392,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           logo_path?: string | null
+          map_category?: string | null
           map_type?: string | null
           name?: string
           source_map_id?: string | null

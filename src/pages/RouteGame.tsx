@@ -12,14 +12,16 @@ import { useUser } from '../context/UserContext';
 import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
 import flagSweden from '@/assets/flag-sweden.png';
 import flagBelgium from '@/assets/flag-belgium.png';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 type MapSelection = 'all' | string;
+type MapCategory = 'official' | 'private' | 'community';
 
 // Country code to flag image mapping for reliable cross-platform display
 const COUNTRY_FLAG_IMAGES: Record<string, string> = {
@@ -37,7 +39,7 @@ const RouteGame: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { user, loading: userLoading } = useUser();
-  const { desktopCache, mobileCache, isPreloading, getRoutesForMap } = useRouteCache();
+  const { desktopCache, mobileCache, isPreloading, getRoutesForMap, getUserRoutes, officialMaps, userMaps, communityMaps } = useRouteCache();
   const { showTutorial, closeTutorial } = useRouteGameTutorial();
   
   // Check for user map parameter
@@ -46,18 +48,23 @@ const RouteGame: React.FC = () => {
   
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedMapId, setSelectedMapId] = useState<MapSelection>('all');
+  const [selectedMapCategory, setSelectedMapCategory] = useState<MapCategory>('official');
   const [selectedMap, setSelectedMap] = useState<MapSource | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [allMapsForRoutes, setAllMapsForRoutes] = useState<MapSource[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [userMapName, setUserMapName] = useState<string>('');
+  const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
+  const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
-  // Get available maps from cache
+  // Get available maps from cache - only official maps for the main grid
   const cache = isMobile ? mobileCache : desktopCache;
   const availableMaps = cache?.maps || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
+  const uniqueUserMapNames = getUniqueMapNames(userMaps);
+  const uniqueCommunityMapNames = getUniqueMapNames(communityMaps);
 
   const toggleFullscreen = useCallback(async () => {
     if (isMobile || !document.fullscreenEnabled) {
@@ -258,83 +265,146 @@ const RouteGame: React.FC = () => {
                   {t('loadingMaps')}
                 </div>
               ) : uniqueMapNames.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {/* All Maps Option */}
-                  <button
-                    onClick={() => handleMapSelect('all')}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                      selectedMapId === 'all'
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-card'
-                    }`}
-                  >
-                    <Shuffle className="h-8 w-8 mb-2 text-primary" />
-                    <span className="font-medium text-sm">All Maps</span>
-                    <span className="text-xs text-muted-foreground">Random mix</span>
-                  </button>
-                  
-                  {/* Individual Map Options */}
-                  {uniqueMapNames.map(mapName => {
-                    // Find the map source to get metadata
-                    const mapSource = availableMaps.find(m => m.name === mapName);
-                    const countryCode = mapSource?.countryCode;
-                    const logoPath = mapSource?.logoPath;
-                    const isPwt = isPwtMap(mapName);
-                    const isKnivsta = mapName.toLowerCase().includes('knivsta');
-                    const isEkeby = mapName.toLowerCase().includes('ekeby');
-                    
-                    // Use flag image for reliable cross-platform display
-                    const flagImage = countryCode ? COUNTRY_FLAG_IMAGES[countryCode] : null;
-                    
-                    // Determine which logo to show
-                    const showKartkompanietLogo = isKnivsta || isEkeby;
-                    const customLogoUrl = logoPath ? `${LOGO_STORAGE_URL}/${logoPath}` : null;
-                    
-                    return (
-                      <button
-                        key={mapName}
-                        onClick={() => handleMapSelect(mapName)}
-                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                          selectedMapId === mapName
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border bg-card'
-                        }`}
-                      >
-                        {flagImage && (
-                          <img 
-                            src={flagImage} 
-                            alt={countryCode}
-                            className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm"
-                          />
-                        )}
-                        {isPwt ? (
-                          <PwtAttribution variant="badge" className="mb-2" />
-                        ) : customLogoUrl ? (
-                          <img src={customLogoUrl} alt={`${mapName} logo`} className="h-8 w-8 mb-2 object-contain rounded" />
-                        ) : showKartkompanietLogo ? (
-                          <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
-                        ) : (
-                          <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                        )}
-                        <span className="font-medium text-sm">{mapName}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {mapSource?.description || 'Orienteering map'}
-                        </span>
-                    </button>
-                    );
-                  })}
-                  
-                  {/* Upload your own map link */}
-                  {user && (
+                <div className="space-y-6">
+                  {/* Official Maps Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {/* All Maps Option */}
                     <button
-                      onClick={() => navigate('/my-maps')}
-                      className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-primary/40 transition-all hover:border-primary hover:bg-primary/5 bg-card/50"
+                      onClick={() => { handleMapSelect('all'); setSelectedMapCategory('official'); }}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                        selectedMapId === 'all' && selectedMapCategory === 'official'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-card'
+                      }`}
                     >
-                      <Map className="h-8 w-8 mb-2 text-primary" />
-                      <span className="font-medium text-sm text-primary">{t('uploadYourMap') || 'Your maps'}</span>
-                      <span className="text-xs text-muted-foreground text-center">{t('privateMapHint') || 'Private — only visible to you'}</span>
+                      <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                      <span className="font-medium text-sm">All Maps</span>
+                      <span className="text-xs text-muted-foreground">Random mix</span>
                     </button>
+                    
+                    {/* Individual Map Options */}
+                    {uniqueMapNames.map(mapName => {
+                      const mapSource = availableMaps.find(m => m.name === mapName);
+                      const countryCode = mapSource?.countryCode;
+                      const logoPath = mapSource?.logoPath;
+                      const isPwt = isPwtMap(mapName);
+                      const isKnivsta = mapName.toLowerCase().includes('knivsta');
+                      const isEkeby = mapName.toLowerCase().includes('ekeby');
+                      const flagImage = countryCode ? COUNTRY_FLAG_IMAGES[countryCode] : null;
+                      const showKartkompanietLogo = isKnivsta || isEkeby;
+                      const customLogoUrl = logoPath ? `${LOGO_STORAGE_URL}/${logoPath}` : null;
+                      
+                      return (
+                        <button
+                          key={mapName}
+                          onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('official'); }}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                            selectedMapId === mapName && selectedMapCategory === 'official'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border bg-card'
+                          }`}
+                        >
+                          {flagImage && (
+                            <img src={flagImage} alt={countryCode} className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm" />
+                          )}
+                          {isPwt ? (
+                            <PwtAttribution variant="badge" className="mb-2" />
+                          ) : customLogoUrl ? (
+                            <img src={customLogoUrl} alt={`${mapName} logo`} className="h-8 w-8 mb-2 object-contain rounded" />
+                          ) : showKartkompanietLogo ? (
+                            <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
+                          ) : (
+                            <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                          )}
+                          <span className="font-medium text-sm">{mapName}</span>
+                          <span className="text-xs text-muted-foreground">{mapSource?.description || 'Orienteering map'}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Your Private Maps - Collapsible */}
+                  {user && (
+                    <Collapsible open={privateMapsOpen} onOpenChange={setPrivateMapsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">Your Private Maps</span>
+                            <span className="text-xs text-muted-foreground">({uniqueUserMapNames.length})</span>
+                          </div>
+                          {privateMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-3">
+                        <div className="p-3 mb-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                          <p className="text-sm text-amber-800 dark:text-amber-200">
+                            <Lock className="h-3 w-3 inline mr-1" />
+                            Stats from these maps are private and won't affect the public leaderboard.
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {uniqueUserMapNames.map(mapName => (
+                            <button
+                              key={mapName}
+                              onClick={() => navigate(`/route-game?map=${userMaps.find(m => m.name === mapName)?.id}`)}
+                              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-border bg-card transition-all hover:border-primary/50"
+                            >
+                              <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                              <span className="font-medium text-sm">{mapName}</span>
+                              <span className="text-xs text-muted-foreground">Private</span>
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => navigate('/my-maps')}
+                            className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-primary/40 transition-all hover:border-primary hover:bg-primary/5"
+                          >
+                            <Map className="h-8 w-8 mb-2 text-primary" />
+                            <span className="font-medium text-sm text-primary">Upload New</span>
+                          </button>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   )}
+
+                  {/* Community Maps - Collapsible (Prepared for future) */}
+                  <Collapsible open={communityMapsOpen} onOpenChange={setCommunityMapsOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Community Maps</span>
+                          <span className="text-xs text-muted-foreground">({uniqueCommunityMapNames.length})</span>
+                        </div>
+                        {communityMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3">
+                      <div className="p-3 mb-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          <Users className="h-3 w-3 inline mr-1" />
+                          Stats go to map-specific leaderboards, not the public leaderboard.
+                        </p>
+                      </div>
+                      {uniqueCommunityMapNames.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {uniqueCommunityMapNames.map(mapName => (
+                            <button
+                              key={mapName}
+                              onClick={() => navigate(`/route-game?map=${communityMaps.find(m => m.name === mapName)?.id}`)}
+                              className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-border bg-card transition-all hover:border-primary/50"
+                            >
+                              <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+                              <span className="font-medium text-sm">{mapName}</span>
+                              <span className="text-xs text-muted-foreground">Community</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">No community maps available yet.</p>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               ) : (
                 <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">

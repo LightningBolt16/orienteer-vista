@@ -26,6 +26,7 @@ export interface MapSource {
   namingScheme?: 'new' | 'old';
   isDbMap?: boolean;
   isUserMap?: boolean;
+  mapCategory?: 'official' | 'private' | 'community';
 }
 
 const STORAGE_URL = 'https://pldlmtuxqxszaajxtufx.supabase.co/storage/v1/object/public/route-images';
@@ -123,7 +124,7 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
     // Fetch from database first
     let query = supabase
       .from('route_maps')
-      .select('id, name, logo_path, country_code, is_public, user_id')
+      .select('id, name, logo_path, country_code, is_public, user_id, map_category')
       .order('name');
     
     // Get public maps OR user's private maps
@@ -142,17 +143,30 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
     if (dbMaps && dbMaps.length > 0) {
       console.log(`Loaded ${dbMaps.length} maps from database`);
       
-      const maps: MapSource[] = dbMaps.map(map => ({
-        id: map.id,
-        name: map.name,
-        aspect: '16_9', // Default, will be overridden per route
-        logoPath: map.logo_path || undefined,
-        flagImage: map.country_code || undefined,
-        countryCode: map.country_code || undefined,
-        description: (map as any).description || undefined,
-        isDbMap: true,
-        isUserMap: map.user_id !== null && !map.is_public,
-      }));
+      const maps: MapSource[] = dbMaps.map(map => {
+        // Determine map category
+        let mapCategory: 'official' | 'private' | 'community' = 'official';
+        if ((map as any).map_category) {
+          mapCategory = (map as any).map_category;
+        } else if (map.user_id !== null && !map.is_public) {
+          mapCategory = 'private';
+        } else if (map.user_id !== null && map.is_public) {
+          mapCategory = 'community';
+        }
+        
+        return {
+          id: map.id,
+          name: map.name,
+          aspect: '16_9', // Default, will be overridden per route
+          logoPath: map.logo_path || undefined,
+          flagImage: map.country_code || undefined,
+          countryCode: map.country_code || undefined,
+          description: (map as any).description || undefined,
+          isDbMap: true,
+          isUserMap: map.user_id !== null && !map.is_public,
+          mapCategory,
+        };
+      });
 
       mapCache.set(cacheKey, maps);
       return maps;
@@ -164,6 +178,24 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
     console.error('Error in getAvailableMaps:', error);
     return getLocalMaps();
   }
+}
+
+// Get only official maps (for public leaderboard)
+export async function getOfficialMaps(): Promise<MapSource[]> {
+  const allMaps = await getAvailableMaps();
+  return allMaps.filter(m => m.mapCategory === 'official');
+}
+
+// Get user's private maps
+export async function getUserPrivateMaps(userId: string): Promise<MapSource[]> {
+  const allMaps = await getAvailableMaps(userId);
+  return allMaps.filter(m => m.mapCategory === 'private');
+}
+
+// Get community maps
+export async function getCommunityMaps(): Promise<MapSource[]> {
+  const allMaps = await getAvailableMaps();
+  return allMaps.filter(m => m.mapCategory === 'community');
 }
 
 async function getLocalMaps(): Promise<MapSource[]> {
