@@ -45,24 +45,44 @@ export async function applyAnnotationsToTif(
   lines: ImpassableLine[],
   color: string
 ): Promise<File> {
+  console.log(`[Annotations] Starting for ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+  
   // Load TIF into data URL
+  console.time(`[Annotations] convertTifToDataUrl ${file.name}`);
   const dataUrl = await convertTifToDataUrl(file);
+  console.timeEnd(`[Annotations] convertTifToDataUrl ${file.name}`);
   
   // Create image from data URL
+  console.time(`[Annotations] loadImage ${file.name}`);
   const img = await loadImage(dataUrl);
+  console.timeEnd(`[Annotations] loadImage ${file.name}`);
+  console.log(`[Annotations] Image loaded: ${img.width}x${img.height}`);
   
-  // Create canvas at original image size
-  const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  const ctx = canvas.getContext('2d');
+  // Use OffscreenCanvas if available for better reliability with large images
+  const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+  console.log(`[Annotations] Using ${useOffscreen ? 'OffscreenCanvas' : 'regular Canvas'}`);
+  
+  let canvas: HTMLCanvasElement | OffscreenCanvas;
+  let ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  
+  if (useOffscreen) {
+    canvas = new OffscreenCanvas(img.width, img.height);
+    ctx = canvas.getContext('2d');
+  } else {
+    canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx = canvas.getContext('2d');
+  }
   
   if (!ctx) {
     throw new Error('Could not get canvas context');
   }
   
   // Draw original image
+  console.time(`[Annotations] drawImage ${file.name}`);
   ctx.drawImage(img, 0, 0);
+  console.timeEnd(`[Annotations] drawImage ${file.name}`);
   
   // Calculate line width based on image size
   // Larger maps need thicker lines proportionally
@@ -71,6 +91,7 @@ export async function applyAnnotationsToTif(
   const borderWidth = AREA_BORDER_WIDTH * scaleFactor;
   
   // Draw impassable areas
+  console.log(`[Annotations] Drawing ${areas.length} areas and ${lines.length} lines`);
   areas.forEach(area => {
     if (area.points.length < 3) return;
     
@@ -107,9 +128,27 @@ export async function applyAnnotationsToTif(
     ctx.stroke();
   });
   
-  // Export canvas to blob
-  // Using PNG format since browser-based TIFF encoding is not well-supported
-  const blob = await canvasToBlob(canvas, 'image/png');
+  // Export canvas to blob - use OffscreenCanvas.convertToBlob when available (more reliable)
+  console.time(`[Annotations] export blob ${file.name}`);
+  let blob: Blob;
+  
+  try {
+    if (useOffscreen && canvas instanceof OffscreenCanvas) {
+      blob = await canvas.convertToBlob({ type: 'image/png', quality: 0.95 });
+    } else {
+      blob = await canvasToBlob(canvas as HTMLCanvasElement, 'image/png');
+    }
+  } catch (exportError) {
+    console.error(`[Annotations] Blob export failed for ${file.name}:`, exportError);
+    throw new Error(`Failed to export annotated image. The image may be too large for your browser to process (${img.width}x${img.height} pixels).`);
+  }
+  console.timeEnd(`[Annotations] export blob ${file.name}`);
+  
+  if (!blob || blob.size === 0) {
+    throw new Error(`Export produced empty blob for ${file.name}. Try reducing image size or using fewer annotations.`);
+  }
+  
+  console.log(`[Annotations] Exported ${file.name}: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
   
   // Create new file with .png extension
   const originalName = file.name.replace(/\.(tif|tiff)$/i, '.png');

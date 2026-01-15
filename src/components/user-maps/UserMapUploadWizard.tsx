@@ -53,6 +53,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
   const [isApplyingAnnotations, setIsApplyingAnnotations] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [colorTifPreviewUrl, setColorTifPreviewUrl] = useState<string | null>(null);
   const [isConvertingTif, setIsConvertingTif] = useState(false);
   const [tifConversionError, setTifConversionError] = useState<string | null>(null);
@@ -193,6 +194,8 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const handleSubmit = async () => {
     if (!colorTifFile || !bwTifFile || roiCoordinates.length < 3 || !colorDimensions) return;
 
+    setSubmitError(null);
+
     try {
       let finalColorFile = colorTifFile;
       let finalBwFile = bwTifFile;
@@ -202,6 +205,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
         setIsApplyingAnnotations(true);
         try {
           console.log(`Applying ${impassableAreas.length} areas and ${impassableLines.length} lines to maps...`);
+          console.time('applyAnnotations');
           
           // Apply annotations to both files in parallel
           const [annotatedColor, annotatedBw] = await Promise.all([
@@ -209,12 +213,19 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
             applyAnnotationsToTif(bwTifFile, impassableAreas, impassableLines, '#000000'),   // Black
           ]);
           
+          console.timeEnd('applyAnnotations');
           finalColorFile = annotatedColor;
           finalBwFile = annotatedBw;
-          console.log('Annotations applied successfully');
+          console.log('Annotations applied successfully', {
+            colorSize: annotatedColor.size,
+            bwSize: annotatedBw.size,
+          });
         } catch (annotationError) {
           console.error('Failed to apply annotations:', annotationError);
-          throw new Error('Failed to apply impassable annotations to maps');
+          const errorMessage = annotationError instanceof Error ? annotationError.message : 'Unknown error';
+          setSubmitError(`Failed to apply annotations: ${errorMessage}`);
+          setIsApplyingAnnotations(false);
+          return;
         } finally {
           setIsApplyingAnnotations(false);
         }
@@ -251,6 +262,8 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       }
     } catch (error) {
       console.error('Submit error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setSubmitError(`Upload failed: ${errorMessage}`);
     }
   };
 
@@ -516,6 +529,19 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                   </div>
                 )}
 
+                {/* Error Display */}
+                {submitError && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                    <div className="flex items-start gap-2 text-destructive">
+                      <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Submission Failed</p>
+                        <p className="text-xs mt-1">{submitError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
                     <strong>Note:</strong> Route processing may take several minutes depending on map size and parameters. 
@@ -527,9 +553,14 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                   className="w-full"
                   size="lg"
                   onClick={handleSubmit}
-                  disabled={uploading}
+                  disabled={uploading || isApplyingAnnotations}
                 >
-                  {uploading ? (
+                  {isApplyingAnnotations ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Applying annotations...
+                    </>
+                  ) : uploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Uploading to cloud...
