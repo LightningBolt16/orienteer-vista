@@ -73,25 +73,36 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Add markers for each community map
-    communityMaps.forEach((cm) => {
+    // Add markers for each community map - filter invalid coordinates
+    const validMaps = communityMaps.filter(cm => 
+      !isNaN(cm.latitude) && !isNaN(cm.longitude) && 
+      cm.latitude !== 0 && cm.longitude !== 0 &&
+      Math.abs(cm.latitude) <= 90 && Math.abs(cm.longitude) <= 180
+    );
+    
+    validMaps.forEach((cm) => {
       if (!map.current) return;
       
+      const isSelected = selectedMapName === cm.name;
       const el = document.createElement('div');
       el.className = 'community-map-marker';
       el.style.cssText = `
-        width: 24px;
-        height: 24px;
-        background: ${selectedMapName === cm.name ? '#22c55e' : '#3b82f6'};
-        border: 2px solid white;
-        border-radius: 50%;
         cursor: pointer;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         transition: transform 0.2s;
       `;
       
+      // Orienteering control flag SVG
+      el.innerHTML = `
+        <svg width="28" height="36" viewBox="0 0 28 36" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+          <polygon points="4,4 24,4 24,20 4,20" fill="${isSelected ? '#22c55e' : '#FF6600'}" stroke="white" stroke-width="2"/>
+          <polygon points="4,4 14,4 14,12 4,12" fill="white"/>
+          <polygon points="14,12 24,12 24,20 14,20" fill="white"/>
+          <line x1="14" y1="20" x2="14" y2="36" stroke="#555" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      `;
+      
       el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.2)';
+        el.style.transform = 'scale(1.15)';
         setHoveredMap(cm);
       });
       
@@ -105,17 +116,17 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
         setShowMap(false);
       });
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([cm.longitude, cm.latitude])
         .addTo(map.current);
       
       markers.current.push(marker);
     });
 
-    // Fit bounds to show all markers
-    if (communityMaps.length > 0) {
+    // Fit bounds to show all markers (use validMaps)
+    if (validMaps.length > 0) {
       const bounds = new mapboxgl.LngLatBounds();
-      communityMaps.forEach(cm => bounds.extend([cm.longitude, cm.latitude]));
+      validMaps.forEach(cm => bounds.extend([cm.longitude, cm.latitude]));
       map.current.fitBounds(bounds, { padding: 50, maxZoom: 6 });
     }
 

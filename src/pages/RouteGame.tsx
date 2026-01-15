@@ -427,11 +427,12 @@ const RouteGame: React.FC = () => {
                         />
                       </div>
                       
-                      {uniqueCommunityMapNames.length > 0 ? (
+                        {uniqueCommunityMapNames.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                           {uniqueCommunityMapNames.map(mapName => {
                             const mapSource = communityMaps.find(m => m.name === mapName);
                             const isSelected = selectedMapId === mapName && selectedMapCategory === 'community';
+                            const logoUrl = mapSource?.logoPath ? `${LOGO_STORAGE_URL}/${mapSource.logoPath}` : null;
                             return (
                               <button
                                 key={mapName}
@@ -440,7 +441,19 @@ const RouteGame: React.FC = () => {
                                   isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                                 }`}
                               >
-                                <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+                                {logoUrl ? (
+                                  <img 
+                                    src={logoUrl} 
+                                    alt={`${mapName} logo`} 
+                                    className="h-8 w-8 mb-2 object-contain rounded"
+                                    onError={(e) => {
+                                      // Fallback to Users icon if logo fails to load
+                                      e.currentTarget.style.display = 'none';
+                                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                    }}
+                                  />
+                                ) : null}
+                                <Users className={`h-8 w-8 mb-2 text-muted-foreground ${logoUrl ? 'hidden' : ''}`} />
                                 <span className="font-medium text-sm">{mapName}</span>
                                 {mapSource?.locationName ? (
                                   <span className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-full">

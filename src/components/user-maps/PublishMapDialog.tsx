@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Globe, Loader2 } from 'lucide-react';
+import { Globe, Loader2, Upload, X, Image } from 'lucide-react';
 import LocationPicker from '@/components/map/LocationPicker';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useUser } from '@/context/UserContext';
 
 interface PublishMapDialogProps {
   open: boolean;
@@ -37,10 +38,53 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
   mapName,
   onPublished,
 }) => {
+  const { user } = useUser();
   const [title, setTitle] = useState(mapName);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState<LocationData | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image file (PNG, JPG, etc.)',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Logo must be smaller than 2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const removeLogo = () => {
+    setLogoFile(null);
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handlePublish = async () => {
     if (!title.trim()) {
@@ -76,6 +120,24 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
         throw new Error('Route map not found. Please ensure the map has been processed.');
       }
 
+      // Upload logo if provided
+      let logoPath: string | null = null;
+      if (logoFile && user) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${user.id}/${routeMap.id}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('map-logos')
+          .upload(fileName, logoFile, { upsert: true });
+        
+        if (uploadError) {
+          console.error('Logo upload error:', uploadError);
+          throw new Error('Failed to upload logo');
+        }
+        
+        logoPath = fileName;
+      }
+
       // Update the route_maps entry to make it public
       const { error: updateError } = await supabase
         .from('route_maps')
@@ -87,6 +149,7 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
           latitude: location.lat,
           longitude: location.lng,
           location_name: location.name,
+          ...(logoPath && { logo_path: logoPath }),
         })
         .eq('id', routeMap.id);
 
@@ -152,6 +215,46 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
             <LocationPicker
               value={location || undefined}
               onChange={setLocation}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Map Logo (optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Add a logo or image to represent your map in the community browser
+            </p>
+            
+            {logoPreview ? (
+              <div className="relative w-24 h-24 rounded-lg border border-border overflow-hidden">
+                <img 
+                  src={logoPreview} 
+                  alt="Logo preview" 
+                  className="w-full h-full object-contain bg-muted"
+                />
+                <button
+                  type="button"
+                  onClick={removeLogo}
+                  className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-primary/50 cursor-pointer flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Image className="h-6 w-6" />
+                <span className="text-xs">Add logo</span>
+              </div>
+            )}
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoSelect}
+              className="hidden"
             />
           </div>
         </div>
