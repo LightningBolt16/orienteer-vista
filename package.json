@@ -49,6 +49,7 @@
     "geotiff": "^2.1.4-beta.1",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
+    "mapbox-gl": "^3.18.0",
     "nanoid": "^4.0.2",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
