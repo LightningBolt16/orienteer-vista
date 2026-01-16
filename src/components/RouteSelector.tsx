@@ -89,8 +89,8 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
     }
   };
 
-  const handleDirectionSelect = (selectedIndex: number) => {
-    if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;
+  const handleDirectionSelect = useCallback((selectedIndex: number) => {
+    if (isTransitioning || routeData.length === 0 || isPaused) return;
     
     const currentRoute = routeData[currentRouteIndex];
     const numAlternates = currentRoute.numAlternates || 1;
@@ -101,7 +101,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
       (currentRoute.shortestSide === 'left' ? 0 : 1);
     
     const isCorrect = selectedIndex === correctIndex;
-    const responseTime = Date.now() - startTime;
+    const responseTime = startTime ? Date.now() - startTime : 0;
     const mapName = currentRoute.mapName || mapSource?.name;
     
     // Reset inactivity timer on interaction
@@ -144,7 +144,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
       setIsTransitioning(false);
       setIsImageLoaded(false);
     }, 350);
-  };
+  }, [isTransitioning, routeData, isPaused, currentRouteIndex, startTime, mapSource, resetTimer, warmupCount]);
 
   // Legacy handler for left/right
   const handleLegacyDirectionSelect = (direction: 'left' | 'right') => {
@@ -165,7 +165,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
   // Keyboard controls - arrows mapped: Left=0(Red), Right=1(Blue), Up=2(Green), Down=3(Purple)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isPaused) return;
+      if (isPaused || isTransitioning) return;
       
       const currentRoute = routeData[currentRouteIndex];
       if (!currentRoute) return;
@@ -181,7 +181,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPaused, currentRouteIndex, routeData]);
+  }, [isPaused, isTransitioning, currentRouteIndex, routeData, handleDirectionSelect]);
 
   if (routeData.length === 0) {
     return (
