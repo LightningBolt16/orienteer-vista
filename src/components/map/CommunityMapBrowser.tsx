@@ -5,7 +5,7 @@ import { MapPin, X, RefreshCw, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { usePublicConfig } from '@/hooks/usePublicConfig';
-import orienteeringFlag from '@/assets/orienteering-flag.png';
+import orienteeringControlFlag from '@/assets/orienteering-control-flag.png';
 
 interface CommunityMap {
   id: string;
@@ -98,17 +98,20 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
       el.className = 'community-map-marker';
       el.style.cursor = 'pointer';
       el.style.position = 'relative';
+      el.style.width = '28px';
+      el.style.height = '28px';
       
-      // Create image element for the flag
+      // Create image element for the control flag
       const img = document.createElement('img');
-      img.src = orienteeringFlag;
+      img.src = orienteeringControlFlag;
       img.alt = cm.name;
       img.style.cssText = `
-        width: 32px;
-        height: 32px;
+        width: 28px;
+        height: 28px;
         transition: transform 0.15s ease-out;
         filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-        ${isSelected ? 'outline: 2px solid #22c55e; outline-offset: 2px; border-radius: 4px;' : ''}
+        border-radius: 4px;
+        ${isSelected ? 'outline: 2px solid #22c55e; outline-offset: 2px;' : ''}
       `;
       
       el.appendChild(img);
@@ -145,7 +148,11 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
         setShowMap(false);
       });
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      // Use bottom-center anchor so marker stays fixed at the coordinate point
+      const marker = new mapboxgl.Marker({ 
+        element: el, 
+        anchor: 'bottom'
+      })
         .setLngLat([cm.longitude, cm.latitude])
         .addTo(map.current);
       
