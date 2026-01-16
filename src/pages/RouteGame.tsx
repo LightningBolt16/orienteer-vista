@@ -12,7 +12,7 @@ import { useUser } from '../context/UserContext';
 import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin, Star } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
@@ -20,6 +20,7 @@ import flagSweden from '@/assets/flag-sweden.png';
 import flagBelgium from '@/assets/flag-belgium.png';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
+import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
 
 type MapSelection = 'all' | string;
 type MapCategory = 'official' | 'private' | 'community';
@@ -42,6 +43,7 @@ const RouteGame: React.FC = () => {
   const { user, loading: userLoading } = useUser();
   const { desktopCache, mobileCache, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, officialMaps, userMaps, communityMaps } = useRouteCache();
   const { showTutorial, closeTutorial } = useRouteGameTutorial();
+  const { favorites, favoriteMaps, toggleFavorite, isFavorite, loading: favoritesLoading } = useCommunityFavorites();
   
   // Check for user map parameter
   const userMapId = searchParams.get('map');
@@ -65,7 +67,8 @@ const RouteGame: React.FC = () => {
   const availableMaps = cache?.maps || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
   const uniqueUserMapNames = getUniqueMapNames(userMaps);
-  const uniqueCommunityMapNames = getUniqueMapNames(communityMaps);
+  // For community, only show favorited maps
+  const uniqueFavoriteMapNames = favoriteMaps.map(m => m.name);
 
   const toggleFullscreen = useCallback(async () => {
     if (isMobile || !document.fullscreenEnabled) {
@@ -159,10 +162,35 @@ const RouteGame: React.FC = () => {
             routes = routes.filter(r => r.mapName?.toLowerCase() === selectedMapId.toLowerCase());
           }
         } else if (selectedMapCategory === 'community') {
-          // Load community map routes using getCommunityRoutes from context
-          const result = await getCommunityRoutes(selectedMapId, isMobile);
-          routes = result.routes;
-          maps = result.maps;
+          // Load community map routes - filter by favorites when 'all' is selected
+          if (selectedMapId === 'all') {
+            // Random mix from all favorited community maps
+            const favoriteMapIds = favoriteMaps.map(m => m.id);
+            if (favoriteMapIds.length === 0) {
+              routes = [];
+              maps = [];
+            } else {
+              // Fetch routes for each favorited map and combine
+              const allRoutes: RouteData[] = [];
+              const allMaps: MapSource[] = [];
+              for (const fav of favoriteMaps) {
+                const result = await getCommunityRoutes(fav.name, isMobile);
+                allRoutes.push(...result.routes);
+                // Avoid duplicate maps
+                result.maps.forEach(m => {
+                  if (!allMaps.find(existing => existing.id === m.id)) {
+                    allMaps.push(m);
+                  }
+                });
+              }
+              routes = allRoutes;
+              maps = allMaps;
+            }
+          } else {
+            const result = await getCommunityRoutes(selectedMapId, isMobile);
+            routes = result.routes;
+            maps = result.maps;
+          }
         } else {
           // Load official map routes (default)
           const result = await getRoutesForMap(selectedMapId, isMobile);
@@ -174,7 +202,6 @@ const RouteGame: React.FC = () => {
         setAllMapsForRoutes(maps);
         
         if (selectedMapId !== 'all') {
-          const aspect = isMobile ? '9_16' : '16_9';
           const mapSource = maps.find(m => m.name === selectedMapId);
           setSelectedMap(mapSource || null);
         } else {
@@ -201,7 +228,7 @@ const RouteGame: React.FC = () => {
     };
     
     loadRoutes();
-  }, [selectedMapId, selectedMapCategory, isMobile, isPreloading, getRoutesForMap, getUserRoutes, t, isUserMapMode, communityMaps]);
+  }, [selectedMapId, selectedMapCategory, isMobile, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, t, isUserMapMode, favoriteMaps]);
   
   const handleMapSelect = (mapName: MapSelection) => {
     setSelectedMapId(mapName);
@@ -368,6 +395,21 @@ const RouteGame: React.FC = () => {
                           </p>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {/* Random Mix for Private Maps */}
+                          {uniqueUserMapNames.length > 1 && (
+                            <button
+                              onClick={() => { handleMapSelect('all'); setSelectedMapCategory('private'); }}
+                              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                                selectedMapId === 'all' && selectedMapCategory === 'private'
+                                  ? 'border-primary bg-primary/10'
+                                  : 'border-border bg-card'
+                              }`}
+                            >
+                              <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                              <span className="font-medium text-sm">Random Mix</span>
+                              <span className="text-xs text-muted-foreground">All your maps</span>
+                            </button>
+                          )}
                           {uniqueUserMapNames.map(mapName => {
                             const isSelected = selectedMapId === mapName && selectedMapCategory === 'private';
                             return (
@@ -396,14 +438,16 @@ const RouteGame: React.FC = () => {
                     </Collapsible>
                   )}
 
-                  {/* Community Maps - Collapsible (Prepared for future) */}
+                  {/* Community Maps - Collapsible */}
                   <Collapsible open={communityMapsOpen} onOpenChange={setCommunityMapsOpen}>
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">Community Maps</span>
-                          <span className="text-xs text-muted-foreground">({uniqueCommunityMapNames.length})</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({uniqueFavoriteMapNames.length} favorite{uniqueFavoriteMapNames.length !== 1 ? 's' : ''})
+                          </span>
                         </div>
                         {communityMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </Button>
@@ -411,8 +455,8 @@ const RouteGame: React.FC = () => {
                     <CollapsibleContent className="pt-3">
                       <div className="p-3 mb-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
                         <p className="text-sm text-blue-800 dark:text-blue-200">
-                          <Users className="h-3 w-3 inline mr-1" />
-                          Stats go to map-specific leaderboards, not the public leaderboard.
+                          <Star className="h-3 w-3 inline mr-1 fill-yellow-400 text-yellow-400" />
+                          Star maps from the browser below to add them here. Stats go to map-specific leaderboards.
                         </p>
                       </div>
                       
@@ -424,12 +468,29 @@ const RouteGame: React.FC = () => {
                             setSelectedMapCategory('community'); 
                           }}
                           selectedMapName={selectedMapCategory === 'community' ? (selectedMapId === 'all' ? undefined : selectedMapId) : undefined}
+                          favorites={favorites}
+                          onToggleFavorite={toggleFavorite}
                         />
                       </div>
                       
-                        {uniqueCommunityMapNames.length > 0 ? (
+                      {uniqueFavoriteMapNames.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {uniqueCommunityMapNames.map(mapName => {
+                          {/* Random Mix for Favorited Community Maps */}
+                          {uniqueFavoriteMapNames.length > 1 && (
+                            <button
+                              onClick={() => { handleMapSelect('all'); setSelectedMapCategory('community'); }}
+                              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                                selectedMapId === 'all' && selectedMapCategory === 'community'
+                                  ? 'border-primary bg-primary/10'
+                                  : 'border-border bg-card'
+                              }`}
+                            >
+                              <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                              <span className="font-medium text-sm">Random Mix</span>
+                              <span className="text-xs text-muted-foreground">From favorites</span>
+                            </button>
+                          )}
+                          {uniqueFavoriteMapNames.map(mapName => {
                             const mapSource = communityMaps.find(m => m.name === mapName);
                             const isSelected = selectedMapId === mapName && selectedMapCategory === 'community';
                             const logoUrl = mapSource?.logoPath ? `${LOGO_STORAGE_URL}/${mapSource.logoPath}` : null;
@@ -437,17 +498,17 @@ const RouteGame: React.FC = () => {
                               <button
                                 key={mapName}
                                 onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('community'); }}
-                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
                                   isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                                 }`}
                               >
+                                <Star className="absolute top-1 right-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
                                 {logoUrl ? (
                                   <img 
                                     src={logoUrl} 
                                     alt={`${mapName} logo`} 
                                     className="h-8 w-8 mb-2 object-contain rounded"
                                     onError={(e) => {
-                                      // Fallback to Users icon if logo fails to load
                                       e.currentTarget.style.display = 'none';
                                       e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                     }}
@@ -468,7 +529,9 @@ const RouteGame: React.FC = () => {
                           })}
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">No community maps available yet.</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No favorites yet. Use the map browser above to star community maps you want to practice on.
+                        </p>
                       )}
                     </CollapsibleContent>
                   </Collapsible>

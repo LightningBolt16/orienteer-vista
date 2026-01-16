@@ -142,6 +142,35 @@ export type Database = {
         }
         Relationships: []
       }
+      community_map_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          route_map_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          route_map_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          route_map_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_map_favorites_route_map_id_fkey"
+            columns: ["route_map_id"]
+            isOneToOne: false
+            referencedRelation: "route_maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       duel_answers: {
         Row: {
           answer: string
