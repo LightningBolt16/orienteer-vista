@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
         user_id: userMap.user_id,
         source_map_id: map_id,
         is_public: false,
+        map_category: 'private',
         description: `Custom map with ${route_count || 0} routes`,
         map_type: 'forest',
       }).select().single()
