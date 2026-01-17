@@ -215,6 +215,7 @@ export type Database = {
       duel_rooms: {
         Row: {
           created_at: string
+          current_player_count: number | null
           current_route_index: number | null
           game_ends_at: string | null
           game_started_at: string | null
@@ -227,6 +228,15 @@ export type Database = {
           host_ready: boolean | null
           host_score: number | null
           id: string
+          max_players: number | null
+          player_3_id: string | null
+          player_3_name: string | null
+          player_3_ready: boolean | null
+          player_3_score: number | null
+          player_4_id: string | null
+          player_4_name: string | null
+          player_4_ready: boolean | null
+          player_4_score: number | null
           room_code: string
           routes: Json | null
           settings: Json
@@ -235,6 +245,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_player_count?: number | null
           current_route_index?: number | null
           game_ends_at?: string | null
           game_started_at?: string | null
@@ -247,6 +258,15 @@ export type Database = {
           host_ready?: boolean | null
           host_score?: number | null
           id?: string
+          max_players?: number | null
+          player_3_id?: string | null
+          player_3_name?: string | null
+          player_3_ready?: boolean | null
+          player_3_score?: number | null
+          player_4_id?: string | null
+          player_4_name?: string | null
+          player_4_ready?: boolean | null
+          player_4_score?: number | null
           room_code: string
           routes?: Json | null
           settings?: Json
@@ -255,6 +275,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_player_count?: number | null
           current_route_index?: number | null
           game_ends_at?: string | null
           game_started_at?: string | null
@@ -267,6 +288,15 @@ export type Database = {
           host_ready?: boolean | null
           host_score?: number | null
           id?: string
+          max_players?: number | null
+          player_3_id?: string | null
+          player_3_name?: string | null
+          player_3_ready?: boolean | null
+          player_3_score?: number | null
+          player_4_id?: string | null
+          player_4_name?: string | null
+          player_4_ready?: boolean | null
+          player_4_score?: number | null
           room_code?: string
           routes?: Json | null
           settings?: Json
