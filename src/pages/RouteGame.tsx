@@ -12,7 +12,7 @@ import { useUser } from '../context/UserContext';
 import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin, Star } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin, Star, Check, Layers } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
@@ -60,6 +60,8 @@ const RouteGame: React.FC = () => {
   const [userMapName, setUserMapName] = useState<string>('');
   const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
   const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
   const gameContainerRef = useRef<HTMLDivElement>(null);
 
   // Get available maps from cache - only official maps for the main grid
@@ -231,7 +233,82 @@ const RouteGame: React.FC = () => {
   }, [selectedMapId, selectedMapCategory, isMobile, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, t, isUserMapMode, favoriteMaps]);
   
   const handleMapSelect = (mapName: MapSelection) => {
-    setSelectedMapId(mapName);
+    if (multiSelectMode && mapName !== 'all') {
+      // Toggle selection in multi-select mode
+      setSelectedMaps(prev => 
+        prev.includes(mapName) 
+          ? prev.filter(m => m !== mapName)
+          : [...prev, mapName]
+      );
+    } else {
+      // Single select mode - clear multi-select and set single map
+      setMultiSelectMode(false);
+      setSelectedMaps([]);
+      setSelectedMapId(mapName);
+    }
+  };
+
+  const toggleMultiSelectMode = () => {
+    if (multiSelectMode) {
+      // Exiting multi-select mode - clear selections
+      setSelectedMaps([]);
+    }
+    setMultiSelectMode(!multiSelectMode);
+  };
+
+  const playSelectedMaps = async () => {
+    if (selectedMaps.length === 0) return;
+    
+    setIsLoading(true);
+    try {
+      const allRoutes: RouteData[] = [];
+      const allMaps: MapSource[] = [];
+      
+      // Load routes from each selected map based on current category
+      for (const mapName of selectedMaps) {
+        let result;
+        if (selectedMapCategory === 'private') {
+          result = await getUserRoutes(isMobile);
+          result.routes = result.routes.filter(r => r.mapName?.toLowerCase() === mapName.toLowerCase());
+        } else if (selectedMapCategory === 'community') {
+          result = await getCommunityRoutes(mapName, isMobile);
+        } else {
+          result = await getRoutesForMap(mapName, isMobile);
+        }
+        
+        allRoutes.push(...result.routes);
+        result.maps.forEach(m => {
+          if (!allMaps.find(existing => existing.id === m.id || existing.name === m.name)) {
+            allMaps.push(m);
+          }
+        });
+      }
+      
+      // Shuffle the combined routes for random mix
+      const shuffledRoutes = [...allRoutes].sort(() => Math.random() - 0.5);
+      
+      setRouteData(shuffledRoutes);
+      setAllMapsForRoutes(allMaps);
+      setSelectedMap(null); // Multiple maps selected
+      setMultiSelectMode(false);
+      setSelectedMaps([]);
+      
+      if (shuffledRoutes.length === 0) {
+        toast({
+          title: t('error'),
+          description: 'No routes found in selected maps.',
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load multi-map routes:', error);
+      toast({
+        title: t('error'),
+        description: 'Failed to load routes from selected maps.',
+        variant: "destructive"
+      });
+    }
+    setIsLoading(false);
   };
 
   const handleBackToPublicMaps = () => {
@@ -317,21 +394,52 @@ const RouteGame: React.FC = () => {
                 </div>
               ) : uniqueMapNames.length > 0 ? (
                 <div className="space-y-6">
+                  {/* Multi-Select Toggle and Play Button */}
+                  <div className="flex items-center justify-between gap-3">
+                    <Button
+                      variant={multiSelectMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={toggleMultiSelectMode}
+                      className="gap-2"
+                    >
+                      <Layers className="h-4 w-4" />
+                      {multiSelectMode ? 'Cancel Multi-Select' : 'Multi-Select'}
+                    </Button>
+                    
+                    {multiSelectMode && selectedMaps.length > 0 && (
+                      <Button
+                        onClick={playSelectedMaps}
+                        className="gap-2 bg-primary"
+                      >
+                        <Shuffle className="h-4 w-4" />
+                        Play {selectedMaps.length} Map{selectedMaps.length > 1 ? 's' : ''}
+                      </Button>
+                    )}
+                  </div>
+
+                  {multiSelectMode && (
+                    <p className="text-sm text-muted-foreground">
+                      Click maps to select them, then press "Play" to combine their routes into a random mix.
+                    </p>
+                  )}
+
                   {/* Official Maps Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {/* All Maps Option */}
-                    <button
-                      onClick={() => { handleMapSelect('all'); setSelectedMapCategory('official'); }}
-                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                        selectedMapId === 'all' && selectedMapCategory === 'official'
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border bg-card'
-                      }`}
-                    >
-                      <Shuffle className="h-8 w-8 mb-2 text-primary" />
-                      <span className="font-medium text-sm">All Maps</span>
-                      <span className="text-xs text-muted-foreground">Random mix</span>
-                    </button>
+                    {/* All Maps Option - Only show when not in multi-select mode */}
+                    {!multiSelectMode && (
+                      <button
+                        onClick={() => { handleMapSelect('all'); setSelectedMapCategory('official'); }}
+                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                          selectedMapId === 'all' && selectedMapCategory === 'official'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border bg-card'
+                        }`}
+                      >
+                        <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                        <span className="font-medium text-sm">All Maps</span>
+                        <span className="text-xs text-muted-foreground">Random mix</span>
+                      </button>
+                    )}
                     
                     {/* Individual Map Options */}
                     {uniqueMapNames.map(mapName => {
@@ -344,17 +452,25 @@ const RouteGame: React.FC = () => {
                       const flagImage = countryCode ? COUNTRY_FLAG_IMAGES[countryCode] : null;
                       const showKartkompanietLogo = isKnivsta || isEkeby;
                       const customLogoUrl = logoPath ? `${LOGO_STORAGE_URL}/${logoPath}` : null;
+                      const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                      const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'official';
                       
                       return (
                         <button
                           key={mapName}
-                          onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('official'); }}
+                          onClick={() => { handleMapSelect(mapName); if (!multiSelectMode) setSelectedMapCategory('official'); }}
                           className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                            selectedMapId === mapName && selectedMapCategory === 'official'
+                            isMultiSelected || isSingleSelected
                               ? 'border-primary bg-primary/10'
                               : 'border-border bg-card'
                           }`}
                         >
+                          {/* Multi-select checkmark */}
+                          {multiSelectMode && isMultiSelected && (
+                            <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                              <Check className="h-3 w-3 text-primary-foreground" />
+                            </div>
+                          )}
                           {flagImage && (
                             <img src={flagImage} alt={countryCode} className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm" />
                           )}
