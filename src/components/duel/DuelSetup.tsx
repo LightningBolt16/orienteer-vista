@@ -23,6 +23,7 @@ export interface DuelSettings {
   timeLimit?: number; // seconds per route, undefined means no limit
   isOnline?: boolean; // true for online multiplayer
   playerName?: string; // player name for online mode
+  maxPlayers?: number; // max players for online mode (2-4)
 }
 
 interface DuelSetupProps {
@@ -54,6 +55,7 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
   const { desktopCache, mobileCache, isPreloading } = useRouteCache();
   const [playMode, setPlayMode] = useState<'local' | 'online' | null>(null);
   const [playerName, setPlayerName] = useState('');
+  const [maxPlayers, setMaxPlayers] = useState<number>(2);
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
   const [gameType, setGameType] = useState<'routes' | 'timed'>('routes');
   const [selectedRouteCount, setSelectedRouteCount] = useState<number>(10);
@@ -92,6 +94,7 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
       gameMode,
       timeLimit,
       playerName: playerName.trim() || undefined,
+      maxPlayers: playMode === 'online' ? maxPlayers : 2,
     };
   };
 
@@ -165,15 +168,36 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
             </button>
           </div>
 
-          {/* Online Mode: Name Input and Join Room Option - integrated */}
+          {/* Online Mode: Name Input, Player Count, and Join Room Option */}
           {playMode === 'online' && (
-            <div className="space-y-2 pt-2 border-t border-border">
+            <div className="space-y-3 pt-2 border-t border-border">
               <Input 
                 placeholder="Enter your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 className="text-center"
               />
+              
+              {/* Max Players Selector */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-center">Number of Players</p>
+                <div className="flex justify-center gap-2">
+                  {[2, 3, 4].map(count => (
+                    <button
+                      key={count}
+                      onClick={() => setMaxPlayers(count)}
+                      className={`px-6 py-2 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                        maxPlayers === count
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
               <Button 
                 variant="outline" 
                 onClick={handleJoinRoom}

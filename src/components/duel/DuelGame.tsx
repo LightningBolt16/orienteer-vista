@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface OnlineDuelHook {
   room: OnlineDuelRoom | null;
   isHost: boolean;
+  playerSlot: 'host' | 'guest' | 'player_3' | 'player_4' | null;
   playerId: string | null;
   submitAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => Promise<void>;
   finishGame: () => Promise<void>;
@@ -440,7 +441,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
       <OnlineDuelGameView
         routes={routes}
         room={activeRoom}
-        isHost={isHost}
+        playerSlot={onlineDuel.playerSlot || 'host'}
         isMobile={isMobile}
         onAnswer={onlineDuel.submitAnswer}
         onExit={onExit}
