@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { OnlineDuelRoom } from '@/hooks/useOnlineDuel';
+import { OnlineDuelRoom, PlayerSlot } from '@/hooks/useOnlineDuel';
 import { useRouteCache } from '@/context/RouteCache';
 import { DuelSettings } from './DuelSetup';
 import { RouteData } from '@/utils/routeDataUtils';
@@ -13,12 +13,14 @@ import { supabase } from '@/integrations/supabase/client';
 interface OnlineDuelHook {
   room: OnlineDuelRoom | null;
   isHost: boolean;
+  playerSlot: PlayerSlot | null;
   isConnecting: boolean;
   playerId: string | null;
-  createRoom: (settings: any, routes: RouteData[], hostName?: string) => Promise<OnlineDuelRoom | null>;
+  createRoom: (settings: any, routes: RouteData[], hostName?: string, maxPlayers?: number) => Promise<OnlineDuelRoom | null>;
   joinRoom: (roomCode: string, guestName?: string) => Promise<OnlineDuelRoom | null>;
   startGame: () => Promise<void>;
   leaveRoom: () => Promise<void>;
+  canStartGame: (room: OnlineDuelRoom | null) => boolean;
 }
 
 interface OnlineDuelLobbyProps {
@@ -29,6 +31,9 @@ interface OnlineDuelLobbyProps {
   joinMode?: boolean;
   onlineDuel: OnlineDuelHook;
 }
+
+const PLAYER_COLORS = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500'];
+const PLAYER_LABELS = ['P1', 'P2', 'P3', 'P4'];
 
 const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({ 
   settings, 
@@ -47,11 +52,11 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
   const [displayName] = useState(initialPlayerName || 'Player');
   const [isStarting, setIsStarting] = useState(false);
 
-  const { room, isHost, isConnecting, createRoom, joinRoom, startGame, leaveRoom } = onlineDuel;
+  const { room, isHost, isConnecting, createRoom, joinRoom, startGame, leaveRoom, canStartGame } = onlineDuel;
 
   // Polling fallback for guest - in case realtime subscription misses the status change
   useEffect(() => {
-    // Only poll when: guest mode, room joined, waiting for host
+    // Only poll when: not host, room joined, waiting for host
     if (!room || isHost || room.status === 'playing') return;
     
     console.log('[OnlineDuelLobby] Starting guest polling fallback');
@@ -109,7 +114,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
       });
       return;
     }
-    await createRoom(settings, loadedRoutes, displayName);
+    await createRoom(settings, loadedRoutes, displayName, settings.maxPlayers || 2);
     setMode('create');
   };
 
@@ -134,11 +139,11 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
   };
 
   const handleStartGame = async () => {
-    if (!room?.guest_id || isStarting) {
-      if (!room?.guest_id) {
+    if (!canStartGame(room) || isStarting) {
+      if (!canStartGame(room)) {
         toast({
-          title: 'Waiting for opponent',
-          description: 'Share the room code to invite someone',
+          title: 'Waiting for players',
+          description: 'Need at least 2 players to start',
         });
       }
       return;
@@ -155,8 +160,23 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
     onBack();
   };
 
-  // Room created - waiting for opponent
+  // Helper to get player info for a slot
+  const getPlayerInfo = (slot: number) => {
+    if (!room) return { id: null, name: null };
+    switch (slot) {
+      case 0: return { id: room.host_id, name: room.host_name || 'Host' };
+      case 1: return { id: room.guest_id, name: room.guest_name || 'Player 2' };
+      case 2: return { id: room.player_3_id, name: room.player_3_name || 'Player 3' };
+      case 3: return { id: room.player_4_id, name: room.player_4_name || 'Player 4' };
+      default: return { id: null, name: null };
+    }
+  };
+
+  // Room created - waiting for players
   if (room && mode === 'create') {
+    const maxPlayers = room.max_players || 2;
+    const playerSlots = Array.from({ length: maxPlayers }, (_, i) => i);
+
     return (
       <div className="max-w-md mx-auto p-4 space-y-4">
         <Card>
@@ -166,7 +186,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
               Room Created
             </CardTitle>
             <CardDescription>
-              Share this code with your opponent
+              Share this code with your opponents ({room.current_player_count}/{maxPlayers} players)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -182,27 +202,29 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
 
             {/* Players Status */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">P1</div>
-                  <span className="font-medium">{room.host_name || 'Host'}</span>
-                </div>
-                <Check className="h-4 w-4 text-green-500" />
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${room.guest_id ? 'bg-blue-500' : 'bg-muted-foreground'}`}>P2</div>
-                  <span className="font-medium">
-                    {room.guest_id ? (room.guest_name || 'Opponent') : 'Waiting...'}
-                  </span>
-                </div>
-                {room.guest_id ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                )}
-              </div>
+              {playerSlots.map((slotIndex) => {
+                const player = getPlayerInfo(slotIndex);
+                const isJoined = !!player.id;
+                
+                return (
+                  <div key={slotIndex} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${isJoined ? PLAYER_COLORS[slotIndex] : 'bg-muted-foreground'}`}>
+                        {PLAYER_LABELS[slotIndex]}
+                      </div>
+                      <span className="font-medium">
+                        {isJoined ? player.name : 'Waiting...'}
+                      </span>
+                      {slotIndex === 0 && <span className="text-xs text-muted-foreground">(Host)</span>}
+                    </div>
+                    {isJoined ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Actions */}
@@ -214,7 +236,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
               <Button 
                 onClick={handleStartGame} 
                 className="flex-1"
-                disabled={!room.guest_id || isStarting}
+                disabled={!canStartGame(room) || isStarting}
               >
                 {isStarting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -232,6 +254,9 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
 
   // Joined a room - waiting for host to start
   if (room && mode !== 'create') {
+    const maxPlayers = room.max_players || 2;
+    const playerSlots = Array.from({ length: maxPlayers }, (_, i) => i);
+
     return (
       <div className="max-w-md mx-auto p-4 space-y-4">
         <Card>
@@ -241,17 +266,45 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
               Room Joined
             </CardTitle>
             <CardDescription>
-              Waiting for host to start the game
+              Waiting for host to start ({room.current_player_count}/{maxPlayers} players)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="text-center py-4">
-              <div className="text-2xl font-mono font-bold text-primary mb-2">
+            <div className="text-center py-2">
+              <div className="text-2xl font-mono font-bold text-primary mb-4">
                 Room: {room.room_code}
               </div>
+              
+              {/* Players Status */}
+              <div className="space-y-2 mb-4">
+                {playerSlots.map((slotIndex) => {
+                  const player = getPlayerInfo(slotIndex);
+                  const isJoined = !!player.id;
+                  
+                  return (
+                    <div key={slotIndex} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${isJoined ? PLAYER_COLORS[slotIndex] : 'bg-muted-foreground'}`}>
+                          {PLAYER_LABELS[slotIndex]}
+                        </div>
+                        <span className="font-medium">
+                          {isJoined ? player.name : 'Waiting...'}
+                        </span>
+                        {slotIndex === 0 && <span className="text-xs text-muted-foreground">(Host)</span>}
+                      </div>
+                      {isJoined ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Waiting for host...</span>
+                <span>Waiting for host to start...</span>
               </div>
             </div>
 

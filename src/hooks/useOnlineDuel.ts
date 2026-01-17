@@ -9,18 +9,28 @@ export interface OnlineDuelRoom {
   room_code: string;
   host_id: string;
   guest_id: string | null;
+  player_3_id: string | null;
+  player_4_id: string | null;
   status: 'waiting' | 'playing' | 'finished';
   settings: any;
   routes: RouteData[] | null;
   current_route_index: number;
   host_score: number;
   guest_score: number;
+  player_3_score: number;
+  player_4_score: number;
   host_ready: boolean;
   guest_ready: boolean;
+  player_3_ready: boolean;
+  player_4_ready: boolean;
   game_started_at: string | null;
   game_ends_at: string | null;
   host_name: string | null;
   guest_name: string | null;
+  player_3_name: string | null;
+  player_4_name: string | null;
+  max_players: number;
+  current_player_count: number;
 }
 
 interface UseOnlineDuelProps {
@@ -29,14 +39,18 @@ interface UseOnlineDuelProps {
   onGameEnd?: () => void;
 }
 
+export type PlayerSlot = 'host' | 'guest' | 'player_3' | 'player_4';
+
 export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseOnlineDuelProps = {}) => {
   const { toast } = useToast();
   const [room, setRoom] = useState<OnlineDuelRoom | null>(null);
-  const [isHost, setIsHost] = useState(false);
+  const [playerSlot, setPlayerSlot] = useState<PlayerSlot | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
+
+  const isHost = playerSlot === 'host';
 
   // Get or create persistent player ID (supports guests via sessionStorage)
   useEffect(() => {
@@ -91,7 +105,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   };
 
   // Create a new room
-  const createRoom = useCallback(async (settings: any, routes: RouteData[], hostName?: string) => {
+  const createRoom = useCallback(async (settings: any, routes: RouteData[], hostName?: string, maxPlayers: number = 2) => {
     if (!playerId) {
       toast({ title: 'Not ready', description: 'Please wait...', variant: 'destructive' });
       return null;
@@ -110,6 +124,8 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           settings,
           routes: routes as any,
           status: 'waiting',
+          max_players: maxPlayers,
+          current_player_count: 1,
         })
         .select()
         .single();
@@ -117,7 +133,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       if (error) throw error;
 
       setRoom(data as unknown as OnlineDuelRoom);
-      setIsHost(true);
+      setPlayerSlot('host');
       
       // Subscribe to room updates
       subscribeToRoom(data.id);
@@ -150,13 +166,12 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
     setIsConnecting(true);
     try {
-      // Find the room
+      // Find the room with available slots
       const { data: roomData, error: findError } = await supabase
         .from('duel_rooms')
         .select('*')
         .eq('room_code', roomCode.toUpperCase())
         .eq('status', 'waiting')
-        .is('guest_id', null)
         .single();
 
       if (findError || !roomData) {
@@ -168,10 +183,54 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
         return null;
       }
 
+      // Check if room is full
+      if (roomData.current_player_count >= roomData.max_players) {
+        toast({
+          title: 'Room is full',
+          description: 'This room already has the maximum number of players',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
+      // Determine which slot to fill
+      let updateData: any = {};
+      let slot: PlayerSlot;
+      
+      if (!roomData.guest_id) {
+        slot = 'guest';
+        updateData = { 
+          guest_id: playerId, 
+          guest_name: guestName || null,
+          current_player_count: roomData.current_player_count + 1
+        };
+      } else if (!roomData.player_3_id && roomData.max_players >= 3) {
+        slot = 'player_3';
+        updateData = { 
+          player_3_id: playerId, 
+          player_3_name: guestName || null,
+          current_player_count: roomData.current_player_count + 1
+        };
+      } else if (!roomData.player_4_id && roomData.max_players >= 4) {
+        slot = 'player_4';
+        updateData = { 
+          player_4_id: playerId, 
+          player_4_name: guestName || null,
+          current_player_count: roomData.current_player_count + 1
+        };
+      } else {
+        toast({
+          title: 'Room is full',
+          description: 'No available slots in this room',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
       // Join the room
       const { data, error } = await supabase
         .from('duel_rooms')
-        .update({ guest_id: playerId, guest_name: guestName || null })
+        .update(updateData)
         .eq('id', roomData.id)
         .select()
         .single();
@@ -179,7 +238,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       if (error) throw error;
 
       setRoom(data as unknown as OnlineDuelRoom);
-      setIsHost(false);
+      setPlayerSlot(slot);
       
       // Subscribe to room updates
       subscribeToRoom(data.id);
@@ -314,34 +373,41 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
   // Set ready status
   const setReady = useCallback(async (ready: boolean) => {
-    if (!room) return;
+    if (!room || !playerSlot) return;
 
-    const updateField = isHost ? { host_ready: ready } : { guest_ready: ready };
+    const readyField = `${playerSlot === 'host' ? 'host' : playerSlot}_ready`;
     
     const { error } = await supabase
       .from('duel_rooms')
-      .update(updateField)
+      .update({ [readyField]: ready })
       .eq('id', room.id);
 
     if (error) {
       console.error('Error setting ready:', error);
     }
-  }, [room, isHost]);
+  }, [room, playerSlot]);
+
+  // Check if minimum players are present for game start
+  const canStartGame = useCallback((currentRoom: OnlineDuelRoom | null) => {
+    if (!currentRoom) return false;
+    // Need at least 2 players
+    return currentRoom.current_player_count >= 2;
+  }, []);
 
   // Start the game (host only)
   const startGame = useCallback(async () => {
-    console.log('[OnlineDuel] startGame called', { roomId: room?.id, isHost, hasGuest: !!room?.guest_id });
+    console.log('[OnlineDuel] startGame called', { roomId: room?.id, isHost, playerCount: room?.current_player_count });
     
     if (!room || !isHost) {
       console.log('[OnlineDuel] Cannot start - not host or no room');
       return;
     }
 
-    if (!room.guest_id) {
-      console.log('[OnlineDuel] Cannot start - no guest joined');
+    if (!canStartGame(room)) {
+      console.log('[OnlineDuel] Cannot start - not enough players');
       toast({
-        title: 'Waiting for opponent',
-        description: 'Share the room code to invite someone',
+        title: 'Waiting for players',
+        description: 'Need at least 2 players to start',
       });
       return;
     }
@@ -382,7 +448,30 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
         variant: 'destructive',
       });
     }
-  }, [room, isHost, toast, onGameStart]);
+  }, [room, isHost, toast, onGameStart, canStartGame]);
+
+  // Get score field name for current player
+  const getScoreField = useCallback(() => {
+    switch (playerSlot) {
+      case 'host': return 'host_score';
+      case 'guest': return 'guest_score';
+      case 'player_3': return 'player_3_score';
+      case 'player_4': return 'player_4_score';
+      default: return 'host_score';
+    }
+  }, [playerSlot]);
+
+  // Get current player's score
+  const getMyScore = useCallback(() => {
+    if (!room || !playerSlot) return 0;
+    switch (playerSlot) {
+      case 'host': return room.host_score;
+      case 'guest': return room.guest_score;
+      case 'player_3': return room.player_3_score;
+      case 'player_4': return room.player_4_score;
+      default: return 0;
+    }
+  }, [room, playerSlot]);
 
   // Submit an answer
   const submitAnswer = useCallback(async (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => {
@@ -404,16 +493,17 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     }
 
     // Update score
-    const scoreField = isHost ? 'host_score' : 'guest_score';
+    const scoreField = getScoreField();
+    const currentScore = getMyScore();
     const scoreChange = isCorrect ? 1 : -0.5;
     
     await supabase
       .from('duel_rooms')
       .update({ 
-        [scoreField]: (isHost ? room.host_score : room.guest_score) + scoreChange 
+        [scoreField]: currentScore + scoreChange 
       })
       .eq('id', room.id);
-  }, [room, playerId, isHost]);
+  }, [room, playerId, getScoreField, getMyScore]);
 
   // Leave/delete room
   const leaveRoom = useCallback(async () => {
@@ -425,16 +515,37 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
 
     if (isHost) {
       await supabase.from('duel_rooms').delete().eq('id', room.id);
-    } else {
+    } else if (playerSlot) {
+      // Clear the player's slot
+      const clearFields: any = { current_player_count: Math.max(1, room.current_player_count - 1) };
+      switch (playerSlot) {
+        case 'guest':
+          clearFields.guest_id = null;
+          clearFields.guest_name = null;
+          clearFields.guest_ready = false;
+          break;
+        case 'player_3':
+          clearFields.player_3_id = null;
+          clearFields.player_3_name = null;
+          clearFields.player_3_ready = false;
+          break;
+        case 'player_4':
+          clearFields.player_4_id = null;
+          clearFields.player_4_name = null;
+          clearFields.player_4_ready = false;
+          break;
+      }
+      
       await supabase
         .from('duel_rooms')
-        .update({ guest_id: null, guest_ready: false })
+        .update(clearFields)
         .eq('id', room.id);
     }
 
     setRoom(null);
     setChannel(null);
-  }, [room, channel, isHost]);
+    setPlayerSlot(null);
+  }, [room, channel, isHost, playerSlot]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -458,6 +569,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   return {
     room,
     isHost,
+    playerSlot,
     isConnecting,
     isSubscribed,
     playerId,
@@ -470,5 +582,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     finishGame,
     subscribeToRoom,
     refetchRoom,
+    canStartGame,
+    getMyScore,
   };
 };
