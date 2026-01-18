@@ -290,8 +290,7 @@ const RouteGame: React.FC = () => {
       setRouteData(shuffledRoutes);
       setAllMapsForRoutes(allMaps);
       setSelectedMap(null); // Multiple maps selected
-      setMultiSelectMode(false);
-      setSelectedMaps([]);
+      // Keep multi-select mode and selection visible so user knows what they're playing
       
       if (shuffledRoutes.length === 0) {
         toast({
@@ -511,8 +510,8 @@ const RouteGame: React.FC = () => {
                           </p>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {/* Random Mix for Private Maps */}
-                          {uniqueUserMapNames.length > 1 && (
+                          {/* Random Mix for Private Maps - hide in multi-select mode */}
+                          {!multiSelectMode && uniqueUserMapNames.length > 1 && (
                             <button
                               onClick={() => { handleMapSelect('all'); setSelectedMapCategory('private'); }}
                               className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
@@ -527,15 +526,22 @@ const RouteGame: React.FC = () => {
                             </button>
                           )}
                           {uniqueUserMapNames.map(mapName => {
-                            const isSelected = selectedMapId === mapName && selectedMapCategory === 'private';
+                            const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                            const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'private';
                             return (
                               <button
                                 key={mapName}
-                                onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('private'); }}
-                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                                  isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                                onClick={() => { handleMapSelect(mapName); if (!multiSelectMode) setSelectedMapCategory('private'); }}
+                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                                  isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                                 }`}
                               >
+                                {/* Multi-select checkmark */}
+                                {multiSelectMode && isMultiSelected && (
+                                  <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                                    <Check className="h-3 w-3 text-primary-foreground" />
+                                  </div>
+                                )}
                                 <Map className="h-8 w-8 mb-2 text-muted-foreground" />
                                 <span className="font-medium text-sm">{mapName}</span>
                                 <span className="text-xs text-muted-foreground">Private</span>
@@ -591,8 +597,8 @@ const RouteGame: React.FC = () => {
                       
                       {uniqueFavoriteMapNames.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {/* Random Mix for Favorited Community Maps */}
-                          {uniqueFavoriteMapNames.length > 1 && (
+                          {/* Random Mix for Favorited Community Maps - hide in multi-select mode */}
+                          {!multiSelectMode && uniqueFavoriteMapNames.length > 1 && (
                             <button
                               onClick={() => { handleMapSelect('all'); setSelectedMapCategory('community'); }}
                               className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
@@ -608,16 +614,23 @@ const RouteGame: React.FC = () => {
                           )}
                           {uniqueFavoriteMapNames.map(mapName => {
                             const mapSource = communityMaps.find(m => m.name === mapName);
-                            const isSelected = selectedMapId === mapName && selectedMapCategory === 'community';
+                            const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                            const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'community';
                             const logoUrl = mapSource?.logoPath ? `${LOGO_STORAGE_URL}/${mapSource.logoPath}` : null;
                             return (
                               <button
                                 key={mapName}
-                                onClick={() => { handleMapSelect(mapName); setSelectedMapCategory('community'); }}
+                                onClick={() => { handleMapSelect(mapName); if (!multiSelectMode) setSelectedMapCategory('community'); }}
                                 className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                                  isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                                  isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                                 }`}
                               >
+                                {/* Multi-select checkmark */}
+                                {multiSelectMode && isMultiSelected && (
+                                  <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                                    <Check className="h-3 w-3 text-primary-foreground" />
+                                  </div>
+                                )}
                                 <Star className="absolute top-1 right-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
                                 {logoUrl ? (
                                   <img 
