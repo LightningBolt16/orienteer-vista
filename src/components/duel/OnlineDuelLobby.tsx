@@ -51,17 +51,32 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
   const [loadedRoutes, setLoadedRoutes] = useState<RouteData[]>([]);
   const [displayName] = useState(initialPlayerName || 'Player');
   const [isStarting, setIsStarting] = useState(false);
+  
+  // Ref to prevent double-triggering game start
+  const gameStartedRef = React.useRef(false);
 
   const { room, isHost, isConnecting, createRoom, joinRoom, startGame, leaveRoom, canStartGame } = onlineDuel;
 
+  // Reset gameStartedRef when room changes
+  useEffect(() => {
+    if (!room) {
+      gameStartedRef.current = false;
+    }
+  }, [room?.id]);
+
   // Polling fallback for guest - in case realtime subscription misses the status change
   useEffect(() => {
-    // Only poll when: not host, room joined, waiting for host
-    if (!room || isHost || room.status === 'playing') return;
+    // Only poll when: not host, room joined, game not yet started
+    if (!room?.id || isHost || gameStartedRef.current) return;
     
-    console.log('[OnlineDuelLobby] Starting guest polling fallback');
+    console.log('[OnlineDuelLobby] Starting guest polling fallback for room:', room.id);
     
     const pollInterval = setInterval(async () => {
+      if (gameStartedRef.current) {
+        clearInterval(pollInterval);
+        return;
+      }
+      
       console.log('[OnlineDuelLobby] Polling room status...');
       const { data, error } = await supabase
         .from('duel_rooms')
@@ -74,8 +89,9 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
         return;
       }
       
-      if (data?.status === 'playing' && data.routes) {
+      if (data?.status === 'playing' && data.routes && !gameStartedRef.current) {
         console.log('[OnlineDuelLobby] Polling detected game started!');
+        gameStartedRef.current = true;
         clearInterval(pollInterval);
         onGameStart(data.routes as unknown as RouteData[], data as unknown as OnlineDuelRoom);
       }
@@ -85,7 +101,7 @@ const OnlineDuelLobby: React.FC<OnlineDuelLobbyProps> = ({
       console.log('[OnlineDuelLobby] Stopping guest polling');
       clearInterval(pollInterval);
     };
-  }, [room, isHost, onGameStart]);
+  }, [room?.id, isHost, onGameStart]);
 
   // Load routes when creating a room (not when joining)
   useEffect(() => {

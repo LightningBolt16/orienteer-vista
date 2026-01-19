@@ -267,6 +267,9 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   const onOpponentAnswerRef = React.useRef(onOpponentAnswer);
   const onGameEndRef = React.useRef(onGameEnd);
   const playerIdRef = React.useRef(playerId);
+  
+  // Track previous room status to detect transitions reliably (payload.old can be incomplete)
+  const previousStatusRef = React.useRef<string | null>(null);
 
   // Keep refs up to date
   useEffect(() => {
@@ -292,14 +295,18 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     
     if (data) {
       const fetchedRoom = data as unknown as OnlineDuelRoom;
-      console.log('[OnlineDuel] Refetched room status:', fetchedRoom.status);
+      console.log('[OnlineDuel] Refetched room status:', fetchedRoom.status, 'previous:', previousStatusRef.current);
       setRoom(fetchedRoom);
       
-      // If room is already playing, trigger game start
-      if (fetchedRoom.status === 'playing') {
+      // If room is already playing and we haven't triggered yet, trigger game start
+      if (fetchedRoom.status === 'playing' && previousStatusRef.current !== 'playing') {
         console.log('[OnlineDuel] Room already playing - triggering game start');
+        previousStatusRef.current = 'playing';
         onGameStartRef.current?.(fetchedRoom);
       }
+      
+      // Update previous status ref
+      previousStatusRef.current = fetchedRoom.status;
     }
   }, []);
 
@@ -322,21 +329,25 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
           console.log('[OnlineDuel] Room update received:', payload.eventType, payload.new);
           if (payload.new) {
             const newRoom = payload.new as unknown as OnlineDuelRoom;
-            const oldRoom = payload.old as any;
             
             setRoom(newRoom);
             
             // Trigger game start when status changes to playing
-            // This works for both realtime updates AND when we detect it after subscription
-            if (newRoom.status === 'playing' && oldRoom?.status === 'waiting') {
-              console.log('[OnlineDuel] Game started - transitioning to playing');
+            // Use ref to track previous status instead of relying on payload.old (which can be incomplete)
+            if (newRoom.status === 'playing' && previousStatusRef.current !== 'playing') {
+              console.log('[OnlineDuel] Game started - transitioning to playing (previous:', previousStatusRef.current, ')');
+              previousStatusRef.current = 'playing';
               onGameStartRef.current?.(newRoom);
             }
             
-            if (newRoom.status === 'finished' && oldRoom?.status === 'playing') {
+            if (newRoom.status === 'finished' && previousStatusRef.current === 'playing') {
               console.log('[OnlineDuel] Game ended');
+              previousStatusRef.current = 'finished';
               onGameEndRef.current?.();
             }
+            
+            // Always update the previous status ref
+            previousStatusRef.current = newRoom.status;
           }
         }
       )
