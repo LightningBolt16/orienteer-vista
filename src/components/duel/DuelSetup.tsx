@@ -1,21 +1,34 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { useLanguage } from '../../context/LanguageContext';
 import { useRouteCache } from '../../context/RouteCache';
+import { useUser } from '../../context/UserContext';
+import { useCommunityFavorites } from '../../hooks/useCommunityFavorites';
 import { MapSource, getUniqueMapNames } from '../../utils/routeDataUtils';
-import { Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, Wifi, Users } from 'lucide-react';
+import { Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, Wifi, Users, Lock, ChevronDown, ChevronUp, Star, MapPin, Check, Layers } from 'lucide-react';
 import { isPwtMap } from '../PwtAttribution';
 import PwtAttribution from '../PwtAttribution';
 import ScoringInfoDialog from './ScoringInfoDialog';
+import CommunityMapBrowser from '../map/CommunityMapBrowser';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { toast as sonnerToast } from 'sonner';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
 import flagSweden from '@/assets/flag-sweden.png';
 import flagBelgium from '@/assets/flag-belgium.png';
 
+// Storage URL for map logos
+const LOGO_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/map-logos`;
+
+export type MapCategory = 'official' | 'private' | 'community';
+
 export interface DuelSettings {
   mapId: string;
+  mapIds?: string[]; // For multi-select mode
+  mapCategory?: MapCategory;
   gameType: 'routes' | 'timed'; // routes = fixed count, timed = unlimited within time
   routeCount: number;
   gameDuration?: number; // total game time in seconds (for timed mode)
@@ -52,11 +65,16 @@ const GAME_DURATION_OPTIONS = [
 
 const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoom, onBack }) => {
   const { t } = useLanguage();
-  const { desktopCache, mobileCache, isPreloading } = useRouteCache();
+  const navigate = useNavigate();
+  const { user } = useUser();
+  const { desktopCache, mobileCache, isPreloading, userMaps, communityMaps } = useRouteCache();
+  const { favorites, favoriteMaps, toggleFavorite } = useCommunityFavorites();
+  
   const [playMode, setPlayMode] = useState<'local' | 'online' | null>(null);
   const [playerName, setPlayerName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<number>(2);
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
+  const [selectedMapCategory, setSelectedMapCategory] = useState<MapCategory>('official');
   const [gameType, setGameType] = useState<'routes' | 'timed'>('routes');
   const [selectedRouteCount, setSelectedRouteCount] = useState<number>(10);
   const [customRouteCount, setCustomRouteCount] = useState<string>('');
@@ -64,8 +82,17 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
   const [selectedDuration, setSelectedDuration] = useState<number>(60);
   const [customDuration, setCustomDuration] = useState<string>('');
   const [isCustomDuration, setIsCustomDuration] = useState(false);
-  const [gameMode, setGameMode] = useState<'speed' | 'wait'>('wait'); // Default to wait for mobile compatibility
+  const [gameMode, setGameMode] = useState<'speed' | 'wait'>('wait');
   const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
+  
+  // Multi-select mode state
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
+  const [playButtonAnimating, setPlayButtonAnimating] = useState(false);
+  
+  // Private/Community collapsible states
+  const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
+  const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
   
   // Detect mobile device
   const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
@@ -82,12 +109,41 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
 
   const availableMaps = (isMobile ? mobileCache?.maps : desktopCache?.maps) || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
+  const uniqueUserMapNames = getUniqueMapNames(userMaps);
+  const uniqueFavoriteMapNames = favoriteMaps.map(m => m.name);
+
+  const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
+    if (multiSelectMode && mapName !== 'all') {
+      // Toggle selection in multi-select mode
+      setSelectedMaps(prev => 
+        prev.includes(mapName) 
+          ? prev.filter(m => m !== mapName)
+          : [...prev, mapName]
+      );
+      setSelectedMapCategory(category);
+    } else {
+      // Single select mode
+      setMultiSelectMode(false);
+      setSelectedMaps([]);
+      setSelectedMapId(mapName);
+      setSelectedMapCategory(category);
+    }
+  };
+
+  const toggleMultiSelectMode = () => {
+    if (multiSelectMode) {
+      setSelectedMaps([]);
+    }
+    setMultiSelectMode(!multiSelectMode);
+  };
 
   const buildSettings = (): DuelSettings => {
     const routeCount = isCustomRoutes ? parseInt(customRouteCount) || 10 : selectedRouteCount;
     const gameDuration = isCustomDuration ? parseInt(customDuration) || 60 : selectedDuration;
     return {
-      mapId: selectedMapId,
+      mapId: multiSelectMode && selectedMaps.length > 0 ? 'multi' : selectedMapId,
+      mapIds: multiSelectMode && selectedMaps.length > 0 ? selectedMaps : undefined,
+      mapCategory: selectedMapCategory,
       gameType,
       routeCount: gameType === 'routes' ? Math.min(Math.max(1, routeCount), 200) : 999,
       gameDuration: gameType === 'timed' ? gameDuration : undefined,
@@ -224,58 +280,282 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
               Loading maps...
             </div>
           ) : uniqueMapNames.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {/* All Maps Option */}
-              <button
-                onClick={() => setSelectedMapId('all')}
-                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                  selectedMapId === 'all'
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border bg-card'
-                }`}
-              >
-                <Shuffle className="h-8 w-8 mb-2 text-primary" />
-                <span className="font-medium text-sm">All Maps</span>
-                <span className="text-xs text-muted-foreground">Random mix</span>
-              </button>
-              
-              {/* Individual Map Options */}
-              {uniqueMapNames.map(mapName => {
-                const isPwt = isPwtMap(mapName);
-                const isKnivsta = mapName.toLowerCase().includes('knivsta');
-                const isEkeby = mapName.toLowerCase().includes('ekeby');
-                const isBelgien = mapName.toLowerCase().includes('belgien');
-                const isGeel = mapName.toLowerCase().includes('geel');
-                const countryFlag = isPwt ? flagItaly : (isKnivsta || isEkeby) ? flagSweden : (isBelgien || isGeel) ? flagBelgium : null;
+            <div className="space-y-6">
+              {/* Multi-Select Toggle and Play Button */}
+              <div className="flex items-center justify-between gap-3">
+                <Button
+                  variant={multiSelectMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={toggleMultiSelectMode}
+                  className="gap-2"
+                >
+                  <Layers className="h-4 w-4" />
+                  {multiSelectMode ? 'Cancel Multi-Select' : 'Multi-Select'}
+                </Button>
                 
-                return (
+                {multiSelectMode && selectedMaps.length > 0 && (
+                  <Button
+                    onClick={() => {
+                      setPlayButtonAnimating(true);
+                      setTimeout(() => setPlayButtonAnimating(false), 200);
+                      sonnerToast.success(`Selected ${selectedMaps.length} map${selectedMaps.length > 1 ? 's' : ''}`, {
+                        description: selectedMaps.join(', '),
+                        duration: 3000,
+                      });
+                    }}
+                    className={`gap-2 bg-primary transition-transform duration-150 ${
+                      playButtonAnimating ? 'scale-95' : 'hover:scale-105'
+                    }`}
+                  >
+                    <Check className={`h-4 w-4 ${playButtonAnimating ? 'animate-spin' : ''}`} />
+                    {selectedMaps.length} Map{selectedMaps.length > 1 ? 's' : ''} Selected
+                  </Button>
+                )}
+              </div>
+
+              {multiSelectMode && (
+                <p className="text-sm text-muted-foreground">
+                  Click maps to select them for a random mix in your duel.
+                </p>
+              )}
+
+              {/* Official Maps Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {/* All Maps Option - Only show when not in multi-select mode */}
+                {!multiSelectMode && (
                   <button
-                    key={mapName}
-                    onClick={() => setSelectedMapId(mapName)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                      selectedMapId === mapName
+                    onClick={() => handleMapSelect('all', 'official')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                      selectedMapId === 'all' && selectedMapCategory === 'official'
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-card'
                     }`}
                   >
-                    {countryFlag && (
-                      <img 
-                        src={countryFlag} 
-                        alt="Country flag" 
-                        className="absolute top-1 right-1 h-4 w-6 object-cover rounded-sm shadow-sm"
-                      />
-                    )}
-                    {isPwt ? (
-                      <PwtAttribution variant="badge" className="mb-2" />
-                    ) : (isKnivsta || isEkeby) ? (
-                      <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
-                    ) : (
-                      <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                    )}
-                    <span className="font-medium text-sm">{mapName}</span>
+                    <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                    <span className="font-medium text-sm">All Maps</span>
+                    <span className="text-xs text-muted-foreground">Random mix</span>
                   </button>
-                );
-              })}
+                )}
+                
+                {/* Individual Map Options */}
+                {uniqueMapNames.map(mapName => {
+                  const isPwt = isPwtMap(mapName);
+                  const isKnivsta = mapName.toLowerCase().includes('knivsta');
+                  const isEkeby = mapName.toLowerCase().includes('ekeby');
+                  const isBelgien = mapName.toLowerCase().includes('belgien');
+                  const isGeel = mapName.toLowerCase().includes('geel');
+                  const countryFlag = isPwt ? flagItaly : (isKnivsta || isEkeby) ? flagSweden : (isBelgien || isGeel) ? flagBelgium : null;
+                  const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                  const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'official';
+                  
+                  return (
+                    <button
+                      key={mapName}
+                      onClick={() => handleMapSelect(mapName, 'official')}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                        isMultiSelected || isSingleSelected
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      {/* Multi-select checkmark */}
+                      {multiSelectMode && isMultiSelected && (
+                        <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                      {countryFlag && (
+                        <img 
+                          src={countryFlag} 
+                          alt="Country flag" 
+                          className="absolute top-1 right-1 h-4 w-6 object-cover rounded-sm shadow-sm"
+                        />
+                      )}
+                      {isPwt ? (
+                        <PwtAttribution variant="badge" className="mb-2" />
+                      ) : (isKnivsta || isEkeby) ? (
+                        <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
+                      ) : (
+                        <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                      )}
+                      <span className="font-medium text-sm">{mapName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Private Maps - Collapsible (only show if user is logged in and has maps) */}
+              {user && uniqueUserMapNames.length > 0 && (
+                <Collapsible open={privateMapsOpen} onOpenChange={setPrivateMapsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Private Maps</span>
+                        <span className="text-xs text-muted-foreground">({uniqueUserMapNames.length})</span>
+                      </div>
+                      {privateMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-3">
+                    <div className="p-3 mb-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        <Lock className="h-3 w-3 inline mr-1" />
+                        Stats from these maps are private and won't affect the public leaderboard.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {/* Random Mix for Private Maps - hide in multi-select mode */}
+                      {!multiSelectMode && uniqueUserMapNames.length > 1 && (
+                        <button
+                          onClick={() => handleMapSelect('all', 'private')}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                            selectedMapId === 'all' && selectedMapCategory === 'private'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border bg-card'
+                          }`}
+                        >
+                          <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                          <span className="font-medium text-sm">Random Mix</span>
+                          <span className="text-xs text-muted-foreground">All your maps</span>
+                        </button>
+                      )}
+                      {uniqueUserMapNames.map(mapName => {
+                        const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                        const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'private';
+                        return (
+                          <button
+                            key={mapName}
+                            onClick={() => handleMapSelect(mapName, 'private')}
+                            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                              isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                            }`}
+                          >
+                            {/* Multi-select checkmark */}
+                            {multiSelectMode && isMultiSelected && (
+                              <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                                <Check className="h-3 w-3 text-primary-foreground" />
+                              </div>
+                            )}
+                            <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                            <span className="font-medium text-sm">{mapName}</span>
+                            <span className="text-xs text-muted-foreground">Private</span>
+                          </button>
+                        );
+                      })}
+                      <button
+                        onClick={() => navigate('/my-maps')}
+                        className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-primary/40 transition-all hover:border-primary hover:bg-primary/5"
+                      >
+                        <Map className="h-8 w-8 mb-2 text-primary" />
+                        <span className="font-medium text-sm text-primary">Upload New</span>
+                      </button>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {/* Community Maps - Collapsible */}
+              <Collapsible open={communityMapsOpen} onOpenChange={setCommunityMapsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Community Maps</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({uniqueFavoriteMapNames.length} favorite{uniqueFavoriteMapNames.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    {communityMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <div className="p-3 mb-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <Star className="h-3 w-3 inline mr-1 fill-yellow-400 text-yellow-400" />
+                      Star maps from the browser below to add them here.
+                    </p>
+                  </div>
+                  
+                  {/* Map Browser */}
+                  <div className="mb-4">
+                    <CommunityMapBrowser 
+                      onSelectMap={(mapName) => handleMapSelect(mapName, 'community')}
+                      selectedMapName={selectedMapCategory === 'community' ? (selectedMapId === 'all' ? undefined : selectedMapId) : undefined}
+                      favorites={favorites}
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  </div>
+                  
+                  {uniqueFavoriteMapNames.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {/* Random Mix for Favorited Community Maps - hide in multi-select mode */}
+                      {!multiSelectMode && uniqueFavoriteMapNames.length > 1 && (
+                        <button
+                          onClick={() => handleMapSelect('all', 'community')}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                            selectedMapId === 'all' && selectedMapCategory === 'community'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border bg-card'
+                          }`}
+                        >
+                          <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                          <span className="font-medium text-sm">Random Mix</span>
+                          <span className="text-xs text-muted-foreground">From favorites</span>
+                        </button>
+                      )}
+                      {uniqueFavoriteMapNames.map(mapName => {
+                        const mapSource = communityMaps.find(m => m.name === mapName);
+                        const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                        const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'community';
+                        const logoUrl = mapSource?.logoPath ? `${LOGO_STORAGE_URL}/${mapSource.logoPath}` : null;
+                        return (
+                          <button
+                            key={mapName}
+                            onClick={() => handleMapSelect(mapName, 'community')}
+                            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                              isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                            }`}
+                          >
+                            {/* Multi-select checkmark */}
+                            {multiSelectMode && isMultiSelected && (
+                              <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                                <Check className="h-3 w-3 text-primary-foreground" />
+                              </div>
+                            )}
+                            <Star className="absolute top-1 right-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            {logoUrl ? (
+                              <img 
+                                src={logoUrl} 
+                                alt={`${mapName} logo`} 
+                                className="h-8 w-8 mb-2 object-contain rounded"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <Users className={`h-8 w-8 mb-2 text-muted-foreground ${logoUrl ? 'hidden' : ''}`} />
+                            <span className="font-medium text-sm">{mapName}</span>
+                            {mapSource?.locationName ? (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-full">
+                                <MapPin className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate">{mapSource.locationName.split(',')[0]}</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Community</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No favorites yet. Use the map browser above to star community maps.
+                    </p>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           ) : (
             <div className="flex items-center p-4 text-sm text-amber-800 border border-amber-200 rounded-md bg-amber-50">

@@ -12,7 +12,7 @@ type DuelPhase = 'intro' | 'setup' | 'playing' | 'online-lobby' | 'online-join';
 
 const DuelMode: React.FC = () => {
   const navigate = useNavigate();
-  const { getRoutesForMap, isPreloading } = useRouteCache();
+  const { getRoutesForMap, getUserRoutes, getCommunityRoutes, isPreloading } = useRouteCache();
   const [phase, setPhase] = useState<DuelPhase>('intro');
   const [gameRoutes, setGameRoutes] = useState<RouteData[]>([]);
   const [settings, setSettings] = useState<DuelSettings>({
@@ -24,25 +24,18 @@ const DuelMode: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [playerName, setPlayerName] = useState<string>('');
 
-  // Centralized online duel hook - persists across lobby and game phases
   const onlineDuel = useOnlineDuel({
     onGameStart: (room) => {
-      // When host starts game, both players transition to playing
-      // Use the room passed directly to avoid stale closure
       if (room?.routes) {
         setGameRoutes(room.routes as RouteData[]);
         setPhase('playing');
       }
     },
-    onGameEnd: () => {
-      // Game ended - handled in OnlineDuelGameView
-    },
+    onGameEnd: () => {},
   });
 
-  // Preload routes when entering setup phase for faster game start
   useEffect(() => {
     if (phase === 'setup') {
-      // Preload default routes in background
       getRoutesForMap('all', true).catch(console.error);
     }
   }, [phase, getRoutesForMap]);
@@ -59,12 +52,50 @@ const DuelMode: React.FC = () => {
     setPhase('setup');
   };
 
+  // Load routes based on settings (handles multi-select and categories)
+  const loadRoutesForSettings = async (newSettings: DuelSettings): Promise<RouteData[]> => {
+    const isMobile = window.innerWidth <= 768;
+    let allRoutes: RouteData[] = [];
+
+    // Multi-select mode
+    if (newSettings.mapIds && newSettings.mapIds.length > 0) {
+      for (const mapName of newSettings.mapIds) {
+        let result;
+        if (newSettings.mapCategory === 'private') {
+          result = await getUserRoutes(isMobile);
+          result.routes = result.routes.filter(r => r.mapName?.toLowerCase() === mapName.toLowerCase());
+        } else if (newSettings.mapCategory === 'community') {
+          result = await getCommunityRoutes(mapName, isMobile);
+        } else {
+          result = await getRoutesForMap(mapName, isMobile);
+        }
+        allRoutes.push(...result.routes);
+      }
+    } else {
+      // Single map selection
+      if (newSettings.mapCategory === 'private') {
+        const result = await getUserRoutes(isMobile);
+        allRoutes = newSettings.mapId === 'all' 
+          ? result.routes 
+          : result.routes.filter(r => r.mapName?.toLowerCase() === newSettings.mapId.toLowerCase());
+      } else if (newSettings.mapCategory === 'community') {
+        const result = await getCommunityRoutes(newSettings.mapId, isMobile);
+        allRoutes = result.routes;
+      } else {
+        const result = await getRoutesForMap(newSettings.mapId, isMobile);
+        allRoutes = result.routes;
+      }
+    }
+
+    return allRoutes;
+  };
+
   const handleSetupComplete = async (newSettings: DuelSettings) => {
     setIsLoading(true);
     setSettings(newSettings);
     
     try {
-      const { routes } = await getRoutesForMap(newSettings.mapId, true);
+      const routes = await loadRoutesForSettings(newSettings);
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
       const selectedRoutes = shuffled.slice(0, newSettings.routeCount);
       
@@ -103,7 +134,7 @@ const DuelMode: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const { routes } = await getRoutesForMap(settings.mapId, true);
+      const routes = await loadRoutesForSettings(settings);
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
       const selectedRoutes = shuffled.slice(0, settings.routeCount);
       
