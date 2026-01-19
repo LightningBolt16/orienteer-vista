@@ -12,6 +12,7 @@ import { useUser } from '../context/UserContext';
 import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
+import { toast as sonnerToast } from 'sonner';
 import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin, Star, Check, Layers } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
@@ -256,8 +257,14 @@ const RouteGame: React.FC = () => {
     setMultiSelectMode(!multiSelectMode);
   };
 
+  const [playButtonAnimating, setPlayButtonAnimating] = useState(false);
+  
   const playSelectedMaps = async () => {
     if (selectedMaps.length === 0) return;
+    
+    // Trigger button animation
+    setPlayButtonAnimating(true);
+    setTimeout(() => setPlayButtonAnimating(false), 200);
     
     setIsLoading(true);
     try {
@@ -297,6 +304,12 @@ const RouteGame: React.FC = () => {
           title: t('error'),
           description: 'No routes found in selected maps.',
           variant: "destructive"
+        });
+      } else {
+        // Show success notification
+        sonnerToast.success(`Now playing ${selectedMaps.length} map${selectedMaps.length > 1 ? 's' : ''}`, {
+          description: selectedMaps.join(', '),
+          duration: 3000,
         });
       }
     } catch (error) {
@@ -408,9 +421,11 @@ const RouteGame: React.FC = () => {
                     {multiSelectMode && selectedMaps.length > 0 && (
                       <Button
                         onClick={playSelectedMaps}
-                        className="gap-2 bg-primary"
+                        className={`gap-2 bg-primary transition-transform duration-150 ${
+                          playButtonAnimating ? 'scale-95' : 'hover:scale-105'
+                        }`}
                       >
-                        <Shuffle className="h-4 w-4" />
+                        <Shuffle className={`h-4 w-4 ${playButtonAnimating ? 'animate-spin' : ''}`} />
                         Play {selectedMaps.length} Map{selectedMaps.length > 1 ? 's' : ''}
                       </Button>
                     )}
