@@ -442,14 +442,14 @@ const Profile: React.FC = () => {
         <div className="mt-10 border-t border-muted pt-8">
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="overview">{t('overview') || 'Overview'}</TabsTrigger>
-              <TabsTrigger value="maps">{t('perMap') || 'Per Map'}</TabsTrigger>
-              <TabsTrigger value="progress">{t('progress') || 'Progress'}</TabsTrigger>
+              <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
+              <TabsTrigger value="maps">{t('perMap')}</TabsTrigger>
+              <TabsTrigger value="progress">{t('progress')}</TabsTrigger>
             </TabsList>
 
             {/* Overview Tab - All Time Stats */}
             <TabsContent value="overview">
-              <h2 className="text-xl font-semibold mb-6">{t('allTimeStatistics') || 'All-Time Statistics'}</h2>
+              <h2 className="text-xl font-semibold mb-6">{t('allTimeStatistics')}</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg bg-secondary/50">
@@ -494,7 +494,7 @@ const Profile: React.FC = () => {
 
             {/* Per Map Tab */}
             <TabsContent value="maps">
-              <h2 className="text-xl font-semibold mb-6">{t('performanceByMap') || 'Performance by Map'}</h2>
+              <h2 className="text-xl font-semibold mb-6">{t('performanceByMap')}</h2>
               
               {loadingStats ? (
                 <div className="flex justify-center py-8">
@@ -503,7 +503,7 @@ const Profile: React.FC = () => {
               ) : mapStats.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Map className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>{t('noMapStats') || 'No map statistics yet. Play some routes to see your per-map performance!'}</p>
+                  <p>{t('noMapStats')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -520,11 +520,11 @@ const Profile: React.FC = () => {
                         </div>
                         <div>
                           <div className="text-lg font-bold text-orienteering">{stat.speed}ms</div>
-                          <div className="text-muted-foreground">{t('speed') || 'Speed'}</div>
+                          <div className="text-muted-foreground">{t('speed')}</div>
                         </div>
                         <div>
                           <div className="text-lg font-bold text-orienteering">{stat.attempts?.total || 0}</div>
-                          <div className="text-muted-foreground">{t('attempts') || 'Attempts'}</div>
+                          <div className="text-muted-foreground">{t('attempts')}</div>
                         </div>
                       </div>
                     </div>
@@ -580,7 +580,7 @@ const Profile: React.FC = () => {
                           dot={{ fill: 'hsl(24, 100%, 50%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
-                          name={t('accuracy') || 'Accuracy'}
+                          name={t('accuracy')}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -609,7 +609,7 @@ const Profile: React.FC = () => {
                           dot={{ fill: 'hsl(142, 76%, 36%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
-                          name={t('speed') || 'Speed (ms)'}
+                          name={t('speed')}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -617,7 +617,7 @@ const Profile: React.FC = () => {
 
                   {/* Daily Attempts Chart */}
                   <div className="p-4 rounded-lg border border-border">
-                    <h3 className="font-semibold mb-4">{t('dailyAttempts') || 'Daily Attempts'}</h3>
+                    <h3 className="font-semibold mb-4">{t('dailyAttempts')}</h3>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={performanceData}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -638,7 +638,7 @@ const Profile: React.FC = () => {
                           dot={{ fill: 'hsl(217, 91%, 60%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
                           connectNulls={true}
-                          name={t('attempts') || 'Attempts'}
+                          name={t('attempts')}
                         />
                       </LineChart>
                     </ResponsiveContainer>

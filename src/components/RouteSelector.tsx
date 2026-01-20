@@ -26,6 +26,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [warmupCount, setWarmupCount] = useState(0);
+  const [pendingRouteIndex, setPendingRouteIndex] = useState<number | null>(null);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
   const { user } = useUser();
 
@@ -138,13 +139,21 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
     setTimeout(() => {
       // Random next route instead of sequential
       const randomIndex = Math.floor(Math.random() * routeData.length);
-      setCurrentRouteIndex(randomIndex);
+      setPendingRouteIndex(randomIndex);
+      // Keep result visible until new image loads
+    }, 350);
+  }, [isTransitioning, routeData, isPaused, currentRouteIndex, startTime, mapSource, resetTimer, warmupCount]);
+
+  // Complete transition when pending image is loaded
+  useEffect(() => {
+    if (pendingRouteIndex !== null && isImageLoaded) {
+      setCurrentRouteIndex(pendingRouteIndex);
+      setPendingRouteIndex(null);
       setResult(null);
       setResultMessage('');
       setIsTransitioning(false);
-      setIsImageLoaded(false);
-    }, 350);
-  }, [isTransitioning, routeData, isPaused, currentRouteIndex, startTime, mapSource, resetTimer, warmupCount]);
+    }
+  }, [isImageLoaded, pendingRouteIndex]);
 
   // Legacy handler for left/right
   const handleLegacyDirectionSelect = (direction: 'left' | 'right') => {
@@ -266,11 +275,23 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
         <img
           src={currentRoute.imagePath}
           alt={`Route ${currentRoute.candidateIndex}`}
-          className={`w-full h-auto ${
-            isTransitioning ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'
-          }`}
-          onLoad={() => setIsImageLoaded(true)}
+          className="w-full h-auto"
+          onLoad={() => {
+            if (pendingRouteIndex === null) {
+              setIsImageLoaded(true);
+            }
+          }}
         />
+        
+        {/* Hidden preload image for pending route */}
+        {pendingRouteIndex !== null && routeData[pendingRouteIndex] && (
+          <img
+            src={routeData[pendingRouteIndex].imagePath}
+            alt="preload"
+            className="hidden"
+            onLoad={() => setIsImageLoaded(true)}
+          />
+        )}
 
         {/* Result Overlay */}
         {result && (

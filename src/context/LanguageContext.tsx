@@ -677,6 +677,31 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       clubApproved: 'Klubben har godkänts',
       clubRejected: 'Klubbförfrågan har avslagits',
       
+      // Pause/Inactivity
+      gamePaused: 'Spelet pausat',
+      inactivityPauseMessage: 'Spelet pausades på grund av inaktivitet. Din tid påverkas inte.',
+      welcomeBack: 'Välkommen tillbaka!',
+      visibilityPauseMessage: 'Spelet pausades medan du var borta. Klicka för att fortsätta.',
+      continue: 'Fortsätt',
+
+      // Profile Stats
+      overview: 'Översikt',
+      perMap: 'Per karta',
+      progress: 'Utveckling',
+      last100: 'senaste 100',
+      performanceByMap: 'Prestation per karta',
+      noMapStats: 'Ingen kartstatistik ännu. Spela några rutter för att se din prestation per karta!',
+      attempts: 'Försök',
+      performanceOverTime: 'Prestation över tid',
+      lastWeek: '7 dagar',
+      lastMonth: '30 dagar',
+      last90Days: '90 dagar',
+      allTime: 'All tid',
+      noPerformanceData: 'Ingen prestationsdata ännu. Spela några rutter för att se din utveckling!',
+      accuracyOverTime: 'Träffsäkerhet över tid',
+      speedOverTime: 'Genomsnittlig hastighet över tid',
+      dailyAttempts: 'Dagliga försök',
+
       // Tutorial
       tutorialTitle: 'Hur man spelar',
       tutorialSubtitle: 'Lär dig grunderna i vägvalsspelet',

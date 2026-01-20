@@ -17,17 +17,17 @@ const PauseOverlay: React.FC<PauseOverlayProps> = ({ reason, onResume }) => {
         {reason === 'inactivity' ? (
           <>
             <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">{t('gamePaused') || 'Game Paused'}</h2>
+            <h2 className="text-2xl font-bold mb-2">{t('gamePaused')}</h2>
             <p className="text-muted-foreground mb-6">
-              {t('inactivityPauseMessage') || 'The game was paused due to inactivity. Your time won\'t be affected.'}
+              {t('inactivityPauseMessage')}
             </p>
           </>
         ) : (
           <>
             <Eye className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">{t('welcomeBack') || 'Welcome Back!'}</h2>
+            <h2 className="text-2xl font-bold mb-2">{t('welcomeBack')}</h2>
             <p className="text-muted-foreground mb-6">
-              {t('visibilityPauseMessage') || 'The game was paused while you were away. Click to continue.'}
+              {t('visibilityPauseMessage')}
             </p>
           </>
         )}
@@ -38,7 +38,7 @@ const PauseOverlay: React.FC<PauseOverlayProps> = ({ reason, onResume }) => {
           className="gap-2"
         >
           <Play className="h-5 w-5" />
-          {t('continue') || 'Continue'}
+          {t('continue')}
         </Button>
       </div>
     </div>
