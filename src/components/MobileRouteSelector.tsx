@@ -25,6 +25,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [warmupCount, setWarmupCount] = useState(0);
+  const [pendingRouteIndex, setPendingRouteIndex] = useState<number | null>(null);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
   const { user } = useUser();
 
@@ -136,13 +137,21 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     setTimeout(() => {
       // Random next route instead of sequential
       const randomIndex = Math.floor(Math.random() * routeData.length);
-      setCurrentRouteIndex(randomIndex);
+      setPendingRouteIndex(randomIndex);
+      // Keep result visible until new image loads
+    }, 350);
+  };
+
+  // Complete transition when pending image is loaded
+  useEffect(() => {
+    if (pendingRouteIndex !== null && isImageLoaded) {
+      setCurrentRouteIndex(pendingRouteIndex);
+      setPendingRouteIndex(null);
       setResult(null);
       setResultMessage('');
       setIsTransitioning(false);
-      setIsImageLoaded(false);
-    }, 350);
-  };
+    }
+  }, [isImageLoaded, pendingRouteIndex]);
 
   const handleResume = () => {
     resume();
@@ -281,11 +290,23 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
         <img
           src={currentRoute.imagePath}
           alt={`Route ${currentRoute.candidateIndex}`}
-          className={`w-full h-auto ${
-            isTransitioning ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'
-          }`}
-          onLoad={() => setIsImageLoaded(true)}
+          className="w-full h-auto"
+          onLoad={() => {
+            if (pendingRouteIndex === null) {
+              setIsImageLoaded(true);
+            }
+          }}
         />
+        
+        {/* Hidden preload image for pending route */}
+        {pendingRouteIndex !== null && routeData[pendingRouteIndex] && (
+          <img
+            src={routeData[pendingRouteIndex].imagePath}
+            alt="preload"
+            className="hidden"
+            onLoad={() => setIsImageLoaded(true)}
+          />
+        )}
 
         {/* Touch Zones */}
         {!result && isImageLoaded && !isTransitioning && renderTouchZones()}
