@@ -27,16 +27,18 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [warmupCount, setWarmupCount] = useState(0);
   const [pendingRouteIndex, setPendingRouteIndex] = useState<number | null>(null);
+  const [preloadPool, setPreloadPool] = useState<number[]>([]);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
   const { user } = useUser();
 
   const WARMUP_ROUTES = 3;
+  const PRELOAD_COUNT = 10;
 
   const { isPaused, pauseReason, resume, resetTimer } = useInactivityDetection({
     inactivityTimeout: 30000,
   });
 
-  // Reset on route data change
+  // Reset on route data change and initialize preload pool
   useEffect(() => {
     setCurrentRouteIndex(0);
     setIsTransitioning(false);
@@ -44,29 +46,30 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
     setResultMessage('');
     setWarmupCount(0);
     preloadedImages.current.clear();
+    
+    // Initialize pool with PRELOAD_COUNT random indices
+    if (routeData.length > 0) {
+      const indices = routeData.map((_, i) => i);
+      const shuffled = [...indices].sort(() => Math.random() - 0.5);
+      const initialPool = shuffled.slice(0, Math.min(PRELOAD_COUNT, routeData.length));
+      setPreloadPool(initialPool);
+    }
   }, [routeData]);
 
-  // Preload images
+  // Preload all images in the pool
   useEffect(() => {
-    if (routeData.length === 0) return;
+    if (preloadPool.length === 0 || routeData.length === 0) return;
 
-    const preloadImage = (index: number) => {
-      if (index >= routeData.length) return;
+    preloadPool.forEach(index => {
       const route = routeData[index];
-      const imageUrl = route.imagePath || '';
-      
-      if (!imageUrl || preloadedImages.current.has(imageUrl)) return;
-
-      const img = new Image();
-      img.src = imageUrl;
-      preloadedImages.current.set(imageUrl, img);
-    };
-
-    // Preload current and next few images
-    for (let i = 0; i < 5; i++) {
-      preloadImage(currentRouteIndex + i);
-    }
-  }, [routeData, currentRouteIndex]);
+      const imageUrl = route?.imagePath || '';
+      if (imageUrl && !preloadedImages.current.has(imageUrl)) {
+        const img = new Image();
+        img.src = imageUrl;
+        preloadedImages.current.set(imageUrl, img);
+      }
+    });
+  }, [preloadPool, routeData]);
 
   // Start timer when image loads
   useEffect(() => {
@@ -124,25 +127,33 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
 
     setIsTransitioning(true);
 
-    // Preload next image
-    const nextIndex = currentRouteIndex + 1;
-    if (nextIndex < routeData.length) {
-      const nextRoute = routeData[nextIndex];
-      const nextImageUrl = nextRoute.imagePath || '';
-      if (nextImageUrl && !preloadedImages.current.has(nextImageUrl)) {
-        const img = new Image();
-        img.src = nextImageUrl;
-        preloadedImages.current.set(nextImageUrl, img);
-      }
-    }
-
     setTimeout(() => {
-      // Random next route instead of sequential
-      const randomIndex = Math.floor(Math.random() * routeData.length);
-      setPendingRouteIndex(randomIndex);
-      // Keep result visible until new image loads
+      // Pick next route FROM the preloaded pool
+      let nextIndex: number;
+      if (preloadPool.length > 0) {
+        const poolIndex = Math.floor(Math.random() * preloadPool.length);
+        nextIndex = preloadPool[poolIndex];
+        
+        // Remove used index and add a new random one
+        setPreloadPool(prev => {
+          const newPool = prev.filter((_, i) => i !== poolIndex);
+          const available = routeData
+            .map((_, i) => i)
+            .filter(i => !newPool.includes(i) && i !== nextIndex);
+          if (available.length > 0) {
+            const newIndex = available[Math.floor(Math.random() * available.length)];
+            newPool.push(newIndex);
+          }
+          return newPool;
+        });
+      } else {
+        // Fallback to pure random if pool is empty
+        nextIndex = Math.floor(Math.random() * routeData.length);
+      }
+      
+      setPendingRouteIndex(nextIndex);
     }, 350);
-  }, [isTransitioning, routeData, isPaused, currentRouteIndex, startTime, mapSource, resetTimer, warmupCount]);
+  }, [isTransitioning, routeData, isPaused, currentRouteIndex, startTime, mapSource, resetTimer, warmupCount, preloadPool]);
 
   // Complete transition when pending image is loaded
   useEffect(() => {

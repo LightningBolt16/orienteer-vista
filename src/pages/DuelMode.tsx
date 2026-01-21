@@ -118,11 +118,21 @@ const DuelMode: React.FC = () => {
 
   const handleJoinRoom = (name: string) => {
     setPlayerName(name);
+    // CRITICAL: Set isOnline to true for guests joining online rooms
+    setSettings(prev => ({
+      ...prev,
+      isOnline: true
+    }));
     setPhase('online-join');
   };
 
   const handleOnlineGameStart = useCallback((routes: RouteData[], room: OnlineDuelRoom) => {
     setGameRoutes(routes);
+    // Ensure isOnline is set when transitioning to playing
+    setSettings(prev => ({
+      ...prev,
+      isOnline: true
+    }));
     setPhase('playing');
   }, []);
 
