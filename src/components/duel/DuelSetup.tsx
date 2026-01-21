@@ -100,12 +100,20 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
   // Speed race is disabled for mobile + Local mode (only one screen, can't show two routes)
   const isSpeedRaceDisabled = isMobile && playMode === 'local';
   
-  // Auto-switch to wait mode if speed race becomes disabled
+  // Online mode ONLY supports speed race
+  const isOnlineMode = playMode === 'online';
+  const isTurnBasedDisabled = isOnlineMode;
+  
+  // Auto-switch to wait mode if speed race becomes disabled, or to speed mode if online
   React.useEffect(() => {
     if (isSpeedRaceDisabled && gameMode === 'speed') {
       setGameMode('wait');
     }
-  }, [isSpeedRaceDisabled, gameMode]);
+    // Force speed mode for online play
+    if (isOnlineMode && gameMode === 'wait') {
+      setGameMode('speed');
+    }
+  }, [isSpeedRaceDisabled, isOnlineMode, gameMode]);
 
   const availableMaps = (isMobile ? mobileCache?.maps : desktopCache?.maps) || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);
@@ -596,16 +604,21 @@ const DuelSetup: React.FC<DuelSetupProps> = ({ onStart, onStartOnline, onJoinRoo
             </button>
             
             <button
-              onClick={() => setGameMode('wait')}
-              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                gameMode === 'wait'
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border bg-card'
+              onClick={() => !isTurnBasedDisabled && setGameMode('wait')}
+              disabled={isTurnBasedDisabled}
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all relative ${
+                isTurnBasedDisabled
+                  ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
+                  : gameMode === 'wait'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-card hover:border-primary/50'
               }`}
             >
               <Pause className="h-8 w-8 mb-2 text-blue-500" />
               <span className="font-medium text-sm">Turn-Based</span>
-              <span className="text-xs text-muted-foreground text-center">Wait for both players</span>
+              <span className="text-xs text-muted-foreground text-center">
+                {isTurnBasedDisabled ? 'Not available for online play' : 'Wait for both players'}
+              </span>
             </button>
           </div>
         </CardContent>
