@@ -278,15 +278,18 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
   };
 
   return (
-    <div className={`relative ${isFullscreen ? 'h-screen' : ''}`}>
+    <div className={`relative ${isFullscreen ? 'h-screen w-screen bg-black flex items-center justify-center' : ''}`}>
       {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
       
-      <div className="relative">
+      <div className={`relative ${isFullscreen ? 'w-full h-full flex items-center justify-center' : ''}`}>
         {/* Route Image */}
         <img
           src={currentRoute.imagePath}
           alt={`Route ${currentRoute.candidateIndex}`}
-          className="w-full h-auto"
+          className={isFullscreen 
+            ? 'max-w-full max-h-full w-auto h-auto object-contain' 
+            : 'w-full h-auto'
+          }
           onLoad={() => {
             if (pendingRouteIndex === null) {
               setIsImageLoaded(true);
