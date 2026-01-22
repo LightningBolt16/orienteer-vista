@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAdmin } from '../hooks/useAdmin';
@@ -142,6 +142,17 @@ const Header: React.FC = () => {
                   <span>{t('routeGame')}</span>
                 </Link>
                 
+                <Link 
+                  to="/duel" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/duel') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Swords className="h-5 w-5" />
+                  <span>{t('duelMode') || 'Duel Mode'}</span>
+                </Link>
+                
                 {isAuthenticated && (
                   <Link 
                     to="/my-maps"
@@ -239,6 +250,15 @@ const Header: React.FC = () => {
               <span>{t('routeGame')}</span>
             </Link>
             
+            <Link 
+              to="/duel" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/duel') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <Swords className="h-4 w-4" />
+              <span>{t('duelMode') || 'Duel Mode'}</span>
+            </Link>
             
             <div className="flex items-center space-x-2 ml-4">
               {isAuthenticated && (
