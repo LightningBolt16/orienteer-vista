@@ -10,20 +10,18 @@ import { useCommunityFavorites } from '../../hooks/useCommunityFavorites';
 import { getUniqueMapNames } from '../../utils/routeDataUtils';
 import { 
   Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, 
-  Wifi, Users, Lock, ChevronDown, ChevronUp, Star, MapPin, Check, 
-  Layers, ArrowLeft, ArrowRight, ChevronLeft 
+  Wifi, Users, Lock, ChevronDown, ChevronUp, Star, Check, 
+  Layers, ChevronLeft, Rocket
 } from 'lucide-react';
 import { isPwtMap } from '../PwtAttribution';
 import PwtAttribution from '../PwtAttribution';
 import ScoringInfoDialog from './ScoringInfoDialog';
 import CommunityMapBrowser from '../map/CommunityMapBrowser';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
-import { toast as sonnerToast } from 'sonner';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
 import flagSweden from '@/assets/flag-sweden.png';
 import flagBelgium from '@/assets/flag-belgium.png';
-import { Progress } from '../ui/progress';
 
 const LOGO_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/map-logos`;
 
@@ -67,17 +65,12 @@ const GAME_DURATION_OPTIONS = [
   { label: '10 min', value: 600 },
 ];
 
-type WizardStep = 'playMode' | 'map' | 'gameMode' | 'gameLength' | 'confirm';
-
 const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnline, onJoinRoom, onBack }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useUser();
   const { desktopCache, mobileCache, isPreloading, userMaps, communityMaps } = useRouteCache();
   const { favorites, favoriteMaps, toggleFavorite } = useCommunityFavorites();
-  
-  // Current step
-  const [currentStep, setCurrentStep] = useState<WizardStep>('playMode');
   
   // Settings state
   const [playMode, setPlayMode] = useState<'local' | 'online' | null>(null);
@@ -123,10 +116,6 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   const uniqueUserMapNames = getUniqueMapNames(userMaps);
   const uniqueFavoriteMapNames = favoriteMaps.map(m => m.name);
 
-  const steps: WizardStep[] = ['playMode', 'map', 'gameMode', 'gameLength', 'confirm'];
-  const currentStepIndex = steps.indexOf(currentStep);
-  const progress = ((currentStepIndex + 1) / steps.length) * 100;
-
   const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
     if (multiSelectMode && mapName !== 'all') {
       setSelectedMaps(prev => 
@@ -167,6 +156,19 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
     };
   };
 
+  const buildQuickPlaySettings = (): DuelSettings => {
+    return {
+      mapId: 'all',
+      mapCategory: 'official',
+      gameType: 'routes',
+      routeCount: 10,
+      gameMode: playMode === 'online' ? 'speed' : 'speed',
+      timeLimit: undefined,
+      playerName: playerName.trim() || undefined,
+      maxPlayers: 2,
+    };
+  };
+
   const handleStart = () => {
     onStart(buildSettings());
   };
@@ -178,91 +180,68 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
     });
   };
 
+  const handleQuickPlay = () => {
+    if (playMode === 'online') {
+      onStartOnline({
+        ...buildQuickPlaySettings(),
+        isOnline: true,
+      });
+    } else {
+      onStart(buildQuickPlaySettings());
+    }
+  };
+
   const handleJoinRoom = () => {
     onJoinRoom(playerName.trim() || 'Player');
   };
 
-  const canProceed = (): boolean => {
-    switch (currentStep) {
-      case 'playMode':
-        return playMode !== null;
-      case 'map':
-        return multiSelectMode ? selectedMaps.length > 0 : selectedMapId !== '';
-      case 'gameMode':
-        return true;
-      case 'gameLength':
-        if (gameType === 'routes' && isCustomRoutes && !customRouteCount) return false;
-        if (gameType === 'timed' && isCustomDuration && !customDuration) return false;
-        return true;
-      case 'confirm':
-        return true;
-      default:
-        return false;
-    }
-  };
-
-  const goNext = () => {
-    const nextIndex = currentStepIndex + 1;
-    if (nextIndex < steps.length) {
-      setCurrentStep(steps[nextIndex]);
-    }
-  };
-
-  const goBack = () => {
-    if (currentStepIndex === 0) {
-      onBack();
-    } else {
-      setCurrentStep(steps[currentStepIndex - 1]);
-    }
-  };
-
-  const getStepTitle = () => {
-    switch (currentStep) {
-      case 'playMode': return 'Choose Play Mode';
-      case 'map': return 'Select Map';
-      case 'gameMode': return 'Game Mode';
-      case 'gameLength': return 'Game Length';
-      case 'confirm': return 'Ready to Duel!';
-    }
-  };
+  // Determine which steps are unlocked
+  const isMapStepUnlocked = playMode !== null;
+  const isGameModeStepUnlocked = isMapStepUnlocked && (multiSelectMode ? selectedMaps.length > 0 : selectedMapId !== '');
+  const isGameLengthStepUnlocked = isGameModeStepUnlocked;
+  const isConfirmStepUnlocked = isGameLengthStepUnlocked && (
+    gameType === 'routes' 
+      ? (!isCustomRoutes || customRouteCount !== '')
+      : (!isCustomDuration || customDuration !== '')
+  );
 
   const renderPlayModeStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Play Mode</CardTitle>
+    <Card className="transition-all duration-300">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Step 1: Play Mode</CardTitle>
         <CardDescription>Choose how you want to duel</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setPlayMode('local')}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all hover:border-primary/50 ${
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
               playMode === 'local'
                 ? 'border-primary bg-primary/10'
                 : 'border-border bg-card'
             }`}
           >
-            <Users className="h-10 w-10 mb-3 text-primary" />
-            <span className="font-medium">Local</span>
-            <span className="text-sm text-muted-foreground">Same device</span>
+            <Users className="h-8 w-8 mb-2 text-primary" />
+            <span className="font-medium text-sm">Local</span>
+            <span className="text-xs text-muted-foreground">Same device</span>
           </button>
           
           <button
             onClick={() => setPlayMode('online')}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all hover:border-primary/50 ${
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
               playMode === 'online'
                 ? 'border-primary bg-primary/10'
                 : 'border-border bg-card'
             }`}
           >
-            <Wifi className="h-10 w-10 mb-3 text-green-500" />
-            <span className="font-medium">Online</span>
-            <span className="text-sm text-muted-foreground">Play remotely</span>
+            <Wifi className="h-8 w-8 mb-2 text-green-500" />
+            <span className="font-medium text-sm">Online</span>
+            <span className="text-xs text-muted-foreground">Play remotely</span>
           </button>
         </div>
 
         {playMode === 'online' && (
-          <div className="space-y-3 pt-4 border-t border-border">
+          <div className="space-y-3 pt-3 border-t border-border">
             <Input 
               placeholder="Enter your name"
               value={playerName}
@@ -280,14 +259,30 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
             </Button>
           </div>
         )}
+
+        {/* Quick Play button appears after selecting play mode */}
+        {playMode !== null && (
+          <div className="pt-3 border-t border-border">
+            <Button 
+              onClick={handleQuickPlay}
+              variant="secondary"
+              className="w-full gap-2"
+              disabled={isPreloading}
+            >
+              <Rocket className="h-4 w-4" />
+              Quick Play
+              <span className="text-xs text-muted-foreground ml-1">(Default settings)</span>
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 
   const renderMapStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Select Map</CardTitle>
+    <Card className={`transition-all duration-300 ${!isMapStepUnlocked ? 'opacity-50 pointer-events-none' : ''}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Step 2: Select Map</CardTitle>
         <CardDescription>Choose a map for the duel</CardDescription>
       </CardHeader>
       <CardContent>
@@ -297,7 +292,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
             Loading maps...
           </div>
         ) : uniqueMapNames.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Multi-Select Toggle */}
             <div className="flex items-center justify-between gap-3">
               <Button
@@ -318,19 +313,18 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
             </div>
 
             {/* Official Maps Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[40vh] overflow-y-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[35vh] overflow-y-auto">
               {!multiSelectMode && (
                 <button
                   onClick={() => handleMapSelect('all', 'official')}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                  className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 ${
                     selectedMapId === 'all' && selectedMapCategory === 'official'
                       ? 'border-primary bg-primary/10'
                       : 'border-border bg-card'
                   }`}
                 >
-                  <Shuffle className="h-8 w-8 mb-2 text-primary" />
-                  <span className="font-medium text-sm">All Maps</span>
-                  <span className="text-xs text-muted-foreground">Random mix</span>
+                  <Shuffle className="h-6 w-6 mb-1 text-primary" />
+                  <span className="font-medium text-xs">All Maps</span>
                 </button>
               )}
               
@@ -348,7 +342,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   <button
                     key={mapName}
                     onClick={() => handleMapSelect(mapName, 'official')}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
                       isMultiSelected || isSingleSelected
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-card'
@@ -356,24 +350,24 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   >
                     {multiSelectMode && isMultiSelected && (
                       <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
-                        <Check className="h-3 w-3 text-primary-foreground" />
+                        <Check className="h-2.5 w-2.5 text-primary-foreground" />
                       </div>
                     )}
                     {countryFlag && (
                       <img 
                         src={countryFlag} 
                         alt="Country flag" 
-                        className="absolute top-1 right-1 h-4 w-6 object-cover rounded-sm shadow-sm"
+                        className="absolute top-1 right-1 h-3 w-5 object-cover rounded-sm shadow-sm"
                       />
                     )}
                     {isPwt ? (
-                      <PwtAttribution variant="badge" className="mb-2" />
+                      <PwtAttribution variant="badge" className="mb-1" />
                     ) : (isKnivsta || isEkeby) ? (
-                      <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-8 w-8 mb-2 object-contain" />
+                      <img src={kartkompanietLogo} alt="Kartkompaniet" className="h-6 w-6 mb-1 object-contain" />
                     ) : (
-                      <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                      <Map className="h-6 w-6 mb-1 text-muted-foreground" />
                     )}
-                    <span className="font-medium text-sm">{mapName}</span>
+                    <span className="font-medium text-xs">{mapName}</span>
                   </button>
                 );
               })}
@@ -383,17 +377,17 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
             {user && uniqueUserMapNames.length > 0 && (
               <Collapsible open={privateMapsOpen} onOpenChange={setPrivateMapsOpen}>
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                  <Button variant="ghost" className="w-full justify-between p-2 h-auto border rounded-lg text-sm">
                     <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-muted-foreground" />
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="font-medium">Private Maps</span>
                       <span className="text-xs text-muted-foreground">({uniqueUserMapNames.length})</span>
                     </div>
                     {privateMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <CollapsibleContent className="pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {uniqueUserMapNames.map(mapName => {
                       const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                       const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'private';
@@ -401,17 +395,17 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                         <button
                           key={mapName}
                           onClick={() => handleMapSelect(mapName, 'private')}
-                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
                             isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                           }`}
                         >
                           {multiSelectMode && isMultiSelected && (
                             <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
-                              <Check className="h-3 w-3 text-primary-foreground" />
+                              <Check className="h-2.5 w-2.5 text-primary-foreground" />
                             </div>
                           )}
-                          <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                          <span className="font-medium text-sm">{mapName}</span>
+                          <Map className="h-6 w-6 mb-1 text-muted-foreground" />
+                          <span className="font-medium text-xs">{mapName}</span>
                         </button>
                       );
                     })}
@@ -423,9 +417,9 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
             {/* Community Maps Collapsible */}
             <Collapsible open={communityMapsOpen} onOpenChange={setCommunityMapsOpen}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                <Button variant="ghost" className="w-full justify-between p-2 h-auto border rounded-lg text-sm">
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="font-medium">Community Maps</span>
                     <span className="text-xs text-muted-foreground">
                       ({uniqueFavoriteMapNames.length} favorite{uniqueFavoriteMapNames.length !== 1 ? 's' : ''})
@@ -434,8 +428,8 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   {communityMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <div className="mb-4">
+              <CollapsibleContent className="pt-2">
+                <div className="mb-3">
                   <CommunityMapBrowser 
                     onSelectMap={(mapName) => handleMapSelect(mapName, 'community')}
                     selectedMapName={selectedMapCategory === 'community' ? (selectedMapId === 'all' ? undefined : selectedMapId) : undefined}
@@ -445,27 +439,26 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                 </div>
                 
                 {uniqueFavoriteMapNames.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {uniqueFavoriteMapNames.map(mapName => {
-                      const mapSource = communityMaps.find(m => m.name === mapName);
                       const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                       const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'community';
                       return (
                         <button
                           key={mapName}
                           onClick={() => handleMapSelect(mapName, 'community')}
-                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
                             isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                           }`}
                         >
                           {multiSelectMode && isMultiSelected && (
                             <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
-                              <Check className="h-3 w-3 text-primary-foreground" />
+                              <Check className="h-2.5 w-2.5 text-primary-foreground" />
                             </div>
                           )}
-                          <Star className="absolute top-1 right-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <Users className="h-8 w-8 mb-2 text-muted-foreground" />
-                          <span className="font-medium text-sm">{mapName}</span>
+                          <Star className="absolute top-1 right-1 h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          <Users className="h-6 w-6 mb-1 text-muted-foreground" />
+                          <span className="font-medium text-xs">{mapName}</span>
                         </button>
                       );
                     })}
@@ -485,20 +478,20 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   );
 
   const renderGameModeStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          Game Mode
+    <Card className={`transition-all duration-300 ${!isGameModeStepUnlocked ? 'opacity-50 pointer-events-none' : ''}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          Step 3: Game Mode
           <ScoringInfoDialog gameMode={gameMode} gameType={gameType} isOnline={playMode === 'online'} />
         </CardTitle>
         <CardDescription>How do you want to compete?</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => !isSpeedRaceDisabled && setGameMode('speed')}
             disabled={isSpeedRaceDisabled}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all relative ${
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all relative ${
               isSpeedRaceDisabled
                 ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
                 : gameMode === 'speed'
@@ -506,17 +499,17 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   : 'border-border bg-card hover:border-primary/50'
             }`}
           >
-            <Zap className="h-10 w-10 mb-3 text-yellow-500" />
-            <span className="font-medium">Speed Race</span>
+            <Zap className="h-8 w-8 mb-2 text-yellow-500" />
+            <span className="font-medium text-sm">Speed Race</span>
             <span className="text-xs text-muted-foreground text-center mt-1">
-              {isSpeedRaceDisabled ? 'Not available on mobile Local' : 'Fastest answer wins bonus'}
+              {isSpeedRaceDisabled ? 'Not on mobile' : 'Fastest wins bonus'}
             </span>
           </button>
           
           <button
             onClick={() => !isTurnBasedDisabled && setGameMode('wait')}
             disabled={isTurnBasedDisabled}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all relative ${
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all relative ${
               isTurnBasedDisabled
                 ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
                 : gameMode === 'wait'
@@ -524,27 +517,27 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   : 'border-border bg-card hover:border-primary/50'
             }`}
           >
-            <Pause className="h-10 w-10 mb-3 text-blue-500" />
-            <span className="font-medium">Turn-Based</span>
+            <Pause className="h-8 w-8 mb-2 text-blue-500" />
+            <span className="font-medium text-sm">Turn-Based</span>
             <span className="text-xs text-muted-foreground text-center mt-1">
-              {isTurnBasedDisabled ? 'Not available for online' : 'Wait for both players'}
+              {isTurnBasedDisabled ? 'Not for online' : 'Wait for both'}
             </span>
           </button>
         </div>
 
         {/* Time Limit per Route */}
         {gameType === 'routes' && (
-          <div className="space-y-3 pt-4 border-t">
-            <p className="text-sm font-medium text-center flex items-center justify-center gap-2">
-              <Timer className="h-4 w-4" />
+          <div className="space-y-2 pt-3 border-t">
+            <p className="text-xs font-medium text-center flex items-center justify-center gap-1">
+              <Timer className="h-3.5 w-3.5" />
               Time Limit per Route (optional)
             </p>
-            <div className="flex flex-wrap gap-2 justify-center">
+            <div className="flex flex-wrap gap-1.5 justify-center">
               {TIME_PER_ROUTE_OPTIONS.map(option => (
                 <button
                   key={option.label}
                   onClick={() => setTimeLimit(option.value)}
-                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-all hover:border-primary/50 ${
+                  className={`px-3 py-1.5 rounded-lg border-2 text-sm font-medium transition-all hover:border-primary/50 ${
                     timeLimit === option.value
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-card'
@@ -561,47 +554,47 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   );
 
   const renderGameLengthStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Game Length
+    <Card className={`transition-all duration-300 ${!isGameLengthStepUnlocked ? 'opacity-50 pointer-events-none' : ''}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="h-4 w-4" />
+          Step 4: Game Length
         </CardTitle>
         <CardDescription>Choose fixed routes or time-based challenge</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setGameType('routes')}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all hover:border-primary/50 ${
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
               gameType === 'routes'
                 ? 'border-primary bg-primary/10'
                 : 'border-border bg-card'
             }`}
           >
-            <Map className="h-10 w-10 mb-3 text-green-500" />
-            <span className="font-medium">Fixed Routes</span>
-            <span className="text-xs text-muted-foreground">Set number of routes</span>
+            <Map className="h-8 w-8 mb-2 text-green-500" />
+            <span className="font-medium text-sm">Fixed Routes</span>
+            <span className="text-xs text-muted-foreground">Set number</span>
           </button>
           
           <button
             onClick={() => setGameType('timed')}
-            className={`flex flex-col items-center justify-center p-6 rounded-lg border-2 transition-all hover:border-primary/50 ${
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
               gameType === 'timed'
                 ? 'border-primary bg-primary/10'
                 : 'border-border bg-card'
             }`}
           >
-            <Timer className="h-10 w-10 mb-3 text-orange-500" />
-            <span className="font-medium">Time Challenge</span>
-            <span className="text-xs text-muted-foreground">Race against the clock</span>
+            <Timer className="h-8 w-8 mb-2 text-orange-500" />
+            <span className="font-medium text-sm">Time Challenge</span>
+            <span className="text-xs text-muted-foreground">Race the clock</span>
           </button>
         </div>
 
         {gameType === 'routes' && (
-          <div className="space-y-3 pt-4 border-t">
-            <p className="text-sm font-medium text-center">Number of Routes</p>
-            <div className="flex flex-wrap gap-2 justify-center">
+          <div className="space-y-2 pt-3 border-t">
+            <p className="text-xs font-medium text-center">Number of Routes</p>
+            <div className="flex flex-wrap gap-1.5 justify-center">
               {ROUTE_COUNT_OPTIONS.map(count => (
                 <button
                   key={count}
@@ -609,7 +602,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                     setSelectedRouteCount(count);
                     setIsCustomRoutes(false);
                   }}
-                  className={`px-4 py-2 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                  className={`px-3 py-1.5 rounded-lg border-2 text-sm font-bold transition-all hover:border-primary/50 ${
                     !isCustomRoutes && selectedRouteCount === count
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-card'
@@ -620,7 +613,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
               ))}
               <button
                 onClick={() => setIsCustomRoutes(true)}
-                className={`px-4 py-2 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                className={`px-3 py-1.5 rounded-lg border-2 text-sm font-bold transition-all hover:border-primary/50 ${
                   isCustomRoutes
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-card'
@@ -639,7 +632,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   placeholder="Enter number (1-200)"
                   value={customRouteCount}
                   onChange={(e) => setCustomRouteCount(e.target.value)}
-                  className="w-48 text-center"
+                  className="w-40 text-center text-sm"
                 />
               </div>
             )}
@@ -647,9 +640,9 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
         )}
 
         {gameType === 'timed' && (
-          <div className="space-y-3 pt-4 border-t">
-            <p className="text-sm font-medium text-center">Game Duration</p>
-            <div className="flex flex-wrap gap-2 justify-center">
+          <div className="space-y-2 pt-3 border-t">
+            <p className="text-xs font-medium text-center">Game Duration</p>
+            <div className="flex flex-wrap gap-1.5 justify-center">
               {GAME_DURATION_OPTIONS.map(option => (
                 <button
                   key={option.value}
@@ -657,7 +650,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                     setSelectedDuration(option.value);
                     setIsCustomDuration(false);
                   }}
-                  className={`px-4 py-2 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                  className={`px-3 py-1.5 rounded-lg border-2 text-sm font-bold transition-all hover:border-primary/50 ${
                     !isCustomDuration && selectedDuration === option.value
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-card'
@@ -668,7 +661,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
               ))}
               <button
                 onClick={() => setIsCustomDuration(true)}
-                className={`px-4 py-2 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                className={`px-3 py-1.5 rounded-lg border-2 text-sm font-bold transition-all hover:border-primary/50 ${
                   isCustomDuration
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-card'
@@ -687,7 +680,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                   placeholder="Seconds (10-3600)"
                   value={customDuration}
                   onChange={(e) => setCustomDuration(e.target.value)}
-                  className="w-48 text-center"
+                  className="w-40 text-center text-sm"
                 />
               </div>
             )}
@@ -710,29 +703,29 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
         : selectedMapId;
     
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Swords className="h-5 w-5 text-primary" />
-            Ready to Duel!
+      <Card className={`transition-all duration-300 ${!isConfirmStepUnlocked ? 'opacity-50 pointer-events-none' : ''}`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Swords className="h-4 w-4 text-primary" />
+            Step 5: Ready to Duel!
           </CardTitle>
-          <CardDescription>Review your settings</CardDescription>
+          <CardDescription>Review and start</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between py-2 border-b">
+        <CardContent className="space-y-3">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground">Mode</span>
               <span className="font-medium">{playMode === 'online' ? 'Online' : 'Local'}</span>
             </div>
-            <div className="flex justify-between py-2 border-b">
+            <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground">Map</span>
               <span className="font-medium">{mapDisplay}</span>
             </div>
-            <div className="flex justify-between py-2 border-b">
+            <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground">Game Mode</span>
               <span className="font-medium">{gameMode === 'speed' ? 'Speed Race' : 'Turn-Based'}</span>
             </div>
-            <div className="flex justify-between py-2 border-b">
+            <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground">Game Type</span>
               <span className="font-medium">
                 {gameType === 'routes' 
@@ -741,7 +734,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
               </span>
             </div>
             {timeLimit && (
-              <div className="flex justify-between py-2 border-b">
+              <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground">Time per Route</span>
                 <span className="font-medium">{timeLimit}s</span>
               </div>
@@ -750,25 +743,25 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
 
           {/* Online mode: Player count & name at bottom */}
           {playMode === 'online' && (
-            <div className="space-y-4 pt-4 border-t">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-center">Your Name</p>
+            <div className="space-y-3 pt-3 border-t">
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-center">Your Name</p>
                 <Input 
                   placeholder="Enter your name"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  className="text-center"
+                  className="text-center text-sm"
                 />
               </div>
               
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-center">Number of Players</p>
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-center">Number of Players</p>
                 <div className="flex justify-center gap-2">
                   {[2, 3, 4].map(count => (
                     <button
                       key={count}
                       onClick={() => setMaxPlayers(count)}
-                      className={`px-6 py-2 rounded-lg border-2 font-bold transition-all hover:border-primary/50 ${
+                      className={`px-5 py-1.5 rounded-lg border-2 text-sm font-bold transition-all hover:border-primary/50 ${
                         maxPlayers === count
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border bg-card'
@@ -783,10 +776,10 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
               <Button 
                 onClick={handleStartOnlineRoom} 
                 className="w-full" 
-                size="lg"
+                size="default"
                 disabled={isPreloading}
               >
-                <Wifi className="h-5 w-5 mr-2" />
+                <Wifi className="h-4 w-4 mr-2" />
                 Create Online Room
               </Button>
             </div>
@@ -796,10 +789,10 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
             <Button 
               onClick={handleStart} 
               className="w-full" 
-              size="lg"
+              size="default"
               disabled={isPreloading}
             >
-              <Users className="h-5 w-5 mr-2" />
+              <Users className="h-4 w-4 mr-2" />
               Start Local Duel
             </Button>
           )}
@@ -808,52 +801,48 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
     );
   };
 
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 'playMode': return renderPlayModeStep();
-      case 'map': return renderMapStep();
-      case 'gameMode': return renderGameModeStep();
-      case 'gameLength': return renderGameLengthStep();
-      case 'confirm': return renderConfirmStep();
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header with back button */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={goBack}>
+          <Button variant="ghost" size="icon" onClick={onBack}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
             <h1 className="text-lg font-semibold flex items-center gap-2">
               <Swords className="h-5 w-5 text-primary" />
-              {getStepTitle()}
+              Duel Setup
             </h1>
-            <p className="text-xs text-muted-foreground">
-              Step {currentStepIndex + 1} of {steps.length}
-            </p>
           </div>
         </div>
-        <Progress value={progress} className="h-1" />
       </div>
 
-      {/* Content */}
-      <div className="max-w-2xl mx-auto p-4 space-y-6">
-        {renderCurrentStep()}
-
-        {/* Navigation buttons (except on confirm step which has its own) */}
-        {currentStep !== 'confirm' && (
-          <div className="flex justify-end">
-            <Button 
-              onClick={goNext} 
-              disabled={!canProceed()}
-              className="gap-2"
-            >
-              Next
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+      {/* Stacked Steps Content */}
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        {renderPlayModeStep()}
+        
+        {isMapStepUnlocked && (
+          <div className="animate-fade-in">
+            {renderMapStep()}
+          </div>
+        )}
+        
+        {isGameModeStepUnlocked && (
+          <div className="animate-fade-in">
+            {renderGameModeStep()}
+          </div>
+        )}
+        
+        {isGameLengthStepUnlocked && (
+          <div className="animate-fade-in">
+            {renderGameLengthStep()}
+          </div>
+        )}
+        
+        {isConfirmStepUnlocked && (
+          <div className="animate-fade-in">
+            {renderConfirmStep()}
           </div>
         )}
       </div>
