@@ -102,6 +102,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       profile: 'Profile',
       guest: 'Guest',
       signOut: 'Sign Out',
+      duel: 'Duel',
       
       // Route Game
       excellent: 'Excellent',

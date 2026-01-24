@@ -150,7 +150,7 @@ const Header: React.FC = () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Swords className="h-5 w-5" />
-                  <span>{t('duelMode') || 'Duel Mode'}</span>
+                  <span>{t('duel')}</span>
                 </Link>
                 
                 {isAuthenticated && (
@@ -257,7 +257,7 @@ const Header: React.FC = () => {
               }`}
             >
               <Swords className="h-4 w-4" />
-              <span>{t('duelMode') || 'Duel Mode'}</span>
+              <span>{t('duel')}</span>
             </Link>
             
             <div className="flex items-center space-x-2 ml-4">
