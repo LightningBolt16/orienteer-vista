@@ -577,6 +577,46 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
       .eq('id', room.id);
   }, [room]);
 
+  // Restart the game with new routes (host only)
+  const restartGame = useCallback(async (newRoutes: RouteData[]) => {
+    if (!room || !isHost) return false;
+
+    try {
+      console.log('[OnlineDuel] Restarting game with new routes');
+      const { data, error } = await supabase
+        .from('duel_rooms')
+        .update({
+          status: 'playing',
+          routes: newRoutes as any,
+          current_route_index: 0,
+          host_score: 0,
+          guest_score: 0,
+          player_3_score: 0,
+          player_4_score: 0,
+          game_started_at: new Date().toISOString(),
+        })
+        .eq('id', room.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('[OnlineDuel] Game restarted successfully');
+      const updatedRoom = data as unknown as OnlineDuelRoom;
+      setRoom(updatedRoom);
+      previousStatusRef.current = 'playing';
+      onGameStart?.(updatedRoom);
+      return true;
+    } catch (err) {
+      console.error('[OnlineDuel] Error restarting game:', err);
+      toast({
+        title: 'Failed to restart game',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [room, isHost, toast, onGameStart]);
+
   return {
     room,
     isHost,
@@ -591,6 +631,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
     submitAnswer,
     leaveRoom,
     finishGame,
+    restartGame,
     subscribeToRoom,
     refetchRoom,
     canStartGame,

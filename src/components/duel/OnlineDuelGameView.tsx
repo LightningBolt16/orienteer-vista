@@ -20,6 +20,7 @@ interface OnlineDuelGameViewProps {
   onAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => Promise<void>;
   onExit: () => void;
   onFinishGame: () => Promise<void>;
+  onRematch?: () => void;
 }
 
 const PRELOAD_AHEAD_COUNT = 5;
@@ -39,6 +40,7 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   onAnswer,
   onExit,
   onFinishGame,
+  onRematch,
 }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -239,10 +241,18 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
             })}
           </div>
 
-          <Button onClick={onExit} className="w-full">
-            <Home className="h-4 w-4 mr-2" />
-            Exit
-          </Button>
+          <div className="flex gap-4">
+            <Button variant="outline" onClick={onExit} className="flex-1">
+              <Home className="h-4 w-4 mr-2" />
+              Exit
+            </Button>
+            {playerSlot === 'host' && onRematch && (
+              <Button onClick={onRematch} className="flex-1">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Rematch
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
