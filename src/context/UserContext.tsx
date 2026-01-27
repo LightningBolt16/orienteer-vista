@@ -362,7 +362,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         await supabaseManager.executeWithRetry(
           async () => {
-            const { error } = await (supabase
+            console.log('[UserContext] Updating user profile:', {
+              userId: user.id,
+              accuracy: newAccuracy,
+              speed: newSpeed,
+              alltimeTotal: newAlltimeTotal
+            });
+            
+            const { data, error } = await (supabase
               .from('user_profiles' as any)
               .update({
                 accuracy: newAccuracy,
@@ -377,11 +384,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 alltime_time_sum: newAlltimeTimeSum,
                 updated_at: new Date().toISOString()
               })
-              .eq('user_id', user.id) as any);
+              .eq('user_id', user.id)
+              .select()
+              .single() as any);
               
             if (error) {
+              console.error('[UserContext] Failed to update user profile:', error);
               throw error;
             }
+            
+            console.log('[UserContext] User profile updated successfully:', data);
+            return data;
           },
           'Update user performance'
         );

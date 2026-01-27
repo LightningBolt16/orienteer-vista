@@ -148,7 +148,16 @@ const DuelMode: React.FC = () => {
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
       const selectedRoutes = shuffled.slice(0, settings.routeCount);
       
-      setGameRoutes(selectedRoutes);
+      // For online mode, update the room in database
+      if (settings.isOnline && onlineDuel.restartGame) {
+        const success = await onlineDuel.restartGame(selectedRoutes);
+        if (success) {
+          setGameRoutes(selectedRoutes);
+        }
+      } else {
+        // Local mode - just update local state
+        setGameRoutes(selectedRoutes);
+      }
     } catch (error) {
       console.error('Failed to reload routes:', error);
     }

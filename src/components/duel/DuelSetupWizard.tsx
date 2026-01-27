@@ -74,7 +74,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   
   // Settings state
   const [playMode, setPlayMode] = useState<'local' | 'online' | null>(null);
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(user?.name || '');
   const [maxPlayers, setMaxPlayers] = useState<number>(2);
   const [selectedMapId, setSelectedMapId] = useState<string>('all');
   const [selectedMapCategory, setSelectedMapCategory] = useState<MapCategory>('official');
@@ -110,6 +110,13 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
       setGameMode('speed');
     }
   }, [isSpeedRaceDisabled, isOnlineMode, gameMode]);
+
+  // Pre-fill player name for logged-in users
+  useEffect(() => {
+    if (user?.name && !playerName) {
+      setPlayerName(user.name);
+    }
+  }, [user?.name]);
 
   const availableMaps = (isMobile ? mobileCache?.maps : desktopCache?.maps) || [];
   const uniqueMapNames = getUniqueMapNames(availableMaps);

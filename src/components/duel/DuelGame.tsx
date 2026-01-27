@@ -19,6 +19,7 @@ interface OnlineDuelHook {
   playerId: string | null;
   submitAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => Promise<void>;
   finishGame: () => Promise<void>;
+  restartGame?: (newRoutes: RouteData[]) => Promise<boolean>;
 }
 
 interface DuelGameProps {
@@ -446,6 +447,7 @@ const DuelGame: React.FC<DuelGameProps> = ({ routes, totalRoutes, settings, onEx
         onAnswer={onlineDuel.submitAnswer}
         onExit={onExit}
         onFinishGame={onlineDuel.finishGame}
+        onRematch={onRestart}
       />
     );
   }
