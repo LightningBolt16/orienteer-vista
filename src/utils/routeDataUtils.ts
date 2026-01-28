@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export type SourceAspect = '1:1' | '16_9' | '9_16';
+
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';  // Legacy: for 2-route scenarios
@@ -11,6 +13,7 @@ export interface RouteData {
   mainRouteIndex?: number;     // Index of main route in the sorted array (0-based, left to right)
   mapName?: string;
   imagePath?: string;
+  sourceAspect?: SourceAspect;  // The aspect ratio of the source image
 }
 
 export interface MapSource {
@@ -293,15 +296,26 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
 
   // Try database first for DB maps
   if (mapSource.isDbMap || await isDbMap(mapSource.id)) {
+    // First, check if map has 1:1 format images (preferred for adaptive cropping)
+    const { data: check1to1 } = await supabase
+      .from('route_images')
+      .select('id')
+      .eq('map_id', mapSource.id)
+      .eq('aspect_ratio', '1:1')
+      .limit(1);
+
+    const use1to1 = check1to1 && check1to1.length > 0;
+    const queryAspect = use1to1 ? '1:1' : mapSource.aspect;
+
     const { data: dbRoutes, error } = await supabase
       .from('route_images')
-      .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path')
+      .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path, aspect_ratio')
       .eq('map_id', mapSource.id)
-      .eq('aspect_ratio', mapSource.aspect)
+      .eq('aspect_ratio', queryAspect)
       .order('candidate_index');
 
     if (!error && dbRoutes && dbRoutes.length > 0) {
-      console.log(`Loaded ${dbRoutes.length} routes from database for ${mapSource.name} (${mapSource.aspect})`);
+      console.log(`Loaded ${dbRoutes.length} routes from database for ${mapSource.name} (${queryAspect})`);
       
       const routes = dbRoutes.map(route => {
         // User maps have paths like "userId/mapId/aspect/file.webp"
@@ -324,6 +338,11 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
         // For multi-route, we use the mainRouteIndex
         const shortestSide: 'left' | 'right' = route.shortest_side === 'left' ? 'left' : 'right';
         
+        // Determine source aspect from the actual stored aspect ratio
+        const sourceAspect: SourceAspect = route.aspect_ratio === '1:1' ? '1:1' : 
+          (route.aspect_ratio.includes('16') && route.aspect_ratio.includes('9') ? 
+            (route.aspect_ratio.includes('16_9') || route.aspect_ratio === '16:9' ? '16_9' : '9_16') : '16_9');
+        
         return {
           candidateIndex: route.candidate_index,
           shortestSide,
@@ -335,6 +354,7 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
           mainRouteIndex,
           mapName: mapSource.name,
           imagePath: `${baseUrl}/${route.image_path}`,
+          sourceAspect,
         };
       });
 

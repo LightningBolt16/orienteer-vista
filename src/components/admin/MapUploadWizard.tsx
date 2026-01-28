@@ -1,12 +1,14 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, CheckCircle, XCircle, Loader2, FolderOpen, FileText, Image, Globe, Flag } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Upload, CheckCircle, XCircle, Loader2, FolderOpen, FileText, Image, Globe, Flag, Square, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useMapUpload } from '@/hooks/useMapUpload';
+import { Input } from '@/components/ui/input';
+import { useMapUpload, ImageFormat } from '@/hooks/useMapUpload';
 import { toast } from '@/components/ui/use-toast';
+import MapVersionComparison from './MapVersionComparison';
 
 interface FolderValidation {
   isValid: boolean;
@@ -14,6 +16,8 @@ interface FolderValidation {
   csvFile: File | null;
   images16_9: File[];
   images9_16: File[];
+  images1_1: File[];
+  imageFormat: ImageFormat;
   parsedRoutes: Array<{
     candidateIndex: number;
     mainSide: string;
@@ -21,6 +25,12 @@ interface FolderValidation {
     altLength: number;
   }>;
   errors: string[];
+}
+
+interface ExistingMapInfo {
+  id: string;
+  name: string;
+  routeCount: number;
 }
 
 // Common orienteering countries
@@ -59,13 +69,17 @@ const MAP_TYPES = [
   { value: 'park', label: 'Park' },
 ];
 
+type WizardStep = 'select' | 'validate' | 'compare' | 'upload' | 'complete';
+
 const MapUploadWizard: React.FC = () => {
-  const [step, setStep] = useState<'select' | 'validate' | 'upload' | 'complete'>('select');
+  const [step, setStep] = useState<WizardStep>('select');
   const [validation, setValidation] = useState<FolderValidation | null>(null);
   const [countryCode, setCountryCode] = useState<string>('');
   const [mapType, setMapType] = useState<string>('forest');
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const { progress, validateFolder, uploadMap, reset } = useMapUpload();
+  const [existingMap, setExistingMap] = useState<ExistingMapInfo | null>(null);
+  const [newMapName, setNewMapName] = useState<string>('');
+  const { progress, validateFolder, checkExistingMap, uploadMap, reset } = useMapUpload();
 
   const handleFolderSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -74,6 +88,7 @@ const MapUploadWizard: React.FC = () => {
     setStep('validate');
     const result = await validateFolder(files);
     setValidation(result);
+    setNewMapName(result.mapName);
   }, [validateFolder]);
 
   const handleLogoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,20 +98,40 @@ const MapUploadWizard: React.FC = () => {
     }
   }, []);
 
-  const handleUpload = useCallback(async () => {
+  const handleProceedToUpload = useCallback(async () => {
+    if (!validation || !validation.isValid) return;
+
+    // Check if map with same name exists
+    const existing = await checkExistingMap(validation.mapName);
+    
+    if (existing) {
+      setExistingMap(existing);
+      setStep('compare');
+    } else {
+      // No existing map, proceed directly to upload
+      handleUpload();
+    }
+  }, [validation, checkExistingMap]);
+
+  const handleUpload = useCallback(async (replaceMapId?: string) => {
     if (!validation || !validation.isValid) return;
 
     setStep('upload');
     try {
-      await uploadMap(validation, {
+      // If renaming, update the validation object
+      const uploadValidation = newMapName !== validation.mapName 
+        ? { ...validation, mapName: newMapName }
+        : validation;
+
+      await uploadMap(uploadValidation, {
         countryCode: countryCode || undefined,
         mapType: mapType || 'forest',
         logoFile: logoFile || undefined,
-      });
+      }, replaceMapId);
       setStep('complete');
       toast({
         title: 'Upload Complete',
-        description: `Successfully uploaded ${validation.mapName} with ${validation.parsedRoutes.length} routes.`
+        description: `Successfully uploaded ${uploadValidation.mapName} with ${validation.parsedRoutes.length} routes.`
       });
     } catch (error) {
       toast({
@@ -105,7 +140,24 @@ const MapUploadWizard: React.FC = () => {
         variant: 'destructive'
       });
     }
-  }, [validation, uploadMap, countryCode, mapType, logoFile]);
+  }, [validation, uploadMap, countryCode, mapType, logoFile, newMapName]);
+
+  const handleReplace = useCallback(() => {
+    if (existingMap) {
+      handleUpload(existingMap.id);
+    }
+  }, [existingMap, handleUpload]);
+
+  const handleRename = useCallback(() => {
+    // Go back to validate step to let user rename
+    setStep('validate');
+    setExistingMap(null);
+  }, []);
+
+  const handleCompareCancel = useCallback(() => {
+    setStep('validate');
+    setExistingMap(null);
+  }, []);
 
   const handleReset = useCallback(() => {
     setStep('select');
@@ -113,6 +165,8 @@ const MapUploadWizard: React.FC = () => {
     setCountryCode('');
     setMapType('forest');
     setLogoFile(null);
+    setExistingMap(null);
+    setNewMapName('');
     reset();
   }, [reset]);
 
@@ -120,22 +174,25 @@ const MapUploadWizard: React.FC = () => {
     ? Math.round((progress.current / progress.total) * 100) 
     : 0;
 
+  const steps: WizardStep[] = ['select', 'validate', 'compare', 'upload', 'complete'];
+  const stepLabels = ['Select', 'Validate', 'Compare', 'Upload', 'Done'];
+
   return (
     <div className="space-y-6">
       {/* Step Indicator */}
       <div className="flex items-center justify-center gap-2">
-        {['select', 'validate', 'upload', 'complete'].map((s, i) => (
+        {steps.map((s, i) => (
           <React.Fragment key={s}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
               step === s 
                 ? 'bg-primary text-primary-foreground' 
-                : ['select', 'validate', 'upload', 'complete'].indexOf(step) > i
+                : steps.indexOf(step) > i
                   ? 'bg-primary/20 text-primary'
                   : 'bg-muted text-muted-foreground'
             }`}>
               {i + 1}
             </div>
-            {i < 3 && <div className="w-12 h-0.5 bg-muted" />}
+            {i < steps.length - 1 && <div className="w-8 h-0.5 bg-muted" />}
           </React.Fragment>
         ))}
       </div>
@@ -153,16 +210,34 @@ const MapUploadWizard: React.FC = () => {
             <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary/50 transition-colors">
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-sm text-muted-foreground mb-2">
-                Select a folder with the following structure:
+                Select a folder with one of these structures:
               </p>
-              <pre className="text-xs text-left bg-muted p-3 rounded-md mb-4 inline-block">
+              <div className="flex flex-col md:flex-row gap-4 justify-center mb-4">
+                <div className="bg-muted p-3 rounded-md">
+                  <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
+                    <Square className="h-3 w-3" /> New 1:1 Format (Recommended)
+                  </p>
+                  <pre className="text-xs text-left">
+{`{MapName}/
+  ├── 1_1/
+  │   └── candidate_1.webp...
+  └── {MapName}.csv`}
+                  </pre>
+                </div>
+                <div className="bg-muted p-3 rounded-md">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    <Layers className="h-3 w-3" /> Legacy Format
+                  </p>
+                  <pre className="text-xs text-left">
 {`{MapName}/
   ├── 16_9/
-  │   └── candidate_1.webp ... candidate_N.webp
+  │   └── candidate_1.webp...
   ├── 9_16/
-  │   └── candidate_1.webp ... candidate_N.webp
+  │   └── candidate_1.webp...
   └── {MapName}.csv`}
-              </pre>
+                  </pre>
+                </div>
+              </div>
               <div>
                 <input
                   type="file"
@@ -195,13 +270,17 @@ const MapUploadWizard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <FolderOpen className="h-4 w-4" />
                   <span className="font-medium">Map Name</span>
                 </div>
-                <p className="text-lg">{validation.mapName}</p>
+                <Input 
+                  value={newMapName} 
+                  onChange={(e) => setNewMapName(e.target.value)}
+                  className="mt-1"
+                />
               </div>
 
               <div className="p-4 bg-muted rounded-lg">
@@ -214,19 +293,45 @@ const MapUploadWizard: React.FC = () => {
 
               <div className="p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Image className="h-4 w-4" />
-                  <span className="font-medium">16:9 Images</span>
+                  {validation.imageFormat === '1:1' ? (
+                    <Square className="h-4 w-4" />
+                  ) : (
+                    <Layers className="h-4 w-4" />
+                  )}
+                  <span className="font-medium">Format</span>
                 </div>
-                <p className="text-lg">{validation.images16_9.length} files</p>
+                <p className={`text-lg ${validation.imageFormat === '1:1' ? 'text-green-600' : ''}`}>
+                  {validation.imageFormat === '1:1' ? '1:1 Square' : 'Legacy (16:9 + 9:16)'}
+                </p>
               </div>
 
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Image className="h-4 w-4" />
-                  <span className="font-medium">9:16 Images</span>
+              {validation.imageFormat === '1:1' ? (
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Image className="h-4 w-4" />
+                    <span className="font-medium">1:1 Images</span>
+                  </div>
+                  <p className="text-lg">{validation.images1_1.length} files</p>
                 </div>
-                <p className="text-lg">{validation.images9_16.length} files</p>
-              </div>
+              ) : (
+                <>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Image className="h-4 w-4" />
+                      <span className="font-medium">16:9 Images</span>
+                    </div>
+                    <p className="text-lg">{validation.images16_9.length} files</p>
+                  </div>
+
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Image className="h-4 w-4" />
+                      <span className="font-medium">9:16 Images</span>
+                    </div>
+                    <p className="text-lg">{validation.images9_16.length} files</p>
+                  </div>
+                </>
+              )}
             </div>
 
             {validation.errors.length > 0 && (
@@ -346,14 +451,28 @@ const MapUploadWizard: React.FC = () => {
                 Back
               </Button>
               <Button 
-                onClick={handleUpload} 
+                onClick={handleProceedToUpload} 
                 disabled={!validation.isValid}
               >
-                Start Upload
+                Continue
               </Button>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Step: Compare (conditional) */}
+      {step === 'compare' && existingMap && validation && (
+        <MapVersionComparison
+          existingMapId={existingMap.id}
+          newMapName={newMapName}
+          newRouteCount={validation.parsedRoutes.length}
+          newFormat={validation.imageFormat}
+          newPreviewFile={validation.imageFormat === '1:1' ? validation.images1_1[0] : validation.images16_9[0]}
+          onReplace={handleReplace}
+          onRename={handleRename}
+          onCancel={handleCompareCancel}
+        />
       )}
 
       {/* Step: Upload Progress */}

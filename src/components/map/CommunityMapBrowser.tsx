@@ -145,7 +145,8 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
       
       el.addEventListener('click', () => {
         onSelectMap(cm.name);
-        setShowMap(false);
+        setHoveredMap(cm); // Keep the info visible instead of closing
+        // Don't close the map - let user see info and favorite if they want
       });
 
       // Use bottom-center anchor so marker stays fixed at the coordinate point
