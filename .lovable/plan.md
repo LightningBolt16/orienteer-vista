@@ -1,260 +1,319 @@
 
-# Fix Plan: Leaderboard Updates, Online Duel Issues, and UX Improvements
+# Admin Upload Maps Improvements
 
-## Issues Identified
-
-### 1. Leaderboard Not Updating
-**Root Cause**: Route attempts are being recorded to `route_attempts` table successfully (verified in database), but the `user_profiles` table is not being updated with the new accuracy/speed stats.
-
-**Analysis**:
-- Recent route attempts exist (2026-01-26), but user_profiles last updated on 2026-01-19
-- The `updatePerformance` function in `UserContext.tsx` appears to be failing silently when updating `user_profiles`
-- The update uses `supabaseManager.executeWithRetry`, but errors may not be surfacing properly
-
-### 2. Online Duel Game End Synchronization
-**Root Cause**: Multiple issues in the online duel flow:
-
-**Problem A - Game Not Ending for All Players**:
-- The `finishGame` function updates room status to 'finished'
-- But guests may not receive this update if realtime subscription misses the event
-- The `OnlineDuelGameView` doesn't have a rematch button (only Exit)
-
-**Problem B - End Screen Score Display Issues**:
-- The local `DuelGame.tsx` game over screen shows P1/P2 scores from local state
-- For online mode, `OnlineDuelGameView.tsx` is used but shows scores from `room.host_score`, `room.guest_score` etc.
-- The database shows scores are not always being updated correctly (some show 0)
-
-**Problem C - Rematch Not Working**:
-- `handleRestart` in `DuelMode.tsx` only reloads routes locally
-- It does NOT update the database room status back to 'playing'
-- It does NOT reset scores in the database
-- Guests are still subscribed to the old finished game state
-
-### 3. Pre-fill Username for Logged-in Users
-**Missing Feature**: The `playerName` state in `DuelSetupWizard.tsx` is initialized to empty string `''` instead of using `user?.name`.
+## Overview
+Enhance the admin map upload page with three major features:
+1. **New 1:1 Square Format Support** - Upload single square images that get dynamically cropped
+2. **Client-Side Adaptive Cropping** - Crop to user's actual screen aspect ratio for better fullscreen experience
+3. **Map Version Comparison** - Compare new uploads with existing maps before replacing
 
 ---
 
-## Technical Solutions
+## Phase 1: Database Schema Updates
 
-### Fix 1: Leaderboard Update - Add Error Logging and Retry
+### 1.1 Update `route_images` Table Constraints
+Add support for '1:1' aspect ratio in the database:
 
-**File**: `src/context/UserContext.tsx`
+```sql
+-- Modify aspect_ratio check constraint to include '1:1'
+ALTER TABLE route_images 
+DROP CONSTRAINT IF EXISTS route_images_aspect_ratio_check;
 
-**Changes**:
-1. Add better error logging when `user_profiles` update fails
-2. Ensure the update query is correctly targeting the user
-3. Add a fallback polling mechanism to verify updates
-
-```typescript
-// Around lines 363-387, improve error handling:
-await supabaseManager.executeWithRetry(
-  async () => {
-    console.log('[UserContext] Updating user profile:', {
-      userId: user.id,
-      accuracy: newAccuracy,
-      speed: newSpeed,
-      alltimeTotal: newAlltimeTotal
-    });
-    
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .update({
-        accuracy: newAccuracy,
-        speed: newSpeed,
-        attempts: { total, correct, timeSum },
-        alltime_total: newAlltimeTotal,
-        alltime_correct: newAlltimeCorrect,
-        alltime_time_sum: newAlltimeTimeSum,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', user.id)
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('[UserContext] Failed to update user profile:', error);
-      throw error;
-    }
-    
-    console.log('[UserContext] User profile updated successfully:', data);
-    return data;
-  },
-  'Update user performance'
-);
+ALTER TABLE route_images 
+ADD CONSTRAINT route_images_aspect_ratio_check 
+CHECK (aspect_ratio IN ('16_9', '9_16', '16:9', '9:16', '1:1'));
 ```
+
+The `route_images` table will store:
+- `aspect_ratio = '1:1'` for new square format (one row per route instead of two)
+- `aspect_ratio = '16_9'` or `'9_16'` for legacy format (two rows per route)
 
 ---
 
-### Fix 2: Online Duel Game End Synchronization
+## Phase 2: Upload Wizard Updates
 
-**File**: `src/hooks/useOnlineDuel.ts`
+### 2.1 Folder Structure Detection
+Update `validateFolder` in `src/hooks/useMapUpload.ts` to detect format:
 
-**Add a `restartGame` function** that properly resets the room for all players:
-
-```typescript
-// Add new function after finishGame (around line 578)
-const restartGame = useCallback(async (newRoutes: RouteData[]) => {
-  if (!room || !isHost) return false;
-
-  try {
-    const { data, error } = await supabase
-      .from('duel_rooms')
-      .update({
-        status: 'playing',
-        routes: newRoutes as any,
-        current_route_index: 0,
-        host_score: 0,
-        guest_score: 0,
-        player_3_score: 0,
-        player_4_score: 0,
-        game_started_at: new Date().toISOString(),
-      })
-      .eq('id', room.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    setRoom(data as unknown as OnlineDuelRoom);
-    onGameStart?.(data as unknown as OnlineDuelRoom);
-    return true;
-  } catch (err) {
-    console.error('[OnlineDuel] Error restarting game:', err);
-    toast({
-      title: 'Failed to restart game',
-      variant: 'destructive',
-    });
-    return false;
-  }
-}, [room, isHost, toast, onGameStart]);
+**New folder structure option:**
+```
+{MapName}/
+  ├── 1_1/
+  │   └── candidate_1.webp ... candidate_N.webp
+  └── {MapName}.csv
 ```
 
-**File**: `src/pages/DuelMode.tsx`
+**Legacy folder structure:**
+```
+{MapName}/
+  ├── 16_9/
+  │   └── candidate_1.webp ... candidate_N.webp  
+  ├── 9_16/
+  │   └── candidate_1.webp ... candidate_N.webp
+  └── {MapName}.csv
+```
 
-**Update `handleRestart`** to use the new `restartGame` for online mode:
+The hook will:
+1. Check for `1_1/` folder first (new format)
+2. Fall back to `16_9/` + `9_16/` folders (legacy format)
+3. Set `imageFormat: '1:1' | 'legacy'` in validation result
+
+### 2.2 Update MapUploadWizard UI
+Update `src/components/admin/MapUploadWizard.tsx`:
+
+1. Show detected format in validation step (1:1 vs legacy)
+2. Display image count (halved for 1:1 format)
+3. Update folder structure example to show both options
+
+### 2.3 Upload Logic Changes
+Update `uploadMap` function:
+
+For **1:1 format**:
+- Upload to `{mapname}/1_1/` folder in storage
+- Insert single row per route with `aspect_ratio = '1:1'`
+
+For **legacy format**:
+- Keep existing dual-upload behavior
+- Insert two rows per route (16_9 and 9_16)
+
+---
+
+## Phase 3: Map Version Comparison Step
+
+### 3.1 New Comparison Component
+Create `src/components/admin/MapVersionComparison.tsx`:
+
+This component shows when uploading a map with the same name as an existing one:
+
+**UI Layout:**
+```
+┌─────────────────────────────────────────────────────┐
+│  ⚠️ Existing Map Found: "Matera"                   │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ┌──────────────────┐    ┌──────────────────┐      │
+│  │   EXISTING       │    │   NEW UPLOAD     │      │
+│  │   [Preview]      │    │   [Preview]      │      │
+│  │                  │    │                  │      │
+│  │  500 routes      │    │  750 routes      │      │
+│  │  Created Jan 3   │    │  Today           │      │
+│  │  Format: Legacy  │    │  Format: 1:1     │      │
+│  └──────────────────┘    └──────────────────┘      │
+│                                                     │
+│  What would you like to do?                        │
+│                                                     │
+│  [Replace Existing]  [Upload as New Name]  [Cancel]│
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- Side-by-side preview of first route from each version
+- Route count comparison
+- Format comparison (1:1 vs legacy)
+- Creation date of existing map
+- Three actions: Replace, Rename, Cancel
+
+### 3.2 Add Comparison Step to Wizard Flow
+Update wizard steps: `select` → `validate` → **`compare`** → `upload` → `complete`
+
+The compare step:
+1. Queries `route_maps` for existing map with same name
+2. If found, shows `MapVersionComparison` component
+3. User chooses action before proceeding
+
+### 3.3 Replace Existing Map Logic
+When user chooses "Replace Existing":
+
+1. Delete old `route_images` records for the map
+2. Delete old images from storage bucket
+3. Delete old `route_maps` entry
+4. Proceed with new upload
 
 ```typescript
-const handleRestart = async () => {
-  setIsLoading(true);
+async function replaceExistingMap(existingMapId: string): Promise<void> {
+  // 1. Get existing image paths
+  const { data: oldImages } = await supabase
+    .from('route_images')
+    .select('image_path')
+    .eq('map_id', existingMapId);
   
-  try {
-    const routes = await loadRoutesForSettings(settings);
-    const shuffled = [...routes].sort(() => Math.random() - 0.5);
-    const selectedRoutes = shuffled.slice(0, settings.routeCount);
-    
-    // For online mode, update the room in database
-    if (settings.isOnline && onlineDuel.restartGame) {
-      const success = await onlineDuel.restartGame(selectedRoutes);
-      if (success) {
-        setGameRoutes(selectedRoutes);
-      }
-    } else {
-      // Local mode - just update local state
-      setGameRoutes(selectedRoutes);
-    }
-  } catch (error) {
-    console.error('Failed to reload routes:', error);
+  // 2. Delete from storage
+  if (oldImages?.length) {
+    const paths = oldImages.map(i => i.image_path);
+    await supabase.storage.from('route-images').remove(paths);
   }
   
-  setIsLoading(false);
-};
-```
-
-**File**: `src/components/duel/OnlineDuelGameView.tsx`
-
-**Add Rematch button** to the game over screen (around line 242):
-
-```typescript
-<div className="flex gap-4">
-  <Button variant="outline" onClick={onExit} className="flex-1">
-    <Home className="h-4 w-4 mr-2" />
-    Exit
-  </Button>
-  {/* Add Rematch button - only show for host */}
-  {playerSlot === 'host' && onRematch && (
-    <Button onClick={onRematch} className="flex-1">
-      <RotateCcw className="h-4 w-4 mr-2" />
-      Rematch
-    </Button>
-  )}
-</div>
-```
-
-Also update the component props to accept `onRematch`:
-
-```typescript
-interface OnlineDuelGameViewProps {
-  routes: RouteData[];
-  room: OnlineDuelRoom;
-  playerSlot: PlayerSlot;
-  isMobile: boolean;
-  onAnswer: (...) => Promise<void>;
-  onExit: () => void;
-  onFinishGame: () => Promise<void>;
-  onRematch?: () => void; // New prop
+  // 3. Delete route_images records
+  await supabase.from('route_images').delete().eq('map_id', existingMapId);
+  
+  // 4. Delete route_maps entry
+  await supabase.from('route_maps').delete().eq('id', existingMapId);
 }
 ```
 
-**File**: `src/components/duel/DuelGame.tsx`
+---
 
-**Pass the rematch handler** to OnlineDuelGameView (around line 448):
+## Phase 4: Client-Side Adaptive Cropping
+
+### 4.1 Screen Aspect Ratio Detection Hook
+Create `src/hooks/useScreenAspect.ts`:
 
 ```typescript
-<OnlineDuelGameView
-  routes={routes}
-  room={activeRoom}
-  playerSlot={onlineDuel.playerSlot || 'host'}
-  isMobile={isMobile}
-  onAnswer={onlineDuel.submitAnswer}
-  onExit={onExit}
-  onFinishGame={onlineDuel.finishGame}
-  onRematch={onRestart} // Add this prop
+interface ScreenAspect {
+  width: number;
+  height: number;
+  ratio: number;  // width/height
+  category: 'ultrawide' | 'wide' | 'standard' | 'portrait' | 'tall';
+}
+
+function useScreenAspect(): ScreenAspect {
+  // Returns current screen dimensions and aspect category
+  // Updates on resize/orientation change
+}
+```
+
+Categories:
+- **ultrawide**: ratio > 2.0 (21:9 monitors)
+- **wide**: ratio 1.6-2.0 (16:9, 16:10)  
+- **standard**: ratio 1.3-1.6 (4:3)
+- **portrait**: ratio 0.5-0.75 (9:16 phones)
+- **tall**: ratio < 0.5 (unusual tall screens)
+
+### 4.2 Dynamic Image Cropper Component
+Create `src/components/map/AdaptiveCropImage.tsx`:
+
+```typescript
+interface AdaptiveCropImageProps {
+  src: string;
+  sourceAspect: '1:1' | '16_9' | '9_16';
+  className?: string;
+  alt?: string;
+}
+```
+
+**Behavior for 1:1 source images:**
+- Crop to screen aspect ratio using CSS `object-fit: cover` + `object-position`
+- Calculate visible region based on screen aspect vs 1:1
+- For 21:9 ultrawide: crop top/bottom from center
+- For 9:16 portrait: crop left/right from center
+- Always keep the route visible (center-weighted)
+
+**Implementation:**
+```css
+/* Example for ultrawide (21:9) from 1:1 source */
+.adaptive-crop-ultrawide {
+  object-fit: cover;
+  object-position: center center;
+  aspect-ratio: 21/9;
+}
+
+/* Example for portrait (9:16) from 1:1 source */
+.adaptive-crop-portrait {
+  object-fit: cover;
+  object-position: center center;
+  aspect-ratio: 9/16;
+}
+```
+
+### 4.3 Update Route Selectors
+Modify `RouteSelector.tsx` and `MobileRouteSelector.tsx`:
+
+1. Detect if current route uses '1:1' format
+2. Use `AdaptiveCropImage` component for 1:1 routes
+3. Keep existing `object-contain` for legacy format
+4. In fullscreen mode: fill entire screen with adaptive crop (no black bars)
+
+**For fullscreen 1:1 images:**
+```tsx
+<AdaptiveCropImage
+  src={currentRoute.imagePath}
+  sourceAspect="1:1"
+  className="w-screen h-screen"
+  alt={`Route ${currentRoute.candidateIndex}`}
 />
 ```
 
----
+### 4.4 Update Route Data Utilities
+Modify `src/utils/routeDataUtils.ts`:
 
-### Fix 3: Pre-fill Username for Logged-in Users
-
-**File**: `src/components/duel/DuelSetupWizard.tsx`
-
-**Initialize `playerName` with user's name** (around line 77):
+1. Handle '1:1' aspect ratio in queries
+2. For 1:1 maps, don't filter by mobile/desktop aspect
+3. Return `sourceAspect` property in `RouteData`
 
 ```typescript
-// Change from:
-const [playerName, setPlayerName] = useState('');
+// When loading routes for 1:1 maps
+const { data: dbRoutes } = await supabase
+  .from('route_images')
+  .select('...')
+  .eq('map_id', mapSource.id)
+  .eq('aspect_ratio', '1:1');  // Single query, not filtered by device
 
-// To:
-const [playerName, setPlayerName] = useState(user?.name || '');
-
-// Also add useEffect to update if user loads after mount:
-useEffect(() => {
-  if (user?.name && !playerName) {
-    setPlayerName(user.name);
-  }
-}, [user?.name]);
+// In RouteData interface
+interface RouteData {
+  // ... existing fields
+  sourceAspect?: '1:1' | '16_9' | '9_16';
+}
 ```
 
 ---
 
-## Implementation Summary
+## Phase 5: Updated Wizard Steps
 
-| File | Changes |
-|------|---------|
-| `src/context/UserContext.tsx` | Add detailed logging for user_profiles updates, verify updates succeed |
-| `src/hooks/useOnlineDuel.ts` | Add `restartGame` function that resets scores and status in database |
-| `src/pages/DuelMode.tsx` | Update `handleRestart` to call `restartGame` for online mode |
-| `src/components/duel/OnlineDuelGameView.tsx` | Add Rematch button for host, add `onRematch` prop |
-| `src/components/duel/DuelGame.tsx` | Pass `onRestart` as `onRematch` to OnlineDuelGameView |
-| `src/components/duel/DuelSetupWizard.tsx` | Initialize `playerName` with `user?.name`, add useEffect to update on user load |
+### Final Step Flow:
+
+```
+1. SELECT FOLDER
+   - User selects folder
+   - Detect format (1:1 or legacy)
+
+2. VALIDATE
+   - Show detected format
+   - Show image counts
+   - Show CSV preview
+   - Metadata inputs (country, type, logo)
+
+3. COMPARE (conditional)
+   - Only shown if map name exists
+   - Side-by-side comparison
+   - Choose: Replace / Rename / Cancel
+
+4. UPLOAD
+   - If replacing: delete old first
+   - Upload images to storage
+   - Save metadata to database
+   - Progress bar with stages
+
+5. COMPLETE
+   - Success message
+   - Link to test routes
+```
 
 ---
 
-## Testing Checklist
+## Technical Summary
 
-1. **Leaderboard**: Play 5+ routes on Matera, verify user_profiles.updated_at changes
-2. **Online Duel End**: Host finishes game, verify guest sees game over screen
-3. **Online Duel Scores**: Verify all player scores display correctly on end screen
-4. **Online Rematch**: Host clicks Rematch, verify all players restart with reset scores
-5. **Pre-filled Name**: Log in, go to Duel > Online, verify name field is pre-filled
+### Files to Create:
+- `src/components/admin/MapVersionComparison.tsx` - Comparison UI
+- `src/components/map/AdaptiveCropImage.tsx` - Dynamic cropping component
+- `src/hooks/useScreenAspect.ts` - Screen aspect detection hook
+
+### Files to Modify:
+- `src/hooks/useMapUpload.ts` - Add 1:1 format detection, comparison query, replace logic
+- `src/components/admin/MapUploadWizard.tsx` - Add compare step, update UI
+- `src/components/RouteSelector.tsx` - Use adaptive cropping for 1:1 images
+- `src/components/MobileRouteSelector.tsx` - Use adaptive cropping for 1:1 images  
+- `src/utils/routeDataUtils.ts` - Handle 1:1 aspect in queries and data loading
+
+### Database Migration:
+- Update `route_images.aspect_ratio` constraint to allow '1:1'
+
+---
+
+## Benefits
+
+1. **Reduced file count**: 1:1 format = half the images to generate/store
+2. **Better fullscreen experience**: No black bars on any screen aspect ratio
+3. **Ultrawide support**: 21:9 monitors get proper full coverage
+4. **Easier version management**: Clear comparison before replacing maps
+5. **Backward compatible**: Legacy 16:9/9:16 format still fully supported
