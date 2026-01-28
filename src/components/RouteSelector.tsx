@@ -5,6 +5,7 @@ import PauseOverlay from './PauseOverlay';
 import { useInactivityDetection } from '@/hooks/useInactivityDetection';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
+import AdaptiveCropImage from './map/AdaptiveCropImage';
 
 interface RouteSelectorProps {
   routeData: RouteData[];
@@ -282,20 +283,35 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
       {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
       
       <div className={`relative ${isFullscreen ? 'w-full h-full flex items-center justify-center' : ''}`}>
-        {/* Route Image */}
-        <img
-          src={currentRoute.imagePath}
-          alt={`Route ${currentRoute.candidateIndex}`}
-          className={isFullscreen 
-            ? 'max-w-full max-h-full w-auto h-auto object-contain' 
-            : 'w-full h-auto'
-          }
-          onLoad={() => {
-            if (pendingRouteIndex === null) {
-              setIsImageLoaded(true);
+        {/* Route Image - use AdaptiveCropImage for 1:1 sources */}
+        {currentRoute.sourceAspect === '1:1' ? (
+          <AdaptiveCropImage
+            src={currentRoute.imagePath || ''}
+            sourceAspect="1:1"
+            className={isFullscreen ? '' : 'w-full h-auto'}
+            alt={`Route ${currentRoute.candidateIndex}`}
+            isFullscreen={isFullscreen}
+            onLoad={() => {
+              if (pendingRouteIndex === null) {
+                setIsImageLoaded(true);
+              }
+            }}
+          />
+        ) : (
+          <img
+            src={currentRoute.imagePath}
+            alt={`Route ${currentRoute.candidateIndex}`}
+            className={isFullscreen 
+              ? 'max-w-full max-h-full w-auto h-auto object-contain' 
+              : 'w-full h-auto'
             }
-          }}
-        />
+            onLoad={() => {
+              if (pendingRouteIndex === null) {
+                setIsImageLoaded(true);
+              }
+            }}
+          />
+        )}
         
         {/* Hidden preload image for pending route */}
         {pendingRouteIndex !== null && routeData[pendingRouteIndex] && (
