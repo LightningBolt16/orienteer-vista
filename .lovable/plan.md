@@ -1,319 +1,379 @@
 
-# Admin Upload Maps Improvements
+# Route Finder Gamemode - Implementation Plan
 
 ## Overview
-Enhance the admin map upload page with three major features:
-1. **New 1:1 Square Format Support** - Upload single square images that get dynamically cropped
-2. **Client-Side Adaptive Cropping** - Crop to user's actual screen aspect ratio for better fullscreen experience
-3. **Map Version Comparison** - Compare new uploads with existing maps before replacing
+
+A new gamemode where users draw their route freehand on a clean map (showing only start/finish markers), and the system scores them based on whether their drawn route, when snapped to the terrain graph, matches the optimal shortest path.
 
 ---
 
-## Phase 1: Database Schema Updates
+## Architecture Summary
 
-### 1.1 Update `route_images` Table Constraints
-Add support for '1:1' aspect ratio in the database:
+```text
++------------------+     +-------------------+     +------------------+
+|  Modal Processor |---->|  Supabase Storage |---->|  React Frontend  |
+|  (route-finder)  |     |  + Database       |     |  (RouteFinderGame)|
++------------------+     +-------------------+     +------------------+
+        |                        |                        |
+        v                        v                        v
+  - Base image (clean)     - route_finder_images    - RouteDrawingCanvas
+  - Answer image (route)   - graph_data JSON        - Graph pathfinding
+  - Skeleton graph JSON    - route_finder_maps      - Binary scoring
+```
+
+---
+
+## Phase 1: Database Schema
+
+### New Tables
+
+**`route_finder_maps`** - Maps available for Route Finder gamemode
 
 ```sql
--- Modify aspect_ratio check constraint to include '1:1'
-ALTER TABLE route_images 
-DROP CONSTRAINT IF EXISTS route_images_aspect_ratio_check;
-
-ALTER TABLE route_images 
-ADD CONSTRAINT route_images_aspect_ratio_check 
-CHECK (aspect_ratio IN ('16_9', '9_16', '16:9', '9:16', '1:1'));
+CREATE TABLE route_finder_maps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+  source_map_id UUID REFERENCES user_maps(id),
+  is_public BOOLEAN DEFAULT false,
+  map_category TEXT DEFAULT 'official',
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-The `route_images` table will store:
-- `aspect_ratio = '1:1'` for new square format (one row per route instead of two)
-- `aspect_ratio = '16_9'` or `'9_16'` for legacy format (two rows per route)
+**`route_finder_challenges`** - Individual route challenges with graph data
+
+```sql
+CREATE TABLE route_finder_challenges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  map_id UUID REFERENCES route_finder_maps(id) ON DELETE CASCADE,
+  challenge_index INTEGER NOT NULL,
+  
+  -- Graph data for client-side pathfinding
+  graph_data JSONB NOT NULL,  -- {nodes: [{id, x, y}], edges: [{from, to, weight}]}
+  start_node_id TEXT NOT NULL,
+  finish_node_id TEXT NOT NULL,
+  optimal_path JSONB NOT NULL,  -- [node_id_1, node_id_2, ...]
+  optimal_length NUMERIC NOT NULL,
+  
+  -- Image paths
+  base_image_path TEXT NOT NULL,    -- Clean map with start/finish only
+  answer_image_path TEXT NOT NULL,  -- Map with optimal route overlayed
+  aspect_ratio TEXT NOT NULL CHECK (aspect_ratio IN ('16_9', '9_16', '1:1')),
+  
+  -- Metadata
+  difficulty_score NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**`route_finder_attempts`** - User attempts for scoring/leaderboard
+
+```sql
+CREATE TABLE route_finder_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  challenge_id UUID REFERENCES route_finder_challenges(id),
+  map_name TEXT NOT NULL,
+  is_correct BOOLEAN NOT NULL,
+  response_time INTEGER NOT NULL,  -- ms
+  user_path JSONB,  -- Optional: store user's snapped path for analysis
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### RLS Policies
+
+- Challenges: Public read, admin insert/update/delete
+- Attempts: Users can insert/view their own, public read for leaderboard
+- Maps: Public read, admin manage
 
 ---
 
-## Phase 2: Upload Wizard Updates
+## Phase 2: Modal Processor Script
 
-### 2.1 Folder Structure Detection
-Update `validateFolder` in `src/hooks/useMapUpload.ts` to detect format:
+### New File: `docs/modal-processor-route-finder.py`
 
-**New folder structure option:**
+Key differences from `modal-processor-complete.py`:
+
+1. **Single optimal route per challenge** (no alternate routes needed)
+2. **Longer route selection** (800-2500m pixel distance range)
+3. **Exports simplified skeleton graph as JSON**
+4. **Generates two images per challenge:**
+   - Base image: Clean map + start/finish markers only
+   - Answer image: Map with optimal route overlayed
+
+### Graph Export Format
+
+```json
+{
+  "nodes": [
+    {"id": "n_0", "x": 1234, "y": 567},
+    {"id": "n_1", "x": 1240, "y": 580}
+  ],
+  "edges": [
+    {"from": "n_0", "to": "n_1", "weight": 15.2}
+  ],
+  "start": "n_0",
+  "finish": "n_42",
+  "optimal_path": ["n_0", "n_5", "n_12", "n_42"],
+  "optimal_length": 1847.5
+}
 ```
-{MapName}/
-  ├── 1_1/
-  │   └── candidate_1.webp ... candidate_N.webp
-  └── {MapName}.csv
+
+### Processing Flow
+
+```python
+# Pseudocode for route-finder processor
+
+1. Load color/BW maps (same as existing)
+2. Apply impassable annotations (same as existing)
+3. Generate skeleton graph (same as existing)
+4. Simplify graph to ~500-2000 nodes for frontend efficiency
+5. Select route pairs with longer distances (800-2500px)
+6. For each challenge:
+   a. Compute optimal path using A*
+   b. Export simplified graph JSON (nodes near route corridor)
+   c. Generate base image (map + start/finish markers, no routes)
+   d. Generate answer image (map + optimal route overlay)
+   e. Upload via webhook
+7. Send completion webhook with graph data
 ```
 
-**Legacy folder structure:**
-```
-{MapName}/
-  ├── 16_9/
-  │   └── candidate_1.webp ... candidate_N.webp  
-  ├── 9_16/
-  │   └── candidate_1.webp ... candidate_N.webp
-  └── {MapName}.csv
-```
+### Graph Simplification Strategy
 
-The hook will:
-1. Check for `1_1/` folder first (new format)
-2. Fall back to `16_9/` + `9_16/` folders (legacy format)
-3. Set `imageFormat: '1:1' | 'legacy'` in validation result
-
-### 2.2 Update MapUploadWizard UI
-Update `src/components/admin/MapUploadWizard.tsx`:
-
-1. Show detected format in validation step (1:1 vs legacy)
-2. Display image count (halved for 1:1 format)
-3. Update folder structure example to show both options
-
-### 2.3 Upload Logic Changes
-Update `uploadMap` function:
-
-For **1:1 format**:
-- Upload to `{mapname}/1_1/` folder in storage
-- Insert single row per route with `aspect_ratio = '1:1'`
-
-For **legacy format**:
-- Keep existing dual-upload behavior
-- Insert two rows per route (16_9 and 9_16)
+- Keep only nodes within a corridor around the optimal route (300px radius)
+- Merge very close nodes (within 10px) to reduce complexity
+- Target 500-1500 nodes per challenge for responsive client-side pathfinding
 
 ---
 
-## Phase 3: Map Version Comparison Step
+## Phase 3: Webhook Updates
 
-### 3.1 New Comparison Component
-Create `src/components/admin/MapVersionComparison.tsx`:
+### Modify `map-processing-webhook/index.ts`
 
-This component shows when uploading a map with the same name as an existing one:
+Add new endpoints for Route Finder:
 
-**UI Layout:**
-```
-┌─────────────────────────────────────────────────────┐
-│  ⚠️ Existing Map Found: "Matera"                   │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ┌──────────────────┐    ┌──────────────────┐      │
-│  │   EXISTING       │    │   NEW UPLOAD     │      │
-│  │   [Preview]      │    │   [Preview]      │      │
-│  │                  │    │                  │      │
-│  │  500 routes      │    │  750 routes      │      │
-│  │  Created Jan 3   │    │  Today           │      │
-│  │  Format: Legacy  │    │  Format: 1:1     │      │
-│  └──────────────────┘    └──────────────────┘      │
-│                                                     │
-│  What would you like to do?                        │
-│                                                     │
-│  [Replace Existing]  [Upload as New Name]  [Cancel]│
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
+- `POST /rf-upload-image` - Upload base/answer images
+- `POST /rf-complete` - Finalize processing, insert graph data
 
-**Features:**
-- Side-by-side preview of first route from each version
-- Route count comparison
-- Format comparison (1:1 vs legacy)
-- Creation date of existing map
-- Three actions: Replace, Rename, Cancel
+### New Trigger Edge Function
 
-### 3.2 Add Comparison Step to Wizard Flow
-Update wizard steps: `select` → `validate` → **`compare`** → `upload` → `complete`
+Create `supabase/functions/trigger-route-finder-processing/index.ts`
 
-The compare step:
-1. Queries `route_maps` for existing map with same name
-2. If found, shows `MapVersionComparison` component
-3. User chooses action before proceeding
-
-### 3.3 Replace Existing Map Logic
-When user chooses "Replace Existing":
-
-1. Delete old `route_images` records for the map
-2. Delete old images from storage bucket
-3. Delete old `route_maps` entry
-4. Proceed with new upload
-
-```typescript
-async function replaceExistingMap(existingMapId: string): Promise<void> {
-  // 1. Get existing image paths
-  const { data: oldImages } = await supabase
-    .from('route_images')
-    .select('image_path')
-    .eq('map_id', existingMapId);
-  
-  // 2. Delete from storage
-  if (oldImages?.length) {
-    const paths = oldImages.map(i => i.image_path);
-    await supabase.storage.from('route-images').remove(paths);
-  }
-  
-  // 3. Delete route_images records
-  await supabase.from('route_images').delete().eq('map_id', existingMapId);
-  
-  // 4. Delete route_maps entry
-  await supabase.from('route_maps').delete().eq('id', existingMapId);
-}
-```
+Similar to existing trigger, but:
+- Targets Route Finder Modal endpoint
+- Uses different processing parameters (longer routes, single optimal path)
 
 ---
 
-## Phase 4: Client-Side Adaptive Cropping
+## Phase 4: Frontend Components
 
-### 4.1 Screen Aspect Ratio Detection Hook
-Create `src/hooks/useScreenAspect.ts`:
+### 4.1 Route Drawing Canvas
 
-```typescript
-interface ScreenAspect {
-  width: number;
-  height: number;
-  ratio: number;  // width/height
-  category: 'ultrawide' | 'wide' | 'standard' | 'portrait' | 'tall';
-}
+**New File: `src/components/route-finder/RouteDrawingCanvas.tsx`**
 
-function useScreenAspect(): ScreenAspect {
-  // Returns current screen dimensions and aspect category
-  // Updates on resize/orientation change
-}
-```
+Features:
+- Freehand drawing on canvas overlay
+- Touch and mouse support
+- Undo last segment
+- Clear all
+- Zoom/pan support for large maps
+- Visual feedback for drawing state
 
-Categories:
-- **ultrawide**: ratio > 2.0 (21:9 monitors)
-- **wide**: ratio 1.6-2.0 (16:9, 16:10)  
-- **standard**: ratio 1.3-1.6 (4:3)
-- **portrait**: ratio 0.5-0.75 (9:16 phones)
-- **tall**: ratio < 0.5 (unusual tall screens)
-
-### 4.2 Dynamic Image Cropper Component
-Create `src/components/map/AdaptiveCropImage.tsx`:
-
-```typescript
-interface AdaptiveCropImageProps {
-  src: string;
-  sourceAspect: '1:1' | '16_9' | '9_16';
-  className?: string;
-  alt?: string;
-}
-```
-
-**Behavior for 1:1 source images:**
-- Crop to screen aspect ratio using CSS `object-fit: cover` + `object-position`
-- Calculate visible region based on screen aspect vs 1:1
-- For 21:9 ultrawide: crop top/bottom from center
-- For 9:16 portrait: crop left/right from center
-- Always keep the route visible (center-weighted)
-
-**Implementation:**
-```css
-/* Example for ultrawide (21:9) from 1:1 source */
-.adaptive-crop-ultrawide {
-  object-fit: cover;
-  object-position: center center;
-  aspect-ratio: 21/9;
-}
-
-/* Example for portrait (9:16) from 1:1 source */
-.adaptive-crop-portrait {
-  object-fit: cover;
-  object-position: center center;
-  aspect-ratio: 9/16;
-}
-```
-
-### 4.3 Update Route Selectors
-Modify `RouteSelector.tsx` and `MobileRouteSelector.tsx`:
-
-1. Detect if current route uses '1:1' format
-2. Use `AdaptiveCropImage` component for 1:1 routes
-3. Keep existing `object-contain` for legacy format
-4. In fullscreen mode: fill entire screen with adaptive crop (no black bars)
-
-**For fullscreen 1:1 images:**
 ```tsx
-<AdaptiveCropImage
-  src={currentRoute.imagePath}
-  sourceAspect="1:1"
-  className="w-screen h-screen"
-  alt={`Route ${currentRoute.candidateIndex}`}
-/>
+interface RouteDrawingCanvasProps {
+  imageUrl: string;
+  onPathComplete: (points: Point[]) => void;
+  disabled?: boolean;
+}
 ```
 
-### 4.4 Update Route Data Utilities
-Modify `src/utils/routeDataUtils.ts`:
+### 4.2 Graph Pathfinding Utility
 
-1. Handle '1:1' aspect ratio in queries
-2. For 1:1 maps, don't filter by mobile/desktop aspect
-3. Return `sourceAspect` property in `RouteData`
+**New File: `src/utils/routeFinderUtils.ts`**
+
+Functions:
+- `snapPointsToGraph(userPoints, graph)` - Snap freehand drawing to graph nodes
+- `findShortestPath(graph, start, end)` - A* implementation for user's path
+- `comparePaths(userPath, optimalPath)` - Binary comparison (match/no match)
+- `pathToNodeIds(snappedPath, graph)` - Convert point sequence to node IDs
 
 ```typescript
-// When loading routes for 1:1 maps
-const { data: dbRoutes } = await supabase
-  .from('route_images')
-  .select('...')
-  .eq('map_id', mapSource.id)
-  .eq('aspect_ratio', '1:1');  // Single query, not filtered by device
+interface GraphNode {
+  id: string;
+  x: number;
+  y: number;
+}
 
-// In RouteData interface
-interface RouteData {
-  // ... existing fields
-  sourceAspect?: '1:1' | '16_9' | '9_16';
+interface GraphEdge {
+  from: string;
+  to: string;
+  weight: number;
+}
+
+interface RouteFinderGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  start: string;
+  finish: string;
+  optimalPath: string[];
+  optimalLength: number;
+}
+
+// Snap user's freehand drawing to nearest graph nodes
+function snapPointsToGraph(
+  userPoints: Point[], 
+  graph: RouteFinderGraph
+): string[] {
+  // 1. Find nearest node for each user point
+  // 2. Remove consecutive duplicates
+  // 3. Return sequence of node IDs
+}
+
+// Compare user's snapped path to optimal
+function isPathOptimal(
+  userNodePath: string[], 
+  optimalPath: string[]
+): boolean {
+  // Check if user traversed the same nodes as optimal
+  // Allow for minor variations (same edges traversed)
+}
+```
+
+### 4.3 Route Finder Game Component
+
+**New File: `src/components/route-finder/RouteFinderGame.tsx`**
+
+Game flow:
+1. Show base image with start/finish markers
+2. User draws their route
+3. User taps "Submit" (or auto-submit on reaching finish)
+4. System snaps drawing to graph
+5. Compare to optimal path
+6. Show result (correct/wrong) with answer image overlay
+7. Next challenge
+
+### 4.4 Route Finder Page
+
+**New File: `src/pages/RouteFinder.tsx`**
+
+- Map selection (similar to RouteGame)
+- Challenge loading from database
+- Score tracking
+- Tutorial for first-time users
+
+---
+
+## Phase 5: Data Flow
+
+### Loading a Challenge
+
+```typescript
+async function loadChallenge(challengeId: string): Promise<Challenge> {
+  const { data } = await supabase
+    .from('route_finder_challenges')
+    .select('*, route_finder_maps(name)')
+    .eq('id', challengeId)
+    .single();
+  
+  return {
+    baseImageUrl: getStorageUrl(data.base_image_path),
+    answerImageUrl: getStorageUrl(data.answer_image_path),
+    graph: data.graph_data,
+    optimalPath: data.optimal_path,
+    mapName: data.route_finder_maps.name,
+  };
+}
+```
+
+### Scoring a Drawing
+
+```typescript
+async function scoreDrawing(
+  userPoints: Point[], 
+  challenge: Challenge
+): Promise<{isCorrect: boolean, snappedPath: string[]}> {
+  // 1. Snap user's freehand points to graph nodes
+  const snappedPath = snapPointsToGraph(userPoints, challenge.graph);
+  
+  // 2. Find the path the user actually drew (via A* between snapped points)
+  const userPath = findUserPath(snappedPath, challenge.graph);
+  
+  // 3. Compare to optimal path
+  const isCorrect = isPathOptimal(userPath, challenge.optimalPath);
+  
+  return { isCorrect, snappedPath: userPath };
 }
 ```
 
 ---
 
-## Phase 5: Updated Wizard Steps
+## Phase 6: Mobile Support
 
-### Final Step Flow:
-
-```
-1. SELECT FOLDER
-   - User selects folder
-   - Detect format (1:1 or legacy)
-
-2. VALIDATE
-   - Show detected format
-   - Show image counts
-   - Show CSV preview
-   - Metadata inputs (country, type, logo)
-
-3. COMPARE (conditional)
-   - Only shown if map name exists
-   - Side-by-side comparison
-   - Choose: Replace / Rename / Cancel
-
-4. UPLOAD
-   - If replacing: delete old first
-   - Upload images to storage
-   - Save metadata to database
-   - Progress bar with stages
-
-5. COMPLETE
-   - Success message
-   - Link to test routes
-```
+- RouteDrawingCanvas uses touch events
+- Simpler UI for mobile (larger buttons, clearer touch targets)
+- Same aspect ratio logic as Route Choice (16:9 desktop, 9:16 mobile)
 
 ---
 
-## Technical Summary
+## Implementation Order
 
-### Files to Create:
-- `src/components/admin/MapVersionComparison.tsx` - Comparison UI
-- `src/components/map/AdaptiveCropImage.tsx` - Dynamic cropping component
-- `src/hooks/useScreenAspect.ts` - Screen aspect detection hook
-
-### Files to Modify:
-- `src/hooks/useMapUpload.ts` - Add 1:1 format detection, comparison query, replace logic
-- `src/components/admin/MapUploadWizard.tsx` - Add compare step, update UI
-- `src/components/RouteSelector.tsx` - Use adaptive cropping for 1:1 images
-- `src/components/MobileRouteSelector.tsx` - Use adaptive cropping for 1:1 images  
-- `src/utils/routeDataUtils.ts` - Handle 1:1 aspect in queries and data loading
-
-### Database Migration:
-- Update `route_images.aspect_ratio` constraint to allow '1:1'
+| Step | Task | Dependencies |
+|------|------|--------------|
+| 1 | Database migration (create tables + RLS) | None |
+| 2 | Create Modal processor script (docs/modal-processor-route-finder.py) | Step 1 |
+| 3 | Add webhook endpoints for Route Finder | Step 1 |
+| 4 | Create trigger edge function | Step 3 |
+| 5 | Create routeFinderUtils.ts (graph + pathfinding) | None |
+| 6 | Create RouteDrawingCanvas component | None |
+| 7 | Create RouteFinderGame component | Steps 5, 6 |
+| 8 | Create RouteFinder page + routing | Step 7 |
+| 9 | Add admin upload support for Route Finder maps | Steps 1-4 |
+| 10 | Testing and iteration | All |
 
 ---
 
-## Benefits
+## Technical Considerations
 
-1. **Reduced file count**: 1:1 format = half the images to generate/store
-2. **Better fullscreen experience**: No black bars on any screen aspect ratio
-3. **Ultrawide support**: 21:9 monitors get proper full coverage
-4. **Easier version management**: Clear comparison before replacing maps
-5. **Backward compatible**: Legacy 16:9/9:16 format still fully supported
+### Graph Size Optimization
+
+The simplified graph per challenge should be 500-1500 nodes to ensure:
+- Fast loading (JSON ~50-150KB per challenge)
+- Responsive client-side A* pathfinding (<50ms)
+- Accurate snapping of freehand drawings
+
+### Drawing Snapping Algorithm
+
+1. Sample user's freehand path at regular intervals (every 10-20px)
+2. For each sample point, find nearest graph node (KD-tree recommended)
+3. Build path by connecting consecutive snapped nodes via shortest graph path
+4. Compare resulting node sequence to optimal path
+
+### Binary Scoring Logic
+
+A path is "correct" if:
+- The user's snapped path follows the same edges as the optimal path
+- Minor variations are allowed (e.g., same route taken but in slightly different order through junction)
+- The path must go from start to finish (incomplete paths = wrong)
+
+---
+
+## Files to Create
+
+1. `supabase/migrations/[timestamp]_route_finder_tables.sql` - Database schema
+2. `docs/modal-processor-route-finder.py` - Modal processing script
+3. `supabase/functions/trigger-route-finder-processing/index.ts` - Trigger function
+4. `src/utils/routeFinderUtils.ts` - Graph and pathfinding utilities
+5. `src/components/route-finder/RouteDrawingCanvas.tsx` - Drawing component
+6. `src/components/route-finder/RouteFinderGame.tsx` - Game logic component
+7. `src/pages/RouteFinder.tsx` - Game page
+
+## Files to Modify
+
+1. `supabase/functions/map-processing-webhook/index.ts` - Add RF endpoints
+2. `src/App.tsx` - Add route for `/route-finder`
+3. `src/components/Header.tsx` - Add navigation link (optional)
+4. `supabase/config.toml` - Add new edge function config
