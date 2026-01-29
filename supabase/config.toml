@@ -10,7 +10,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.trigger-map-processing]
-verify_jwt = true
+verify_jwt = false
 
 [functions.public-config]
+verify_jwt = false
+
+[functions.trigger-route-finder-processing]
 verify_jwt = false

@@ -365,6 +365,153 @@ export type Database = {
         }
         Relationships: []
       }
+      route_finder_attempts: {
+        Row: {
+          challenge_id: string | null
+          created_at: string | null
+          id: string
+          is_correct: boolean
+          map_name: string
+          response_time: number
+          user_id: string
+          user_path: Json | null
+        }
+        Insert: {
+          challenge_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_correct: boolean
+          map_name: string
+          response_time: number
+          user_id: string
+          user_path?: Json | null
+        }
+        Update: {
+          challenge_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_correct?: boolean
+          map_name?: string
+          response_time?: number
+          user_id?: string
+          user_path?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_finder_attempts_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "route_finder_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_finder_challenges: {
+        Row: {
+          answer_image_path: string
+          aspect_ratio: string
+          base_image_path: string
+          challenge_index: number
+          created_at: string | null
+          difficulty_score: number | null
+          finish_node_id: string
+          graph_data: Json
+          id: string
+          map_id: string
+          optimal_length: number
+          optimal_path: Json
+          start_node_id: string
+        }
+        Insert: {
+          answer_image_path: string
+          aspect_ratio: string
+          base_image_path: string
+          challenge_index: number
+          created_at?: string | null
+          difficulty_score?: number | null
+          finish_node_id: string
+          graph_data: Json
+          id?: string
+          map_id: string
+          optimal_length: number
+          optimal_path: Json
+          start_node_id: string
+        }
+        Update: {
+          answer_image_path?: string
+          aspect_ratio?: string
+          base_image_path?: string
+          challenge_index?: number
+          created_at?: string | null
+          difficulty_score?: number | null
+          finish_node_id?: string
+          graph_data?: Json
+          id?: string
+          map_id?: string
+          optimal_length?: number
+          optimal_path?: Json
+          start_node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_finder_challenges_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "route_finder_maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_finder_maps: {
+        Row: {
+          country_code: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          location_name: string | null
+          map_category: string | null
+          name: string
+          source_map_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          country_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          location_name?: string | null
+          map_category?: string | null
+          name: string
+          source_map_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          country_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          location_name?: string | null
+          map_category?: string | null
+          name?: string
+          source_map_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_finder_maps_source_map_id_fkey"
+            columns: ["source_map_id"]
+            isOneToOne: false
+            referencedRelation: "user_maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       route_images: {
         Row: {
           alt_route_length: number | null

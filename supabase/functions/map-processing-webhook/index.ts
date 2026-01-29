@@ -287,6 +287,96 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // ==================== ROUTE FINDER ENDPOINTS ====================
+
+    // RF: UPLOAD IMAGE (base or answer image)
+    if (req.method === 'POST' && action === 'rf-upload-image') {
+      const body = await req.json()
+      const { map_id, storage_path, image_data, content_type = 'image/webp' } = body
+      
+      if (!map_id || !storage_path || !image_data) {
+        return new Response(JSON.stringify({ error: 'Missing required fields' }), 
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Decode base64 image
+      const bin = atob(image_data)
+      const imageBytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) imageBytes[i] = bin.charCodeAt(i)
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage.from('user-route-images')
+        .upload(storage_path, imageBytes, { contentType: content_type, cacheControl: '3600', upsert: true })
+
+      if (uploadError) {
+        console.error('RF upload error:', uploadError)
+        return new Response(JSON.stringify({ error: uploadError.message }), 
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      console.log('RF image uploaded:', storage_path)
+      return new Response(JSON.stringify({ success: true, path: storage_path }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // RF: COMPLETE PROCESSING (finalize with graph data)
+    if (req.method === 'POST' && action === 'rf-complete') {
+      const body = await req.json()
+      const { map_id, map_name, challenges, user_id } = body
+      
+      console.log('RF complete request:', JSON.stringify({
+        map_id, map_name, user_id,
+        challenge_count: challenges?.length || 0,
+      }))
+
+      if (!map_id || !map_name || !challenges || !Array.isArray(challenges)) {
+        return new Response(JSON.stringify({ error: 'Missing required fields' }), 
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Create route_finder_maps entry
+      const { data: rfMap, error: mapError } = await supabase.from('route_finder_maps').insert({
+        name: map_name,
+        user_id: user_id || null,
+        is_public: false,
+        map_category: 'private',
+        description: `Route finder map with ${challenges.length} challenges`,
+      }).select().single()
+
+      if (mapError) {
+        console.error('Error creating route_finder_maps:', mapError)
+        return new Response(JSON.stringify({ error: 'Failed to create route finder map' }), 
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Insert challenges
+      const challengeRecords = challenges.map((c: any, index: number) => ({
+        map_id: rfMap.id,
+        challenge_index: index,
+        graph_data: c.graph_data,
+        start_node_id: c.start_node_id,
+        finish_node_id: c.finish_node_id,
+        optimal_path: c.optimal_path,
+        optimal_length: c.optimal_length,
+        base_image_path: c.base_image_path,
+        answer_image_path: c.answer_image_path,
+        aspect_ratio: c.aspect_ratio || '1:1',
+        difficulty_score: c.difficulty_score || null,
+      }))
+
+      const { error: insertError } = await supabase.from('route_finder_challenges').insert(challengeRecords)
+
+      if (insertError) {
+        console.error('Error inserting challenges:', insertError)
+        return new Response(JSON.stringify({ error: 'Failed to insert challenges' }), 
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      console.log('RF processing complete:', rfMap.id, 'with', challenges.length, 'challenges')
+      return new Response(JSON.stringify({ success: true, route_finder_map_id: rfMap.id }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     return new Response(JSON.stringify({ error: 'Unknown action' }), 
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
