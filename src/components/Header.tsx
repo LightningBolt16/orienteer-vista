@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords, Route } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAdmin } from '../hooks/useAdmin';
@@ -153,6 +153,17 @@ const Header: React.FC = () => {
                   <span>{t('duel')}</span>
                 </Link>
                 
+                <Link 
+                  to="/route-finder" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/route-finder') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Route className="h-5 w-5" />
+                  <span>{t('routeFinder') || 'Route Finder'}</span>
+                </Link>
+                
                 {isAuthenticated && (
                   <Link 
                     to="/my-maps"
@@ -258,6 +269,16 @@ const Header: React.FC = () => {
             >
               <Swords className="h-4 w-4" />
               <span>{t('duel')}</span>
+            </Link>
+            
+            <Link 
+              to="/route-finder" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/route-finder') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <Route className="h-4 w-4" />
+              <span>{t('routeFinder') || 'Route Finder'}</span>
             </Link>
             
             <div className="flex items-center space-x-2 ml-4">
