@@ -31,20 +31,23 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const webhookSecret = Deno.env.get('MAP_PROCESSING_WEBHOOK_SECRET') ?? ''
+
+    const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authHeader } }
+    })
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
     )
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token)
-    if (claimsError || !claimsData?.claims) {
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), 
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
-
-    const userId = claimsData.claims.sub
 
     const body = await req.json()
     const { map_id, map_name, processing_parameters } = body
@@ -56,17 +59,14 @@ Deno.serve(async (req) => {
 
     console.log('Triggering Route Finder processing for map:', map_id)
 
-    // Get map details
-    const serviceClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Get map details using service role
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey)
 
     const { data: userMap, error: mapError } = await serviceClient
       .from('user_maps')
       .select('*')
       .eq('id', map_id)
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .single()
 
     if (mapError || !userMap) {
@@ -74,24 +74,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Map not found or access denied' }), 
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
-
-    // Generate signed URLs for the TIF files
-    const { data: colorUrl } = await serviceClient.storage
-      .from('user-map-sources')
-      .createSignedUrl(userMap.color_tif_path, 3600)
-
-    const { data: bwUrl } = await serviceClient.storage
-      .from('user-map-sources')
-      .createSignedUrl(userMap.bw_tif_path, 3600)
-
-    if (!colorUrl?.signedUrl || !bwUrl?.signedUrl) {
-      return new Response(JSON.stringify({ error: 'Failed to generate signed URLs' }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-    }
-
-    // Prepare webhook URL
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/map-processing-webhook`
-    const webhookSecret = Deno.env.get('MAP_PROCESSING_WEBHOOK_SECRET')
 
     // Modal endpoint for Route Finder processing
     const modalEndpoint = Deno.env.get('MODAL_ENDPOINT_URL')
@@ -102,35 +84,87 @@ Deno.serve(async (req) => {
     }
 
     // Build Route Finder specific endpoint
-    // The Modal processor should have a separate endpoint for Route Finder
     const rfEndpoint = modalEndpoint.replace('/process-map', '/process-route-finder')
 
-    // Prepare processing request
-    const processingRequest = {
-      map_id,
-      map_name: map_name || userMap.name,
-      user_id: userId,
-      color_tif_url: colorUrl.signedUrl,
-      bw_tif_url: bwUrl.signedUrl,
-      roi_coordinates: userMap.roi_coordinates,
-      impassable_annotations: userMap.impassable_annotations || [],
-      processing_parameters: {
-        ...userMap.processing_parameters,
-        ...processing_parameters,
-        // Route Finder specific parameters
-        mode: 'route_finder',
-        min_route_length: 800,
-        max_route_length: 2500,
-        num_challenges: processing_parameters?.num_challenges || 20,
-        graph_simplification_radius: 300,
-      },
-      webhook_url: webhookUrl,
-      webhook_secret: webhookSecret,
+    // Prepare webhook URL
+    const webhookUrl = `${supabaseUrl}/functions/v1/map-processing-webhook`
+
+    let jobPayload: Record<string, unknown>
+    const storageProvider = userMap.storage_provider || 'supabase'
+
+    if (storageProvider === 'r2') {
+      // R2 storage - pass R2 keys directly to Modal
+      // Modal will download using its own R2 credentials
+      console.log('Using R2 storage for Route Finder map:', map_id)
+      
+      jobPayload = {
+        map_id: userMap.id,
+        name: map_name || userMap.name,
+        user_id: user.id,
+        storage_provider: 'r2',
+        r2_color_key: userMap.r2_color_key,
+        r2_bw_key: userMap.r2_bw_key,
+        roi_coordinates: userMap.roi_coordinates,
+        impassable_annotations: userMap.impassable_annotations || [],
+        processing_parameters: {
+          ...userMap.processing_parameters,
+          ...processing_parameters,
+          // Route Finder specific parameters
+          mode: 'route_finder',
+          min_route_length: 800,
+          max_route_length: 2500,
+          num_challenges: processing_parameters?.num_challenges || 20,
+          graph_simplification_radius: 300,
+        },
+        webhook_url: webhookUrl,
+        webhook_secret: webhookSecret,
+      }
+    } else {
+      // Supabase storage - generate signed URLs
+      console.log('Using Supabase storage for Route Finder map:', map_id)
+
+      const { data: colorUrl } = await serviceClient.storage
+        .from('user-map-sources')
+        .createSignedUrl(userMap.color_tif_path, 3600)
+
+      const { data: bwUrl } = await serviceClient.storage
+        .from('user-map-sources')
+        .createSignedUrl(userMap.bw_tif_path, 3600)
+
+      if (!colorUrl?.signedUrl || !bwUrl?.signedUrl) {
+        console.error('Failed to generate signed URLs for Supabase storage')
+        return new Response(JSON.stringify({ error: 'Failed to generate signed URLs' }), 
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      jobPayload = {
+        map_id: userMap.id,
+        name: map_name || userMap.name,
+        user_id: user.id,
+        storage_provider: 'supabase',
+        color_tif_url: colorUrl.signedUrl,
+        bw_tif_url: bwUrl.signedUrl,
+        roi_coordinates: userMap.roi_coordinates,
+        impassable_annotations: userMap.impassable_annotations || [],
+        processing_parameters: {
+          ...userMap.processing_parameters,
+          ...processing_parameters,
+          // Route Finder specific parameters
+          mode: 'route_finder',
+          min_route_length: 800,
+          max_route_length: 2500,
+          num_challenges: processing_parameters?.num_challenges || 20,
+          graph_simplification_radius: 300,
+        },
+        webhook_url: webhookUrl,
+        webhook_secret: webhookSecret,
+      }
     }
 
     console.log('Sending to Modal Route Finder processor:', JSON.stringify({
       map_id,
-      map_name: processingRequest.map_name,
+      map_name: jobPayload.name,
+      storage_provider: storageProvider,
       mode: 'route_finder',
     }))
 
@@ -138,7 +172,7 @@ Deno.serve(async (req) => {
     const modalResponse = await fetch(rfEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(processingRequest),
+      body: JSON.stringify(jobPayload),
     })
 
     if (!modalResponse.ok) {
@@ -156,6 +190,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       message: 'Route Finder processing started',
+      storage_provider: storageProvider,
       call_id: modalResult.call_id,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
