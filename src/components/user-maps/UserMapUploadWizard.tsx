@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, Upload, Check, Loader2, HelpCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import TifFileUploader from './TifFileUploader';
 import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
@@ -29,6 +30,7 @@ interface ImpassableLine {
 const INSTRUCTIONS_SEEN_KEY = 'ocad_instructions_seen';
 
 type WizardStep = 'upload' | 'annotations' | 'roi' | 'parameters' | 'submit';
+type ProcessingMode = 'route_choice' | 'route_finder' | 'both';
 
 interface Point {
   x: number;
@@ -60,6 +62,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [impassableAreas, setImpassableAreas] = useState<ImpassableArea[]>([]);
   const [impassableLines, setImpassableLines] = useState<ImpassableLine[]>([]);
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>('route_choice');
   const [isApplyingAnnotations, setIsApplyingAnnotations] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -229,14 +232,28 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
       });
 
       if (result) {
-        // Trigger processing via edge function
+        // Trigger processing via edge function based on selected mode
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            await supabase.functions.invoke('trigger-map-processing', {
-              body: { map_id: result.id },
-            });
-            console.log('Processing triggered for map:', result.id);
+            // Trigger Route Choice processing
+            if (processingMode === 'route_choice' || processingMode === 'both') {
+              await supabase.functions.invoke('trigger-map-processing', {
+                body: { map_id: result.id },
+              });
+              console.log('Route Choice processing triggered for map:', result.id);
+            }
+            
+            // Trigger Route Finder processing
+            if (processingMode === 'route_finder' || processingMode === 'both') {
+              await supabase.functions.invoke('trigger-route-finder-processing', {
+                body: { 
+                  map_id: result.id,
+                  map_name: mapName,
+                },
+              });
+              console.log('Route Finder processing triggered for map:', result.id);
+            }
           }
         } catch (triggerError) {
           console.error('Failed to trigger processing:', triggerError);
@@ -422,15 +439,80 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
 
       case 'parameters':
         return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Customize the route generation parameters. Default values work well for most maps.
-            </p>
-            <ProcessingParametersForm
-              parameters={parameters}
-              onChange={setParameters}
-              hasPro={hasPro}
-            />
+          <div className="space-y-6">
+            {/* Processing Mode Selection */}
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Processing Mode</Label>
+              <p className="text-sm text-muted-foreground">
+                Choose what type of challenges to generate from your map.
+              </p>
+              <RadioGroup
+                value={processingMode}
+                onValueChange={(value) => setProcessingMode(value as ProcessingMode)}
+                className="space-y-3"
+              >
+                <div className="flex items-start space-x-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="route_choice" id="route_choice" className="mt-1" />
+                  <div className="flex-1">
+                    <Label htmlFor="route_choice" className="font-medium cursor-pointer">
+                      Route Choice Game
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Multiple choice challenges - pick the shortest route from colored options.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="route_finder" id="route_finder" className="mt-1" />
+                  <div className="flex-1">
+                    <Label htmlFor="route_finder" className="font-medium cursor-pointer">
+                      Route Finder Game
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Freehand drawing challenges - draw the optimal route on a clean map.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="both" id="both" className="mt-1" />
+                  <div className="flex-1">
+                    <Label htmlFor="both" className="font-medium cursor-pointer">
+                      Both Modes
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Generate challenges for both game modes (takes longer to process).
+                    </p>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Route Choice Parameters (only shown for route_choice or both) */}
+            {(processingMode === 'route_choice' || processingMode === 'both') && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted-foreground">Route Choice Settings</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <ProcessingParametersForm
+                  parameters={parameters}
+                  onChange={setParameters}
+                  hasPro={hasPro}
+                />
+              </div>
+            )}
+
+            {/* Route Finder info */}
+            {(processingMode === 'route_finder' || processingMode === 'both') && (
+              <div className="bg-muted rounded-lg p-4">
+                <h4 className="font-medium text-sm mb-2">Route Finder Settings</h4>
+                <p className="text-xs text-muted-foreground">
+                  Route Finder generates longer routes (800-2500px) with simplified skeleton graphs 
+                  for client-side path comparison. Default settings will be used.
+                </p>
+              </div>
+            )}
           </div>
         );
 
@@ -477,13 +559,31 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Routes to Generate</p>
-                      <p className="font-medium">{parameters.num_output_routes}</p>
+                      <p className="text-muted-foreground">Processing Mode</p>
+                      <p className="font-medium">
+                        {processingMode === 'route_choice' && 'Route Choice Game'}
+                        {processingMode === 'route_finder' && 'Route Finder Game'}
+                        {processingMode === 'both' && 'Both Modes'}
+                      </p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Distance Range</p>
-                      <p className="font-medium">{parameters.candidate_min_dist}m - {parameters.candidate_max_dist}m</p>
-                    </div>
+                    {(processingMode === 'route_choice' || processingMode === 'both') && (
+                      <>
+                        <div>
+                          <p className="text-muted-foreground">Routes to Generate</p>
+                          <p className="font-medium">{parameters.num_output_routes}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Distance Range</p>
+                          <p className="font-medium">{parameters.candidate_min_dist}m - {parameters.candidate_max_dist}m</p>
+                        </div>
+                      </>
+                    )}
+                    {(processingMode === 'route_finder' || processingMode === 'both') && (
+                      <div>
+                        <p className="text-muted-foreground">Route Finder Challenges</p>
+                        <p className="font-medium">~20 challenges</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
