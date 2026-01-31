@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Build Route Finder specific endpoint
-    const rfEndpoint = modalEndpoint.replace('/process-map', '/process-route-finder')
+    // Use the same Modal endpoint - the 'mode' parameter will differentiate processing
+    // The Modal script checks for mode='route_finder' in processing_parameters
 
     // Prepare webhook URL
     const webhookUrl = `${supabaseUrl}/functions/v1/map-processing-webhook`
@@ -168,8 +168,8 @@ Deno.serve(async (req) => {
       mode: 'route_finder',
     }))
 
-    // Trigger Modal processing
-    const modalResponse = await fetch(rfEndpoint, {
+    // Trigger Modal processing - using the same endpoint but with mode='route_finder'
+    const modalResponse = await fetch(modalEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jobPayload),

@@ -144,6 +144,453 @@ def eval_pair(pair, Gs, num_alts_needed, overlap_tiers, min_sep, max_len_ratio):
     }
 
 # =============================================================================
+# ROUTE FINDER MODE PROCESSING
+# =============================================================================
+
+def simplify_graph_for_challenge(full_graph, optimal_path, corridor_radius=300):
+    """
+    Simplify graph to only include nodes within corridor of optimal path.
+    This reduces graph size for efficient client-side pathfinding.
+    """
+    from scipy.spatial import KDTree as KDTree_scipy
+    
+    path_points = np.array(optimal_path)
+    path_tree = KDTree_scipy(path_points)
+    
+    all_nodes = list(full_graph.nodes())
+    corridor_nodes = set()
+    
+    for node in all_nodes:
+        dist, _ = path_tree.query(node)
+        if dist <= corridor_radius:
+            corridor_nodes.add(node)
+    
+    for node in optimal_path:
+        corridor_nodes.add(tuple(node))
+    
+    node_list = list(corridor_nodes)
+    node_id_map = {node: f"n_{i}" for i, node in enumerate(node_list)}
+    
+    nodes_json = [
+        {"id": node_id_map[node], "x": int(node[1]), "y": int(node[0])}
+        for node in node_list
+    ]
+    
+    edges_json = []
+    seen_edges = set()
+    
+    for u, v, data in full_graph.edges(data=True):
+        if u in corridor_nodes and v in corridor_nodes:
+            edge_key = tuple(sorted([node_id_map[u], node_id_map[v]]))
+            if edge_key not in seen_edges:
+                edges_json.append({
+                    "from": node_id_map[u],
+                    "to": node_id_map[v],
+                    "weight": round(data.get('weight', euclid(u, v)), 2)
+                })
+                seen_edges.add(edge_key)
+    
+    return nodes_json, edges_json, node_id_map
+
+
+def process_route_finder_mode(job_payload, update_status, download_file, download_from_r2, download_and_stitch_tiles):
+    """
+    Process map for Route Finder gamemode.
+    Generates skeleton graphs, base images, and answer images.
+    """
+    import os
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from PIL import Image, ImageDraw
+    from skimage.morphology import skeletonize
+    from matplotlib.path import Path
+    from scipy.spatial import KDTree
+    from sklearn.cluster import DBSCAN
+    import random
+    import requests
+    import base64
+    from matplotlib.patches import Circle, FancyBboxPatch
+    
+    Image.MAX_IMAGE_PIXELS = None
+    
+    def upload_rf_image(file_path: str, storage_path: str, challenge_index: int, image_type: str, aspect_ratio: str):
+        with open(file_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+        requests.post(
+            f"{job_payload['webhook_url']}/rf-upload-image",
+            json={
+                "map_id": job_payload["map_id"],
+                "image_data": image_data,
+                "storage_path": storage_path,
+                "challenge_index": challenge_index,
+                "image_type": image_type,
+                "aspect_ratio": aspect_ratio,
+                "content_type": "image/webp",
+            },
+            headers={"Content-Type": "application/json", "X-Webhook-Secret": job_payload["webhook_secret"]}
+        )
+    
+    map_id = job_payload["map_id"]
+    map_name = job_payload.get("name", "Unknown Map")
+    params = job_payload.get("processing_parameters", {})
+    
+    MIN_ROUTE_LENGTH = params.get("min_route_length", 800)
+    MAX_ROUTE_LENGTH = params.get("max_route_length", 2500)
+    NUM_CHALLENGES = params.get("num_challenges", 20)
+    GRAPH_SIMPLIFICATION_RADIUS = params.get("graph_simplification_radius", 300)
+    NUM_RANDOM_POINTS = params.get("num_random_points", 1500)
+    ZOOM_MARGIN = params.get("zoom_margin", 80)
+    MARKER_RADIUS = params.get("marker_radius", 40)
+    LINE_WIDTH = 8
+    
+    update_status("processing", f"Starting Route Finder generation. Target: {NUM_CHALLENGES} challenges.")
+    
+    try:
+        # Load data
+        if job_payload.get("storage_provider") == "r2":
+            color_path = download_from_r2(job_payload["r2_color_key"], "/tmp/color.tif")
+            bw_path = download_from_r2(job_payload["r2_bw_key"], "/tmp/bw.tif")
+        else:
+            if job_payload.get("is_tiled", False):
+                color_path = download_and_stitch_tiles(job_payload["color_tile_urls"], job_payload["tile_grid"], "/tmp/color.tif")
+                bw_path = download_and_stitch_tiles(job_payload["bw_tile_urls"], job_payload["tile_grid"], "/tmp/bw.tif")
+            else:
+                color_path = download_file(job_payload["color_tif_url"], "/tmp/color.tif")
+                bw_path = download_file(job_payload["bw_tif_url"], "/tmp/bw.tif")
+        
+        color_image = Image.open(color_path).convert("RGB")
+        bw_image = Image.open(bw_path).convert("L")
+        
+        # Apply impassable annotations
+        impassable = job_payload.get("impassable_annotations")
+        if impassable:
+            areas = impassable.get("areas", [])
+            lines = impassable.get("lines", [])
+            print(f"Applying {len(areas)} impassable areas and {len(lines)} lines...")
+            
+            color_rgba = color_image.convert("RGBA")
+            overlay = Image.new("RGBA", color_rgba.size, (0, 0, 0, 0))
+            color_draw = ImageDraw.Draw(overlay)
+            violet = (255, 0, 255, 180)
+            violet_solid = (255, 0, 255, 255)
+            
+            for area in areas:
+                points = [(p["x"], p["y"]) for p in area.get("points", [])]
+                if len(points) >= 3:
+                    color_draw.polygon(points, fill=violet, outline=violet_solid)
+            for line in lines:
+                start = line.get("start", {})
+                end = line.get("end", {})
+                if start and end:
+                    color_draw.line([(start["x"], start["y"]), (end["x"], end["y"])], fill=violet_solid, width=12)
+            
+            color_image = Image.alpha_composite(color_rgba, overlay).convert("RGB")
+            
+            bw_draw = ImageDraw.Draw(bw_image)
+            for area in areas:
+                points = [(p["x"], p["y"]) for p in area.get("points", [])]
+                if len(points) >= 3:
+                    bw_draw.polygon(points, fill=0, outline=0)
+            for line in lines:
+                start = line.get("start", {})
+                end = line.get("end", {})
+                if start and end:
+                    bw_draw.line([(start["x"], start["y"]), (end["x"], end["y"])], fill=0, width=8)
+        
+        w_full, h_full = color_image.size
+        
+        # Load ROI
+        roi_json = job_payload.get("roi_coordinates", [])
+        if roi_json:
+            roi_poly = np.array([[pt["x"], pt["y"]] for pt in roi_json])
+        else:
+            roi_poly = np.array([[0,0], [w_full,0], [w_full,h_full], [0,h_full]])
+        
+        roi_left = int(max(0, np.floor(np.min(roi_poly[:,0]))))
+        roi_top = int(max(0, np.floor(np.min(roi_poly[:,1]))))
+        roi_right = int(min(w_full, np.ceil(np.max(roi_poly[:,0]))))
+        roi_bottom = int(min(h_full, np.ceil(np.max(roi_poly[:,1]))))
+        
+        color_crop = color_image.crop((roi_left, roi_top, roi_right, roi_bottom))
+        bw_crop = bw_image.crop((roi_left, roi_top, roi_right, roi_bottom))
+        w_crop, h_crop = color_crop.size
+        
+        # Build skeleton graph
+        update_status("processing", "Building skeleton graph...")
+        
+        def gen_points(poly, count, bounds):
+            p = []
+            while len(p) < count:
+                cand = np.random.uniform(bounds[0], bounds[2], (count, 2))
+                cand[:, 1] = np.random.uniform(bounds[1], bounds[3], count)
+                valid = poly.contains_points(cand)
+                for pt in cand[valid]:
+                    p.append(tuple(pt))
+                    if len(p) >= count: break
+            return p
+        
+        roi_path_obj = Path(roi_poly)
+        points_global = gen_points(roi_path_obj, NUM_RANDOM_POINTS, (roi_left, roi_top, roi_right, roi_bottom))
+        roi_csv_points = [(pt[1]-roi_top, pt[0]-roi_left) for pt in points_global]
+        
+        binary_crop = (np.array(bw_crop) > 128).astype(np.uint8)
+        skeleton = skeletonize(binary_crop.astype(bool))
+        fullG = nx.Graph()
+        skel_pts = list(zip(*np.nonzero(skeleton)))
+        skel_set = set(skel_pts)
+        
+        for r, c in skel_pts:
+            fullG.add_node((r, c))
+            for dr, dc in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
+                nr, nc = r+dr, c+dc
+                if (nr, nc) in skel_set:
+                    wt = 1 if abs(dr)+abs(dc)==1 else 1.414
+                    fullG.add_edge((r, c), (nr, nc), weight=wt)
+        
+        # Simplify to junctions
+        junctions = {n for n in fullG.nodes() if fullG.degree(n) != 2}
+        Gs = nx.Graph()
+        for n in junctions: Gs.add_node(n)
+        visited_edges = set()
+        for start_node in junctions:
+            for neighbor in fullG.neighbors(start_node):
+                if tuple(sorted((start_node, neighbor))) in visited_edges: continue
+                path = [start_node, neighbor]
+                curr = neighbor
+                prev = start_node
+                dist = fullG[start_node][neighbor]['weight']
+                while curr not in junctions and fullG.degree(curr) == 2:
+                    nhs = list(fullG.neighbors(curr))
+                    nhs.remove(prev)
+                    if not nhs: break
+                    nxt = nhs[0]
+                    dist += fullG[curr][nxt]['weight']
+                    path.append(nxt)
+                    prev, curr = curr, nxt
+                if curr in junctions:
+                    u, v = start_node, curr
+                    if Gs.has_edge(u, v):
+                        if dist < Gs[u][v]['weight']: Gs[u][v]['weight'] = dist
+                    else:
+                        Gs.add_edge(u, v, weight=dist)
+                    visited_edges.add(tuple(sorted((start_node, neighbor))))
+        
+        # Snap random points to graph
+        gs_nodes = np.array(list(Gs.nodes()))
+        if len(gs_nodes) == 0: raise Exception("No navigable terrain found.")
+        tree = KDTree(gs_nodes)
+        snapped_pts = [tuple(gs_nodes[tree.query(p)[1]]) for p in roi_csv_points]
+        
+        # Cluster to reduce duplicates
+        db = DBSCAN(eps=5, min_samples=1).fit(snapped_pts)
+        unique_pts = []
+        labels = set(db.labels_)
+        for l in labels:
+            cluster = [snapped_pts[i] for i in range(len(snapped_pts)) if db.labels_[i] == l]
+            unique_pts.append(cluster[0])
+        
+        # Find long route pairs
+        update_status("processing", f"Finding route pairs (length {MIN_ROUTE_LENGTH}-{MAX_ROUTE_LENGTH}px)...")
+        
+        cand_tree = KDTree(unique_pts)
+        pairs = []
+        for i, p1 in enumerate(unique_pts):
+            idxs = cand_tree.query_ball_point(p1, MAX_ROUTE_LENGTH)
+            for j in idxs:
+                if j <= i: continue
+                p2 = unique_pts[j]
+                straight_dist = np.linalg.norm(np.array(p1)-np.array(p2))
+                if straight_dist >= MIN_ROUTE_LENGTH * 0.6:
+                    pairs.append((p1, p2))
+        
+        if len(pairs) > 10000: pairs = random.sample(pairs, 10000)
+        print(f"Found {len(pairs)} candidate pairs")
+        
+        # Evaluate pairs
+        update_status("processing", f"Evaluating {len(pairs)} pairs...")
+        
+        def eval_route_pair(pair):
+            st, en = pair
+            try:
+                path = nx.astar_path(Gs, st, en, heuristic=euclid, weight="weight")
+                path_length = nx.path_weight(Gs, path, weight="weight")
+                if path_length < MIN_ROUTE_LENGTH or path_length > MAX_ROUTE_LENGTH:
+                    return None
+                return {"start": st, "end": en, "path": path, "length": path_length}
+            except nx.NetworkXNoPath:
+                return None
+        
+        valid_routes = []
+        with ProcessPoolExecutor() as ex:
+            futures = [ex.submit(eval_route_pair, p) for p in pairs]
+            for f in as_completed(futures):
+                res = f.result()
+                if res: valid_routes.append(res)
+        
+        print(f"Valid routes found: {len(valid_routes)}")
+        valid_routes.sort(key=lambda x: x["length"], reverse=True)
+        
+        # Select diverse routes
+        selected_routes = []
+        MIN_START_END_DIST = 200
+        
+        for route in valid_routes:
+            if len(selected_routes) >= NUM_CHALLENGES: break
+            too_close = False
+            for sel in selected_routes:
+                d_start = math.hypot(route["start"][0] - sel["start"][0], route["start"][1] - sel["start"][1])
+                d_end = math.hypot(route["end"][0] - sel["end"][0], route["end"][1] - sel["end"][1])
+                if d_start < MIN_START_END_DIST or d_end < MIN_START_END_DIST:
+                    too_close = True
+                    break
+            if not too_close:
+                selected_routes.append(route)
+        
+        print(f"Selected {len(selected_routes)} diverse challenges")
+        
+        # Generate images and graph data
+        update_status("processing", f"Generating {len(selected_routes)} challenge images...")
+        
+        os.makedirs("/tmp/rf_16_9", exist_ok=True)
+        os.makedirs("/tmp/rf_9_16", exist_ok=True)
+        
+        challenges_data = []
+        
+        def adjust_bbox(min_c, min_r, max_c, max_r, ratio, w, h):
+            bw = max_c - min_c; bh = max_r - min_r
+            curr_r = bw / bh if bh else ratio
+            cent_c = (min_c + max_c) / 2; cent_r = (min_r + max_r) / 2
+            if curr_r < ratio:
+                nw = bh * ratio; nh = bh
+            else:
+                nw = bw; nh = bw / ratio
+            return (int(max(cent_c-nw/2,0)), int(max(cent_r-nh/2,0)), 
+                    int(min(cent_c+nw/2,w)), int(min(cent_r+nh/2,h)))
+        
+        for idx, route in enumerate(selected_routes):
+            st = route["start"]
+            en = route["end"]
+            path = route["path"]
+            path_length = route["length"]
+            
+            # Convert path to pixel coordinates (row, col)
+            path_coords = [(int(node[0]), int(node[1])) for node in path]
+            
+            # Generate simplified graph for this challenge
+            nodes_json, edges_json, node_id_map = simplify_graph_for_challenge(Gs, path, GRAPH_SIMPLIFICATION_RADIUS)
+            start_node_id = node_id_map.get(tuple(st), f"n_start")
+            finish_node_id = node_id_map.get(tuple(en), f"n_finish")
+            optimal_path_ids = [node_id_map.get(tuple(n), f"n_{i}") for i, n in enumerate(path)]
+            
+            graph_data = {"nodes": nodes_json, "edges": edges_json}
+            
+            # Calculate bounding box
+            all_r = [n[0] for n in path]
+            all_c = [n[1] for n in path]
+            min_r, max_r = min(all_r) - ZOOM_MARGIN, max(all_r) + ZOOM_MARGIN
+            min_c, max_c = min(all_c) - ZOOM_MARGIN, max(all_c) + ZOOM_MARGIN
+            
+            # Generate 16:9 and 9:16 crops
+            for ar_name, ar_val in [("16:9", 16/9), ("9:16", 9/16)]:
+                left, top, right, bottom = adjust_bbox(min_c, min_r, max_c, max_r, ar_val, w_crop, h_crop)
+                cropped = color_crop.crop((left, top, right, bottom))
+                crop_w, crop_h = cropped.size
+                
+                # Transform coordinates to crop space
+                st_crop = (st[1] - left, st[0] - top)  # (col, row) -> (x, y)
+                en_crop = (en[1] - left, en[0] - top)
+                path_crop = [(n[1] - left, n[0] - top) for n in path_coords]
+                
+                # Create base image (clean map + markers only)
+                fig_base, ax_base = plt.subplots(figsize=(crop_w/100, crop_h/100), dpi=100)
+                ax_base.imshow(cropped)
+                ax_base.axis('off')
+                ax_base.set_xlim(0, crop_w); ax_base.set_ylim(crop_h, 0)
+                
+                # Draw start triangle
+                tri_size = MARKER_RADIUS
+                tri_pts = [
+                    (st_crop[0], st_crop[1] - tri_size),
+                    (st_crop[0] - tri_size * 0.866, st_crop[1] + tri_size * 0.5),
+                    (st_crop[0] + tri_size * 0.866, st_crop[1] + tri_size * 0.5),
+                ]
+                from matplotlib.patches import Polygon
+                ax_base.add_patch(Polygon(tri_pts, closed=True, fill=False, edgecolor='magenta', linewidth=4))
+                
+                # Draw finish double circle
+                ax_base.add_patch(Circle(en_crop, MARKER_RADIUS, fill=False, edgecolor='magenta', linewidth=4))
+                ax_base.add_patch(Circle(en_crop, MARKER_RADIUS * 0.7, fill=False, edgecolor='magenta', linewidth=4))
+                
+                base_path = f"/tmp/rf_{ar_name.replace(':', '_')}/base_{idx}.webp"
+                plt.savefig(base_path, format='webp', bbox_inches='tight', pad_inches=0, dpi=100)
+                plt.close(fig_base)
+                
+                # Create answer image (map + route + markers)
+                fig_ans, ax_ans = plt.subplots(figsize=(crop_w/100, crop_h/100), dpi=100)
+                ax_ans.imshow(cropped)
+                ax_ans.axis('off')
+                ax_ans.set_xlim(0, crop_w); ax_ans.set_ylim(crop_h, 0)
+                
+                # Draw route
+                xs, ys = zip(*path_crop)
+                ax_ans.plot(xs, ys, color='magenta', linewidth=LINE_WIDTH, alpha=0.8, solid_capstyle='round')
+                
+                # Draw markers
+                ax_ans.add_patch(Polygon(tri_pts, closed=True, fill=False, edgecolor='magenta', linewidth=4))
+                ax_ans.add_patch(Circle(en_crop, MARKER_RADIUS, fill=False, edgecolor='magenta', linewidth=4))
+                ax_ans.add_patch(Circle(en_crop, MARKER_RADIUS * 0.7, fill=False, edgecolor='magenta', linewidth=4))
+                
+                ans_path = f"/tmp/rf_{ar_name.replace(':', '_')}/answer_{idx}.webp"
+                plt.savefig(ans_path, format='webp', bbox_inches='tight', pad_inches=0, dpi=100)
+                plt.close(fig_ans)
+                
+                # Upload images
+                base_storage = f"{map_id}/rf/{idx}/base_{ar_name.replace(':', '_')}.webp"
+                ans_storage = f"{map_id}/rf/{idx}/answer_{ar_name.replace(':', '_')}.webp"
+                
+                upload_rf_image(base_path, base_storage, idx, "base", ar_name)
+                upload_rf_image(ans_path, ans_storage, idx, "answer", ar_name)
+            
+            challenges_data.append({
+                "challenge_index": idx,
+                "graph_data": graph_data,
+                "start_node_id": start_node_id,
+                "finish_node_id": finish_node_id,
+                "optimal_path": optimal_path_ids,
+                "optimal_length": round(path_length, 2),
+                "base_image_path": f"{map_id}/rf/{idx}/base_16_9.webp",
+                "answer_image_path": f"{map_id}/rf/{idx}/answer_16_9.webp",
+                "aspect_ratio": "16:9",
+            })
+        
+        # Send completion webhook
+        update_status("processing", "Finalizing challenges...")
+        
+        requests.post(
+            f"{job_payload['webhook_url']}/rf-complete",
+            json={
+                "map_id": map_id,
+                "map_name": map_name,
+                "user_id": job_payload.get("user_id"),
+                "challenges": challenges_data,
+            },
+            headers={"Content-Type": "application/json", "X-Webhook-Secret": job_payload["webhook_secret"]}
+        )
+        
+        update_status("completed", f"Done. Generated {len(challenges_data)} Route Finder challenges.")
+        return {"success": True, "challenges_generated": len(challenges_data)}
+        
+    except Exception as e:
+        import traceback
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"Route Finder processing failed: {error_msg}")
+        print(traceback.format_exc())
+        update_status("failed", error=error_msg)
+        return {"success": False, "error": error_msg}
+
+
+# =============================================================================
 # MAIN PROCESSING FUNCTION
 # =============================================================================
 
@@ -253,6 +700,10 @@ def process_map(job_payload: dict):
     # --- CONFIGURATION ---
     map_id = job_payload["map_id"]
     params = job_payload.get("processing_parameters", {})
+    
+    # Check for Route Finder mode - delegate to separate processing logic
+    if params.get("mode") == "route_finder":
+        return process_route_finder_mode(job_payload, update_status, download_file, download_from_r2, download_and_stitch_tiles)
     
     NUM_ALTS_PER_CANDIDATE = params.get("num_alternate_routes", 3)
     
