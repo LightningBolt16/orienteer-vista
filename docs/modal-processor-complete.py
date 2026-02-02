@@ -53,6 +53,31 @@ def get_max_separation(path_a, path_b):
     dists, _ = tree_b.query(path_a)
     return np.max(dists)
 
+# Module-level helper for Route Finder multiprocessing (can't pickle nested functions)
+_rf_graph = None
+_rf_min_length = None
+_rf_max_length = None
+
+def _init_rf_worker(graph_data, min_len, max_len):
+    """Initialize worker process with graph data."""
+    global _rf_graph, _rf_min_length, _rf_max_length
+    _rf_graph = graph_data
+    _rf_min_length = min_len
+    _rf_max_length = max_len
+
+def _eval_route_pair(pair):
+    """Evaluate a single route pair - must be at module level for pickling."""
+    global _rf_graph, _rf_min_length, _rf_max_length
+    st, en = pair
+    try:
+        path = nx.astar_path(_rf_graph, st, en, heuristic=euclid, weight="weight")
+        path_length = nx.path_weight(_rf_graph, path, weight="weight")
+        if path_length < _rf_min_length or path_length > _rf_max_length:
+            return None
+        return {"start": st, "end": en, "path": path, "length": path_length}
+    except nx.NetworkXNoPath:
+        return None
+
 def find_alts_smart(original_G, st, en, mainp, requested_alts, overlap_tiers, min_sep, max_len_ratio):
     alts = []
     local_weights = {}
@@ -407,26 +432,19 @@ def process_route_finder_mode(job_payload, update_status, download_file, downloa
         if len(pairs) > 10000: pairs = random.sample(pairs, 10000)
         print(f"Found {len(pairs)} candidate pairs")
         
-        # Evaluate pairs
+        # Evaluate pairs - use single-threaded to avoid pickling issues with graph
         update_status("processing", f"Evaluating {len(pairs)} pairs...")
         
-        def eval_route_pair(pair):
+        valid_routes = []
+        for pair in pairs:
             st, en = pair
             try:
                 path = nx.astar_path(Gs, st, en, heuristic=euclid, weight="weight")
                 path_length = nx.path_weight(Gs, path, weight="weight")
-                if path_length < MIN_ROUTE_LENGTH or path_length > MAX_ROUTE_LENGTH:
-                    return None
-                return {"start": st, "end": en, "path": path, "length": path_length}
+                if path_length >= MIN_ROUTE_LENGTH and path_length <= MAX_ROUTE_LENGTH:
+                    valid_routes.append({"start": st, "end": en, "path": path, "length": path_length})
             except nx.NetworkXNoPath:
-                return None
-        
-        valid_routes = []
-        with ProcessPoolExecutor() as ex:
-            futures = [ex.submit(eval_route_pair, p) for p in pairs]
-            for f in as_completed(futures):
-                res = f.result()
-                if res: valid_routes.append(res)
+                pass
         
         print(f"Valid routes found: {len(valid_routes)}")
         valid_routes.sort(key=lambda x: x["length"], reverse=True)
