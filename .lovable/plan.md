@@ -1,124 +1,141 @@
 
-# Route Finder Gamemode - Implementation Plan
 
-## Status: ✅ Phase 1 Complete
+# Plan: Separate Route Choice and Route Finder Processing Scripts
 
-Frontend components and database schema implemented. Ready for Modal processor integration.
+## Problem Summary
 
----
+When uploading a map for **Route Finder**, the processing still triggers the **Route Choice** logic, resulting in:
+1. Being redirected to Route Game instead of Route Finder
+2. "No Routes Available" error in Route Finder
 
-## What's Implemented
+The root cause is that the unified `modal-processor-complete.py` script has a mode check (`mode == 'route_finder'`), but this isn't properly differentiating the processing because both edge functions call the same Modal endpoint. Additionally, the Route Finder processing might not be completing successfully, causing the system to fall back to Route Choice behavior.
 
-### Database Tables (✅ Complete)
-- `route_finder_maps` - Maps available for Route Finder gamemode
-- `route_finder_challenges` - Individual challenges with graph data
-- `route_finder_attempts` - User attempts for scoring
+## Solution
 
-### Frontend Components (✅ Complete)
-- `src/utils/routeFinderUtils.ts` - Graph pathfinding & scoring
-- `src/components/route-finder/RouteDrawingCanvas.tsx` - Freehand drawing
-- `src/components/route-finder/RouteFinderGame.tsx` - Game logic
-- `src/components/route-finder/RouteFinderResult.tsx` - Result display
-- `src/pages/RouteFinder.tsx` - Game page with map selection
-
-### Edge Functions (✅ Complete)
-- Webhook endpoints for `rf-upload-image` and `rf-complete`
-- `trigger-route-finder-processing` edge function
-
-### Routing (✅ Complete)
-- `/route-finder` route added to App.tsx
+Create completely separate Modal scripts for Route Choice and Route Finder, each with their own independent endpoints.
 
 ---
 
-## What's Needed Next
+## Implementation Steps
 
-### Modal Processor Script
-Create `docs/modal-processor-route-finder.py` with:
+### 1. Revert Route Choice Script (Clean Version)
 
-1. **Graph Export Format:**
-```json
-{
-  "nodes": [{"id": "n_0", "x": 1234, "y": 567}, ...],
-  "edges": [{"from": "n_0", "to": "n_1", "weight": 15.2}, ...],
-  "start": "n_0",
-  "finish": "n_42",
-  "optimalPath": ["n_0", "n_5", "n_12", "n_42"],
-  "optimalLength": 1847.5
-}
+Create a clean `docs/modal-processor-route-choice.py` by removing all Route Finder code from the current complete script:
+- Remove the `process_route_finder_mode` function
+- Remove the `simplify_graph_for_challenge` function  
+- Remove the Route Finder helper globals (`_rf_graph`, etc.)
+- Remove the mode check at line 723
+- Keep only Route Choice processing logic
+
+### 2. Create Standalone Route Finder Script
+
+Update `docs/modal-processor-route-finder.py` with:
+- Fix the pickling issue by using single-threaded processing (currently line 395-399 uses `ProcessPoolExecutor`)
+- Add version logging for deployment verification
+- Use a different Modal app name: `route-finder-processor`
+- Include its own web endpoint that's separate from Route Choice
+
+### 3. Update Edge Function Configuration
+
+#### 3.1 Update `trigger-route-finder-processing` edge function:
+- Add a new secret: `MODAL_ROUTE_FINDER_ENDPOINT_URL`
+- Use this separate endpoint instead of the shared `MODAL_ENDPOINT_URL`
+- Add version logging for debugging
+
+#### 3.2 Keep `trigger-map-processing` unchanged:
+- Uses `MODAL_ENDPOINT_URL` for Route Choice only
+- No mode parameter needed
+
+### 4. Update Supabase Config
+
+Add the `trigger-route-finder-processing` function config if not already present.
+
+### 5. Add Secret for Route Finder Endpoint
+
+Add a new secret `MODAL_ROUTE_FINDER_ENDPOINT_URL` that points to the Route Finder Modal deployment.
+
+---
+
+## Technical Details
+
+### Route Choice Script (`modal-processor-route-choice.py`)
+- **App name**: `map-processor` (existing)
+- **Endpoint**: `/process-map` (existing)
+- **Webhooks used**: 
+  - `/update-status`
+  - `/upload-image`
+  - `/complete`
+
+### Route Finder Script (`modal-processor-route-finder.py`)
+- **App name**: `route-finder-processor`
+- **Endpoint**: `/process-route-finder`
+- **Webhooks used**:
+  - `/update-status`
+  - `/rf-upload-image`
+  - `/rf-complete`
+
+### Edge Function Changes
+
+```typescript
+// trigger-route-finder-processing/index.ts
+const VERSION = "route-finder-trigger-v1.0.0";
+
+// Use separate endpoint
+const modalEndpoint = Deno.env.get('MODAL_ROUTE_FINDER_ENDPOINT_URL');
 ```
 
-2. **Processing Flow:**
-   - Load color/BW maps
-   - Apply impassable annotations
-   - Generate skeleton graph
-   - Simplify to 500-1500 nodes per challenge
-   - Select routes with 800-2500px distance
-   - For each challenge:
-     - Compute optimal path via A*
-     - Generate base image (clean map + start/finish markers)
-     - Generate answer image (map + optimal route overlay)
-     - Upload via `/rf-upload-image`
-   - Complete via `/rf-complete` with all graph data
+### Pickling Fix in Route Finder Script
 
-3. **Webhook Calls:**
+Replace:
 ```python
-# Upload each image
-POST /rf-upload-image
-{
-  "map_id": "...",
-  "storage_path": "user_id/map_id/base_0.webp",
-  "image_data": "<base64>",
-  "content_type": "image/webp"
-}
+with ProcessPoolExecutor() as ex:
+    futures = [ex.submit(eval_route_pair, p) for p in pairs]
+```
 
-# Complete processing
-POST /rf-complete
-{
-  "map_id": "...",
-  "map_name": "...",
-  "user_id": "...",
-  "challenges": [
-    {
-      "graph_data": {...},
-      "start_node_id": "n_0",
-      "finish_node_id": "n_42",
-      "optimal_path": ["n_0", ...],
-      "optimal_length": 1847.5,
-      "base_image_path": "user_id/map_id/base_0.webp",
-      "answer_image_path": "user_id/map_id/answer_0.webp",
-      "aspect_ratio": "1:1"
-    }
-  ]
-}
+With single-threaded loop:
+```python
+valid_routes = []
+for pair in pairs:
+    st, en = pair
+    try:
+        path = nx.astar_path(Gs, st, en, heuristic=euclid, weight="weight")
+        path_length = nx.path_weight(Gs, path, weight="weight")
+        if MIN_ROUTE_LENGTH <= path_length <= MAX_ROUTE_LENGTH:
+            valid_routes.append({"start": st, "end": en, "path": path, "length": path_length})
+    except nx.NetworkXNoPath:
+        pass
 ```
 
 ---
 
-## Scoring Logic
+## Files to Create/Modify
 
-Binary scoring (correct/wrong):
-- User's freehand drawing is sampled at 15px intervals
-- Each sample point snapped to nearest graph node
-- Path reconstructed through A* between consecutive nodes
-- Correct if user path matches ≥85% of optimal path nodes with ≤25% deviation
+| File | Action |
+|------|--------|
+| `docs/modal-processor-route-choice.py` | Create (clean Route Choice only) |
+| `docs/modal-processor-route-finder.py` | Update (fix pickling, add version) |
+| `supabase/functions/trigger-route-finder-processing/index.ts` | Update (use separate endpoint) |
+| `supabase/config.toml` | Update if needed |
 
 ---
 
-## Files Created
+## Deployment Steps (After Implementation)
 
-| File | Purpose |
-|------|---------|
-| `src/utils/routeFinderUtils.ts` | Graph pathfinding, snapping, scoring |
-| `src/components/route-finder/RouteDrawingCanvas.tsx` | Freehand drawing canvas |
-| `src/components/route-finder/RouteFinderGame.tsx` | Game logic component |
-| `src/components/route-finder/RouteFinderResult.tsx` | Result display |
-| `src/pages/RouteFinder.tsx` | Game page |
-| `supabase/functions/trigger-route-finder-processing/index.ts` | Trigger function |
+1. Deploy Route Choice script:
+   ```
+   modal deploy docs/modal-processor-route-choice.py
+   ```
+   - Keep using `MODAL_ENDPOINT_URL` for this
 
-## Files Modified
+2. Deploy Route Finder script:
+   ```
+   modal deploy docs/modal-processor-route-finder.py
+   ```
+   - Get the new endpoint URL
 
-| File | Changes |
-|------|---------|
-| `src/App.tsx` | Added /route-finder route |
-| `supabase/functions/map-processing-webhook/index.ts` | Added RF endpoints |
-| `supabase/config.toml` | Added trigger function config |
+3. Add secret `MODAL_ROUTE_FINDER_ENDPOINT_URL` with the new Route Finder endpoint
+
+4. Redeploy edge functions (automatic)
+
+5. Test by uploading a map with "Route Finder" mode selected
+
