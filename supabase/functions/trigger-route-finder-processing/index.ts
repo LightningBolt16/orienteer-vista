@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+const VERSION = "route-finder-trigger-v1.0.0"
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -8,8 +10,8 @@ const corsHeaders = {
 /**
  * Trigger Route Finder map processing on Modal.
  * 
- * This endpoint initiates the generation of Route Finder challenges from a user's map.
- * The Modal processor will:
+ * This uses a SEPARATE Modal endpoint from Route Choice processing.
+ * The Modal processor (route-finder-processor) will:
  * 1. Generate a skeleton graph from the B&W map
  * 2. Find long routes (800-2500px) suitable for Route Finder
  * 3. Create base images (clean map with start/finish only)
@@ -19,6 +21,7 @@ const corsHeaders = {
  */
 
 Deno.serve(async (req) => {
+  console.log(`${VERSION} - Route Finder trigger received`)
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -75,11 +78,12 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Modal endpoint for Route Finder processing
-    const modalEndpoint = Deno.env.get('MODAL_ENDPOINT_URL')
+    // Modal endpoint for Route Finder processing - SEPARATE from Route Choice
+    // Uses MODAL_ROUTE_FINDER_ENDPOINT_URL instead of shared MODAL_ENDPOINT_URL
+    const modalEndpoint = Deno.env.get('MODAL_ROUTE_FINDER_ENDPOINT_URL')
     if (!modalEndpoint) {
-      console.error('MODAL_ENDPOINT_URL not configured')
-      return new Response(JSON.stringify({ error: 'Processing service not configured' }), 
+      console.error('MODAL_ROUTE_FINDER_ENDPOINT_URL not configured - this is a SEPARATE endpoint from Route Choice')
+      return new Response(JSON.stringify({ error: 'Route Finder processing service not configured. Please add MODAL_ROUTE_FINDER_ENDPOINT_URL secret.' }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 

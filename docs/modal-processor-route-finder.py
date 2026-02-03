@@ -1,22 +1,26 @@
 """
-ROUTE FINDER CHALLENGE GENERATOR - MODAL VERSION
+ROUTE FINDER CHALLENGE GENERATOR - MODAL VERSION (STANDALONE)
 ===========================================================================
+Version: 1.0.0
 - Generates skeleton graphs for Route Finder gamemode
 - Creates base images (map + start/finish markers only)
 - Creates answer images (map + optimal route overlay)
 - Exports simplified graph JSON for client-side pathfinding
 - Uses binary scoring: user's snapped path must match optimal path
+
+This is a STANDALONE script separate from Route Choice processing.
+Uses single-threaded path evaluation to avoid pickling issues.
 """
 
 import modal
 import math
 import numpy as np
 import networkx as nx
-import json
-from concurrent.futures import ProcessPoolExecutor, as_completed
+
+VERSION = "route-finder-processor-v1.0.0"
 
 # =============================================================================
-# MODAL APP CONFIGURATION
+# MODAL APP CONFIGURATION - SEPARATE FROM ROUTE CHOICE
 # =============================================================================
 app = modal.App("route-finder-processor")
 
@@ -122,9 +126,11 @@ def process_route_finder(job_payload: dict):
     import random
     import requests
     import base64
-    from matplotlib.patches import Circle, FancyBboxPatch
+    from matplotlib.patches import Circle
     import boto3
     from botocore.config import Config
+    
+    print(f"Route Finder Processor {VERSION} starting...")
     
     Image.MAX_IMAGE_PIXELS = None
 
@@ -183,7 +189,7 @@ def process_route_finder(job_payload: dict):
 
     # --- CONFIGURATION ---
     map_id = job_payload["map_id"]
-    map_name = job_payload.get("map_name", "Unknown Map")
+    map_name = job_payload.get("name", job_payload.get("map_name", "Unknown Map"))
     params = job_payload.get("processing_parameters", {})
     
     # Route Finder specific parameters
@@ -197,25 +203,29 @@ def process_route_finder(job_payload: dict):
     MARKER_RADIUS = params.get("marker_radius", 40)
     LINE_WIDTH = 8
     
+    print(f"Processing Route Finder for map: {map_name} (ID: {map_id})")
+    print(f"Parameters: min_length={MIN_ROUTE_LENGTH}, max_length={MAX_ROUTE_LENGTH}, num_challenges={NUM_CHALLENGES}")
+    
     update_status("processing", f"Starting Route Finder generation. Target: {NUM_CHALLENGES} challenges.")
 
     try:
         # --- LOAD DATA ---
         if job_payload.get("storage_provider") == "r2":
+            print("Loading from R2 storage...")
             color_path = download_from_r2(job_payload["r2_color_key"], "/tmp/color.tif")
             bw_path = download_from_r2(job_payload["r2_bw_key"], "/tmp/bw.tif")
         else:
+            print("Loading from Supabase storage...")
             color_path = download_file(job_payload["color_tif_url"], "/tmp/color.tif")
             bw_path = download_file(job_payload["bw_tif_url"], "/tmp/bw.tif")
 
         color_image = Image.open(color_path).convert("RGB")
         bw_image = Image.open(bw_path).convert("L")
+        print(f"Images loaded: color={color_image.size}, bw={bw_image.size}")
         
         # --- APPLY IMPASSABLE ANNOTATIONS ---
         impassable = job_payload.get("impassable_annotations")
         if impassable:
-            from PIL import ImageDraw
-            
             areas = impassable.get("areas", [])
             lines = impassable.get("lines", [])
             print(f"Applying {len(areas)} impassable areas and {len(lines)} lines...")
@@ -278,6 +288,7 @@ def process_route_finder(job_payload: dict):
         color_crop = color_image.crop((roi_left, roi_top, roi_right, roi_bottom))
         bw_crop = bw_image.crop((roi_left, roi_top, roi_right, roi_bottom))
         w_crop, h_crop = color_crop.size
+        print(f"Cropped to ROI: {w_crop}x{h_crop}")
 
         # --- GRAPH GENERATION ---
         update_status("processing", "Building skeleton graph...")
@@ -302,6 +313,8 @@ def process_route_finder(job_payload: dict):
         fullG = nx.Graph()
         skel_pts = list(zip(*np.nonzero(skeleton)))
         skel_set = set(skel_pts)
+        
+        print(f"Skeleton points: {len(skel_pts)}")
         
         for r, c in skel_pts:
             fullG.add_node((r, c))
@@ -339,9 +352,12 @@ def process_route_finder(job_payload: dict):
                         Gs.add_edge(u, v, weight=dist)
                     visited_edges.add(tuple(sorted((start_node, neighbor))))
 
+        print(f"Simplified graph: {len(Gs.nodes())} nodes, {len(Gs.edges())} edges")
+
         # Snap random points to graph
         gs_nodes = np.array(list(Gs.nodes()))
-        if len(gs_nodes) == 0: raise Exception("No navigable terrain found.")
+        if len(gs_nodes) == 0: 
+            raise Exception("No navigable terrain found in the map.")
         tree = KDTree(gs_nodes)
         snapped_pts = [tuple(gs_nodes[tree.query(p)[1]]) for p in roi_csv_points]
         
@@ -352,6 +368,8 @@ def process_route_finder(job_payload: dict):
         for l in labels:
             cluster = [snapped_pts[i] for i in range(len(snapped_pts)) if db.labels_[i] == l]
             unique_pts.append(cluster[0])
+        
+        print(f"Unique candidate points: {len(unique_pts)}")
             
         # --- FIND LONG ROUTE PAIRS ---
         update_status("processing", f"Finding route pairs (length {MIN_ROUTE_LENGTH}-{MAX_ROUTE_LENGTH}px)...")
@@ -367,38 +385,40 @@ def process_route_finder(job_payload: dict):
                 if straight_dist >= MIN_ROUTE_LENGTH * 0.6:  # Allow some slack for path length
                     pairs.append((p1, p2))
         
-        if len(pairs) > 10000: pairs = random.sample(pairs, 10000)
+        if len(pairs) > 10000: 
+            pairs = random.sample(pairs, 10000)
         print(f"Found {len(pairs)} candidate pairs")
         
-        # --- EVALUATE PAIRS ---
-        update_status("processing", f"Evaluating {len(pairs)} pairs...")
+        # --- EVALUATE PAIRS (SINGLE-THREADED to avoid pickling issues) ---
+        update_status("processing", f"Evaluating {len(pairs)} pairs (single-threaded)...")
         
-        def eval_route_pair(pair):
+        valid_routes = []
+        evaluated = 0
+        
+        for pair in pairs:
             st, en = pair
             try:
                 path = nx.astar_path(Gs, st, en, heuristic=euclid, weight="weight")
                 path_length = nx.path_weight(Gs, path, weight="weight")
                 
-                if path_length < MIN_ROUTE_LENGTH or path_length > MAX_ROUTE_LENGTH:
-                    return None
-                    
-                return {
-                    "start": st,
-                    "end": en,
-                    "path": path,
-                    "length": path_length,
-                }
+                if MIN_ROUTE_LENGTH <= path_length <= MAX_ROUTE_LENGTH:
+                    valid_routes.append({
+                        "start": st,
+                        "end": en,
+                        "path": path,
+                        "length": path_length,
+                    })
             except nx.NetworkXNoPath:
-                return None
-        
-        valid_routes = []
-        with ProcessPoolExecutor() as ex:
-            futures = [ex.submit(eval_route_pair, p) for p in pairs]
-            for f in as_completed(futures):
-                res = f.result()
-                if res: valid_routes.append(res)
+                pass
+            
+            evaluated += 1
+            if evaluated % 1000 == 0:
+                print(f"Evaluated {evaluated}/{len(pairs)} pairs, found {len(valid_routes)} valid routes")
         
         print(f"Valid routes found: {len(valid_routes)}")
+        
+        if len(valid_routes) == 0:
+            raise Exception(f"No valid routes found in length range {MIN_ROUTE_LENGTH}-{MAX_ROUTE_LENGTH}px. Try adjusting parameters.")
         
         # Sort by length (prefer longer routes) and select diverse set
         valid_routes.sort(key=lambda x: x["length"], reverse=True)
@@ -424,6 +444,9 @@ def process_route_finder(job_payload: dict):
         
         print(f"Selected {len(selected_routes)} diverse challenges")
         
+        if len(selected_routes) == 0:
+            raise Exception("Could not select any diverse routes. Try with a larger map or different parameters.")
+        
         # --- GENERATE IMAGES AND GRAPH DATA ---
         update_status("processing", f"Generating {len(selected_routes)} challenge images...")
         
@@ -433,14 +456,18 @@ def process_route_finder(job_payload: dict):
         challenges_data = []
         
         def adjust_bbox(min_c, min_r, max_c, max_r, ratio, w, h):
-            bw = max_c - min_c; bh = max_r - min_r
+            bw = max_c - min_c
+            bh = max_r - min_r
             curr_r = bw / bh if bh else ratio
-            cent_c = (min_c + max_c) / 2; cent_r = (min_r + max_r) / 2
+            cent_c = (min_c + max_c) / 2
+            cent_r = (min_r + max_r) / 2
             
             if curr_r < ratio:
-                nw = bh * ratio; nh = bh
+                nw = bh * ratio
+                nh = bh
             else:
-                nw = bw; nh = bw / ratio
+                nw = bw
+                nh = bw / ratio
             return (int(max(cent_c-nw/2,0)), int(max(cent_r-nh/2,0)), 
                     int(min(cent_c+nw/2,w)), int(min(cent_r+nh/2,h)))
 
@@ -452,7 +479,8 @@ def process_route_finder(job_payload: dict):
             
             # Calculate bounding box
             all_pts = path
-            rs = [p[0] for p in all_pts]; cs = [p[1] for p in all_pts]
+            rs = [p[0] for p in all_pts]
+            cs = [p[1] for p in all_pts]
             rmin, rmax = max(0, min(rs)-ZOOM_MARGIN), min(h_crop, max(rs)+ZOOM_MARGIN)
             cmin, cmax = max(0, min(cs)-ZOOM_MARGIN), min(w_crop, max(cs)+ZOOM_MARGIN)
             
@@ -472,13 +500,16 @@ def process_route_finder(job_payload: dict):
             def generate_challenge_images(bbox, folder, ratio_str):
                 base = color_crop.copy()
                 
-                def off(pt): return (pt[1]-bbox[0], pt[0]-bbox[1])
+                def off(pt): 
+                    return (pt[1]-bbox[0], pt[0]-bbox[1])
                 
                 # --- BASE IMAGE (clean map + start/finish only) ---
                 fig, ax = plt.subplots(figsize=((bbox[2]-bbox[0])/100, (bbox[3]-bbox[1])/100), dpi=100)
                 ax.imshow(base.crop(bbox))
                 
-                s = off(st); e = off(en)
+                s = off(st)
+                e = off(en)
+                
                 # Start marker (triangle)
                 start_marker = plt.Polygon([
                     (s[0], s[1] - MARKER_RADIUS),
@@ -544,11 +575,16 @@ def process_route_finder(job_payload: dict):
                 "optimal_path": optimal_path_ids,
                 "optimal_length": round(path_length, 2),
                 "difficulty_score": round(difficulty, 2),
+                "base_image_path": base_16_9,  # Default to 16:9
+                "answer_image_path": answer_16_9,
                 "base_image_path_16_9": base_16_9,
                 "answer_image_path_16_9": answer_16_9,
                 "base_image_path_9_16": base_9_16,
                 "answer_image_path_9_16": answer_9_16,
             })
+            
+            if i % 5 == 0:
+                print(f"Generated challenge {i}/{len(selected_routes)}")
         
         # --- SEND COMPLETION WEBHOOK ---
         update_status("processing", f"Finalizing {len(challenges_data)} challenges...")
@@ -568,17 +604,28 @@ def process_route_finder(job_payload: dict):
         )
         print(f"rf-complete webhook response: {response.status_code} - {response.text}")
         
+        if response.status_code != 200:
+            raise Exception(f"Webhook failed: {response.status_code} - {response.text}")
+        
         update_status("completed", f"Done. Generated {len(challenges_data)} Route Finder challenges.")
+        print(f"Route Finder processing complete: {len(challenges_data)} challenges generated")
         
     except Exception as e:
         import traceback
         traceback.print_exc()
+        print(f"Route Finder processing failed: {e}")
         update_status("failed", error=str(e))
+        raise
 
+
+# =============================================================================
+# WEB ENDPOINT - SEPARATE FROM ROUTE CHOICE
+# =============================================================================
 
 @app.function(image=image)
 @modal.fastapi_endpoint(method="POST")
 def trigger_route_finder(payload: dict):
     """Trigger Route Finder processing."""
+    print(f"Route Finder trigger received for map: {payload.get('map_id')}")
     process_route_finder.spawn(payload)
-    return {"status": "accepted"}
+    return {"status": "accepted", "version": VERSION}
