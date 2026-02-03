@@ -208,9 +208,9 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
       <RouteFinderResult
         isCorrect={lastResult.isCorrect}
         responseTime={lastResult.responseTime}
-        answerImageUrl={getImageUrl(currentChallenge.answer_image_path)}
+        baseImageUrl={getImageUrl(currentChallenge.base_image_path)}
         userPath={lastResult.userPath}
-        optimalPath={currentChallenge.optimal_path}
+        optimalPath={currentChallenge.graph_data.optimalPath}
         graph={currentChallenge.graph_data}
         onNext={handleNext}
         stats={stats}
