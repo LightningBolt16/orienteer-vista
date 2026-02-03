@@ -1,153 +1,84 @@
 
 
-# Fix Route Finder Submit and Leaderboard Issues
+# Show Both User Path and Correct Route on Result Screen
 
-## Problem Summary
+## Problem
 
-Two distinct issues are preventing proper Route Finder gameplay and leaderboard updates:
+When you draw a route in Route Finder and submit it, the result screen only shows the pre-rendered "answer image" with the correct route. You cannot see:
+1. How the game interpreted (snapped) your freehand drawing
+2. A side-by-side comparison of your route vs the correct route
 
-1. **Submit button crashes**: When submitting a drawn route, the game crashes with "Cannot read properties of undefined (reading '0')". This happens because the `graph_data` stored in the database doesn't contain the `optimalPath` property - it's stored in a separate `optimal_path` column.
+This makes it confusing when you drew what you thought was correct, but the game marked it wrong.
 
-2. **Leaderboard not updating for Route Finder**: The leaderboard only queries the `route_attempts` table (Route Choice), completely ignoring `route_finder_attempts` (Route Finder). Route Finder stats are never reflected in rankings.
+## Solution
 
----
+Modify the result screen to draw both paths as canvas overlays on the base map image:
+- **Your drawn route (snapped)**: Shown in magenta/pink
+- **Correct route**: Shown in green
 
-## Root Cause Analysis
-
-### Issue 1: Graph Data Structure Mismatch
-
-The database stores challenges like this:
-- `graph_data`: Contains `{ nodes: [...], edges: [...] }` (no optimalPath)
-- `optimal_path`: Separate column with the path array
-- `start_node_id`, `finish_node_id`: Separate columns
-
-But `RouteFinderGame.tsx` transforms the data at lines 72-77:
-```typescript
-const transformedChallenges = data.map((c: any) => ({
-  ...c,
-  graph_data: c.graph_data as RouteFinderGraph,  // Missing optimalPath!
-  optimal_path: c.optimal_path as string[],
-}));
-```
-
-The `graph_data` gets cast to `RouteFinderGraph` which expects `optimalPath`, but it's never added. When `scoreDrawing()` calls `isPathOptimal(userPath, graph.optimalPath)`, `graph.optimalPath` is undefined.
-
-**Fix**: Merge the separate columns into the graph object properly:
-```typescript
-const transformedChallenges = data.map((c: any) => ({
-  ...c,
-  graph_data: {
-    ...c.graph_data,
-    start: c.start_node_id,
-    finish: c.finish_node_id,
-    optimalPath: c.optimal_path,
-    optimalLength: c.optimal_length,
-  } as RouteFinderGraph,
-}));
-```
-
-### Issue 2: Separate Leaderboards for Different Games
-
-Route Choice and Route Finder are different game modes with different attempt tables:
-- Route Choice: `route_attempts` table → updates `user_profiles` stats
-- Route Finder: `route_finder_attempts` table → no leaderboard
-
-Currently, Route Finder gameplay saves to `route_finder_attempts` but the leaderboard only queries `user_profiles` which is only updated from `route_attempts`.
-
-**Options**:
-1. **Separate leaderboards**: Create a Route Finder-specific leaderboard
+This way you can directly compare where your route differed from the optimal one.
 
 ---
 
-## Implementation Steps
+## Implementation Details
 
-### Step 1: Fix Graph Data Transformation in RouteFinderGame.tsx
+### File to Modify: `src/components/route-finder/RouteFinderResult.tsx`
 
-Modify the data transformation to properly merge separate columns into the `graph_data` object:
+**Changes:**
+1. Import `getPathCoordinates` from `routeFinderUtils` to convert node IDs to x,y coordinates
+2. Replace the static answer image with the base image + canvas overlay
+3. Draw both paths on the canvas:
+   - User's snapped path in magenta (same color as when drawing)
+   - Optimal path in green (showing the correct answer)
+4. Add a legend explaining which color is which
+5. Accept `baseImageUrl` as an additional prop (passed from `RouteFinderGame`)
 
-**File**: `src/components/route-finder/RouteFinderGame.tsx`
+### File to Modify: `src/components/route-finder/RouteFinderGame.tsx`
 
-**Change** (around lines 72-77):
-```typescript
-const transformedChallenges = data.map((c: any) => ({
-  ...c,
-  map_name: c.route_finder_maps?.name,
-  graph_data: {
-    nodes: c.graph_data.nodes || [],
-    edges: c.graph_data.edges || [],
-    start: c.start_node_id,
-    finish: c.finish_node_id,
-    optimalPath: c.optimal_path || [],
-    optimalLength: c.optimal_length || 0,
-  } as RouteFinderGraph,
-}));
-```
+**Changes:**
+1. Pass `baseImageUrl` to `RouteFinderResult` in addition to `answerImageUrl`
 
-### Step 2: Update Route Finder Stats to User Profiles
+---
 
-Create a leaderboard for Route Finder sepearete from the Route Choice Leaderboards
+## Visual Design
 
-### Step 3: Add Defensive Checks in routeFinderUtils.ts
-
-Add null checks to prevent crashes if data is malformed:
-
-**File**: `src/utils/routeFinderUtils.ts`
-
-**Change** `isPathOptimal` function:
-```typescript
-export function isPathOptimal(
-  userPath: string[],
-  optimalPath: string[]
-): boolean {
-  // Defensive checks
-  if (!userPath || !optimalPath) return false;
-  if (userPath.length < 2 || optimalPath.length < 2) return false;
-  
-  // ... rest of function
-}
-```
-
-**Change** `scoreDrawing` function:
-```typescript
-export function scoreDrawing(
-  userPoints: Point[],
-  graph: RouteFinderGraph
-): { ... } {
-  // Validate graph data
-  if (!graph || !graph.nodes || !graph.optimalPath) {
-    console.error('Invalid graph data for scoring');
-    return {
-      isCorrect: false,
-      snappedPath: [],
-      userPathLength: 0,
-      optimalLength: 0,
-    };
-  }
-  // ... rest of function
-}
+```text
++------------------------------------------+
+|  [Score: 2/5]              [Time: 3.2s]  |
+|                                          |
+|                                          |
+|     +--------------------------+         |
+|     |                          |         |
+|     |   MAP WITH TWO ROUTES    |         |
+|     |   ---- Magenta = Yours   |         |
+|     |   ---- Green = Correct   |         |
+|     |                          |         |
+|     +--------------------------+         |
+|                                          |
+|    Legend:                               |
+|    [---] Your route  [---] Correct       |
+|                                          |
+|    "Not the shortest route"              |
+|    "Compare your route (pink) with       |
+|     the correct route (green)"           |
+|                                          |
+|         [Next Challenge ->]              |
++------------------------------------------+
 ```
 
 ---
 
-## Technical Details
+## Technical Approach
 
-### Files to Modify
+The result component will:
 
-| File | Changes |
-|------|---------|
-| `src/components/route-finder/RouteFinderGame.tsx` | Fix graph data transformation, add route_attempts insert |
-| `src/utils/routeFinderUtils.ts` | Add defensive null checks |
+1. **Load the base image** (clean map without any routes drawn)
+2. **Create a canvas overlay** sized to match the displayed image
+3. **Convert node IDs to coordinates** using `getPathCoordinates(userPath, graph)` and `getPathCoordinates(optimalPath, graph)`
+4. **Draw both paths** with different colors and line styles:
+   - User path: Magenta, solid line
+   - Optimal path: Green, slightly thicker or dashed for contrast
+5. **Handle scaling** - coordinates are in image pixels, need to scale to canvas display size
 
-### Database Tables Involved
-
-- `route_finder_challenges`: Source of challenge data (already correct)
-- `route_finder_attempts`: Route Finder-specific tracking (keep as-is)
-- `route_attempts`: Main attempts table for leaderboard (add Route Finder entries with `RF:` prefix)
-- `user_profiles`: Stores accuracy/speed stats (updated via `updatePerformance`)
-
-### Testing Plan
-
-1. **Submit button fix**: Play Route Finder, draw a route, click Submit - should show result without crashing
-2. **Leaderboard update**: Complete several Route Finder challenges, check that accuracy/speed in profile updates
-3. **Both games work**: Verify Route Choice still works correctly after changes
+This approach uses the same drawing logic as the existing `RouteDrawingCanvas` component, ensuring consistency.
 
