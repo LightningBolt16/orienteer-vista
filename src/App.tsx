@@ -9,6 +9,7 @@ import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import RouteGame from "./pages/RouteGame";
 import RouteFinder from "./pages/RouteFinder";
+import RouteFinderLeaderboard from "./pages/RouteFinderLeaderboard";
 import DuelMode from "./pages/DuelMode";
 import CourseSetter from "./pages/CourseSetter";
 import MyFiles from "./pages/MyFiles";
@@ -56,6 +57,7 @@ const App: React.FC = () => {
                     <Route path="/" element={<Layout><Index /></Layout>} />
                     <Route path="/route-game" element={<Layout><RouteGame /></Layout>} />
                     <Route path="/route-finder" element={<RouteFinder />} />
+                    <Route path="/route-finder/leaderboard" element={<RouteFinderLeaderboard />} />
                     <Route path="/duel" element={<DuelMode />} />
                     <Route path="/course-setter" element={<Layout><CourseSetter /></Layout>} />
                     <Route path="/my-files" element={<Layout><MyFiles /></Layout>} />

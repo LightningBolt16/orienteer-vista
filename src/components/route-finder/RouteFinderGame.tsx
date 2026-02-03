@@ -68,12 +68,19 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
         return;
       }
 
-      // Transform data to include map name
+      // Transform data to include map name and merge optimal path into graph
       const transformedChallenges = data.map((c: any) => ({
         ...c,
         map_name: c.route_finder_maps?.name,
-        graph_data: c.graph_data as RouteFinderGraph,
-        optimal_path: c.optimal_path as string[],
+        // Merge separate columns into the graph_data object
+        graph_data: {
+          nodes: c.graph_data?.nodes || [],
+          edges: c.graph_data?.edges || [],
+          start: c.start_node_id,
+          finish: c.finish_node_id,
+          optimalPath: c.optimal_path || [],
+          optimalLength: c.optimal_length || 0,
+        } as RouteFinderGraph,
       }));
 
       // Shuffle challenges for variety
