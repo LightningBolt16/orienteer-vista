@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import RouteFinderGame from '@/components/route-finder/RouteFinderGame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Lock, MapPin, Loader2 } from 'lucide-react';
+import { ArrowLeft, Lock, MapPin, Loader2, Trophy } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface MapOption {
@@ -127,9 +127,17 @@ const RouteFinder: React.FC = () => {
           </Button>
           
           <h1 className="text-3xl font-bold mb-2">Route Finder</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             Draw the shortest route from start to finish. Your path will be compared to the optimal route.
           </p>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/route-finder/leaderboard')}
+            className="flex items-center gap-2"
+          >
+            <Trophy className="h-4 w-4" />
+            View Leaderboard
+          </Button>
         </div>
 
         {/* Quick play button */}

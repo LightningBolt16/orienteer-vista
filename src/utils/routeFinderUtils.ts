@@ -238,8 +238,12 @@ export function isPathOptimal(
   userPath: string[],
   optimalPath: string[]
 ): boolean {
+  // Defensive checks for null/undefined
+  if (!userPath || !optimalPath) return false;
+  if (!Array.isArray(userPath) || !Array.isArray(optimalPath)) return false;
+  
   // User path must connect start to finish
-  if (userPath.length < 2) return false;
+  if (userPath.length < 2 || optimalPath.length < 2) return false;
   if (userPath[0] !== optimalPath[0]) return false;
   if (userPath[userPath.length - 1] !== optimalPath[optimalPath.length - 1]) return false;
   
@@ -289,6 +293,21 @@ export function scoreDrawing(
   userPathLength: number;
   optimalLength: number;
 } {
+  // Validate graph data to prevent crashes
+  if (!graph || !graph.nodes || !graph.optimalPath || !Array.isArray(graph.optimalPath)) {
+    console.error('Invalid graph data for scoring:', { 
+      hasGraph: !!graph, 
+      hasNodes: !!graph?.nodes, 
+      hasOptimalPath: !!graph?.optimalPath 
+    });
+    return {
+      isCorrect: false,
+      snappedPath: [],
+      userPathLength: 0,
+      optimalLength: graph?.optimalLength || 0,
+    };
+  }
+
   // 1. Snap user's freehand points to graph nodes
   const snappedNodeIds = snapPointsToGraph(userPoints, graph);
   
