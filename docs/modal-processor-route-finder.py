@@ -46,10 +46,16 @@ def euclid(u, v):
     return math.hypot(u[0]-v[0], u[1]-v[1])
 
 
-def simplify_graph_for_challenge(full_graph, optimal_path, corridor_radius=300):
+def simplify_graph_for_challenge(full_graph, optimal_path, corridor_radius=300, bbox=None):
     """
     Simplify graph to only include nodes within corridor of optimal path.
     This reduces graph size for efficient client-side pathfinding.
+    
+    Args:
+        full_graph: The full skeleton graph
+        optimal_path: List of (row, col) tuples for the optimal path
+        corridor_radius: Distance from path to include nodes
+        bbox: Optional (left, top, right, bottom) to transform coordinates to be relative to a crop
     
     Returns: (nodes_list, edges_list, node_id_mapping)
     """
@@ -76,9 +82,19 @@ def simplify_graph_for_challenge(full_graph, optimal_path, corridor_radius=300):
     node_list = list(corridor_nodes)
     node_id_map = {node: f"n_{i}" for i, node in enumerate(node_list)}
     
-    # Build nodes JSON
+    # Determine coordinate offset (for transforming to challenge image space)
+    # bbox is (left, top, right, bottom) in (col, row) format
+    # node coordinates are in (row, col) format
+    offset_row = bbox[1] if bbox else 0  # top
+    offset_col = bbox[0] if bbox else 0  # left
+    
+    # Build nodes JSON with coordinates relative to the challenge image crop
     nodes_json = [
-        {"id": node_id_map[node], "x": int(node[1]), "y": int(node[0])}  # Note: (row, col) -> (y, x)
+        {
+            "id": node_id_map[node], 
+            "x": int(node[1] - offset_col),  # col -> x, offset by bbox left
+            "y": int(node[0] - offset_row)   # row -> y, offset by bbox top
+        }
         for node in node_list
     ]
     
@@ -487,9 +503,10 @@ def process_route_finder(job_payload: dict):
             b169 = adjust_bbox(cmin, rmin, cmax, rmax, 16/9, w_crop, h_crop)
             b916 = adjust_bbox(cmin, rmin, cmax, rmax, 9/16, w_crop, h_crop)
             
-            # Simplify graph for this challenge
+            # Simplify graph for this challenge - use 16:9 bbox for coordinate transformation
+            # since the default base_image_path uses 16:9 format
             nodes_json, edges_json, node_id_map = simplify_graph_for_challenge(
-                Gs, path, GRAPH_SIMPLIFICATION_RADIUS
+                Gs, path, GRAPH_SIMPLIFICATION_RADIUS, bbox=b169
             )
             
             # Map path to node IDs
