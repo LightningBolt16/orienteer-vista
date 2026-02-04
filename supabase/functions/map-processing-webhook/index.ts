@@ -335,9 +335,11 @@ Deno.serve(async (req) => {
       }
 
       // Create route_finder_maps entry - set is_public: true so maps are playable immediately
+      // CRITICAL: Set source_map_id to link back to user_maps for frontend lookup
       const { data: rfMap, error: mapError } = await supabase.from('route_finder_maps').insert({
         name: map_name,
         user_id: user_id || null,
+        source_map_id: map_id,
         is_public: true,
         map_category: 'official',
         description: `Route finder map with ${challenges.length} challenges`,
