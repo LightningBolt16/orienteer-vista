@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
         optimal_length: c.optimal_length,
         base_image_path: c.base_image_path,
         answer_image_path: c.answer_image_path,
-        aspect_ratio: c.aspect_ratio || '16:9',
+        aspect_ratio: (c.aspect_ratio || '16:9').replace(':', '_'),
         difficulty_score: c.difficulty_score || null,
         impassability_mask_path: c.impassability_mask_path || null,
         bbox_width: c.bbox_width || null,
