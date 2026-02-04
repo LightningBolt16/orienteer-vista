@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import RouteDrawingCanvas from './RouteDrawingCanvas';
 import RouteFinderResult from './RouteFinderResult';
-import { scoreDrawing, type RouteFinderGraph, type Point } from '@/utils/routeFinderUtils';
+import { scoreDrawing, loadImpassabilityMask, type RouteFinderGraph, type Point, type ImpassabilityMask } from '@/utils/routeFinderUtils';
 import { Loader2 } from 'lucide-react';
 
 interface Challenge {
@@ -17,6 +17,9 @@ interface Challenge {
   optimal_length: number;
   base_image_path: string;
   answer_image_path: string;
+  impassability_mask_path: string | null;
+  bbox_width: number | null;
+  bbox_height: number | null;
   aspect_ratio: string;
   map_name?: string;
 }
@@ -40,6 +43,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
   const [startTime, setStartTime] = useState<number>(0);
   const [stats, setStats] = useState({ correct: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [currentMask, setCurrentMask] = useState<ImpassabilityMask | null>(null);
 
   // Load challenges
   const loadChallenges = useCallback(async () => {
@@ -99,6 +103,24 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
     loadChallenges();
   }, [loadChallenges]);
 
+  // Load impassability mask when challenge changes
+  const currentChallenge = challenges[currentIndex];
+  
+  useEffect(() => {
+    const loadMask = async () => {
+      if (!currentChallenge?.impassability_mask_path) {
+        setCurrentMask(null);
+        return;
+      }
+      
+      const maskUrl = getImageUrl(currentChallenge.impassability_mask_path);
+      const mask = await loadImpassabilityMask(maskUrl, 4);
+      setCurrentMask(mask);
+    };
+    
+    loadMask();
+  }, [currentChallenge?.impassability_mask_path]);
+
   // Get storage URL for image
   const getImageUrl = (path: string): string => {
     const { data } = supabase.storage.from('user-route-images').getPublicUrl(path);
@@ -107,13 +129,18 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
 
   // Handle path submission
   const handlePathComplete = async (points: Point[]) => {
-    const currentChallenge = challenges[currentIndex];
     if (!currentChallenge) return;
 
     const responseTime = Date.now() - startTime;
 
-    // Score the drawing
-    const result = scoreDrawing(points, currentChallenge.graph_data);
+    // Score the drawing with mask validation
+    const result = scoreDrawing(
+      points, 
+      currentChallenge.graph_data,
+      currentMask,
+      currentChallenge.bbox_width ?? undefined,
+      currentChallenge.bbox_height ?? undefined
+    );
 
     setLastResult({
       isCorrect: result.isCorrect,
@@ -154,6 +181,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
   const handleNext = () => {
     setShowResult(false);
     setLastResult(null);
+    setCurrentMask(null);
 
     if (currentIndex + 1 >= challenges.length) {
       // Game complete
@@ -166,9 +194,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
       setStartTime(Date.now());
     }
   };
-
-  // Current challenge
-  const currentChallenge = challenges[currentIndex];
 
   // Find start and finish markers from graph
   const startMarker = currentChallenge?.graph_data?.nodes?.find(
@@ -214,6 +239,8 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
         graph={currentChallenge.graph_data}
         onNext={handleNext}
         stats={stats}
+        bboxWidth={currentChallenge.bbox_width ?? undefined}
+        bboxHeight={currentChallenge.bbox_height ?? undefined}
       />
     );
   }
@@ -247,6 +274,9 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
         disabled={showResult}
         startMarker={startMarker}
         finishMarker={finishMarker}
+        impassabilityMask={currentMask}
+        bboxWidth={currentChallenge.bbox_width ?? undefined}
+        bboxHeight={currentChallenge.bbox_height ?? undefined}
       />
     </div>
   );

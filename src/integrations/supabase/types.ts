@@ -411,12 +411,15 @@ export type Database = {
           answer_image_path: string
           aspect_ratio: string
           base_image_path: string
+          bbox_height: number | null
+          bbox_width: number | null
           challenge_index: number
           created_at: string | null
           difficulty_score: number | null
           finish_node_id: string
           graph_data: Json
           id: string
+          impassability_mask_path: string | null
           map_id: string
           optimal_length: number
           optimal_path: Json
@@ -426,12 +429,15 @@ export type Database = {
           answer_image_path: string
           aspect_ratio: string
           base_image_path: string
+          bbox_height?: number | null
+          bbox_width?: number | null
           challenge_index: number
           created_at?: string | null
           difficulty_score?: number | null
           finish_node_id: string
           graph_data: Json
           id?: string
+          impassability_mask_path?: string | null
           map_id: string
           optimal_length: number
           optimal_path: Json
@@ -441,12 +447,15 @@ export type Database = {
           answer_image_path?: string
           aspect_ratio?: string
           base_image_path?: string
+          bbox_height?: number | null
+          bbox_width?: number | null
           challenge_index?: number
           created_at?: string | null
           difficulty_score?: number | null
           finish_node_id?: string
           graph_data?: Json
           id?: string
+          impassability_mask_path?: string | null
           map_id?: string
           optimal_length?: number
           optimal_path?: Json

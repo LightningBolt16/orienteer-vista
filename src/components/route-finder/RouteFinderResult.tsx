@@ -12,6 +12,8 @@ interface RouteFinderResultProps {
   graph: RouteFinderGraph;
   onNext: () => void;
   stats: { correct: number; total: number };
+  bboxWidth?: number;
+  bboxHeight?: number;
 }
 
 const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
@@ -23,6 +25,8 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
   graph,
   onNext,
   stats,
+  bboxWidth,
+  bboxHeight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,11 +46,15 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
     img.src = baseImageUrl;
   }, [baseImageUrl]);
 
+  // Use bbox dimensions for coordinate scaling if available
+  const effectiveBboxWidth = bboxWidth || imageDimensions.width;
+  const effectiveBboxHeight = bboxHeight || imageDimensions.height;
+
   // Draw both paths on canvas
   const drawPaths = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container || imageDimensions.width === 0) return;
+    if (!canvas || !container || effectiveBboxWidth === 0) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -55,8 +63,8 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
     canvas.width = containerRect.width;
     canvas.height = containerRect.height;
 
-    const scaleX = imageDimensions.width / containerRect.width;
-    const scaleY = imageDimensions.height / containerRect.height;
+    const scaleX = effectiveBboxWidth / containerRect.width;
+    const scaleY = effectiveBboxHeight / containerRect.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -93,7 +101,7 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
       }
       ctx.stroke();
     }
-  }, [userPath, optimalPath, graph, imageDimensions]);
+  }, [userPath, optimalPath, graph, effectiveBboxWidth, effectiveBboxHeight]);
 
   useEffect(() => {
     drawPaths();

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo2, Trash2, Check } from 'lucide-react';
-import type { Point } from '@/utils/routeFinderUtils';
+import { isPointPassable, type Point, type ImpassabilityMask } from '@/utils/routeFinderUtils';
 
 interface RouteDrawingCanvasProps {
   imageUrl: string;
@@ -10,6 +10,9 @@ interface RouteDrawingCanvasProps {
   showSubmitButton?: boolean;
   startMarker?: Point;
   finishMarker?: Point;
+  impassabilityMask?: ImpassabilityMask | null;
+  bboxWidth?: number;
+  bboxHeight?: number;
 }
 
 const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
@@ -19,6 +22,9 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
   showSubmitButton = true,
   startMarker,
   finishMarker,
+  impassabilityMask,
+  bboxWidth,
+  bboxHeight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,6 +33,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [showImpassableWarning, setShowImpassableWarning] = useState(false);
 
   // Load image and get dimensions
   useEffect(() => {
@@ -37,6 +44,10 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     };
     img.src = imageUrl;
   }, [imageUrl]);
+
+  // Use bbox dimensions for coordinate scaling if available, otherwise use image dimensions
+  const effectiveBboxWidth = bboxWidth || imageDimensions.width;
+  const effectiveBboxHeight = bboxHeight || imageDimensions.height;
 
   // Draw paths on canvas
   const redrawCanvas = useCallback(() => {
@@ -52,10 +63,10 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
 
     // Get container dimensions for scaling
     const containerRect = container.getBoundingClientRect();
-    const scaleX = imageDimensions.width / containerRect.width;
-    const scaleY = imageDimensions.height / containerRect.height;
+    const scaleX = effectiveBboxWidth / containerRect.width;
+    const scaleY = effectiveBboxHeight / containerRect.height;
 
-    // Set canvas size to match image dimensions
+    // Set canvas size to match container
     canvas.width = containerRect.width;
     canvas.height = containerRect.height;
 
@@ -107,7 +118,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-  }, [paths, currentPath, imageDimensions, startMarker, finishMarker]);
+  }, [paths, currentPath, effectiveBboxWidth, effectiveBboxHeight, startMarker, finishMarker]);
 
   useEffect(() => {
     redrawCanvas();
@@ -130,14 +141,20 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
       clientY = e.clientY;
     }
 
-    // Calculate position relative to container, then scale to image coordinates
-    const scaleX = imageDimensions.width / rect.width;
-    const scaleY = imageDimensions.height / rect.height;
+    // Calculate position relative to container, then scale to bbox coordinates
+    const scaleX = effectiveBboxWidth / rect.width;
+    const scaleY = effectiveBboxHeight / rect.height;
 
     return {
       x: (clientX - rect.left) * scaleX,
       y: (clientY - rect.top) * scaleY,
     };
+  };
+
+  // Check if point is on passable terrain
+  const checkPassable = (point: Point): boolean => {
+    if (!impassabilityMask) return true;
+    return isPointPassable(point, impassabilityMask, effectiveBboxWidth, effectiveBboxHeight);
   };
 
   const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
@@ -146,6 +163,13 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     
     const point = getPointFromEvent(e);
     if (!point) return;
+
+    // Check if starting on impassable terrain
+    if (!checkPassable(point)) {
+      setShowImpassableWarning(true);
+      setTimeout(() => setShowImpassableWarning(false), 1500);
+      return;
+    }
 
     setIsDrawing(true);
     setCurrentPath([point]);
@@ -157,6 +181,13 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
 
     const point = getPointFromEvent(e);
     if (!point) return;
+
+    // Check if drawing on impassable terrain - show warning but still record the point
+    // (we'll let the snapping algorithm handle invalid points)
+    if (!checkPassable(point)) {
+      setShowImpassableWarning(true);
+      setTimeout(() => setShowImpassableWarning(false), 500);
+    }
 
     setCurrentPath(prev => [...prev, point]);
   };
@@ -217,6 +248,17 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
           className="absolute inset-0 w-full h-full pointer-events-none"
         />
       </div>
+
+      {/* Impassable terrain warning */}
+      {showImpassableWarning && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+          <div className="bg-red-500/90 backdrop-blur-sm px-4 py-2 rounded-lg animate-in zoom-in-50 duration-200">
+            <p className="text-white font-semibold text-sm">
+              ⚠️ Impassable terrain!
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
