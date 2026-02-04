@@ -3,6 +3,7 @@
  * 
  * Graph-based pathfinding and route comparison for the Route Finder gamemode.
  * Uses A* algorithm for shortest path finding and snaps freehand drawings to graph nodes.
+ * Includes impassability mask validation for accurate path verification.
  */
 
 export interface GraphNode {
@@ -29,6 +30,13 @@ export interface RouteFinderGraph {
 export interface Point {
   x: number;
   y: number;
+}
+
+export interface ImpassabilityMask {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+  scale: number; // How many original pixels per mask pixel (e.g., 4 = 1/4 resolution)
 }
 
 // Build adjacency list for efficient graph traversal
@@ -65,6 +73,57 @@ export function euclideanDistance(a: Point, b: Point): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+// Check if a point is on passable terrain using the mask
+export function isPointPassable(
+  point: Point,
+  mask: ImpassabilityMask | null,
+  bboxWidth?: number,
+  bboxHeight?: number
+): boolean {
+  if (!mask) return true;
+  
+  // If we have bbox dimensions, we need to scale the point to mask coordinates
+  // The mask is MASK_SCALE (4x) smaller than the bbox dimensions
+  const scaleX = mask.width / (bboxWidth || mask.width * mask.scale);
+  const scaleY = mask.height / (bboxHeight || mask.height * mask.scale);
+  
+  const maskX = Math.floor(point.x * scaleX);
+  const maskY = Math.floor(point.y * scaleY);
+  
+  // Bounds check
+  if (maskX < 0 || maskX >= mask.width || maskY < 0 || maskY >= mask.height) {
+    return false; // Out of bounds = impassable
+  }
+  
+  // Get pixel value (RGBA format, check red channel)
+  const idx = (maskY * mask.width + maskX) * 4;
+  return mask.data[idx] > 128; // White (>128) is passable, black (<=128) is impassable
+}
+
+// Check if a line segment between two points crosses impassable terrain
+export function isPathSegmentPassable(
+  from: Point,
+  to: Point,
+  mask: ImpassabilityMask | null,
+  bboxWidth?: number,
+  bboxHeight?: number,
+  samples: number = 10
+): boolean {
+  if (!mask) return true;
+  
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const point: Point = {
+      x: from.x + (to.x - from.x) * t,
+      y: from.y + (to.y - from.y) * t,
+    };
+    if (!isPointPassable(point, mask, bboxWidth, bboxHeight)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Find the nearest graph node to a given point
 export function findNearestNode(point: Point, nodes: GraphNode[]): GraphNode | null {
   if (nodes.length === 0) return null;
@@ -81,6 +140,29 @@ export function findNearestNode(point: Point, nodes: GraphNode[]): GraphNode | n
   }
   
   return nearest;
+}
+
+// Find the nearest passable graph node to a given point
+export function findNearestPassableNode(
+  point: Point,
+  nodes: GraphNode[],
+  mask: ImpassabilityMask | null,
+  bboxWidth?: number,
+  bboxHeight?: number
+): GraphNode | null {
+  if (nodes.length === 0) return null;
+  
+  // Filter to only passable nodes if we have a mask
+  const passableNodes = mask
+    ? nodes.filter(n => isPointPassable(n, mask, bboxWidth, bboxHeight))
+    : nodes;
+  
+  if (passableNodes.length === 0) {
+    // Fall back to nearest node if all are impassable
+    return findNearestNode(point, nodes);
+  }
+  
+  return findNearestNode(point, passableNodes);
 }
 
 // A* pathfinding algorithm
@@ -182,7 +264,10 @@ export function samplePath(points: Point[], interval: number = 15): Point[] {
 // Snap freehand drawing points to nearest graph nodes
 export function snapPointsToGraph(
   userPoints: Point[],
-  graph: RouteFinderGraph
+  graph: RouteFinderGraph,
+  mask?: ImpassabilityMask | null,
+  bboxWidth?: number,
+  bboxHeight?: number
 ): string[] {
   if (userPoints.length === 0 || graph.nodes.length === 0) {
     return [];
@@ -191,11 +276,14 @@ export function snapPointsToGraph(
   // Sample the path at regular intervals
   const sampledPoints = samplePath(userPoints, 15);
   
-  // Snap each sampled point to nearest node
+  // Snap each sampled point to nearest node (preferring passable nodes)
   const snappedNodeIds: string[] = [];
   
   for (const point of sampledPoints) {
-    const nearestNode = findNearestNode(point, graph.nodes);
+    const nearestNode = mask
+      ? findNearestPassableNode(point, graph.nodes, mask, bboxWidth, bboxHeight)
+      : findNearestNode(point, graph.nodes);
+    
     if (nearestNode) {
       // Avoid consecutive duplicates
       if (snappedNodeIds.length === 0 || snappedNodeIds[snappedNodeIds.length - 1] !== nearestNode.id) {
@@ -286,7 +374,10 @@ export function getPathCoordinates(
 // Score a user's drawing against the optimal path
 export function scoreDrawing(
   userPoints: Point[],
-  graph: RouteFinderGraph
+  graph: RouteFinderGraph,
+  mask?: ImpassabilityMask | null,
+  bboxWidth?: number,
+  bboxHeight?: number
 ): {
   isCorrect: boolean;
   snappedPath: string[];
@@ -308,8 +399,8 @@ export function scoreDrawing(
     };
   }
 
-  // 1. Snap user's freehand points to graph nodes
-  const snappedNodeIds = snapPointsToGraph(userPoints, graph);
+  // 1. Snap user's freehand points to graph nodes (considering impassability)
+  const snappedNodeIds = snapPointsToGraph(userPoints, graph, mask, bboxWidth, bboxHeight);
   
   // 2. Reconstruct the actual path through the graph
   const { path: userPath, totalLength: userPathLength } = reconstructUserPath(snappedNodeIds, graph);
@@ -323,4 +414,45 @@ export function scoreDrawing(
     userPathLength,
     optimalLength: graph.optimalLength,
   };
+}
+
+// Load impassability mask from image URL
+export async function loadImpassabilityMask(
+  maskUrl: string,
+  scale: number = 4
+): Promise<ImpassabilityMask | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get canvas context for mask');
+        resolve(null);
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      resolve({
+        data: imageData.data,
+        width: canvas.width,
+        height: canvas.height,
+        scale,
+      });
+    };
+    
+    img.onerror = () => {
+      console.error('Failed to load impassability mask:', maskUrl);
+      resolve(null);
+    };
+    
+    img.src = maskUrl;
+  });
 }

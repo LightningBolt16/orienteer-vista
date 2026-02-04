@@ -1,10 +1,11 @@
 """
 ROUTE FINDER CHALLENGE GENERATOR - MODAL VERSION (STANDALONE)
 ===========================================================================
-Version: 1.0.0
+Version: 1.1.0
 - Generates skeleton graphs for Route Finder gamemode
 - Creates base images (map + start/finish markers only)
 - Creates answer images (map + optimal route overlay)
+- Creates impassability masks for client-side validation
 - Exports simplified graph JSON for client-side pathfinding
 - Uses binary scoring: user's snapped path must match optimal path
 
@@ -17,7 +18,7 @@ import math
 import numpy as np
 import networkx as nx
 
-VERSION = "route-finder-processor-v1.0.0"
+VERSION = "route-finder-processor-v1.1.0"
 
 # =============================================================================
 # MODAL APP CONFIGURATION - SEPARATE FROM ROUTE CHOICE
@@ -186,9 +187,13 @@ def process_route_finder(job_payload: dict):
             print(f"Status update failed: {e}")
     
     def upload_rf_image(file_path: str, storage_path: str, challenge_index: int, image_type: str, aspect_ratio: str):
-        """Upload Route Finder image (base or answer)."""
+        """Upload Route Finder image (base, answer, or mask)."""
         with open(file_path, "rb") as f:
             image_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        # Determine content type based on file extension
+        content_type = "image/png" if file_path.endswith(".png") else "image/webp"
+        
         requests.post(
             f"{job_payload['webhook_url']}/rf-upload-image",
             json={
@@ -196,9 +201,9 @@ def process_route_finder(job_payload: dict):
                 "image_data": image_data,
                 "storage_path": storage_path,
                 "challenge_index": challenge_index,
-                "image_type": image_type,  # 'base' or 'answer'
+                "image_type": image_type,  # 'base', 'answer', or 'mask'
                 "aspect_ratio": aspect_ratio,
-                "content_type": "image/webp",
+                "content_type": content_type,
             },
             headers={"Content-Type": "application/json", "X-Webhook-Secret": job_payload["webhook_secret"]}
         )
@@ -218,6 +223,7 @@ def process_route_finder(job_payload: dict):
     ZOOM_MARGIN = params.get("zoom_margin", 80)
     MARKER_RADIUS = params.get("marker_radius", 40)
     LINE_WIDTH = 8
+    MASK_SCALE = 4  # Downscale factor for impassability masks
     
     print(f"Processing Route Finder for map: {map_name} (ID: {map_id})")
     print(f"Parameters: min_length={MIN_ROUTE_LENGTH}, max_length={MAX_ROUTE_LENGTH}, num_challenges={NUM_CHALLENGES}")
@@ -503,6 +509,10 @@ def process_route_finder(job_payload: dict):
             b169 = adjust_bbox(cmin, rmin, cmax, rmax, 16/9, w_crop, h_crop)
             b916 = adjust_bbox(cmin, rmin, cmax, rmax, 9/16, w_crop, h_crop)
             
+            # Calculate exact bbox dimensions for client-side coordinate scaling
+            bbox_width = b169[2] - b169[0]
+            bbox_height = b169[3] - b169[1]
+            
             # Simplify graph for this challenge - use 16:9 bbox for coordinate transformation
             # since the default base_image_path uses 16:9 format
             nodes_json, edges_json, node_id_map = simplify_graph_for_challenge(
@@ -514,7 +524,30 @@ def process_route_finder(job_payload: dict):
             start_node_id = node_id_map[st]
             finish_node_id = node_id_map[en]
             
-            def generate_challenge_images(bbox, folder, ratio_str):
+            def generate_impassability_mask(bbox, folder, challenge_index):
+                """Generate a downscaled binary mask for the challenge area."""
+                # Crop the B&W image to the bbox
+                mask_region = bw_crop.crop(bbox)
+                
+                # Calculate downscaled dimensions
+                orig_w = bbox[2] - bbox[0]
+                orig_h = bbox[3] - bbox[1]
+                small_w = max(1, orig_w // MASK_SCALE)
+                small_h = max(1, orig_h // MASK_SCALE)
+                
+                # Downscale using NEAREST to preserve binary nature
+                mask_small = mask_region.resize((small_w, small_h), Image.NEAREST)
+                
+                # Convert to pure black/white (threshold at 128)
+                mask_binary = mask_small.point(lambda x: 255 if x > 128 else 0)
+                
+                # Save as PNG (smaller than WEBP for binary images)
+                mask_path = f"/tmp/rf_{folder}/challenge_{challenge_index}_mask.png"
+                mask_binary.save(mask_path, "PNG")
+                
+                return mask_path, small_w, small_h
+            
+            def generate_challenge_images(bbox, folder, ratio_str, is_primary=False):
                 base = color_crop.copy()
                 
                 def off(pt): 
@@ -573,10 +606,21 @@ def process_route_finder(job_payload: dict):
                 
                 upload_rf_image(answer_path, f"{map_id}/route_finder/{folder}/challenge_{i}_answer.webp", i, "answer", ratio_str)
                 
-                return f"{map_id}/route_finder/{folder}/challenge_{i}_base.webp", f"{map_id}/route_finder/{folder}/challenge_{i}_answer.webp"
+                # --- IMPASSABILITY MASK (only for primary aspect ratio) ---
+                mask_storage_path = None
+                if is_primary:
+                    local_mask_path, mask_w, mask_h = generate_impassability_mask(bbox, folder, i)
+                    mask_storage_path = f"{map_id}/route_finder/{folder}/challenge_{i}_mask.png"
+                    upload_rf_image(local_mask_path, mask_storage_path, i, "mask", ratio_str)
+                
+                return (
+                    f"{map_id}/route_finder/{folder}/challenge_{i}_base.webp",
+                    f"{map_id}/route_finder/{folder}/challenge_{i}_answer.webp",
+                    mask_storage_path
+                )
             
-            base_16_9, answer_16_9 = generate_challenge_images(b169, "16_9", "16:9")
-            base_9_16, answer_9_16 = generate_challenge_images(b916, "9_16", "9:16")
+            base_16_9, answer_16_9, mask_path = generate_challenge_images(b169, "16_9", "16:9", is_primary=True)
+            base_9_16, answer_9_16, _ = generate_challenge_images(b916, "9_16", "9:16", is_primary=False)
             
             # Calculate difficulty score based on route complexity
             difficulty = min(10, (path_length / 200) + len(path) / 50)
@@ -594,6 +638,9 @@ def process_route_finder(job_payload: dict):
                 "difficulty_score": round(difficulty, 2),
                 "base_image_path": base_16_9,  # Default to 16:9
                 "answer_image_path": answer_16_9,
+                "impassability_mask_path": mask_path,
+                "bbox_width": bbox_width,
+                "bbox_height": bbox_height,
                 "base_image_path_16_9": base_16_9,
                 "answer_image_path_16_9": answer_16_9,
                 "base_image_path_9_16": base_9_16,
