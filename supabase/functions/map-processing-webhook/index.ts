@@ -334,12 +334,12 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      // Create route_finder_maps entry
+      // Create route_finder_maps entry - set is_public: true so maps are playable immediately
       const { data: rfMap, error: mapError } = await supabase.from('route_finder_maps').insert({
         name: map_name,
         user_id: user_id || null,
-        is_public: false,
-        map_category: 'private',
+        is_public: true,
+        map_category: 'official',
         description: `Route finder map with ${challenges.length} challenges`,
       }).select().single()
 
