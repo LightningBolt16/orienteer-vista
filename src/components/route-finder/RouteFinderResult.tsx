@@ -1,60 +1,77 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, X, ArrowRight } from 'lucide-react';
-import { getPathCoordinates, type RouteFinderGraph } from '@/utils/routeFinderUtils';
+import { ArrowRight } from 'lucide-react';
+import { type Point } from '@/utils/routeFinderUtils';
 
 interface RouteFinderResultProps {
-  isCorrect: boolean;
+  score: number;
+  feedback: string;
   responseTime: number;
-  baseImageUrl: string;
-  userPath: string[];
-  optimalPath: string[];
-  graph: RouteFinderGraph;
+  answerImageUrl: string;
+  userPoints: Point[];
   onNext: () => void;
   stats: { correct: number; total: number };
-  bboxWidth?: number;
-  bboxHeight?: number;
+  imageDimensions: { width: number; height: number };
 }
 
 const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
-  isCorrect,
+  score,
+  feedback,
   responseTime,
-  baseImageUrl,
-  userPath,
-  optimalPath,
-  graph,
+  answerImageUrl,
+  userPoints,
   onNext,
   stats,
-  bboxWidth,
-  bboxHeight,
+  imageDimensions,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [imageBounds, setImageBounds] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   const formatTime = (ms: number): string => {
     const seconds = ms / 1000;
     return seconds.toFixed(1) + 's';
   };
 
-  // Load image dimensions
+  // Calculate actual image bounds within the container (accounting for object-contain)
+  const calculateImageBounds = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || imageDimensions.width === 0) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const containerRatio = containerRect.width / containerRect.height;
+    const imageRatio = imageDimensions.width / imageDimensions.height;
+
+    let renderWidth: number, renderHeight: number, offsetX: number, offsetY: number;
+
+    if (imageRatio > containerRatio) {
+      // Image is wider - letterbox top/bottom
+      renderWidth = containerRect.width;
+      renderHeight = containerRect.width / imageRatio;
+      offsetX = 0;
+      offsetY = (containerRect.height - renderHeight) / 2;
+    } else {
+      // Image is taller - letterbox left/right
+      renderHeight = containerRect.height;
+      renderWidth = containerRect.height * imageRatio;
+      offsetX = (containerRect.width - renderWidth) / 2;
+      offsetY = 0;
+    }
+
+    setImageBounds({ x: offsetX, y: offsetY, width: renderWidth, height: renderHeight });
+  }, [imageDimensions]);
+
   useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-    };
-    img.src = baseImageUrl;
-  }, [baseImageUrl]);
+    calculateImageBounds();
+    window.addEventListener('resize', calculateImageBounds);
+    return () => window.removeEventListener('resize', calculateImageBounds);
+  }, [calculateImageBounds]);
 
-  // Use bbox dimensions for coordinate scaling if available
-  const effectiveBboxWidth = bboxWidth || imageDimensions.width;
-  const effectiveBboxHeight = bboxHeight || imageDimensions.height;
-
-  // Draw both paths on canvas
-  const drawPaths = useCallback(() => {
+  // Draw user's path on canvas
+  const drawUserPath = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container || effectiveBboxWidth === 0) return;
+    if (!canvas || !container || imageBounds.width === 0 || userPoints.length < 2) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -63,68 +80,54 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
     canvas.width = containerRect.width;
     canvas.height = containerRect.height;
 
-    const scaleX = effectiveBboxWidth / containerRect.width;
-    const scaleY = effectiveBboxHeight / containerRect.height;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get coordinates for both paths
-    const userCoords = getPathCoordinates(userPath, graph);
-    const optimalCoords = getPathCoordinates(optimalPath, graph);
+    // Scale user points to canvas coordinates (accounting for image bounds)
+    const scaleX = imageBounds.width / imageDimensions.width;
+    const scaleY = imageBounds.height / imageDimensions.height;
 
-    // Draw optimal path first (green, thicker, slightly transparent)
-    if (optimalCoords.length >= 2) {
-      ctx.strokeStyle = '#22C55E';
-      ctx.lineWidth = 6;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.globalAlpha = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(optimalCoords[0].x / scaleX, optimalCoords[0].y / scaleY);
-      for (let i = 1; i < optimalCoords.length; i++) {
-        ctx.lineTo(optimalCoords[i].x / scaleX, optimalCoords[i].y / scaleY);
-      }
-      ctx.stroke();
-    }
+    ctx.strokeStyle = '#FF00FF';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.9;
 
-    // Draw user path on top (magenta)
-    if (userCoords.length >= 2) {
-      ctx.strokeStyle = '#FF00FF';
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.globalAlpha = 1;
-      ctx.beginPath();
-      ctx.moveTo(userCoords[0].x / scaleX, userCoords[0].y / scaleY);
-      for (let i = 1; i < userCoords.length; i++) {
-        ctx.lineTo(userCoords[i].x / scaleX, userCoords[i].y / scaleY);
-      }
-      ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(
+      imageBounds.x + userPoints[0].x * scaleX,
+      imageBounds.y + userPoints[0].y * scaleY
+    );
+    for (let i = 1; i < userPoints.length; i++) {
+      ctx.lineTo(
+        imageBounds.x + userPoints[i].x * scaleX,
+        imageBounds.y + userPoints[i].y * scaleY
+      );
     }
-  }, [userPath, optimalPath, graph, effectiveBboxWidth, effectiveBboxHeight]);
+    ctx.stroke();
+  }, [userPoints, imageBounds, imageDimensions]);
 
   useEffect(() => {
-    drawPaths();
-  }, [drawPaths]);
+    drawUserPath();
+  }, [drawUserPath]);
 
-  // Redraw on resize
-  useEffect(() => {
-    const handleResize = () => drawPaths();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [drawPaths]);
+  // Get score color
+  const getScoreColor = () => {
+    if (score >= 80) return 'text-green-500';
+    if (score >= 60) return 'text-yellow-500';
+    return 'text-red-500';
+  };
 
   return (
     <div className="relative w-full h-full bg-black">
-      {/* Base map image */}
+      {/* Answer image (shows the pre-rendered correct route) */}
       <img
-        src={baseImageUrl}
-        alt="Map"
+        src={answerImageUrl}
+        alt="Correct route"
         className="absolute inset-0 w-full h-full object-contain"
         draggable={false}
       />
 
-      {/* Canvas overlay for drawing paths */}
+      {/* Canvas overlay for user's path */}
       <div
         ref={containerRef}
         className="absolute inset-0"
@@ -135,20 +138,19 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
         />
       </div>
 
-      {/* Result overlay */}
+      {/* Score display */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div
           className={`
-            w-24 h-24 rounded-full flex items-center justify-center
-            ${isCorrect ? 'bg-green-500/90' : 'bg-red-500/90'}
+            w-28 h-28 rounded-full flex flex-col items-center justify-center
+            bg-background/90 backdrop-blur-sm
             shadow-2xl animate-in zoom-in-50 duration-300
           `}
         >
-          {isCorrect ? (
-            <Check className="h-12 w-12 text-white" strokeWidth={3} />
-          ) : (
-            <X className="h-12 w-12 text-white" strokeWidth={3} />
-          )}
+          <span className={`text-3xl font-bold ${getScoreColor()}`}>
+            {score}%
+          </span>
+          <span className="text-xs text-muted-foreground">Score</span>
         </div>
       </div>
 
@@ -156,7 +158,7 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
       <div className="absolute top-4 right-4 z-10 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Score:</span>
+            <span className="text-sm text-muted-foreground">Correct:</span>
             <span className="font-semibold text-green-500">{stats.correct}</span>
             <span className="text-muted-foreground">/</span>
             <span className="font-semibold">{stats.total}</span>
@@ -176,7 +178,7 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
             <span className="text-muted-foreground">Your route</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-1 bg-[#22C55E] rounded" />
+            <div className="w-4 h-1 bg-[#FF0000] rounded" />
             <span className="text-muted-foreground">Correct route</span>
           </div>
         </div>
@@ -184,18 +186,12 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
 
       {/* Feedback message */}
       <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10">
-        <div className="bg-background/90 backdrop-blur-sm px-6 py-3 rounded-lg text-center">
-          {isCorrect ? (
-            <p className="text-green-500 font-semibold">
-              ✓ You found the shortest route!
-            </p>
-          ) : (
-            <p className="text-red-500 font-semibold">
-              ✗ Not the shortest route
-            </p>
-          )}
+        <div className="bg-background/90 backdrop-blur-sm px-6 py-3 rounded-lg text-center max-w-sm">
+          <p className={`font-semibold ${getScoreColor()}`}>
+            {feedback}
+          </p>
           <p className="text-sm text-muted-foreground mt-1">
-            Compare your route (magenta) with the correct one (green)
+            Compare your route (magenta) with the correct one (red)
           </p>
         </div>
       </div>

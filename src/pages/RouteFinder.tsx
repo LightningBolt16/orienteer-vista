@@ -5,8 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import RouteFinderGame from '@/components/route-finder/RouteFinderGame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Lock, MapPin, Loader2, Trophy } from 'lucide-react';
+import { ArrowLeft, Lock, MapPin, Loader2, Trophy, Bug } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAdmin } from '@/hooks/useAdmin';
 
 interface MapOption {
   id: string;
@@ -18,11 +19,13 @@ interface MapOption {
 const RouteFinder: React.FC = () => {
   const { user, loading: userLoading } = useUser();
   const { t } = useLanguage();
+  const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
   const [gameActive, setGameActive] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
 
   // Load available maps
   useEffect(() => {
@@ -101,8 +104,22 @@ const RouteFinder: React.FC = () => {
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
+        {/* Debug toggle (admin only) */}
+        {isAdmin && (
+          <Button
+            variant={debugMode ? "destructive" : "ghost"}
+            size="icon"
+            onClick={() => setDebugMode(!debugMode)}
+            className="absolute top-4 right-16 z-20 bg-background/80 backdrop-blur-sm"
+            title="Toggle debug mode"
+          >
+            <Bug className="h-5 w-5" />
+          </Button>
+        )}
+
         <RouteFinderGame
           mapId={selectedMapId || undefined}
+          debugMode={debugMode}
           onGameEnd={(stats) => {
             console.log('Game ended:', stats);
           }}
