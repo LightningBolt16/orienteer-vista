@@ -13,6 +13,7 @@ interface RouteDrawingCanvasProps {
   impassabilityMask?: ImpassabilityMask | null;
   bboxWidth?: number;
   bboxHeight?: number;
+  debugMode?: boolean;
 }
 
 const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
@@ -25,14 +26,17 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
   impassabilityMask,
   bboxWidth,
   bboxHeight,
+  debugMode = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [paths, setPaths] = useState<Point[][]>([]);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [imageBounds, setImageBounds] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [showImpassableWarning, setShowImpassableWarning] = useState(false);
 
   // Load image and get dimensions
@@ -49,26 +53,109 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
   const effectiveBboxWidth = bboxWidth || imageDimensions.width;
   const effectiveBboxHeight = bboxHeight || imageDimensions.height;
 
-  // Draw paths on canvas
-  const redrawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
+  // Calculate actual image bounds within container (accounting for object-contain)
+  const calculateImageBounds = useCallback(() => {
     const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!container || imageDimensions.width === 0) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const containerRatio = containerRect.width / containerRect.height;
+    const imageRatio = imageDimensions.width / imageDimensions.height;
+
+    let renderWidth: number, renderHeight: number, offsetX: number, offsetY: number;
+
+    if (imageRatio > containerRatio) {
+      // Image is wider - letterbox top/bottom
+      renderWidth = containerRect.width;
+      renderHeight = containerRect.width / imageRatio;
+      offsetX = 0;
+      offsetY = (containerRect.height - renderHeight) / 2;
+    } else {
+      // Image is taller - letterbox left/right
+      renderHeight = containerRect.height;
+      renderWidth = containerRect.height * imageRatio;
+      offsetX = (containerRect.width - renderWidth) / 2;
+      offsetY = 0;
+    }
+
+    setImageBounds({ x: offsetX, y: offsetY, width: renderWidth, height: renderHeight });
+  }, [imageDimensions]);
+
+  useEffect(() => {
+    calculateImageBounds();
+    window.addEventListener('resize', calculateImageBounds);
+    return () => window.removeEventListener('resize', calculateImageBounds);
+  }, [calculateImageBounds]);
+
+  // Draw debug mask overlay
+  useEffect(() => {
+    if (!debugMode || !impassabilityMask || !debugCanvasRef.current || imageBounds.width === 0) return;
+
+    const canvas = debugCanvasRef.current;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    canvas.width = containerRect.width;
+    canvas.height = containerRect.height;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get container dimensions for scaling
-    const containerRect = container.getBoundingClientRect();
-    const scaleX = effectiveBboxWidth / containerRect.width;
-    const scaleY = effectiveBboxHeight / containerRect.height;
+    // Create temporary canvas for the mask
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = impassabilityMask.width;
+    tempCanvas.height = impassabilityMask.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
 
-    // Set canvas size to match container
+    // Create ImageData from mask
+    const imageData = tempCtx.createImageData(impassabilityMask.width, impassabilityMask.height);
+    for (let i = 0; i < impassabilityMask.width * impassabilityMask.height; i++) {
+      const maskIdx = i * 4;
+      const val = impassabilityMask.data[maskIdx]; // Red channel
+      // Make black areas red for visibility
+      if (val <= 128) {
+        imageData.data[i * 4] = 255;     // Red
+        imageData.data[i * 4 + 1] = 0;   // Green
+        imageData.data[i * 4 + 2] = 0;   // Blue
+        imageData.data[i * 4 + 3] = 200; // Alpha
+      } else {
+        imageData.data[i * 4 + 3] = 0;   // Transparent for passable
+      }
+    }
+    tempCtx.putImageData(imageData, 0, 0);
+
+    // Draw mask scaled to image bounds
+    ctx.drawImage(
+      tempCanvas,
+      imageBounds.x,
+      imageBounds.y,
+      imageBounds.width,
+      imageBounds.height
+    );
+  }, [debugMode, impassabilityMask, imageBounds]);
+
+  // Draw paths on canvas
+  const redrawCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container || imageBounds.width === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const containerRect = container.getBoundingClientRect();
     canvas.width = containerRect.width;
     canvas.height = containerRect.height;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Scale factor from bbox coordinates to canvas pixels
+    const scaleX = imageBounds.width / effectiveBboxWidth;
+    const scaleY = imageBounds.height / effectiveBboxHeight;
 
     // Draw style
     ctx.strokeStyle = '#FF00FF';
@@ -80,9 +167,15 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     for (const path of paths) {
       if (path.length < 2) continue;
       ctx.beginPath();
-      ctx.moveTo(path[0].x / scaleX, path[0].y / scaleY);
+      ctx.moveTo(
+        imageBounds.x + path[0].x * scaleX,
+        imageBounds.y + path[0].y * scaleY
+      );
       for (let i = 1; i < path.length; i++) {
-        ctx.lineTo(path[i].x / scaleX, path[i].y / scaleY);
+        ctx.lineTo(
+          imageBounds.x + path[i].x * scaleX,
+          imageBounds.y + path[i].y * scaleY
+        );
       }
       ctx.stroke();
     }
@@ -90,9 +183,15 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     // Draw current path
     if (currentPath.length >= 2) {
       ctx.beginPath();
-      ctx.moveTo(currentPath[0].x / scaleX, currentPath[0].y / scaleY);
+      ctx.moveTo(
+        imageBounds.x + currentPath[0].x * scaleX,
+        imageBounds.y + currentPath[0].y * scaleY
+      );
       for (let i = 1; i < currentPath.length; i++) {
-        ctx.lineTo(currentPath[i].x / scaleX, currentPath[i].y / scaleY);
+        ctx.lineTo(
+          imageBounds.x + currentPath[i].x * scaleX,
+          imageBounds.y + currentPath[i].y * scaleY
+        );
       }
       ctx.stroke();
     }
@@ -101,7 +200,13 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     if (startMarker) {
       ctx.fillStyle = '#22C55E';
       ctx.beginPath();
-      ctx.arc(startMarker.x / scaleX, startMarker.y / scaleY, 12, 0, Math.PI * 2);
+      ctx.arc(
+        imageBounds.x + startMarker.x * scaleX,
+        imageBounds.y + startMarker.y * scaleY,
+        12,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
@@ -112,22 +217,28 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     if (finishMarker) {
       ctx.fillStyle = '#EF4444';
       ctx.beginPath();
-      ctx.arc(finishMarker.x / scaleX, finishMarker.y / scaleY, 12, 0, Math.PI * 2);
+      ctx.arc(
+        imageBounds.x + finishMarker.x * scaleX,
+        imageBounds.y + finishMarker.y * scaleY,
+        12,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-  }, [paths, currentPath, effectiveBboxWidth, effectiveBboxHeight, startMarker, finishMarker]);
+  }, [paths, currentPath, imageBounds, effectiveBboxWidth, effectiveBboxHeight, startMarker, finishMarker]);
 
   useEffect(() => {
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // Get point from mouse/touch event
+  // Get point from mouse/touch event (in bbox coordinates)
   const getPointFromEvent = (e: React.MouseEvent | React.TouchEvent): Point | null => {
     const container = containerRef.current;
-    if (!container) return null;
+    if (!container || imageBounds.width === 0) return null;
 
     const rect = container.getBoundingClientRect();
     let clientX: number, clientY: number;
@@ -141,13 +252,27 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
       clientY = e.clientY;
     }
 
-    // Calculate position relative to container, then scale to bbox coordinates
-    const scaleX = effectiveBboxWidth / rect.width;
-    const scaleY = effectiveBboxHeight / rect.height;
+    // Get position relative to container
+    const containerX = clientX - rect.left;
+    const containerY = clientY - rect.top;
+
+    // Check if click is within image bounds
+    if (
+      containerX < imageBounds.x ||
+      containerX > imageBounds.x + imageBounds.width ||
+      containerY < imageBounds.y ||
+      containerY > imageBounds.y + imageBounds.height
+    ) {
+      return null; // Click was in letterbox area
+    }
+
+    // Convert to image coordinates, then scale to bbox coordinates
+    const imageX = containerX - imageBounds.x;
+    const imageY = containerY - imageBounds.y;
 
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: (imageX / imageBounds.width) * effectiveBboxWidth,
+      y: (imageY / imageBounds.height) * effectiveBboxHeight,
     };
   };
 
@@ -183,7 +308,6 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     if (!point) return;
 
     // Check if drawing on impassable terrain - show warning but still record the point
-    // (we'll let the snapping algorithm handle invalid points)
     if (!checkPassable(point)) {
       setShowImpassableWarning(true);
       setTimeout(() => setShowImpassableWarning(false), 500);
@@ -231,6 +355,15 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
         draggable={false}
       />
 
+      {/* Debug mask overlay */}
+      {debugMode && (
+        <canvas
+          ref={debugCanvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{ opacity: 0.5 }}
+        />
+      )}
+
       {/* Drawing canvas overlay */}
       <div
         ref={containerRef}
@@ -248,6 +381,13 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
           className="absolute inset-0 w-full h-full pointer-events-none"
         />
       </div>
+
+      {/* Debug mode indicator */}
+      {debugMode && (
+        <div className="absolute top-14 left-4 z-10 bg-red-500/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-white font-medium">
+          DEBUG MODE
+        </div>
+      )}
 
       {/* Impassable terrain warning */}
       {showImpassableWarning && (

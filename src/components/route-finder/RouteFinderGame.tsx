@@ -3,7 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import RouteDrawingCanvas from './RouteDrawingCanvas';
 import RouteFinderResult from './RouteFinderResult';
-import { scoreDrawing, loadImpassabilityMask, type RouteFinderGraph, type Point, type ImpassabilityMask } from '@/utils/routeFinderUtils';
+import { 
+  scoreByProximity, 
+  getScoreFeedback, 
+  getPathCoordinates,
+  type RouteFinderGraph, 
+  type Point, 
+  type ImpassabilityMask,
+  loadImpassabilityMask 
+} from '@/utils/routeFinderUtils';
 import { Loader2 } from 'lucide-react';
 
 interface Challenge {
@@ -26,24 +34,27 @@ interface Challenge {
 
 interface RouteFinderGameProps {
   mapId?: string;
+  debugMode?: boolean;
   onGameEnd?: (stats: { correct: number; total: number }) => void;
 }
 
-const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) => {
+const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, debugMode = false, onGameEnd }) => {
   const { user, updatePerformance } = useUser();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
   const [lastResult, setLastResult] = useState<{
-    isCorrect: boolean;
-    userPath: string[];
+    score: number;
+    feedback: string;
+    userPoints: Point[];
     responseTime: number;
   } | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [stats, setStats] = useState({ correct: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [currentMask, setCurrentMask] = useState<ImpassabilityMask | null>(null);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
 
   // Load challenges
   const loadChallenges = useCallback(async () => {
@@ -121,6 +132,17 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
     loadMask();
   }, [currentChallenge?.impassability_mask_path]);
 
+  // Load base image dimensions when challenge changes
+  useEffect(() => {
+    if (!currentChallenge?.base_image_path) return;
+
+    const img = new Image();
+    img.onload = () => {
+      setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = getImageUrl(currentChallenge.base_image_path);
+  }, [currentChallenge?.base_image_path]);
+
   // Get storage URL for image
   const getImageUrl = (path: string): string => {
     const { data } = supabase.storage.from('user-route-images').getPublicUrl(path);
@@ -133,24 +155,47 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
 
     const responseTime = Date.now() - startTime;
 
-    // Score the drawing with mask validation
-    const result = scoreDrawing(
-      points, 
-      currentChallenge.graph_data,
-      currentMask,
-      currentChallenge.bbox_width ?? undefined,
-      currentChallenge.bbox_height ?? undefined
+    // Get optimal path coordinates from graph
+    const optimalCoords = getPathCoordinates(
+      currentChallenge.graph_data.optimalPath,
+      currentChallenge.graph_data
     );
 
+    // Get start and finish markers
+    const startNode = currentChallenge.graph_data.nodes.find(
+      n => n.id === currentChallenge.start_node_id
+    );
+    const finishNode = currentChallenge.graph_data.nodes.find(
+      n => n.id === currentChallenge.finish_node_id
+    );
+
+    if (!startNode || !finishNode) {
+      console.error('Could not find start or finish nodes');
+      return;
+    }
+
+    // Score using proximity-based system
+    const result = scoreByProximity(
+      points,
+      optimalCoords,
+      startNode,
+      finishNode,
+      100 // tolerance radius in pixels
+    );
+
+    const feedback = getScoreFeedback(result.score, result.reachedFinish);
+    const isCorrect = result.score >= 70; // Consider 70%+ as "correct" for stats
+
     setLastResult({
-      isCorrect: result.isCorrect,
-      userPath: result.snappedPath,
+      score: result.score,
+      feedback,
+      userPoints: points,
       responseTime,
     });
 
     // Update stats
     const newStats = {
-      correct: stats.correct + (result.isCorrect ? 1 : 0),
+      correct: stats.correct + (isCorrect ? 1 : 0),
       total: stats.total + 1,
     };
     setStats(newStats);
@@ -158,17 +203,17 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
     // Save attempt to database
     if (user?.id) {
       try {
-        await supabase.from('route_finder_attempts').insert({
+        await supabase.from('route_finder_attempts').insert([{
           user_id: user.id,
           challenge_id: currentChallenge.id,
           map_name: currentChallenge.map_name || 'Unknown',
-          is_correct: result.isCorrect,
+          is_correct: isCorrect,
           response_time: responseTime,
-          user_path: result.snappedPath,
-        });
+          user_path: points as unknown as any,
+        }]);
 
         // Update user performance
-        updatePerformance(result.isCorrect, responseTime);
+        updatePerformance(isCorrect, responseTime);
       } catch (err) {
         console.error('Error saving attempt:', err);
       }
@@ -231,16 +276,14 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
   if (showResult && lastResult) {
     return (
       <RouteFinderResult
-        isCorrect={lastResult.isCorrect}
+        score={lastResult.score}
+        feedback={lastResult.feedback}
         responseTime={lastResult.responseTime}
-        baseImageUrl={getImageUrl(currentChallenge.base_image_path)}
-        userPath={lastResult.userPath}
-        optimalPath={currentChallenge.graph_data.optimalPath}
-        graph={currentChallenge.graph_data}
+        answerImageUrl={getImageUrl(currentChallenge.answer_image_path)}
+        userPoints={lastResult.userPoints}
         onNext={handleNext}
         stats={stats}
-        bboxWidth={currentChallenge.bbox_width ?? undefined}
-        bboxHeight={currentChallenge.bbox_height ?? undefined}
+        imageDimensions={imageDimensions}
       />
     );
   }
@@ -277,6 +320,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, onGameEnd }) =
         impassabilityMask={currentMask}
         bboxWidth={currentChallenge.bbox_width ?? undefined}
         bboxHeight={currentChallenge.bbox_height ?? undefined}
+        debugMode={debugMode}
       />
     </div>
   );
