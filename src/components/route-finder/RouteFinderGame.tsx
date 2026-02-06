@@ -336,6 +336,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
         bboxWidth={currentChallenge.bbox_width ?? undefined}
         bboxHeight={currentChallenge.bbox_height ?? undefined}
         debugMode={debugMode}
+        graphNodes={debugMode ? currentChallenge.graph_data.nodes : undefined}
       />
     </div>
   );

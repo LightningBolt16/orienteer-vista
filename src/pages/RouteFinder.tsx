@@ -4,9 +4,10 @@ import { useUser } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import RouteFinderGame from '@/components/route-finder/RouteFinderGame';
 import RouteFinderMapSelector from '@/components/route-finder/RouteFinderMapSelector';
+import PublishRouteFinderMapDialog from '@/components/route-finder/PublishRouteFinderMapDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Bug, Maximize2, Minimize2, LogIn, Layers } from 'lucide-react';
+import { Loader2, Bug, Maximize2, Minimize2, LogIn, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -31,6 +32,8 @@ const RouteFinder: React.FC = () => {
   const isMobile = useIsMobile();
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapOption[]>([]);
+  const [privateMaps, setPrivateMaps] = useState<MapOption[]>([]);
+  const [communityMaps, setCommunityMaps] = useState<MapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
   const [debugMode, setDebugMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -48,18 +51,51 @@ const RouteFinder: React.FC = () => {
   
   // Warm-up state - first challenge doesn't count
   const [isWarmUp, setIsWarmUp] = useState(true);
-  const [gameKey, setGameKey] = useState(0); // Key to force re-mount when selection changes
+  const [gameKey, setGameKey] = useState(0);
+
+  // Publishing dialog
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [publishingMapId, setPublishingMapId] = useState<string>('');
+  const [publishingMapName, setPublishingMapName] = useState<string>('');
 
   // Determine if a PWT map is selected (for showing footer)
   const selectedMap = selectedMapId ? maps.find(m => m.id === selectedMapId) : null;
   const showPwtFooter = selectedMap ? isPwtMap(selectedMap.name) : maps.some(m => isPwtMap(m.name));
 
-  // Load available maps
-  useEffect(() => {
-    const loadMaps = async () => {
-      setIsLoadingMaps(true);
-      try {
-        const { data: mapsData, error } = await supabase
+  // Load available maps (official, private, community)
+  const loadMaps = useCallback(async () => {
+    setIsLoadingMaps(true);
+    try {
+      // Load official public maps
+      const { data: officialData, error: officialError } = await supabase
+        .from('route_finder_maps')
+        .select(`
+          id,
+          name,
+          description,
+          country_code,
+          location_name,
+          route_finder_challenges(id)
+        `)
+        .eq('is_public', true)
+        .eq('map_category', 'official');
+
+      if (officialError) throw officialError;
+
+      const officialMaps: MapOption[] = (officialData || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        country_code: m.country_code,
+        location_name: m.location_name,
+        challenge_count: m.route_finder_challenges?.length || 0,
+      })).filter(m => m.challenge_count > 0);
+
+      setMaps(officialMaps);
+
+      // Load private maps if user is logged in
+      if (user) {
+        const { data: privateData, error: privateError } = await supabase
           .from('route_finder_maps')
           .select(`
             id,
@@ -69,29 +105,57 @@ const RouteFinder: React.FC = () => {
             location_name,
             route_finder_challenges(id)
           `)
-          .eq('is_public', true);
+          .eq('user_id', user.id)
+          .eq('is_public', false);
 
-        if (error) throw error;
+        if (!privateError && privateData) {
+          const userPrivateMaps: MapOption[] = privateData.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            description: m.description,
+            country_code: m.country_code,
+            location_name: m.location_name,
+            challenge_count: m.route_finder_challenges?.length || 0,
+          })).filter(m => m.challenge_count > 0);
+          setPrivateMaps(userPrivateMaps);
+        }
 
-        const mapOptions: MapOption[] = (mapsData || []).map((m: any) => ({
-          id: m.id,
-          name: m.name,
-          description: m.description,
-          country_code: m.country_code,
-          location_name: m.location_name,
-          challenge_count: m.route_finder_challenges?.length || 0,
-        })).filter(m => m.challenge_count > 0);
+        // Load community maps (public, community category)
+        const { data: communityData, error: communityError } = await supabase
+          .from('route_finder_maps')
+          .select(`
+            id,
+            name,
+            description,
+            country_code,
+            location_name,
+            route_finder_challenges(id)
+          `)
+          .eq('is_public', true)
+          .eq('map_category', 'community');
 
-        setMaps(mapOptions);
-      } catch (err) {
-        console.error('Error loading maps:', err);
-      } finally {
-        setIsLoadingMaps(false);
+        if (!communityError && communityData) {
+          const commMaps: MapOption[] = communityData.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            description: m.description,
+            country_code: m.country_code,
+            location_name: m.location_name,
+            challenge_count: m.route_finder_challenges?.length || 0,
+          })).filter(m => m.challenge_count > 0);
+          setCommunityMaps(commMaps);
+        }
       }
-    };
+    } catch (err) {
+      console.error('Error loading maps:', err);
+    } finally {
+      setIsLoadingMaps(false);
+    }
+  }, [user]);
 
+  useEffect(() => {
     loadMaps();
-  }, []);
+  }, [loadMaps]);
 
   const toggleFullscreen = useCallback(async () => {
     if (isMobile || !document.fullscreenEnabled) {
@@ -128,19 +192,17 @@ const RouteFinder: React.FC = () => {
 
   const handleMapSelect = (mapId: string | null) => {
     if (multiSelectMode && mapId) {
-      // Toggle selection in multi-select mode
       setSelectedMaps(prev => 
         prev.includes(mapId) 
           ? prev.filter(m => m !== mapId)
           : [...prev, mapId]
       );
     } else {
-      // Single select mode
       setMultiSelectMode(false);
       setSelectedMaps([]);
       setSelectedMapId(mapId);
-      setIsWarmUp(true); // Reset warm-up when changing maps
-      setGameKey(prev => prev + 1); // Force game remount
+      setIsWarmUp(true);
+      setGameKey(prev => prev + 1);
     }
   };
 
@@ -157,16 +219,25 @@ const RouteFinder: React.FC = () => {
     setPlayButtonAnimating(true);
     setTimeout(() => setPlayButtonAnimating(false), 200);
     
-    // For now, just play the first selected map
-    // Multi-map mixing would require changes to RouteFinderGame
     setSelectedMapId(selectedMaps[0]);
     setIsWarmUp(true);
     setGameKey(prev => prev + 1);
     
+    const allMaps = [...maps, ...privateMaps, ...communityMaps];
     sonnerToast.success(`Playing ${selectedMaps.length} map${selectedMaps.length > 1 ? 's' : ''}`, {
-      description: maps.filter(m => selectedMaps.includes(m.id)).map(m => m.name).join(', '),
+      description: allMaps.filter(m => selectedMaps.includes(m.id)).map(m => m.name).join(', '),
       duration: 3000,
     });
+  };
+
+  const handlePublishMap = (mapId: string, mapName: string) => {
+    setPublishingMapId(mapId);
+    setPublishingMapName(mapName);
+    setPublishDialogOpen(true);
+  };
+
+  const handlePublished = () => {
+    loadMaps();
   };
 
   // Show loading while checking auth
@@ -208,6 +279,13 @@ const RouteFinder: React.FC = () => {
           >
             <Bug className="h-4 w-4" />
           </Button>
+        )}
+
+        {/* Warm-up indicator */}
+        {isWarmUp && (
+          <div className="absolute top-4 left-4 z-20 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+            Warm-up Round
+          </div>
         )}
 
         <div className="h-full w-full">
@@ -267,23 +345,26 @@ const RouteFinder: React.FC = () => {
                 isLoading={isLoadingMaps}
                 selectedMapId={selectedMapId}
                 onSelectMap={handleMapSelect}
+                privateMaps={privateMaps}
+                privateMapsOpen={privateMapsOpen}
+                onPrivateMapsOpenChange={setPrivateMapsOpen}
+                communityMaps={communityMaps}
+                communityMapsOpen={communityMapsOpen}
+                onCommunityMapsOpenChange={setCommunityMapsOpen}
                 multiSelectMode={multiSelectMode}
                 selectedMaps={selectedMaps}
                 onToggleMultiSelect={toggleMultiSelectMode}
                 onPlaySelected={playSelectedMaps}
                 playButtonAnimating={playButtonAnimating}
                 isLoggedIn={!!user}
-                privateMapsOpen={privateMapsOpen}
-                onPrivateMapsOpenChange={setPrivateMapsOpen}
-                communityMapsOpen={communityMapsOpen}
-                onCommunityMapsOpenChange={setCommunityMapsOpen}
+                onPublishMap={handlePublishMap}
               />
             </CardContent>
           </Card>
         </section>
 
-        {/* Game Section - Always shows (game loads immediately) */}
-        {maps.length > 0 && !isLoadingMaps && (
+        {/* Game Section - Always shows when maps are loaded */}
+        {(maps.length > 0 || privateMaps.length > 0 || communityMaps.length > 0) && !isLoadingMaps && (
           <section className="max-w-4xl mx-auto">
             <div 
               ref={gameContainerRef}
@@ -357,6 +438,15 @@ const RouteFinder: React.FC = () => {
             <PwtAttribution variant="footer" />
           </section>
         )}
+
+        {/* Publish Dialog */}
+        <PublishRouteFinderMapDialog
+          open={publishDialogOpen}
+          onOpenChange={setPublishDialogOpen}
+          mapId={publishingMapId}
+          mapName={publishingMapName}
+          onPublished={handlePublished}
+        />
       </div>
     </Layout>
   );

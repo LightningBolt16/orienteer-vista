@@ -222,7 +222,7 @@ def process_route_finder(job_payload: dict):
     NUM_RANDOM_POINTS = params.get("num_random_points", 1500)
     MARKER_PADDING = params.get("marker_padding", 200)  # Large padding around start/finish markers
     ROUTE_PADDING = params.get("route_padding", 120)    # Smaller padding around the route itself
-    MARKER_RADIUS = params.get("marker_radius", 40)
+    MARKER_RADIUS = params.get("marker_radius", 60)  # Increased default for better visibility
     LINE_WIDTH = params.get("line_width", 8)
     MASK_SCALE = 4  # Downscale factor for impassability masks
     
