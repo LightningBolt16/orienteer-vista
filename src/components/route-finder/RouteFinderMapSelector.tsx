@@ -1,38 +1,47 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Shuffle, Trophy, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { MapPin, Shuffle, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import flagItaly from '@/assets/flag-italy.png';
+import flagSweden from '@/assets/flag-sweden.png';
+import flagBelgium from '@/assets/flag-belgium.png';
+
+// Country code to flag image mapping
+const COUNTRY_FLAG_IMAGES: Record<string, string> = {
+  IT: flagItaly,
+  SE: flagSweden,
+  BE: flagBelgium,
+};
 
 interface MapOption {
   id: string;
   name: string;
   description?: string;
   challenge_count: number;
+  country_code?: string | null;
+  location_name?: string | null;
 }
 
 interface RouteFinderMapSelectorProps {
   maps: MapOption[];
   isLoading: boolean;
+  selectedMapId: string | null;
   onSelectMap: (mapId: string | null) => void;
-  onStartGame: () => void;
 }
 
 const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
   maps,
   isLoading,
+  selectedMapId,
   onSelectMap,
-  onStartGame,
 }) => {
-  const navigate = useNavigate();
   const { t } = useLanguage();
 
   if (isLoading) {
     return (
       <div className="flex items-center p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        Loading maps...
+        {t('loadingMaps')}
       </div>
     );
   }
@@ -49,49 +58,49 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Quick Play & Leaderboard Row */}
-      <div className="flex items-center gap-3">
-        <Button
-          size="lg"
-          onClick={() => {
-            onSelectMap(null);
-            onStartGame();
-          }}
-          className="gap-2"
-        >
-          <Shuffle className="h-4 w-4" />
-          Quick Play
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/route-finder/leaderboard')}
-          className="gap-2"
-        >
-          <Trophy className="h-4 w-4" />
-          Leaderboard
-        </Button>
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      {/* All Maps Option */}
+      <button
+        onClick={() => onSelectMap(null)}
+        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+          selectedMapId === null
+            ? 'border-primary bg-primary/10'
+            : 'border-border bg-card'
+        }`}
+      >
+        <Shuffle className="h-8 w-8 mb-2 text-primary" />
+        <span className="font-medium text-sm">All Maps</span>
+        <span className="text-xs text-muted-foreground">Random mix</span>
+      </button>
 
-      {/* Map Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {maps.map((map) => (
+      {/* Individual Map Options */}
+      {maps.map((map) => {
+        const flagImage = map.country_code ? COUNTRY_FLAG_IMAGES[map.country_code] : null;
+        const isSelected = selectedMapId === map.id;
+        
+        return (
           <button
             key={map.id}
-            onClick={() => {
-              onSelectMap(map.id);
-              onStartGame();
-            }}
-            className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 border-border bg-card"
+            onClick={() => onSelectMap(map.id)}
+            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+              isSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+            }`}
           >
+            {flagImage && (
+              <img 
+                src={flagImage} 
+                alt={map.country_code || ''} 
+                className="absolute top-1 right-1 w-5 h-4 object-cover rounded-sm shadow-sm" 
+              />
+            )}
             <MapPin className="h-8 w-8 mb-2 text-primary" />
             <span className="font-medium text-sm">{map.name}</span>
             <span className="text-xs text-muted-foreground">
               {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
             </span>
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 };
