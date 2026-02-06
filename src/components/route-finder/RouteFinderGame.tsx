@@ -35,10 +35,18 @@ interface Challenge {
 interface RouteFinderGameProps {
   mapId?: string;
   debugMode?: boolean;
+  isWarmUp?: boolean;
+  onWarmUpComplete?: () => void;
   onGameEnd?: (stats: { correct: number; total: number }) => void;
 }
 
-const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, debugMode = false, onGameEnd }) => {
+const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ 
+  mapId, 
+  debugMode = false, 
+  isWarmUp = false,
+  onWarmUpComplete,
+  onGameEnd 
+}) => {
   const { user, updatePerformance } = useUser();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -193,29 +201,31 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, debugMode = fa
       responseTime,
     });
 
-    // Update stats
-    const newStats = {
-      correct: stats.correct + (isCorrect ? 1 : 0),
-      total: stats.total + 1,
-    };
-    setStats(newStats);
+    // Only update stats and save if NOT a warm-up round
+    if (!isWarmUp) {
+      const newStats = {
+        correct: stats.correct + (isCorrect ? 1 : 0),
+        total: stats.total + 1,
+      };
+      setStats(newStats);
 
-    // Save attempt to database
-    if (user?.id) {
-      try {
-        await supabase.from('route_finder_attempts').insert([{
-          user_id: user.id,
-          challenge_id: currentChallenge.id,
-          map_name: currentChallenge.map_name || 'Unknown',
-          is_correct: isCorrect,
-          response_time: responseTime,
-          user_path: points as unknown as any,
-        }]);
+      // Save attempt to database
+      if (user?.id) {
+        try {
+          await supabase.from('route_finder_attempts').insert([{
+            user_id: user.id,
+            challenge_id: currentChallenge.id,
+            map_name: currentChallenge.map_name || 'Unknown',
+            is_correct: isCorrect,
+            response_time: responseTime,
+            user_path: points as unknown as any,
+          }]);
 
-        // Update user performance
-        updatePerformance(isCorrect, responseTime);
-      } catch (err) {
-        console.error('Error saving attempt:', err);
+          // Update user performance
+          updatePerformance(isCorrect, responseTime);
+        } catch (err) {
+          console.error('Error saving attempt:', err);
+        }
       }
     }
 
@@ -227,6 +237,11 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ mapId, debugMode = fa
     setShowResult(false);
     setLastResult(null);
     setCurrentMask(null);
+
+    // If this was a warm-up, notify parent
+    if (isWarmUp) {
+      onWarmUpComplete?.();
+    }
 
     if (currentIndex + 1 >= challenges.length) {
       // Game complete
