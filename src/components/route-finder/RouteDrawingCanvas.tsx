@@ -307,10 +307,11 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     const point = getPointFromEvent(e);
     if (!point) return;
 
-    // Check if drawing on impassable terrain - show warning but still record the point
+    // Block drawing on impassable terrain entirely
     if (!checkPassable(point)) {
       setShowImpassableWarning(true);
       setTimeout(() => setShowImpassableWarning(false), 500);
+      return; // Don't record the point
     }
 
     setCurrentPath(prev => [...prev, point]);
