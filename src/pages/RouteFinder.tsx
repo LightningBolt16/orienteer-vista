@@ -4,14 +4,15 @@ import { useUser } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import RouteFinderGame from '@/components/route-finder/RouteFinderGame';
 import RouteFinderMapSelector from '@/components/route-finder/RouteFinderMapSelector';
-import Leaderboard from '@/components/Leaderboard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Lock, Loader2, Bug, Maximize2, Minimize2, LogIn } from 'lucide-react';
+import { Loader2, Bug, Maximize2, Minimize2, LogIn, Layers } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Layout from '@/components/Layout';
+import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
+import { toast as sonnerToast } from 'sonner';
 
 interface MapOption {
   id: string;
@@ -31,11 +32,27 @@ const RouteFinder: React.FC = () => {
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
-  const [gameActive, setGameActive] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const gameContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Multi-select state
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
+  const [playButtonAnimating, setPlayButtonAnimating] = useState(false);
+  
+  // Collapsible sections
+  const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
+  const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
+  
+  // Warm-up state - first challenge doesn't count
+  const [isWarmUp, setIsWarmUp] = useState(true);
+  const [gameKey, setGameKey] = useState(0); // Key to force re-mount when selection changes
+
+  // Determine if a PWT map is selected (for showing footer)
+  const selectedMap = selectedMapId ? maps.find(m => m.id === selectedMapId) : null;
+  const showPwtFooter = selectedMap ? isPwtMap(selectedMap.name) : maps.some(m => isPwtMap(m.name));
 
   // Load available maps
   useEffect(() => {
@@ -109,6 +126,49 @@ const RouteFinder: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [isMobile]);
 
+  const handleMapSelect = (mapId: string | null) => {
+    if (multiSelectMode && mapId) {
+      // Toggle selection in multi-select mode
+      setSelectedMaps(prev => 
+        prev.includes(mapId) 
+          ? prev.filter(m => m !== mapId)
+          : [...prev, mapId]
+      );
+    } else {
+      // Single select mode
+      setMultiSelectMode(false);
+      setSelectedMaps([]);
+      setSelectedMapId(mapId);
+      setIsWarmUp(true); // Reset warm-up when changing maps
+      setGameKey(prev => prev + 1); // Force game remount
+    }
+  };
+
+  const toggleMultiSelectMode = () => {
+    if (multiSelectMode) {
+      setSelectedMaps([]);
+    }
+    setMultiSelectMode(!multiSelectMode);
+  };
+
+  const playSelectedMaps = () => {
+    if (selectedMaps.length === 0) return;
+    
+    setPlayButtonAnimating(true);
+    setTimeout(() => setPlayButtonAnimating(false), 200);
+    
+    // For now, just play the first selected map
+    // Multi-map mixing would require changes to RouteFinderGame
+    setSelectedMapId(selectedMaps[0]);
+    setIsWarmUp(true);
+    setGameKey(prev => prev + 1);
+    
+    sonnerToast.success(`Playing ${selectedMaps.length} map${selectedMaps.length > 1 ? 's' : ''}`, {
+      description: maps.filter(m => selectedMaps.includes(m.id)).map(m => m.name).join(', '),
+      duration: 3000,
+    });
+  };
+
   // Show loading while checking auth
   if (userLoading) {
     return (
@@ -120,59 +180,43 @@ const RouteFinder: React.FC = () => {
     );
   }
 
-  // Active game in fullscreen mode
-  if (gameActive && isFullscreen) {
+  // Fullscreen mode - game takes over the entire screen
+  if (isFullscreen) {
     return (
       <div 
         ref={gameContainerRef}
         className="fixed inset-0 z-50 bg-black"
       >
-        {/* Slim Header Bar */}
-        <div className="absolute top-0 left-0 right-0 z-20 bg-background/80 backdrop-blur-sm border-b h-12 flex items-center justify-between px-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setGameActive(false);
-              setIsFullscreen(false);
-            }}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t('back')}
-          </Button>
-          
-          <span className="text-sm font-medium">Route Finder</span>
-          
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button
-                variant={debugMode ? "destructive" : "ghost"}
-                size="icon"
-                onClick={() => setDebugMode(!debugMode)}
-                title="Toggle debug mode"
-                className="h-8 w-8"
-              >
-                <Bug className="h-4 w-4" />
-              </Button>
-            )}
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              className="h-8 w-8"
-              title={t('exitFullscreen')}
-            >
-              <Minimize2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        {/* Fullscreen Toggle Button */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 z-20 bg-black/50 border-white/30 hover:bg-black/70"
+          title={t('exitFullscreen')}
+        >
+          <Minimize2 className="h-4 w-4" />
+        </Button>
 
-        <div className="h-full pt-12">
+        {isAdmin && (
+          <Button
+            variant={debugMode ? "destructive" : "outline"}
+            size="icon"
+            onClick={() => setDebugMode(!debugMode)}
+            className="absolute top-4 right-16 z-20 bg-black/50 border-white/30 hover:bg-black/70"
+            title="Toggle debug mode"
+          >
+            <Bug className="h-4 w-4" />
+          </Button>
+        )}
+
+        <div className="h-full w-full">
           <RouteFinderGame
+            key={gameKey}
             mapId={selectedMapId || undefined}
             debugMode={debugMode}
+            isWarmUp={isWarmUp}
+            onWarmUpComplete={() => setIsWarmUp(false)}
             onGameEnd={(stats) => {
               console.log('Game ended:', stats);
             }}
@@ -182,7 +226,7 @@ const RouteFinder: React.FC = () => {
     );
   }
 
-  // Main view with Layout (map selection + optional inline game + leaderboard)
+  // Main view with Layout
   return (
     <Layout>
       <div className="pb-20 space-y-8">
@@ -222,20 +266,30 @@ const RouteFinder: React.FC = () => {
                 maps={maps}
                 isLoading={isLoadingMaps}
                 selectedMapId={selectedMapId}
-                onSelectMap={setSelectedMapId}
+                onSelectMap={handleMapSelect}
+                multiSelectMode={multiSelectMode}
+                selectedMaps={selectedMaps}
+                onToggleMultiSelect={toggleMultiSelectMode}
+                onPlaySelected={playSelectedMaps}
+                playButtonAnimating={playButtonAnimating}
+                isLoggedIn={!!user}
+                privateMapsOpen={privateMapsOpen}
+                onPrivateMapsOpenChange={setPrivateMapsOpen}
+                communityMapsOpen={communityMapsOpen}
+                onCommunityMapsOpenChange={setCommunityMapsOpen}
               />
             </CardContent>
           </Card>
         </section>
 
-        {/* Game Section - Shows below map selector when active */}
-        {gameActive ? (
+        {/* Game Section - Always shows (game loads immediately) */}
+        {maps.length > 0 && !isLoadingMaps && (
           <section className="max-w-4xl mx-auto">
             <div 
               ref={gameContainerRef}
               className="relative"
             >
-              {/* Fullscreen Toggle Button */}
+              {/* Controls */}
               <div className="absolute top-2 right-2 z-20 flex gap-2">
                 {isAdmin && (
                   <Button
@@ -257,10 +311,20 @@ const RouteFinder: React.FC = () => {
                 </Button>
               </div>
 
+              {/* Warm-up indicator */}
+              {isWarmUp && (
+                <div className="absolute top-2 left-2 z-20 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  Warm-up Round
+                </div>
+              )}
+
               <div className="aspect-video bg-black rounded-lg overflow-hidden">
                 <RouteFinderGame
+                  key={gameKey}
                   mapId={selectedMapId || undefined}
                   debugMode={debugMode}
+                  isWarmUp={isWarmUp}
+                  onWarmUpComplete={() => setIsWarmUp(false)}
                   onGameEnd={(stats) => {
                     console.log('Game ended:', stats);
                   }}
@@ -268,39 +332,29 @@ const RouteFinder: React.FC = () => {
               </div>
             </div>
           </section>
-        ) : (
-          // Start Game Button when not playing
-          <div className="flex justify-center">
-            <Button
-              size="lg"
-              onClick={() => setGameActive(true)}
-              disabled={maps.length === 0}
-              className="bg-orienteering hover:bg-orienteering/90"
-            >
-              {selectedMapId 
-                ? `Play ${maps.find(m => m.id === selectedMapId)?.name || 'Selected Map'}`
-                : 'Start Game'}
-            </Button>
-          </div>
         )}
 
         {/* Toggle Leaderboard Button */}
-        {!isFullscreen && (
-          <div className="flex justify-center">
-            <Button
-              onClick={() => setShowLeaderboard(!showLeaderboard)}
-              variant={gameActive ? "outline" : "default"}
-              className={gameActive ? "" : "bg-orienteering hover:bg-orienteering/90"}
-            >
-              {showLeaderboard ? 'Hide Leaderboard' : t('leaderboard')}
-            </Button>
-          </div>
-        )}
+        <div className="flex justify-center">
+          <Button
+            onClick={() => setShowLeaderboard(!showLeaderboard)}
+            className="bg-orienteering hover:bg-orienteering/90"
+          >
+            {showLeaderboard ? 'Hide Leaderboard' : t('leaderboard')}
+          </Button>
+        </div>
 
         {/* Leaderboard Section */}
-        {showLeaderboard && !isFullscreen && (
+        {showLeaderboard && (
           <section className="max-w-2xl mx-auto animate-fade-in">
             <RouteFinderLeaderboardInline />
+          </section>
+        )}
+
+        {/* PWT Attribution Footer */}
+        {showPwtFooter && (
+          <section className="max-w-lg mx-auto">
+            <PwtAttribution variant="footer" />
           </section>
         )}
       </div>
