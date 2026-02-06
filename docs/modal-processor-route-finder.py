@@ -220,7 +220,8 @@ def process_route_finder(job_payload: dict):
     GRAPH_SIMPLIFICATION_RADIUS = params.get("graph_simplification_radius", 300)
     
     NUM_RANDOM_POINTS = params.get("num_random_points", 1500)
-    ZOOM_MARGIN = params.get("zoom_margin", 80)
+    MARKER_PADDING = params.get("marker_padding", 200)  # Large padding around start/finish markers
+    ROUTE_PADDING = params.get("route_padding", 120)    # Smaller padding around the route itself
     MARKER_RADIUS = params.get("marker_radius", 40)
     LINE_WIDTH = 8
     MASK_SCALE = 4  # Downscale factor for impassability masks
@@ -499,12 +500,37 @@ def process_route_finder(job_payload: dict):
             path = route["path"]
             path_length = route["length"]
             
-            # Calculate bounding box
+            # Calculate bounding box with separate padding for markers and route
             all_pts = path
             rs = [p[0] for p in all_pts]
             cs = [p[1] for p in all_pts]
-            rmin, rmax = max(0, min(rs)-ZOOM_MARGIN), min(h_crop, max(rs)+ZOOM_MARGIN)
-            cmin, cmax = max(0, min(cs)-ZOOM_MARGIN), min(w_crop, max(cs)+ZOOM_MARGIN)
+            
+            # Get start/finish positions
+            st_row, st_col = st[0], st[1]
+            en_row, en_col = en[0], en[1]
+            
+            # Calculate bounds with larger padding around start/finish markers
+            # and smaller padding around the route itself
+            rmin = max(0, min(
+                min(rs) - ROUTE_PADDING,
+                st_row - MARKER_PADDING,
+                en_row - MARKER_PADDING
+            ))
+            rmax = min(h_crop, max(
+                max(rs) + ROUTE_PADDING,
+                st_row + MARKER_PADDING,
+                en_row + MARKER_PADDING
+            ))
+            cmin = max(0, min(
+                min(cs) - ROUTE_PADDING,
+                st_col - MARKER_PADDING,
+                en_col - MARKER_PADDING
+            ))
+            cmax = min(w_crop, max(
+                max(cs) + ROUTE_PADDING,
+                st_col + MARKER_PADDING,
+                en_col + MARKER_PADDING
+            ))
             
             b169 = adjust_bbox(cmin, rmin, cmax, rmax, 16/9, w_crop, h_crop)
             b916 = adjust_bbox(cmin, rmin, cmax, rmax, 9/16, w_crop, h_crop)
