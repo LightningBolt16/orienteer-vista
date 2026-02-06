@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import TifFileUploader from './TifFileUploader';
 import ROIDrawingCanvas from './ROIDrawingCanvas';
 import ProcessingParametersForm from './ProcessingParametersForm';
+import RouteFinderParametersForm, { RouteFinderParameters, DEFAULT_ROUTE_FINDER_PARAMETERS } from './RouteFinderParametersForm';
 import OCADInstructionsDialog from './OCADInstructionsDialog';
 import ImpassableDrawingCanvas from './ImpassableDrawingCanvas';
 import { useUserMaps, ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
@@ -62,6 +63,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
   const [impassableAreas, setImpassableAreas] = useState<ImpassableArea[]>([]);
   const [impassableLines, setImpassableLines] = useState<ImpassableLine[]>([]);
   const [parameters, setParameters] = useState<ProcessingParameters>(DEFAULT_PROCESSING_PARAMETERS);
+  const [routeFinderParameters, setRouteFinderParameters] = useState<RouteFinderParameters>(DEFAULT_ROUTE_FINDER_PARAMETERS);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('route_choice');
   const [isApplyingAnnotations, setIsApplyingAnnotations] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -250,6 +252,7 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
                 body: { 
                   map_id: result.id,
                   map_name: mapName,
+                  processing_parameters: routeFinderParameters,
                 },
               });
               console.log('Route Finder processing triggered for map:', result.id);
@@ -503,14 +506,19 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
               </div>
             )}
 
-            {/* Route Finder info */}
+            {/* Route Finder Settings */}
             {(processingMode === 'route_finder' || processingMode === 'both') && (
-              <div className="bg-muted rounded-lg p-4">
-                <h4 className="font-medium text-sm mb-2">Route Finder Settings</h4>
-                <p className="text-xs text-muted-foreground">
-                  Route Finder generates longer routes (800-2500px) with simplified skeleton graphs 
-                  for client-side path comparison. Default settings will be used.
-                </p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted-foreground">Route Finder Settings</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <RouteFinderParametersForm
+                  parameters={routeFinderParameters}
+                  onChange={setRouteFinderParameters}
+                  hasPro={hasPro}
+                />
               </div>
             )}
           </div>

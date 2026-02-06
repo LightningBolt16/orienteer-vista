@@ -223,11 +223,12 @@ def process_route_finder(job_payload: dict):
     MARKER_PADDING = params.get("marker_padding", 200)  # Large padding around start/finish markers
     ROUTE_PADDING = params.get("route_padding", 120)    # Smaller padding around the route itself
     MARKER_RADIUS = params.get("marker_radius", 40)
-    LINE_WIDTH = 8
+    LINE_WIDTH = params.get("line_width", 8)
     MASK_SCALE = 4  # Downscale factor for impassability masks
     
     print(f"Processing Route Finder for map: {map_name} (ID: {map_id})")
     print(f"Parameters: min_length={MIN_ROUTE_LENGTH}, max_length={MAX_ROUTE_LENGTH}, num_challenges={NUM_CHALLENGES}")
+    print(f"Visual: marker_padding={MARKER_PADDING}, route_padding={ROUTE_PADDING}, marker_radius={MARKER_RADIUS}, line_width={LINE_WIDTH}")
     
     update_status("processing", f"Starting Route Finder generation. Target: {NUM_CHALLENGES} challenges.")
 
