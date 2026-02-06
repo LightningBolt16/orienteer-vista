@@ -110,7 +110,7 @@ const RouteFinderLeaderboard: React.FC = () => {
       const entries: LeaderboardEntry[] = [];
       
       for (const [userId, stats] of userStats.entries()) {
-        if (stats.total < 10) continue; // Minimum 10 attempts to appear
+        if (stats.total < 3) continue; // Minimum 3 attempts to appear
         
         const profile = profileMap.get(userId);
         entries.push({
