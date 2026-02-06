@@ -3,6 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Undo2, Trash2, Check } from 'lucide-react';
 import { isPointPassable, type Point, type ImpassabilityMask } from '@/utils/routeFinderUtils';
 
+interface GraphNode {
+  id: string;
+  x: number;
+  y: number;
+}
+
 interface RouteDrawingCanvasProps {
   imageUrl: string;
   onPathComplete: (points: Point[]) => void;
@@ -14,6 +20,7 @@ interface RouteDrawingCanvasProps {
   bboxWidth?: number;
   bboxHeight?: number;
   debugMode?: boolean;
+  graphNodes?: GraphNode[];
 }
 
 const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
@@ -27,10 +34,12 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
   bboxWidth,
   bboxHeight,
   debugMode = false,
+  graphNodes,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
+  const graphNodesCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [paths, setPaths] = useState<Point[][]>([]);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
@@ -138,6 +147,42 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
     );
   }, [debugMode, impassabilityMask, imageBounds]);
 
+  // Draw graph nodes overlay in debug mode
+  useEffect(() => {
+    if (!debugMode || !graphNodes || !graphNodesCanvasRef.current || imageBounds.width === 0) return;
+
+    const canvas = graphNodesCanvasRef.current;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    canvas.width = containerRect.width;
+    canvas.height = containerRect.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Scale factor from bbox coordinates to canvas pixels
+    const scaleX = imageBounds.width / effectiveBboxWidth;
+    const scaleY = imageBounds.height / effectiveBboxHeight;
+
+    // Draw each graph node as a small cyan dot
+    ctx.fillStyle = '#00FFFF';
+    for (const node of graphNodes) {
+      ctx.beginPath();
+      ctx.arc(
+        imageBounds.x + node.x * scaleX,
+        imageBounds.y + node.y * scaleY,
+        4,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+  }, [debugMode, graphNodes, imageBounds, effectiveBboxWidth, effectiveBboxHeight]);
+
   // Draw paths on canvas
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -196,53 +241,8 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
       ctx.stroke();
     }
 
-    // Draw start marker (triangle)
-    if (startMarker) {
-      const markerX = imageBounds.x + startMarker.x * scaleX;
-      const markerY = imageBounds.y + startMarker.y * scaleY;
-      const size = 28;
-      
-      ctx.strokeStyle = '#22C55E';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      // Equilateral triangle pointing up
-      ctx.moveTo(markerX, markerY - size * 0.7);
-      ctx.lineTo(markerX - size * 0.6, markerY + size * 0.5);
-      ctx.lineTo(markerX + size * 0.6, markerY + size * 0.5);
-      ctx.closePath();
-      ctx.stroke();
-      
-      // White border for visibility
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-
-    // Draw finish marker (double circle)
-    if (finishMarker) {
-      const markerX = imageBounds.x + finishMarker.x * scaleX;
-      const markerY = imageBounds.y + finishMarker.y * scaleY;
-      
-      ctx.strokeStyle = '#EF4444';
-      ctx.lineWidth = 4;
-      
-      // Outer circle
-      ctx.beginPath();
-      ctx.arc(markerX, markerY, 22, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // Inner circle
-      ctx.beginPath();
-      ctx.arc(markerX, markerY, 14, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // White border for visibility
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(markerX, markerY, 22, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    // Note: Start and finish markers are rendered server-side in the base image
+    // The startMarker and finishMarker props are kept for potential future undo-to-intersection feature
   }, [paths, currentPath, imageBounds, effectiveBboxWidth, effectiveBboxHeight, startMarker, finishMarker]);
 
   useEffect(() => {
@@ -376,6 +376,14 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
           ref={debugCanvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ opacity: 0.5 }}
+        />
+      )}
+
+      {/* Debug graph nodes overlay */}
+      {debugMode && graphNodes && (
+        <canvas
+          ref={graphNodesCanvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
         />
       )}
 

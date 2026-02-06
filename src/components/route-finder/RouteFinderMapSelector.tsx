@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { MapPin, Shuffle, Loader2, Lock, Users, Map, ChevronDown, ChevronUp, Star, Check, Layers } from 'lucide-react';
+import { MapPin, Shuffle, Loader2, Lock, Users, Map, ChevronDown, ChevronUp, Star, Check, Layers, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
@@ -34,7 +34,7 @@ interface RouteFinderMapSelectorProps {
   privateMaps?: MapOption[];
   privateMapsOpen?: boolean;
   onPrivateMapsOpenChange?: (open: boolean) => void;
-  // Community maps (for future)
+  // Community maps
   communityMaps?: MapOption[];
   communityMapsOpen?: boolean;
   onCommunityMapsOpenChange?: (open: boolean) => void;
@@ -46,6 +46,8 @@ interface RouteFinderMapSelectorProps {
   playButtonAnimating?: boolean;
   // User state
   isLoggedIn?: boolean;
+  // Publishing
+  onPublishMap?: (mapId: string, mapName: string) => void;
 }
 
 const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
@@ -65,6 +67,7 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
   onPlaySelected,
   playButtonAnimating = false,
   isLoggedIn = false,
+  onPublishMap,
 }) => {
   const { t } = useLanguage();
 
@@ -235,25 +238,39 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
               {privateMaps.map((map) => {
                 const isMapSelected = isSelected(map.id);
                 return (
-                  <button
-                    key={map.id}
-                    onClick={() => handleMapClick(map.id)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                      isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
-                    }`}
-                  >
-                    {/* Multi-select checkmark */}
-                    {multiSelectMode && isMapSelected && (
-                      <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
-                        <Check className="h-3 w-3 text-primary-foreground" />
-                      </div>
+                  <div key={map.id} className="relative">
+                    <button
+                      onClick={() => handleMapClick(map.id)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative w-full ${
+                        isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                      }`}
+                    >
+                      {/* Multi-select checkmark */}
+                      {multiSelectMode && isMapSelected && (
+                        <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                      <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                      <span className="font-medium text-sm">{map.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
+                      </span>
+                    </button>
+                    {/* Publish button */}
+                    {onPublishMap && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPublishMap(map.id, map.name);
+                        }}
+                        className="absolute bottom-1 right-1 p-1 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+                        title="Publish to community"
+                      >
+                        <Globe className="h-3 w-3" />
+                      </button>
                     )}
-                    <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <span className="font-medium text-sm">{map.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
-                    </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
