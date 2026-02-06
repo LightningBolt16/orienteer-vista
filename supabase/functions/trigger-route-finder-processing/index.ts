@@ -113,12 +113,17 @@ Deno.serve(async (req) => {
         processing_parameters: {
           ...userMap.processing_parameters,
           ...processing_parameters,
-          // Route Finder specific parameters
+          // Route Finder specific parameters (use user values or defaults)
           mode: 'route_finder',
-          min_route_length: 800,
-          max_route_length: 2500,
+          min_route_length: processing_parameters?.min_route_length || 800,
+          max_route_length: processing_parameters?.max_route_length || 2500,
           num_challenges: processing_parameters?.num_challenges || 20,
-          graph_simplification_radius: 300,
+          graph_simplification_radius: processing_parameters?.graph_simplification_radius || 300,
+          marker_padding: processing_parameters?.marker_padding || 200,
+          route_padding: processing_parameters?.route_padding || 120,
+          marker_radius: processing_parameters?.marker_radius || 40,
+          line_width: processing_parameters?.line_width || 8,
+          num_random_points: processing_parameters?.num_random_points || 1500,
         },
         webhook_url: webhookUrl,
         webhook_secret: webhookSecret,
@@ -153,12 +158,17 @@ Deno.serve(async (req) => {
         processing_parameters: {
           ...userMap.processing_parameters,
           ...processing_parameters,
-          // Route Finder specific parameters
+          // Route Finder specific parameters (use user values or defaults)
           mode: 'route_finder',
-          min_route_length: 800,
-          max_route_length: 2500,
+          min_route_length: processing_parameters?.min_route_length || 800,
+          max_route_length: processing_parameters?.max_route_length || 2500,
           num_challenges: processing_parameters?.num_challenges || 20,
-          graph_simplification_radius: 300,
+          graph_simplification_radius: processing_parameters?.graph_simplification_radius || 300,
+          marker_padding: processing_parameters?.marker_padding || 200,
+          route_padding: processing_parameters?.route_padding || 120,
+          marker_radius: processing_parameters?.marker_radius || 40,
+          line_width: processing_parameters?.line_width || 8,
+          num_random_points: processing_parameters?.num_random_points || 1500,
         },
         webhook_url: webhookUrl,
         webhook_secret: webhookSecret,
