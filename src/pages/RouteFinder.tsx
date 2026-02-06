@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import RouteFinderGame from '@/components/route-finder/RouteFinderGame';
+import RouteFinderMapSelector from '@/components/route-finder/RouteFinderMapSelector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Lock, MapPin, Loader2, Trophy, Bug } from 'lucide-react';
+import { ArrowLeft, Lock, Loader2, Bug, Maximize2, Minimize2, LogIn } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
+import { useIsMobile } from '@/hooks/use-mobile';
+import Layout from '@/components/Layout';
 
 interface MapOption {
   id: string;
@@ -21,11 +24,14 @@ const RouteFinder: React.FC = () => {
   const { t } = useLanguage();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
   const [gameActive, setGameActive] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const gameContainerRef = useRef<HTMLDivElement>(null);
 
   // Load available maps
   useEffect(() => {
@@ -63,168 +69,158 @@ const RouteFinder: React.FC = () => {
     loadMaps();
   }, []);
 
+  const toggleFullscreen = useCallback(async () => {
+    if (isMobile || !document.fullscreenEnabled) {
+      setIsFullscreen(prev => !prev);
+      return;
+    }
+
+    if (!gameContainerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await gameContainerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (error) {
+      console.error('Fullscreen error, using CSS fallback:', error);
+      setIsFullscreen(prev => !prev);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!isMobile && document.fullscreenEnabled) {
+        setIsFullscreen(!!document.fullscreenElement);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [isMobile]);
+
   // Show loading while checking auth
   if (userLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Require authentication
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-4">
-        <Lock className="h-16 w-16 text-muted-foreground" />
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">{t('loginRequired')}</h2>
-          <p className="text-muted-foreground mb-4">
-            {t('loginToPlay')}
-          </p>
-          <Button onClick={() => navigate('/auth')}>
-            {t('signIn')}
-          </Button>
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </div>
+      </Layout>
     );
   }
 
-  // Active game view
+  // Active game view - still fullscreen without Layout
   if (gameActive) {
     return (
-      <div className="relative w-screen h-screen overflow-hidden">
-        {/* Back button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setGameActive(false)}
-          className="absolute top-4 left-4 z-20 bg-background/80 backdrop-blur-sm"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-
-        {/* Debug toggle (admin only) */}
-        {isAdmin && (
-          <Button
-            variant={debugMode ? "destructive" : "ghost"}
-            size="icon"
-            onClick={() => setDebugMode(!debugMode)}
-            className="absolute top-4 right-16 z-20 bg-background/80 backdrop-blur-sm"
-            title="Toggle debug mode"
-          >
-            <Bug className="h-5 w-5" />
-          </Button>
-        )}
-
-        <RouteFinderGame
-          mapId={selectedMapId || undefined}
-          debugMode={debugMode}
-          onGameEnd={(stats) => {
-            console.log('Game ended:', stats);
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Map selection view
-  return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
+      <div 
+        ref={gameContainerRef}
+        className={`relative ${isFullscreen ? 'fixed inset-0 z-50 bg-black' : 'w-full h-[calc(100vh-4rem)]'}`}
+      >
+        {/* Slim Header Bar */}
+        <div className="absolute top-0 left-0 right-0 z-20 bg-background/80 backdrop-blur-sm border-b h-12 flex items-center justify-between px-4">
           <Button
             variant="ghost"
-            onClick={() => navigate('/')}
-            className="mb-4"
+            size="sm"
+            onClick={() => setGameActive(false)}
+            className="gap-2"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4" />
             {t('back')}
           </Button>
           
-          <h1 className="text-3xl font-bold mb-2">Route Finder</h1>
-          <p className="text-muted-foreground mb-4">
-            Draw the shortest route from start to finish. Your path will be compared to the optimal route.
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => navigate('/route-finder/leaderboard')}
-            className="flex items-center gap-2"
-          >
-            <Trophy className="h-4 w-4" />
-            View Leaderboard
-          </Button>
+          <span className="text-sm font-medium">Route Finder</span>
+          
+          <div className="flex items-center gap-2">
+            {/* Debug toggle (admin only) */}
+            {isAdmin && (
+              <Button
+                variant={debugMode ? "destructive" : "ghost"}
+                size="icon"
+                onClick={() => setDebugMode(!debugMode)}
+                title="Toggle debug mode"
+                className="h-8 w-8"
+              >
+                <Bug className="h-4 w-4" />
+              </Button>
+            )}
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleFullscreen}
+              className="h-8 w-8"
+              title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
-        {/* Quick play button */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-lg">Quick Play</h3>
-                <p className="text-sm text-muted-foreground">
-                  Random challenges from all maps
-                </p>
-              </div>
-              <Button
-                size="lg"
-                onClick={() => {
-                  setSelectedMapId(null);
-                  setGameActive(true);
-                }}
-                disabled={maps.length === 0}
-              >
-                Start Game
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Game Area */}
+        <div className={`${isFullscreen ? 'h-full pt-12' : 'h-full pt-12'}`}>
+          <RouteFinderGame
+            mapId={selectedMapId || undefined}
+            debugMode={debugMode}
+            onGameEnd={(stats) => {
+              console.log('Game ended:', stats);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
-        {/* Map selection */}
-        <h2 className="text-xl font-semibold mb-4">Or choose a map</h2>
+  // Map selection view - with Layout
+  return (
+    <Layout>
+      <div className="pb-20 space-y-8">
+        {/* Guest Mode Banner */}
+        {!user && (
+          <section className="max-w-4xl mx-auto">
+            <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+              <CardContent className="flex items-center justify-between py-3 px-4">
+                <span className="text-sm text-amber-800 dark:text-amber-200">
+                  {t('signInToSaveProgress') || 'Sign in to save your progress and appear on the leaderboard'}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/auth')}
+                  className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  {t('signIn')}
+                </Button>
+              </CardContent>
+            </Card>
+          </section>
+        )}
         
-        {isLoadingMaps ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : maps.length === 0 ? (
+        {/* Map Selection Card */}
+        <section className="max-w-4xl mx-auto">
           <Card>
-            <CardContent className="py-12 text-center">
-              <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                No maps available yet. Check back later!
-              </p>
+            <CardHeader>
+              <CardTitle>Route Finder</CardTitle>
+              <CardDescription>
+                Draw the shortest route from start to finish. Your path will be compared to the optimal route.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RouteFinderMapSelector
+                maps={maps}
+                isLoading={isLoadingMaps}
+                onSelectMap={setSelectedMapId}
+                onStartGame={() => setGameActive(true)}
+              />
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {maps.map((map) => (
-              <Card
-                key={map.id}
-                className="cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => {
-                  setSelectedMapId(map.id);
-                  setGameActive(true);
-                }}
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{map.name}</CardTitle>
-                  {map.description && (
-                    <CardDescription>{map.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <span className="text-sm text-muted-foreground">
-                    {map.challenge_count} challenges
-                  </span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        </section>
       </div>
-    </div>
+    </Layout>
   );
 };
 

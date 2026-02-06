@@ -196,37 +196,51 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
       ctx.stroke();
     }
 
-    // Draw start marker
+    // Draw start marker (triangle)
     if (startMarker) {
-      ctx.fillStyle = '#22C55E';
+      const markerX = imageBounds.x + startMarker.x * scaleX;
+      const markerY = imageBounds.y + startMarker.y * scaleY;
+      const size = 28;
+      
+      ctx.strokeStyle = '#22C55E';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(
-        imageBounds.x + startMarker.x * scaleX,
-        imageBounds.y + startMarker.y * scaleY,
-        12,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
+      // Equilateral triangle pointing up
+      ctx.moveTo(markerX, markerY - size * 0.7);
+      ctx.lineTo(markerX - size * 0.6, markerY + size * 0.5);
+      ctx.lineTo(markerX + size * 0.6, markerY + size * 0.5);
+      ctx.closePath();
+      ctx.stroke();
+      
+      // White border for visibility
       ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
 
-    // Draw finish marker
+    // Draw finish marker (double circle)
     if (finishMarker) {
-      ctx.fillStyle = '#EF4444';
+      const markerX = imageBounds.x + finishMarker.x * scaleX;
+      const markerY = imageBounds.y + finishMarker.y * scaleY;
+      
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 4;
+      
+      // Outer circle
       ctx.beginPath();
-      ctx.arc(
-        imageBounds.x + finishMarker.x * scaleX,
-        imageBounds.y + finishMarker.y * scaleY,
-        12,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
+      ctx.arc(markerX, markerY, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Inner circle
+      ctx.beginPath();
+      ctx.arc(markerX, markerY, 14, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // White border for visibility
       ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(markerX, markerY, 22, 0, Math.PI * 2);
       ctx.stroke();
     }
   }, [paths, currentPath, imageBounds, effectiveBboxWidth, effectiveBboxHeight, startMarker, finishMarker]);
