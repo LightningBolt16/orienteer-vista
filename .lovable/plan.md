@@ -1,163 +1,99 @@
 
-
-# Route Finder Improvements Plan
+# Route Finder Fixes Plan
 
 ## Overview
-This plan addresses six distinct issues with the Route Finder game mode to align it with the Route Game and fix bugs.
+This plan addresses three issues with the Route Finder game mode:
+
+1. **Scores going to wrong leaderboard** - Route Finder attempts are incorrectly updating the Route Choice leaderboard
+2. **Header button text** - Shows "routeFinder" instead of "Route Finder"
+3. **Missing private/community sections** - Map selector doesn't show private and community sections when empty
 
 ---
 
-## Issues to Fix
+## Issue 1: Scores Going to Wrong Leaderboard
 
-### 1. Fullscreen Not Working
-**Problem**: The fullscreen mode in Route Finder is broken. The game container ref isn't properly attached and the fullscreen toggle doesn't work correctly.
-
-**Solution**:
-- Move the `gameContainerRef` to wrap the game section properly (similar to RouteGame.tsx lines 700-733)
-- Ensure the fullscreen mode takes over the entire screen with proper styling
-- Fix the CSS fallback for mobile devices
-
-**Files**: `src/pages/RouteFinder.tsx`
-
----
-
-### 2. Missing Private and Community Map Sections
-**Problem**: The Route Finder map selector doesn't have the collapsible private/community sections like the Route Game has.
-
-**Solution**:
-- Add hooks to load user's private Route Finder maps from `route_finder_maps` where `user_id = auth.uid()` and `is_public = false`
-- Add hooks to load favorited community Route Finder maps (needs new favorites table or column)
-- Add collapsible sections matching RouteGame.tsx structure (lines 507-681)
-- Include CommunityMapBrowser integration for Route Finder maps
-
-**Files**:
-- `src/pages/RouteFinder.tsx` - Add private/community map loading
-- `src/components/route-finder/RouteFinderMapSelector.tsx` - Add sections
-
----
-
-### 3. Publishing System for Route Finder
-**Problem**: No way to publish private Route Finder maps to community, unlike Route Choice.
-
-**Solution**:
-- Create `PublishRouteFinderMapDialog.tsx` similar to existing `PublishMapDialog.tsx`
-- Allow setting title, description, location via Mapbox picker
-- Update `route_finder_maps` to set `is_public = true`, `map_category = 'community'`
-- Add publish button to the Route Finder private maps section
-
-**Files**:
-- Create `src/components/route-finder/PublishRouteFinderMapDialog.tsx`
-- Update `src/pages/RouteFinder.tsx` to include publish functionality
-
----
-
-### 4. Header Text Formatting
-**Problem**: Header says "routeFinder" instead of "Route Finder" (camelCase vs proper title).
-
-**Solution**:
-- Change any instance of "routeFinder" title text to "Route Finder"
-- Ensure the CardTitle in the map selection section says "Route Finder"
-
-**Files**: `src/pages/RouteFinder.tsx`
-
----
-
-### 5. Frontend Markers Override Backend Markers
-**Problem**: The frontend `RouteDrawingCanvas.tsx` is drawing its own green triangle and red circle markers on top of the map, overriding the magenta markers from the server-generated images. The user wants the **server-side processing script** to make the markers bigger, not the frontend to draw different colored markers.
-
-**Current State**:
-- Server generates images with magenta triangle (start) and magenta double-circle (finish) using `MARKER_RADIUS` parameter (default 40px)
-- Frontend is drawing additional green/red markers on top (lines 199-247 of RouteDrawingCanvas.tsx)
-
-**Solution**:
-- **Remove frontend marker drawing entirely** from `RouteDrawingCanvas.tsx` - the server-generated base image already has the markers
-- Increase the default `MARKER_RADIUS` in the Modal processing script from 40 to 60 (or make it configurable in the admin parameters form)
-- The markers on the processed images will appear larger
-
-**Files**:
-- `src/components/route-finder/RouteDrawingCanvas.tsx` - Remove the startMarker and finishMarker drawing code (lines 199-247)
-- `docs/modal-processor-route-finder.py` - Increase default MARKER_RADIUS from 40 to 60
-
----
-
-### 6. Debug Mode: Show Graph Intersection Points
-**Problem**: Debug mode only shows the impassability mask. User wants to see all graph junction/intersection points to verify the undo-to-last-intersection feature will work.
-
-**Solution**:
-- In debug mode, render all graph nodes (intersections) as small circles on the canvas
-- Filter to show only junction nodes (nodes where graph degree != 2, i.e., intersections)
-- Draw these as small purple/cyan dots overlaid on the map
-
-**Files**:
-- `src/components/route-finder/RouteDrawingCanvas.tsx` - Add graph nodes overlay in debug mode
-- `src/components/route-finder/RouteFinderGame.tsx` - Pass graph data to the canvas when debug mode is active
-
----
-
-## Technical Details
-
-### Route Finder Private/Community Map Loading
+### Problem
+In `src/components/route-finder/RouteFinderGame.tsx` at line 225, after saving the attempt to `route_finder_attempts`, the code calls:
 
 ```typescript
-// In RouteFinder.tsx - add query for private maps
-const loadPrivateMaps = async () => {
-  if (!user) return;
-  const { data } = await supabase
-    .from('route_finder_maps')
-    .select(`
-      id, name, description, country_code, location_name,
-      route_finder_challenges(id)
-    `)
-    .eq('user_id', user.id)
-    .eq('is_public', false);
-  // Transform and set state
-};
+updatePerformance(isCorrect, responseTime);
 ```
 
-### Removing Frontend Markers (RouteDrawingCanvas.tsx)
+The `updatePerformance` function in `UserContext.tsx` (lines 304-312) inserts records into the `route_attempts` table (which is for Route Choice game) and updates `user_profiles` statistics. This means every Route Finder attempt:
+- Creates a duplicate entry in `route_attempts` 
+- Artificially inflates Route Choice leaderboard stats
+- Pollutes the Route Choice leaderboard with Route Finder data
 
-Remove lines 199-247 that draw the start triangle and finish double circle. The props `startMarker` and `finishMarker` can remain for coordinate reference if needed for the undo feature, but no visual rendering.
+### Solution
+Remove the `updatePerformance` call from `RouteFinderGame.tsx`. Route Finder already correctly saves attempts to `route_finder_attempts` table at lines 215-222. The Route Finder has its own separate leaderboard that reads from `route_finder_attempts`.
 
-### Debug Mode Graph Nodes
+### Files to Modify
+- `src/components/route-finder/RouteFinderGame.tsx` - Remove line 225 (`updatePerformance(isCorrect, responseTime)`)
+
+---
+
+## Issue 2: Header Button Shows "routeFinder"
+
+### Problem
+In `src/components/Header.tsx`, the navigation link text uses:
 
 ```typescript
-// In RouteDrawingCanvas - add prop for graph nodes
-graphNodes?: { id: string; x: number; y: number }[];
-
-// In debug mode overlay
-{debugMode && graphNodes && (
-  // Draw each node as a small dot
-  graphNodes.forEach(node => {
-    ctx.beginPath();
-    ctx.arc(
-      imageBounds.x + node.x * scaleX,
-      imageBounds.y + node.y * scaleY,
-      4, 0, Math.PI * 2
-    );
-    ctx.fillStyle = '#00FFFF';
-    ctx.fill();
-  });
-)}
+<span>{t('routeFinder') || 'Route Finder'}</span>
 ```
 
----
+The translation key `routeFinder` does not exist in `LanguageContext.tsx`, so it falls back to the raw key "routeFinder" instead of "Route Finder". The fallback `|| 'Route Finder'` isn't working because `t()` returns the key itself when not found (which is truthy).
 
-## Files Summary
+### Solution
+Add the `routeFinder` translation key to both English and Swedish translations in `LanguageContext.tsx`.
 
-| File | Changes |
-|------|---------|
-| `src/pages/RouteFinder.tsx` | Fix fullscreen, add private/community map sections, fix header text |
-| `src/components/route-finder/RouteFinderMapSelector.tsx` | Add collapsible private/community sections with proper styling |
-| `src/components/route-finder/RouteDrawingCanvas.tsx` | Remove frontend marker drawing, add debug graph nodes overlay |
-| `src/components/route-finder/RouteFinderGame.tsx` | Pass graph nodes to canvas for debug mode |
-| `src/components/route-finder/PublishRouteFinderMapDialog.tsx` | New dialog for publishing Route Finder maps |
-| `docs/modal-processor-route-finder.py` | Increase default MARKER_RADIUS from 40 to 60 |
+### Files to Modify
+- `src/context/LanguageContext.tsx` - Add translation entries:
+  - English: `routeFinder: 'Route Finder'`
+  - Swedish: `routeFinder: 'Ruttfinnare'` (or similar Swedish translation)
 
 ---
 
-## Post-Implementation Notes
+## Issue 3: Missing Private/Community Sections
 
-1. **Modal Redeploy Required**: After updating `modal-processor-route-finder.py`, run `modal deploy docs/modal-processor-route-finder.py`
-2. **Map Reprocessing**: Existing maps will keep their current marker size. New maps or reprocessed maps will use the larger markers.
-3. **Community Favorites**: May need a new `route_finder_favorites` table or extend the existing `community_map_favorites` to support Route Finder maps.
+### Problem
+In `src/components/route-finder/RouteFinderMapSelector.tsx`, the Private Maps and Community Maps collapsible sections are conditionally rendered only when there are maps:
+
+```typescript
+// Line 203 - Private maps only shown if length > 0
+{isLoggedIn && privateMaps.length > 0 && onPrivateMapsOpenChange && (
+
+// Line 282 - Community maps only shown if length > 0  
+{communityMaps.length > 0 && onCommunityMapsOpenChange && (
+```
+
+This means users never see these sections until maps exist, so they don't know they can upload their own maps.
+
+### Solution
+Show both sections even when empty, with helpful placeholder messages encouraging users to create/upload maps. This mirrors the Route Choice game behavior.
+
+### Files to Modify
+- `src/components/route-finder/RouteFinderMapSelector.tsx`:
+  - Change condition from `privateMaps.length > 0` to `isLoggedIn && onPrivateMapsOpenChange`
+  - Add empty state message inside Private Maps section: "No private maps yet. Go to My Maps to process Route Finder challenges from your uploaded maps."
+  - Change Community Maps condition from `communityMaps.length > 0` to just `onCommunityMapsOpenChange`  
+  - Add empty state message inside Community Maps section: "No community maps available yet. Publish your private maps to share with others!"
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/components/route-finder/RouteFinderGame.tsx` | Remove `updatePerformance` call (line 225) |
+| `src/context/LanguageContext.tsx` | Add `routeFinder` translation key for EN and SV |
+| `src/components/route-finder/RouteFinderMapSelector.tsx` | Show Private/Community sections always (for logged-in users), with empty state messages |
+
+---
+
+## Technical Notes
+
+- The Route Finder leaderboard (`RouteFinderLeaderboardInline` in RouteFinder.tsx) correctly aggregates from `route_finder_attempts` table
+- The Route Choice leaderboard uses `route_attempts` table and `user_profiles` statistics
+- These two systems should remain completely separate
+- Removing `updatePerformance` ensures Route Finder stats only affect the Route Finder leaderboard
 
