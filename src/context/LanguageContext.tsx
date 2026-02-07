@@ -31,6 +31,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     en: {
       // Navigation & Common Elements
       routeGame: 'Route Game',
+      routeFinder: 'Route Finder',
       courseSetter: 'Course Setter',
       signIn: 'Sign In',
       register: 'Register',
@@ -384,6 +385,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     sv: {
       // Navigation & Common Elements
       routeGame: 'Vägvalsspel',
+      routeFinder: 'Ruttfinnare',
       courseSetter: 'Banläggare',
       signIn: 'Logga in',
       register: 'Registrera',
