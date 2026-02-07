@@ -158,16 +158,16 @@ const RouteFinder: React.FC = () => {
   }, [loadMaps]);
 
   const toggleFullscreen = useCallback(async () => {
+    // For mobile or when native fullscreen isn't available, use CSS fullscreen
     if (isMobile || !document.fullscreenEnabled) {
       setIsFullscreen(prev => !prev);
       return;
     }
 
-    if (!gameContainerRef.current) return;
-
+    // For desktop with native fullscreen support
     try {
       if (!document.fullscreenElement) {
-        await gameContainerRef.current.requestFullscreen();
+        // Enter fullscreen using CSS-based fullscreen (more reliable)
         setIsFullscreen(true);
       } else {
         await document.exitFullscreen();
@@ -256,30 +256,31 @@ const RouteFinder: React.FC = () => {
     return (
       <div 
         ref={gameContainerRef}
-        className="fixed inset-0 z-50 bg-black"
+        className="fixed inset-0 z-50 bg-black flex flex-col"
       >
-        {/* Fullscreen Toggle Button */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleFullscreen}
-          className="absolute top-4 right-4 z-20 bg-black/50 border-white/30 hover:bg-black/70"
-          title={t('exitFullscreen')}
-        >
-          <Minimize2 className="h-4 w-4" />
-        </Button>
-
-        {isAdmin && (
+        {/* Controls bar */}
+        <div className="absolute top-4 right-4 z-20 flex gap-2">
+          {isAdmin && (
+            <Button
+              variant={debugMode ? "destructive" : "outline"}
+              size="icon"
+              onClick={() => setDebugMode(!debugMode)}
+              className="bg-black/50 border-white/30 hover:bg-black/70"
+              title="Toggle debug mode"
+            >
+              <Bug className="h-4 w-4" />
+            </Button>
+          )}
           <Button
-            variant={debugMode ? "destructive" : "outline"}
+            variant="outline"
             size="icon"
-            onClick={() => setDebugMode(!debugMode)}
-            className="absolute top-4 right-16 z-20 bg-black/50 border-white/30 hover:bg-black/70"
-            title="Toggle debug mode"
+            onClick={toggleFullscreen}
+            className="bg-black/50 border-white/30 hover:bg-black/70"
+            title={t('exitFullscreen')}
           >
-            <Bug className="h-4 w-4" />
+            <Minimize2 className="h-4 w-4" />
           </Button>
-        )}
+        </div>
 
         {/* Warm-up indicator */}
         {isWarmUp && (
@@ -288,7 +289,8 @@ const RouteFinder: React.FC = () => {
           </div>
         )}
 
-        <div className="h-full w-full">
+        {/* Game fills the entire screen */}
+        <div className="flex-1 w-full h-full">
           <RouteFinderGame
             key={gameKey}
             mapId={selectedMapId || undefined}
@@ -366,10 +368,7 @@ const RouteFinder: React.FC = () => {
         {/* Game Section - Always shows when maps are loaded */}
         {(maps.length > 0 || privateMaps.length > 0 || communityMaps.length > 0) && !isLoadingMaps && (
           <section className="max-w-4xl mx-auto">
-            <div 
-              ref={gameContainerRef}
-              className="relative"
-            >
+            <div className="relative">
               {/* Controls */}
               <div className="absolute top-2 right-2 z-20 flex gap-2">
                 {isAdmin && (
@@ -399,7 +398,10 @@ const RouteFinder: React.FC = () => {
                 </div>
               )}
 
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              {/* Use different aspect ratios for mobile vs desktop */}
+              <div className={`bg-black rounded-lg overflow-hidden ${
+                isMobile ? 'aspect-[3/4]' : 'aspect-video'
+              }`}>
                 <RouteFinderGame
                   key={gameKey}
                   mapId={selectedMapId || undefined}
