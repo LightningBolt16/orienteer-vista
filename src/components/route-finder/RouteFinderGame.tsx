@@ -47,7 +47,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   onWarmUpComplete,
   onGameEnd 
 }) => {
-  const { user, updatePerformance } = useUser();
+  const { user } = useUser();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -220,9 +220,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
             response_time: responseTime,
             user_path: points as unknown as any,
           }]);
-
-          // Update user performance
-          updatePerformance(isCorrect, responseTime);
         } catch (err) {
           console.error('Error saving attempt:', err);
         }

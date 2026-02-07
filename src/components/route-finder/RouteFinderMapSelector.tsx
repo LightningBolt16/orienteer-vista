@@ -200,7 +200,7 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
       </div>
 
       {/* Your Private Maps - Collapsible */}
-      {isLoggedIn && privateMaps.length > 0 && onPrivateMapsOpenChange && (
+      {isLoggedIn && onPrivateMapsOpenChange && (
         <Collapsible open={privateMapsOpen} onOpenChange={onPrivateMapsOpenChange}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
@@ -219,67 +219,75 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
                 Stats from these maps are private and won't affect the public leaderboard.
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {/* Random Mix for Private Maps - hide in multi-select mode */}
-              {!multiSelectMode && privateMaps.length > 1 && (
-                <button
-                  onClick={() => handleMapClick('private-all')}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
-                    selectedMapId === 'private-all'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-card'
-                  }`}
-                >
-                  <Shuffle className="h-8 w-8 mb-2 text-primary" />
-                  <span className="font-medium text-sm">Random Mix</span>
-                  <span className="text-xs text-muted-foreground">All your maps</span>
-                </button>
-              )}
-              {privateMaps.map((map) => {
-                const isMapSelected = isSelected(map.id);
-                return (
-                  <div key={map.id} className="relative">
-                    <button
-                      onClick={() => handleMapClick(map.id)}
-                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative w-full ${
-                        isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
-                      }`}
-                    >
-                      {/* Multi-select checkmark */}
-                      {multiSelectMode && isMapSelected && (
-                        <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
-                          <Check className="h-3 w-3 text-primary-foreground" />
-                        </div>
-                      )}
-                      <Map className="h-8 w-8 mb-2 text-muted-foreground" />
-                      <span className="font-medium text-sm">{map.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
-                      </span>
-                    </button>
-                    {/* Publish button */}
-                    {onPublishMap && (
+            {privateMaps.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Map className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No private maps yet.</p>
+                <p className="text-xs mt-1">Go to My Maps to process Route Finder challenges from your uploaded maps.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {/* Random Mix for Private Maps - hide in multi-select mode */}
+                {!multiSelectMode && privateMaps.length > 1 && (
+                  <button
+                    onClick={() => handleMapClick('private-all')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                      selectedMapId === 'private-all'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border bg-card'
+                    }`}
+                  >
+                    <Shuffle className="h-8 w-8 mb-2 text-primary" />
+                    <span className="font-medium text-sm">Random Mix</span>
+                    <span className="text-xs text-muted-foreground">All your maps</span>
+                  </button>
+                )}
+                {privateMaps.map((map) => {
+                  const isMapSelected = isSelected(map.id);
+                  return (
+                    <div key={map.id} className="relative">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPublishMap(map.id, map.name);
-                        }}
-                        className="absolute bottom-1 right-1 p-1 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
-                        title="Publish to community"
+                        onClick={() => handleMapClick(map.id)}
+                        className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative w-full ${
+                          isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                        }`}
                       >
-                        <Globe className="h-3 w-3" />
+                        {/* Multi-select checkmark */}
+                        {multiSelectMode && isMapSelected && (
+                          <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                            <Check className="h-3 w-3 text-primary-foreground" />
+                          </div>
+                        )}
+                        <Map className="h-8 w-8 mb-2 text-muted-foreground" />
+                        <span className="font-medium text-sm">{map.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
+                        </span>
                       </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      {/* Publish button */}
+                      {onPublishMap && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPublishMap(map.id, map.name);
+                          }}
+                          className="absolute bottom-1 right-1 p-1 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
+                          title="Publish to community"
+                        >
+                          <Globe className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
       )}
 
-      {/* Community Maps - Collapsible (placeholder for future) */}
-      {communityMaps.length > 0 && onCommunityMapsOpenChange && (
+      {/* Community Maps - Collapsible */}
+      {onCommunityMapsOpenChange && (
         <Collapsible open={communityMapsOpen} onOpenChange={onCommunityMapsOpenChange}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
@@ -298,33 +306,41 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
                 Star maps from the browser below to add them here. Stats go to map-specific leaderboards.
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {communityMaps.map((map) => {
-                const isMapSelected = isSelected(map.id);
-                return (
-                  <button
-                    key={map.id}
-                    onClick={() => handleMapClick(map.id)}
-                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                      isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
-                    }`}
-                  >
-                    {/* Multi-select checkmark */}
-                    {multiSelectMode && isMapSelected && (
-                      <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
-                        <Check className="h-3 w-3 text-primary-foreground" />
-                      </div>
-                    )}
-                    <Star className="absolute top-1 right-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <Users className="h-8 w-8 mb-2 text-muted-foreground" />
-                    <span className="font-medium text-sm">{map.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            {communityMaps.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No community maps available yet.</p>
+                <p className="text-xs mt-1">Publish your private maps to share with others!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {communityMaps.map((map) => {
+                  const isMapSelected = isSelected(map.id);
+                  return (
+                    <button
+                      key={map.id}
+                      onClick={() => handleMapClick(map.id)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                        isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                      }`}
+                    >
+                      {/* Multi-select checkmark */}
+                      {multiSelectMode && isMapSelected && (
+                        <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                      <Star className="absolute top-1 right-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+                      <span className="font-medium text-sm">{map.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </CollapsibleContent>
         </Collapsible>
       )}
