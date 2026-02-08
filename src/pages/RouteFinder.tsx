@@ -157,38 +157,12 @@ const RouteFinder: React.FC = () => {
     loadMaps();
   }, [loadMaps]);
 
-  const toggleFullscreen = useCallback(async () => {
-    // For mobile or when native fullscreen isn't available, use CSS fullscreen
-    if (isMobile || !document.fullscreenEnabled) {
-      setIsFullscreen(prev => !prev);
-      return;
-    }
+  // Pure CSS-based fullscreen toggle - simpler and more reliable
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
 
-    // For desktop with native fullscreen support
-    try {
-      if (!document.fullscreenElement) {
-        // Enter fullscreen using CSS-based fullscreen (more reliable)
-        setIsFullscreen(true);
-      } else {
-        await document.exitFullscreen();
-        setIsFullscreen(false);
-      }
-    } catch (error) {
-      console.error('Fullscreen error, using CSS fallback:', error);
-      setIsFullscreen(prev => !prev);
-    }
-  }, [isMobile]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!isMobile && document.fullscreenEnabled) {
-        setIsFullscreen(!!document.fullscreenElement);
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [isMobile]);
+  // CSS-based fullscreen doesn't need native fullscreen event listener
 
   const handleMapSelect = (mapId: string | null) => {
     if (multiSelectMode && mapId) {

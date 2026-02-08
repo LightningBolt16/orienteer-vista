@@ -381,6 +381,23 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       login: 'Log in',
       unranked: 'Unranked',
       viewFullLeaderboard: 'View full leaderboard',
+      // Country
+      country: 'Country',
+      selectCountry: 'Select your country',
+      noCountrySelected: 'No country selected',
+      // Onboarding
+      next: 'Next',
+      onboardingWelcomeTitle: 'Welcome to Route Choice Champions!',
+      onboardingWelcomeDesc: 'Train your orienteering route choice skills and compete with orienteers worldwide.',
+      onboardingRouteChoiceTitle: 'Route Choice Game',
+      onboardingRouteChoiceDesc: 'Pick the fastest route between two control points. The quicker and more accurate you are, the higher you score!',
+      onboardingRouteFinderTitle: 'Route Finder',
+      onboardingRouteFinderDesc: 'Draw your own route on the map and compare it to the optimal path. Test your navigation skills!',
+      onboardingDuelTitle: 'Duel Mode',
+      onboardingDuelDesc: 'Challenge friends to real-time route choice duels. See who makes better decisions under pressure!',
+      onboardingProfileTitle: 'Set Up Your Profile',
+      onboardingProfileDesc: 'Add your country to appear on national leaderboards and track your progress over time.',
+      onboardingSetupProfile: 'Set Up Profile',
     },
     sv: {
       // Navigation & Common Elements
@@ -734,6 +751,23 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       login: 'Logga in',
       unranked: 'Oplacerad',
       viewFullLeaderboard: 'Visa hela topplistan',
+      // Country
+      country: 'Land',
+      selectCountry: 'Välj ditt land',
+      noCountrySelected: 'Inget land valt',
+      // Onboarding
+      next: 'Nästa',
+      onboardingWelcomeTitle: 'Välkommen till Route Choice Champions!',
+      onboardingWelcomeDesc: 'Träna dina vägvalsfärdigheter i orientering och tävla med orienterare världen över.',
+      onboardingRouteChoiceTitle: 'Vägvalsspel',
+      onboardingRouteChoiceDesc: 'Välj den snabbaste vägen mellan två kontroller. Ju snabbare och mer träffsäker du är, desto högre poäng!',
+      onboardingRouteFinderTitle: 'Ruttfinnare',
+      onboardingRouteFinderDesc: 'Rita din egen rutt på kartan och jämför med den optimala vägen. Testa dina navigeringsfärdigheter!',
+      onboardingDuelTitle: 'Duell-läge',
+      onboardingDuelDesc: 'Utmana vänner i vägvalsdueller i realtid. Se vem som fattar bäst beslut under press!',
+      onboardingProfileTitle: 'Ställ in din profil',
+      onboardingProfileDesc: 'Lägg till ditt land för att synas på nationella topplistor och följ din utveckling över tid.',
+      onboardingSetupProfile: 'Ställ in profil',
     },
   };
 

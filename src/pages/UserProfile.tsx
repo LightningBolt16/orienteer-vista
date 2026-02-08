@@ -1,11 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, CheckCircle, XCircle, Map, ArrowLeft } from 'lucide-react';
+import { User, CheckCircle, XCircle, Map, ArrowLeft, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { format, subDays, subMonths, parseISO } from 'date-fns';
+
+// Country flag mapping
+const COUNTRY_FLAGS: Record<string, string> = {
+  SE: '🇸🇪',
+  NO: '🇳🇴',
+  FI: '🇫🇮',
+  DK: '🇩🇰',
+  DE: '🇩🇪',
+  CH: '🇨🇭',
+  AT: '🇦🇹',
+  FR: '🇫🇷',
+  GB: '🇬🇧',
+  CZ: '🇨🇿',
+  PL: '🇵🇱',
+  IT: '🇮🇹',
+  ES: '🇪🇸',
+  BE: '🇧🇪',
+  NL: '🇳🇱',
+  US: '🇺🇸',
+  AU: '🇦🇺',
+  NZ: '🇳🇿',
+  JP: '🇯🇵',
+  EE: '🇪🇪',
+  LV: '🇱🇻',
+  LT: '🇱🇹',
+  RU: '🇷🇺',
+  UA: '🇺🇦',
+  HU: '🇭🇺',
+  SK: '🇸🇰',
+  SI: '🇸🇮',
+  HR: '🇭🇷',
+  PT: '🇵🇹',
+  IE: '🇮🇪',
+  CA: '🇨🇦',
+};
 
 interface PublicUserProfile {
   user_id: string;
@@ -16,6 +54,7 @@ interface PublicUserProfile {
   alltime_total: number;
   alltime_correct: number;
   alltime_time_sum: number;
+  country_code: string | null;
 }
 
 interface MapStats {
@@ -29,12 +68,21 @@ interface MapStats {
   };
 }
 
+interface PerformanceDataPoint {
+  date: string;
+  accuracy: number;
+  speed: number;
+  attempts: number;
+}
+
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [mapStats, setMapStats] = useState<MapStats[]>([]);
+  const [performanceData, setPerformanceData] = useState<PerformanceDataPoint[]>([]);
+  const [timeFilter, setTimeFilter] = useState<'week' | 'month' | '90days' | 'all'>('month');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +92,7 @@ const UserProfile: React.FC = () => {
       try {
         const { data, error } = await (supabase
           .from('user_profiles' as any)
-          .select('user_id, name, profile_image, accuracy, speed, alltime_total, alltime_correct, alltime_time_sum')
+          .select('user_id, name, profile_image, accuracy, speed, alltime_total, alltime_correct, alltime_time_sum, country_code')
           .eq('user_id', userId)
           .single() as any);
 
@@ -74,6 +122,74 @@ const UserProfile: React.FC = () => {
 
     fetchProfile();
   }, [userId, navigate]);
+
+  // Fetch performance data based on time filter
+  useEffect(() => {
+    const fetchPerformanceData = async () => {
+      if (!userId) return;
+
+      try {
+        let startDate: Date | null = null;
+        
+        if (timeFilter === 'week') {
+          startDate = subDays(new Date(), 7);
+        } else if (timeFilter === 'month') {
+          startDate = subMonths(new Date(), 1);
+        } else if (timeFilter === '90days') {
+          startDate = subDays(new Date(), 90);
+        }
+
+        let query = supabase
+          .from('route_attempts' as any)
+          .select('created_at, is_correct, response_time')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+
+        if (startDate) {
+          query = query.gte('created_at', startDate.toISOString());
+        }
+
+        const { data: attempts, error } = await (query as any);
+
+        if (error) {
+          console.error('Error fetching performance data:', error);
+          return;
+        }
+
+        if (attempts && attempts.length > 0) {
+          // Group by date and calculate daily stats
+          const dailyStats: Record<string, { correct: number; total: number; timeSum: number }> = {};
+
+          attempts.forEach((attempt: any) => {
+            const date = format(parseISO(attempt.created_at), 'yyyy-MM-dd');
+            if (!dailyStats[date]) {
+              dailyStats[date] = { correct: 0, total: 0, timeSum: 0 };
+            }
+            dailyStats[date].total++;
+            if (attempt.is_correct) {
+              dailyStats[date].correct++;
+              dailyStats[date].timeSum += attempt.response_time;
+            }
+          });
+
+          const chartData: PerformanceDataPoint[] = Object.entries(dailyStats).map(([date, stats]) => ({
+            date: format(parseISO(date), 'MMM d'),
+            accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
+            speed: stats.correct > 0 ? Math.round(stats.timeSum / stats.correct) : 0,
+            attempts: stats.total,
+          }));
+
+          setPerformanceData(chartData);
+        } else {
+          setPerformanceData([]);
+        }
+      } catch (error) {
+        console.error('Error fetching performance data:', error);
+      }
+    };
+
+    fetchPerformanceData();
+  }, [timeFilter, userId]);
 
   if (loading) {
     return (
@@ -133,7 +249,14 @@ const UserProfile: React.FC = () => {
           {/* Profile Info */}
           <div className="flex-grow space-y-4 text-center md:text-left">
             <div>
-              <h1 className="text-2xl font-bold">{profile.name}</h1>
+              <div className="flex items-center justify-center md:justify-start gap-2">
+                <h1 className="text-2xl font-bold">{profile.name}</h1>
+                {profile.country_code && COUNTRY_FLAGS[profile.country_code] && (
+                  <span className="text-2xl" title={profile.country_code}>
+                    {COUNTRY_FLAGS[profile.country_code]}
+                  </span>
+                )}
+              </div>
               <p className="text-muted-foreground mt-1">{t('orienteeringEnthusiast')}</p>
             </div>
           </div>
@@ -142,9 +265,10 @@ const UserProfile: React.FC = () => {
         {/* Stats Tabs */}
         <div className="mt-10 border-t border-muted pt-8">
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="overview">{t('overview') || 'Overview'}</TabsTrigger>
               <TabsTrigger value="maps">{t('perMap') || 'Per Map'}</TabsTrigger>
+              <TabsTrigger value="progress">{t('progress') || 'Progress'}</TabsTrigger>
             </TabsList>
 
             {/* Overview Tab - All Time Stats */}
@@ -225,6 +349,120 @@ const UserProfile: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Progress Tab */}
+            <TabsContent value="progress">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">{t('performanceOverTime') || 'Performance Over Time'}</h2>
+                <Select value={timeFilter} onValueChange={(value: 'week' | 'month' | '90days' | 'all') => setTimeFilter(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">{t('lastWeek') || '7 Days'}</SelectItem>
+                    <SelectItem value="month">{t('lastMonth') || '30 Days'}</SelectItem>
+                    <SelectItem value="90days">{t('last90Days') || '90 Days'}</SelectItem>
+                    <SelectItem value="all">{t('allTime') || 'All Time'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {performanceData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>{t('noPerformanceData') || 'No performance data available for this period.'}</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Accuracy Chart */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">{t('accuracyOverTime') || 'Accuracy Over Time'}</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={performanceData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="date" className="text-xs" />
+                          <YAxis domain={[0, 100]} className="text-xs" />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--card))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }} 
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="accuracy" 
+                            stroke="hsl(var(--primary))" 
+                            strokeWidth={2}
+                            dot={{ fill: 'hsl(var(--primary))' }}
+                            name={t('accuracy') || 'Accuracy'}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Speed Chart */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">{t('speedOverTime') || 'Average Speed Over Time'}</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={performanceData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="date" className="text-xs" />
+                          <YAxis className="text-xs" />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--card))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }} 
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="speed" 
+                            stroke="hsl(var(--chart-2))" 
+                            strokeWidth={2}
+                            dot={{ fill: 'hsl(var(--chart-2))' }}
+                            name={`${t('speed') || 'Speed'} (ms)`}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Daily Attempts Chart */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">{t('dailyAttempts') || 'Daily Attempts'}</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={performanceData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="date" className="text-xs" />
+                          <YAxis className="text-xs" />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--card))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }} 
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="attempts" 
+                            stroke="hsl(var(--chart-3))" 
+                            strokeWidth={2}
+                            dot={{ fill: 'hsl(var(--chart-3))' }}
+                            name={t('attempts') || 'Attempts'}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
                 </div>
               )}
             </TabsContent>
