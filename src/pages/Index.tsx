@@ -3,16 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Map, PenTool, Trophy, ArrowRight } from 'lucide-react';
 import Leaderboard from '../components/Leaderboard';
+import OnboardingTutorial from '../components/OnboardingTutorial';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
 import { useLogger } from '../hooks/useLogger';
+import { supabase } from '../integrations/supabase/client';
 
 const Index: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   // Log component lifecycle for debugging
   useLogger('IndexPage');
@@ -25,6 +28,27 @@ const Index: React.FC = () => {
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Check if onboarding should be shown
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      if (user && user.id !== '1') {
+        const { data } = await (supabase
+          .from('user_profiles' as any)
+          .select('onboarding_completed')
+          .eq('user_id', user.id)
+          .single() as any);
+        
+        if (data && data.onboarding_completed === false) {
+          setShowOnboarding(true);
+        }
+      }
+    };
+    
+    if (!loading && user) {
+      checkOnboarding();
+    }
+  }, [loading, user]);
 
   if (loading) {
     return (
@@ -46,6 +70,13 @@ const Index: React.FC = () => {
 
   return (
     <div className="animate-fade-in pb-12">
+      {/* Onboarding Tutorial */}
+      {showOnboarding && user && (
+        <OnboardingTutorial
+          userId={user.id}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
       {/* Route Choice Champions Header */}
       <div className="glass-card mb-12 p-8 md:p-12 rounded-3xl">
         <div className="flex items-center justify-center mb-8">

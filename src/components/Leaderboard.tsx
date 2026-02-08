@@ -33,6 +33,7 @@ type SortDirection = 'asc' | 'desc';
 interface LeaderboardProps {
   mapFilter?: string;
   showAll?: boolean; // If true, show all users. If false, show top 10 + current user's position
+  countryFilter?: string; // Optional country code filter
 }
 
 type LeaderboardEntry = {
@@ -43,9 +44,10 @@ type LeaderboardEntry = {
   rank?: number;
   previousRank?: number;
   profileImage?: string;
+  countryCode?: string;
 };
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = false }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = false, countryFilter }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { leaderboard, user, fetchMapLeaderboard } = useUser();
@@ -77,10 +79,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
           } else {
             // Leaderboard not loaded yet, fetch directly
             const { supabase } = await import('../integrations/supabase/client');
-            const { data, error } = await (supabase
+            let query = supabase
               .from('user_profiles' as any)
-              .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total')
-              .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
+              .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total, country_code')
+              .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD);
+            
+            if (countryFilter) {
+              query = query.eq('country_code', countryFilter);
+            }
+            
+            const { data, error } = await (query
               .order('accuracy', { ascending: false })
               .order('speed', { ascending: true })
               .limit(50) as any);
@@ -105,7 +113,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
                 speed: entry.speed || 0,
                 rank: index + 1,
                 previousRank: entry.previous_rank || null,
-                profileImage: entry.profile_image
+                profileImage: entry.profile_image,
+                countryCode: entry.country_code
               }));
               
               setDisplayLeaderboard(rankedLeaderboard);
@@ -125,7 +134,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     };
     
     loadLeaderboard();
-  }, [mapFilter, leaderboard, fetchMapLeaderboard]);
+  }, [mapFilter, leaderboard, fetchMapLeaderboard, countryFilter]);
 
   // Calculate combined score using new formula with accuracy multiplier
   const calculateCombinedScore = (accuracy: number, speed: number) => {

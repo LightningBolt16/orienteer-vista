@@ -748,9 +748,11 @@ export type Database = {
           alltime_total: number | null
           attempts: Json | null
           bio: string | null
+          country_code: string | null
           created_at: string
           id: string
           name: string | null
+          onboarding_completed: boolean
           previous_rank: number | null
           profile_image: string | null
           speed: number | null
@@ -765,9 +767,11 @@ export type Database = {
           alltime_total?: number | null
           attempts?: Json | null
           bio?: string | null
+          country_code?: string | null
           created_at?: string
           id?: string
           name?: string | null
+          onboarding_completed?: boolean
           previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
@@ -782,9 +786,11 @@ export type Database = {
           alltime_total?: number | null
           attempts?: Json | null
           bio?: string | null
+          country_code?: string | null
           created_at?: string
           id?: string
           name?: string | null
+          onboarding_completed?: boolean
           previous_rank?: number | null
           profile_image?: string | null
           speed?: number | null
