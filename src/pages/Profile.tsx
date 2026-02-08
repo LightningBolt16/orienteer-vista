@@ -291,6 +291,8 @@ const Profile: React.FC = () => {
       });
     }
   };
+
+  const handleImageClick = () => {
     fileInputRef.current?.click();
   };
 
