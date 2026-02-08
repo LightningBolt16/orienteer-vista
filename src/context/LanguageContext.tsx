@@ -398,6 +398,19 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       onboardingProfileTitle: 'Set Up Your Profile',
       onboardingProfileDesc: 'Add your country to appear on national leaderboards and track your progress over time.',
       onboardingSetupProfile: 'Set Up Profile',
+      // Leaderboard filters
+      filterByCountry: 'Filter by country',
+      allCountries: 'All Countries',
+      routeChoice: 'Route Choice',
+      routeFinderLeaderboard: 'Route Finder Leaderboard',
+      searchCountry: 'Search country...',
+      noCountryFound: 'No country found.',
+      player: 'Player',
+      avgTime: 'Avg Time',
+      errorLoadingLeaderboard: 'Error loading leaderboard',
+      tryAgain: 'Try Again',
+      noDataYet: 'No data yet',
+      beFirstRouteFinder: 'Be the first to complete Route Finder challenges!',
     },
     sv: {
       // Navigation & Common Elements
@@ -768,6 +781,19 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       onboardingProfileTitle: 'Ställ in din profil',
       onboardingProfileDesc: 'Lägg till ditt land för att synas på nationella topplistor och följ din utveckling över tid.',
       onboardingSetupProfile: 'Ställ in profil',
+      // Leaderboard filters
+      filterByCountry: 'Filtrera efter land',
+      allCountries: 'Alla länder',
+      routeChoice: 'Vägval',
+      routeFinderLeaderboard: 'Ruttfinnare topplista',
+      searchCountry: 'Sök land...',
+      noCountryFound: 'Inget land hittades.',
+      player: 'Spelare',
+      avgTime: 'Snittid',
+      errorLoadingLeaderboard: 'Fel vid laddning av topplista',
+      tryAgain: 'Försök igen',
+      noDataYet: 'Ingen data än',
+      beFirstRouteFinder: 'Bli först med att slutföra Ruttfinnare-utmaningar!',
     },
   };
 

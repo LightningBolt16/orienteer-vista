@@ -26,6 +26,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useIsMobile } from '../hooks/use-mobile';
+import { getCountryFlag } from '@/components/CountrySelector';
 
 type SortField = 'accuracy' | 'speed' | 'combined';
 type SortDirection = 'asc' | 'desc';
@@ -414,7 +415,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
         </Avatar>
         
         <div className="flex-1 min-w-0 mr-2">
-          <div className="flex items-center min-w-0">
+          <div className="flex items-center min-w-0 gap-1">
+            {entry.countryCode && (
+              <span className="text-sm flex-shrink-0">{getCountryFlag(entry.countryCode)}</span>
+            )}
             <span className="font-medium text-xs truncate">{entry.name}</span>
             {entry.id === user?.id && (
               <span className="ml-1 text-[8px] bg-orienteering/20 text-orienteering px-1 py-0.5 rounded-full flex-shrink-0">
@@ -475,7 +479,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
                 </AvatarFallback>
               )}
             </Avatar>
-            <div>
+            <div className="flex items-center gap-2">
+              {entry.countryCode && (
+                <span className="text-lg">{getCountryFlag(entry.countryCode)}</span>
+              )}
               <span className="font-medium">{entry.name}</span>
               {entry.id === user?.id && (
                 <span className="ml-2 text-xs bg-orienteering/20 text-orienteering px-2 py-0.5 rounded-full">

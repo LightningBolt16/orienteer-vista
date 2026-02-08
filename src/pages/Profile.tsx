@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays, subMonths, startOfDay, parseISO } from 'date-fns';
 import { ImageCropper } from '../components/ImageCropper';
+import CountrySelector from '@/components/CountrySelector';
 
 interface MapStats {
   map_name: string;
@@ -29,41 +30,6 @@ interface PerformanceDataPoint {
   speed: number;
   attempts: number;
 }
-
-// Country options for dropdown
-const COUNTRY_OPTIONS = [
-  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
-  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
-  { code: 'FI', name: 'Finland', flag: '🇫🇮' },
-  { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
-  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
-  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
-  { code: 'AT', name: 'Austria', flag: '🇦🇹' },
-  { code: 'FR', name: 'France', flag: '🇫🇷' },
-  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
-  { code: 'CZ', name: 'Czechia', flag: '🇨🇿' },
-  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
-  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
-  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
-  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
-  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
-  { code: 'US', name: 'United States', flag: '🇺🇸' },
-  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
-  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
-  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
-  { code: 'EE', name: 'Estonia', flag: '🇪🇪' },
-  { code: 'LV', name: 'Latvia', flag: '🇱🇻' },
-  { code: 'LT', name: 'Lithuania', flag: '🇱🇹' },
-  { code: 'RU', name: 'Russia', flag: '🇷🇺' },
-  { code: 'UA', name: 'Ukraine', flag: '🇺🇦' },
-  { code: 'HU', name: 'Hungary', flag: '🇭🇺' },
-  { code: 'SK', name: 'Slovakia', flag: '🇸🇰' },
-  { code: 'SI', name: 'Slovenia', flag: '🇸🇮' },
-  { code: 'HR', name: 'Croatia', flag: '🇭🇷' },
-  { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
-  { code: 'IE', name: 'Ireland', flag: '🇮🇪' },
-  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
-];
 
 const Profile: React.FC = () => {
   const { user, setUser, getUserRank, loading } = useUser();
@@ -508,27 +474,11 @@ const Profile: React.FC = () => {
             {/* Country Selector */}
             <div className="mt-4">
               <label className="text-sm text-muted-foreground mb-2 block">{t('country') || 'Country'}</label>
-              <Select value={userCountry || ''} onValueChange={handleSaveCountry}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder={t('selectCountry') || 'Select your country'}>
-                    {userCountry ? (
-                      <span>
-                        {COUNTRY_OPTIONS.find(c => c.code === userCountry)?.flag}{' '}
-                        {COUNTRY_OPTIONS.find(c => c.code === userCountry)?.name}
-                      </span>
-                    ) : (
-                      t('selectCountry') || 'Select your country'
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {COUNTRY_OPTIONS.map((country) => (
-                    <SelectItem key={country.code} value={country.code}>
-                      {country.flag} {country.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CountrySelector 
+                value={userCountry}
+                onChange={handleSaveCountry}
+                className="w-64"
+              />
             </div>
             
             {alltimeTotal > 0 && (
