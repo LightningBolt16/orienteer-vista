@@ -2,6 +2,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type SourceAspect = '1:1' | '16_9' | '9_16';
 
+export interface SafeZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface RouteData {
   candidateIndex: number;
   shortestSide: 'left' | 'right';  // Legacy: for 2-route scenarios
@@ -14,6 +21,7 @@ export interface RouteData {
   mapName?: string;
   imagePath?: string;
   sourceAspect?: SourceAspect;  // The aspect ratio of the source image
+  safeZone?: SafeZone;          // Safe zone for 1:1 adaptive cropping
 }
 
 export interface MapSource {
@@ -309,7 +317,7 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
 
     const { data: dbRoutes, error } = await supabase
       .from('route_images')
-      .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path, aspect_ratio')
+      .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path, aspect_ratio, safe_zone')
       .eq('map_id', mapSource.id)
       .eq('aspect_ratio', queryAspect)
       .order('candidate_index');
@@ -343,6 +351,15 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
           (route.aspect_ratio.includes('16') && route.aspect_ratio.includes('9') ? 
             (route.aspect_ratio.includes('16_9') || route.aspect_ratio === '16:9' ? '16_9' : '9_16') : '16_9');
         
+        // Parse safe zone
+        let safeZone: SafeZone | undefined;
+        if (route.safe_zone && typeof route.safe_zone === 'object' && !Array.isArray(route.safe_zone)) {
+          const sz = route.safe_zone as Record<string, number>;
+          if (sz.x !== undefined && sz.y !== undefined && sz.w !== undefined && sz.h !== undefined) {
+            safeZone = { x: sz.x, y: sz.y, w: sz.w, h: sz.h };
+          }
+        }
+        
         return {
           candidateIndex: route.candidate_index,
           shortestSide,
@@ -355,6 +372,7 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
           mapName: mapSource.name,
           imagePath: `${baseUrl}/${route.image_path}`,
           sourceAspect,
+          safeZone,
         };
       });
 
@@ -478,7 +496,7 @@ export async function loadUserMapRoutes(
   // Get route images
   const { data: routeImages, error: routeImagesError } = await supabase
     .from('route_images')
-    .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path')
+    .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path, safe_zone')
     .eq('map_id', routeMap.id)
     .eq('aspect_ratio', aspect)
     .order('candidate_index');

@@ -1,6 +1,13 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface SafeZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface ParsedRoute {
   candidateIndex: number;
   mainSide: string;
@@ -9,6 +16,7 @@ interface ParsedRoute {
   overlapPct?: number;
   hardness?: number;
   passNum?: number;
+  safeZone?: SafeZone;
 }
 
 interface UploadProgress {
@@ -75,13 +83,30 @@ export const useMapUpload = () => {
       const mainLenIdx = headers.findIndex(h => h === 'main_len');
       const altLenIdx = headers.findIndex(h => h === 'alt_len');
       const hardnessIdx = headers.findIndex(h => h === 'hardness');
+      const safeXIdx = headers.findIndex(h => h === 'safe_x');
+      const safeYIdx = headers.findIndex(h => h === 'safe_y');
+      const safeWIdx = headers.findIndex(h => h === 'safe_w');
+      const safeHIdx = headers.findIndex(h => h === 'safe_h');
+
+      // Parse safe zone if all 4 fields present
+      let safeZone: SafeZone | undefined;
+      if (safeXIdx >= 0 && safeYIdx >= 0 && safeWIdx >= 0 && safeHIdx >= 0) {
+        const sx = parseFloat(values[safeXIdx]);
+        const sy = parseFloat(values[safeYIdx]);
+        const sw = parseFloat(values[safeWIdx]);
+        const sh = parseFloat(values[safeHIdx]);
+        if (!isNaN(sx) && !isNaN(sy) && !isNaN(sw) && !isNaN(sh)) {
+          safeZone = { x: sx, y: sy, w: sw, h: sh };
+        }
+      }
 
       routes.push({
         candidateIndex: parseInt(values[idIdx] || String(i)),
         mainSide: values[mainSideIdx] || 'left',
         mainLength: parseFloat(values[mainLenIdx]) || 0,
         altLength: parseFloat(values[altLenIdx]) || 0,
-        hardness: hardnessIdx >= 0 ? parseFloat(values[hardnessIdx]) : undefined
+        hardness: hardnessIdx >= 0 ? parseFloat(values[hardnessIdx]) : undefined,
+        safeZone,
       });
     }
 
@@ -421,7 +446,8 @@ export const useMapUpload = () => {
           shortest_side: route.mainSide.toLowerCase(),
           main_route_length: route.mainLength,
           alt_route_length: route.altLength,
-          image_path: `${folderName}/1_1/candidate_${route.candidateIndex}.webp`
+          image_path: `${folderName}/1_1/candidate_${route.candidateIndex}.webp`,
+          safe_zone: route.safeZone ? (route.safeZone as unknown as Record<string, number>) : null,
         }));
 
         // Insert in batches

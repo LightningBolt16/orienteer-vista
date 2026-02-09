@@ -306,6 +306,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
             className={isFullscreen ? '' : 'w-full h-auto'}
             alt={`Route ${currentRoute.candidateIndex}`}
             isFullscreen={isFullscreen}
+            safeZone={currentRoute.safeZone}
             onLoad={() => {
               if (pendingRouteIndex === null) {
                 setIsImageLoaded(true);

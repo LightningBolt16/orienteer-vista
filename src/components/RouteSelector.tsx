@@ -291,6 +291,7 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
             className={isFullscreen ? '' : 'w-full h-auto'}
             alt={`Route ${currentRoute.candidateIndex}`}
             isFullscreen={isFullscreen}
+            safeZone={currentRoute.safeZone}
             onLoad={() => {
               if (pendingRouteIndex === null) {
                 setIsImageLoaded(true);
