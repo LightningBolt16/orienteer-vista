@@ -13,16 +13,12 @@ interface AdaptiveCropImageProps {
 }
 
 /**
- * AdaptiveCropImage component that dynamically crops images based on screen aspect ratio.
+ * AdaptiveCropImage component that displays images based on screen aspect ratio.
  * 
- * For 1:1 source images:
- * - Uses CSS object-fit: cover to crop to the screen's aspect ratio
- * - Fills the entire container without black bars
- * - Center-weighted cropping to keep the route visible
- * 
- * For legacy 16:9/9:16 images:
- * - Uses object-fit: contain to show the full image
- * - May have black bars on non-matching screens
+ * For all source types:
+ * - Uses CSS object-fit: contain to guarantee the full image is always visible
+ * - No cropping ever occurs, ensuring routes are never cut off
+ * - 1:1 images with sufficient padding will fill most of the screen naturally
  */
 const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
   src,
@@ -34,26 +30,24 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
 }) => {
   const screenAspect = useScreenAspect();
 
-  // For 1:1 source images, we crop to fill the screen
+  // For 1:1 source images, use contain to guarantee full visibility
   if (sourceAspect === '1:1') {
-    // In fullscreen mode, fill the entire viewport
     if (isFullscreen) {
       return (
         <img
           src={src}
           alt={alt}
-          className={`w-full h-full object-cover object-center ${className}`}
+          className={`max-w-full max-h-full w-auto h-auto object-contain ${className}`}
           onLoad={onLoad}
         />
       );
     }
 
-    // In non-fullscreen mode, use the screen's aspect ratio
     return (
       <img
         src={src}
         alt={alt}
-        className={`w-full object-cover object-center ${className}`}
+        className={`w-full object-contain ${className}`}
         style={{ aspectRatio: getAspectRatioCSS(screenAspect.ratio) }}
         onLoad={onLoad}
       />
