@@ -533,6 +533,7 @@ export type Database = {
           main_route_length: number | null
           map_id: string
           num_alternates: number | null
+          safe_zone: Json | null
           shortest_side: string
         }
         Insert: {
@@ -546,6 +547,7 @@ export type Database = {
           main_route_length?: number | null
           map_id: string
           num_alternates?: number | null
+          safe_zone?: Json | null
           shortest_side: string
         }
         Update: {
@@ -559,6 +561,7 @@ export type Database = {
           main_route_length?: number | null
           map_id?: string
           num_alternates?: number | null
+          safe_zone?: Json | null
           shortest_side?: string
         }
         Relationships: [

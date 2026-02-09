@@ -425,10 +425,11 @@ const MapUploadWizard: React.FC = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="text-left">
-                        <th className="pr-4">ID</th>
+                     <th className="pr-4">ID</th>
                         <th className="pr-4">Side</th>
                         <th className="pr-4">Main Length</th>
                         <th className="pr-4">Alt Length</th>
+                        <th className="pr-4">Safe Zone</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -438,6 +439,9 @@ const MapUploadWizard: React.FC = () => {
                           <td className="pr-4">{route.mainSide}</td>
                           <td className="pr-4">{route.mainLength.toFixed(1)}</td>
                           <td className="pr-4">{route.altLength.toFixed(1)}</td>
+                          <td className="pr-4">
+                            {(route as any).safeZone ? '✅' : '—'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
