@@ -24,6 +24,7 @@ import ClubsPage from "./pages/ClubsPage";
 import AdminClubRequests from "./pages/AdminClubRequests";
 import AdminProRequests from "./pages/AdminProRequests";
 import UploadMaps from "./pages/admin/UploadMaps";
+import ManageMapVisibility from "./pages/admin/ManageMapVisibility";
 import UserMaps from "./pages/UserMaps";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
@@ -70,6 +71,7 @@ const App: React.FC = () => {
                     <Route path="/admin/club-requests" element={<Layout><AdminClubRequests /></Layout>} />
                     <Route path="/admin/pro-requests" element={<Layout><AdminProRequests /></Layout>} />
                     <Route path="/admin/upload-maps" element={<UploadMaps />} />
+                    <Route path="/admin/map-visibility" element={<ManageMapVisibility />} />
                     <Route path="/my-maps" element={<Layout><UserMaps /></Layout>} />
                     <Route path="*" element={<Layout><NotFound /></Layout>} />
                   </Routes>

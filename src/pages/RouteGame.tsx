@@ -349,8 +349,8 @@ const RouteGame: React.FC = () => {
         <section className="max-w-4xl mx-auto">
           <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
             <CardContent className="flex items-center justify-between py-3 px-4">
-              <span className="text-sm text-amber-800 dark:text-amber-200">
-                {t('signInToSaveProgress') || 'Sign in to save your progress and appear on the leaderboard'}
+               <span className="text-sm text-amber-800 dark:text-amber-200">
+                 {t('signInToSaveProgress')}
               </span>
               <Button 
                 variant="outline" 
@@ -415,7 +415,7 @@ const RouteGame: React.FC = () => {
                       className="gap-2"
                     >
                       <Layers className="h-4 w-4" />
-                      {multiSelectMode ? 'Cancel Multi-Select' : 'Multi-Select'}
+                      {multiSelectMode ? t('cancelMultiSelect') || 'Cancel Multi-Select' : t('multiSelect') || 'Multi-Select'}
                     </Button>
                     
                     {multiSelectMode && selectedMaps.length > 0 && (

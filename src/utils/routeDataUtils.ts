@@ -141,11 +141,11 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
       .select('id, name, logo_path, country_code, is_public, user_id, map_category, latitude, longitude, location_name, description')
       .order('name');
     
-    // Get public maps OR user's private maps
+    // Get public maps OR user's private maps, exclude hidden
     if (userId) {
-      query = query.or(`is_public.eq.true,user_id.eq.${userId}`);
+      query = query.or(`is_public.eq.true,user_id.eq.${userId}`).eq('is_hidden', false);
     } else {
-      query = query.eq('is_public', true);
+      query = query.eq('is_public', true).eq('is_hidden', false);
     }
 
     const { data: dbMaps, error } = await query;

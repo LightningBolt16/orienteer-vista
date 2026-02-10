@@ -105,6 +105,36 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       signOut: 'Sign Out',
       duel: 'Duel',
       
+      // Google Auth
+      orContinueWith: 'Or continue with',
+      signInWithGoogle: 'Sign in with Google',
+      signUpWithGoogle: 'Sign up with Google',
+      signInToSaveProgress: 'Sign in to save your progress and appear on the leaderboard',
+      
+      // Password Reset
+      resetEmailSent: 'We\'ve sent a password reset link to your email address.',
+      resetEmailInstructions: 'Click the link in the email to reset your password. If you don\'t see it, check your spam folder.',
+      sendResetEmail: 'Send Reset Email',
+      sendingResetEmail: 'Sending...',
+      forgotPasswordDescription: 'Enter your email address and we\'ll send you a link to reset your password.',
+      
+      // Game UI
+      warmUpRound: 'Warm-up Round',
+      hideLeaderboard: 'Hide Leaderboard',
+      cancelMultiSelect: 'Cancel Multi-Select',
+      multiSelect: 'Multi-Select',
+      drawYourRoute: 'Draw your route from start to finish',
+      impassableTerrain: 'Impassable terrain!',
+      undo: 'Undo',
+      clear: 'Clear',
+      submit: 'Submit',
+      
+      // Admin
+      clubRequests: 'Club Requests',
+      proRequests: 'Pro Requests',
+      uploadMaps: 'Upload Maps',
+      manageMapVisibility: 'Manage Map Visibility',
+      
       // Route Game
       excellent: 'Excellent',
       good: 'Good',
@@ -487,6 +517,37 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       profile: 'Profil',
       guest: 'Gäst',
       signOut: 'Logga ut',
+      duel: 'Duell',
+      
+      // Google Auth
+      orContinueWith: 'Eller fortsätt med',
+      signInWithGoogle: 'Logga in med Google',
+      signUpWithGoogle: 'Registrera med Google',
+      signInToSaveProgress: 'Logga in för att spara dina framsteg och synas på topplistan',
+      
+      // Password Reset
+      resetEmailSent: 'Vi har skickat en länk för att återställa ditt lösenord till din e-postadress.',
+      resetEmailInstructions: 'Klicka på länken i e-postmeddelandet för att återställa ditt lösenord. Om du inte ser det, kolla din skräppost.',
+      sendResetEmail: 'Skicka återställningslänk',
+      sendingResetEmail: 'Skickar...',
+      forgotPasswordDescription: 'Ange din e-postadress så skickar vi en länk för att återställa ditt lösenord.',
+      
+      // Game UI
+      warmUpRound: 'Uppvärmningsrunda',
+      hideLeaderboard: 'Dölj topplista',
+      cancelMultiSelect: 'Avbryt flerval',
+      multiSelect: 'Flerval',
+      drawYourRoute: 'Rita din rutt från start till mål',
+      impassableTerrain: 'Oframkomlig terräng!',
+      undo: 'Ångra',
+      clear: 'Rensa',
+      submit: 'Skicka in',
+      
+      // Admin
+      clubRequests: 'Klubbförfrågningar',
+      proRequests: 'Pro-förfrågningar',
+      uploadMaps: 'Ladda upp kartor',
+      manageMapVisibility: 'Hantera kartsynlighet',
       
       // Route Game
       excellent: 'Utmärkt',

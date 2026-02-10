@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords, Route } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords, Route, Eye } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAdmin } from '../hooks/useAdmin';
@@ -216,7 +216,7 @@ const Header: React.FC = () => {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Shield className="h-5 w-5" />
-                      <span>Club Requests</span>
+                      <span>{t('clubRequests')}</span>
                     </Link>
                     <Link 
                       to="/admin/pro-requests"
@@ -224,7 +224,7 @@ const Header: React.FC = () => {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Shield className="h-5 w-5" />
-                      <span>Pro Requests</span>
+                      <span>{t('proRequests')}</span>
                     </Link>
                     <Link 
                       to="/admin/upload-maps"
@@ -232,7 +232,15 @@ const Header: React.FC = () => {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Upload className="h-5 w-5" />
-                      <span>Upload Maps</span>
+                      <span>{t('uploadMaps')}</span>
+                    </Link>
+                    <Link 
+                      to="/admin/map-visibility"
+                      className="p-3 rounded-md flex items-center space-x-2 text-yellow-600"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Eye className="h-5 w-5" />
+                      <span>{t('manageMapVisibility')}</span>
                     </Link>
                   </>
                 )}
@@ -326,19 +334,25 @@ const Header: React.FC = () => {
                       <DropdownMenuItem asChild>
                         <Link to="/admin/club-requests" className="text-yellow-600">
                           <Shield className="h-4 w-4 mr-2" />
-                          Club Requests
+                          {t('clubRequests')}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link to="/admin/pro-requests" className="text-yellow-600">
                           <Shield className="h-4 w-4 mr-2" />
-                          Pro Requests
+                          {t('proRequests')}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link to="/admin/upload-maps" className="text-yellow-600">
                           <Upload className="h-4 w-4 mr-2" />
-                          Upload Maps
+                          {t('uploadMaps')}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin/map-visibility" className="text-yellow-600">
+                          <Eye className="h-4 w-4 mr-2" />
+                          {t('manageMapVisibility')}
                         </Link>
                       </DropdownMenuItem>
                     </>

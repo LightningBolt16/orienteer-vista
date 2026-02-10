@@ -114,7 +114,7 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
             className="gap-2"
           >
             <Layers className="h-4 w-4" />
-            {multiSelectMode ? 'Cancel Multi-Select' : 'Multi-Select'}
+            {multiSelectMode ? t('cancelMultiSelect') : t('multiSelect')}
           </Button>
           
           {multiSelectMode && selectedMaps.length > 0 && onPlaySelected && (
