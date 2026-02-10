@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Undo2, Trash2, Check } from 'lucide-react';
 import { isPointPassable, type Point, type ImpassabilityMask } from '@/utils/routeFinderUtils';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface GraphNode {
   id: string;
@@ -36,6 +37,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
   debugMode = false,
   graphNodes,
 }) => {
+  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -412,14 +414,12 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
         </div>
       )}
 
-      {/* Impassable terrain warning */}
+      {/* Impassable terrain warning - subtle corner flash */}
       {showImpassableWarning && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
-          <div className="bg-red-500/90 backdrop-blur-sm px-4 py-2 rounded-lg animate-in zoom-in-50 duration-200">
-            <p className="text-white font-semibold text-sm">
-              ⚠️ Impassable terrain!
-            </p>
-          </div>
+        <div className="absolute inset-0 pointer-events-none z-20 animate-in fade-in duration-200">
+          <div className="absolute inset-0 rounded-lg" style={{
+            background: 'radial-gradient(ellipse at center, transparent 60%, rgba(239, 68, 68, 0.3) 100%)',
+          }} />
         </div>
       )}
 
@@ -433,7 +433,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
           className="bg-background/80 backdrop-blur-sm"
         >
           <Undo2 className="h-4 w-4 mr-1" />
-          Undo
+          {t('undo')}
         </Button>
         
         <Button
@@ -444,7 +444,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
           className="bg-background/80 backdrop-blur-sm"
         >
           <Trash2 className="h-4 w-4 mr-1" />
-          Clear
+          {t('clear')}
         </Button>
 
         {showSubmitButton && (
@@ -456,7 +456,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
             className="bg-primary/90 backdrop-blur-sm"
           >
             <Check className="h-4 w-4 mr-1" />
-            Submit
+            {t('submit')}
           </Button>
         )}
       </div>
@@ -466,7 +466,7 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
           <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-center">
             <p className="text-sm text-muted-foreground">
-              Draw your route from start to finish
+              {t('drawYourRoute')}
             </p>
           </div>
         </div>

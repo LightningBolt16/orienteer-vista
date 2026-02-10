@@ -403,8 +403,8 @@ const AuthPage: React.FC = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    {t('orContinueWith') || 'Or continue with'}
+                   <span className="bg-card px-2 text-muted-foreground">
+                     {t('orContinueWith')}
                   </span>
                 </div>
               </div>
@@ -434,7 +434,7 @@ const AuthPage: React.FC = () => {
                     fill="#EA4335"
                   />
                 </svg>
-                {googleLoading ? t('signingIn') || 'Signing in...' : t('signInWithGoogle') || 'Sign in with Google'}
+                {googleLoading ? t('signingIn') : t('signInWithGoogle')}
               </Button>
             </TabsContent>
             
@@ -480,7 +480,7 @@ const AuthPage: React.FC = () => {
                       {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">{t('passwordRequirements') || 'Minimum 8 characters'}</p>
+                  <p className="text-xs text-muted-foreground">{t('passwordRequirements')}</p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? t('registering') : t('register')}
@@ -491,10 +491,10 @@ const AuthPage: React.FC = () => {
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    {t('orContinueWith') || 'Or continue with'}
-                  </span>
+                 <div className="relative flex justify-center text-xs uppercase">
+                   <span className="bg-card px-2 text-muted-foreground">
+                     {t('orContinueWith')}
+                   </span>
                 </div>
               </div>
               
@@ -523,7 +523,7 @@ const AuthPage: React.FC = () => {
                     fill="#EA4335"
                   />
                 </svg>
-                {googleLoading ? t('signingIn') || 'Signing in...' : t('signUpWithGoogle') || 'Sign up with Google'}
+                {googleLoading ? t('signingIn') : t('signUpWithGoogle')}
               </Button>
             </TabsContent>
           </Tabs>

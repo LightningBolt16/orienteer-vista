@@ -51,7 +51,7 @@ const RouteFinder: React.FC = () => {
   
   // Warm-up state - first challenge doesn't count
   const [isWarmUp, setIsWarmUp] = useState(true);
-  const [gameKey, setGameKey] = useState(0);
+  const [gameKey] = useState(0);
 
   // Publishing dialog
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
@@ -78,7 +78,8 @@ const RouteFinder: React.FC = () => {
           route_finder_challenges(id)
         `)
         .eq('is_public', true)
-        .eq('map_category', 'official');
+        .eq('map_category', 'official')
+        .eq('is_hidden', false);
 
       if (officialError) throw officialError;
 
@@ -132,7 +133,8 @@ const RouteFinder: React.FC = () => {
             route_finder_challenges(id)
           `)
           .eq('is_public', true)
-          .eq('map_category', 'community');
+          .eq('map_category', 'community')
+          .eq('is_hidden', false);
 
         if (!communityError && communityData) {
           const commMaps: MapOption[] = communityData.map((m: any) => ({
@@ -176,7 +178,6 @@ const RouteFinder: React.FC = () => {
       setSelectedMaps([]);
       setSelectedMapId(mapId);
       setIsWarmUp(true);
-      setGameKey(prev => prev + 1);
     }
   };
 
@@ -195,7 +196,6 @@ const RouteFinder: React.FC = () => {
     
     setSelectedMapId(selectedMaps[0]);
     setIsWarmUp(true);
-    setGameKey(prev => prev + 1);
     
     const allMaps = [...maps, ...privateMaps, ...communityMaps];
     sonnerToast.success(`Playing ${selectedMaps.length} map${selectedMaps.length > 1 ? 's' : ''}`, {
@@ -226,7 +226,7 @@ const RouteFinder: React.FC = () => {
   }
 
   // Fullscreen mode - game takes over the entire screen
-  if (isFullscreen) {
+  if (isFullscreen && selectedMapId) {
     return (
       <div 
         ref={gameContainerRef}
@@ -259,14 +259,14 @@ const RouteFinder: React.FC = () => {
         {/* Warm-up indicator */}
         {isWarmUp && (
           <div className="absolute top-4 left-4 z-20 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-            Warm-up Round
+            {t('warmUpRound')}
           </div>
         )}
 
-        {/* Game fills the entire screen */}
+        {/* Game fills the entire screen - use same gameKey to preserve state */}
         <div className="flex-1 w-full h-full">
           <RouteFinderGame
-            key={gameKey}
+            key={`fullscreen-${selectedMapId}`}
             mapId={selectedMapId || undefined}
             debugMode={debugMode}
             isWarmUp={isWarmUp}
@@ -289,8 +289,8 @@ const RouteFinder: React.FC = () => {
           <section className="max-w-4xl mx-auto">
             <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
               <CardContent className="flex items-center justify-between py-3 px-4">
-                <span className="text-sm text-amber-800 dark:text-amber-200">
-                  {t('signInToSaveProgress') || 'Sign in to save your progress and appear on the leaderboard'}
+                 <span className="text-sm text-amber-800 dark:text-amber-200">
+                   {t('signInToSaveProgress')}
                 </span>
                 <Button 
                   variant="outline" 
@@ -368,7 +368,7 @@ const RouteFinder: React.FC = () => {
               {/* Warm-up indicator */}
               {isWarmUp && (
                 <div className="absolute top-2 left-2 z-20 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  Warm-up Round
+                  {t('warmUpRound')}
                 </div>
               )}
 
@@ -377,7 +377,7 @@ const RouteFinder: React.FC = () => {
                 isMobile ? 'aspect-[3/4]' : 'aspect-video'
               }`}>
                 <RouteFinderGame
-                  key={gameKey}
+                  key={`inline-${selectedMapId || 'all'}`}
                   mapId={selectedMapId || undefined}
                   debugMode={debugMode}
                   isWarmUp={isWarmUp}
@@ -397,7 +397,7 @@ const RouteFinder: React.FC = () => {
             onClick={() => setShowLeaderboard(!showLeaderboard)}
             className="bg-orienteering hover:bg-orienteering/90"
           >
-            {showLeaderboard ? 'Hide Leaderboard' : t('leaderboard')}
+            {showLeaderboard ? t('hideLeaderboard') : t('leaderboard')}
           </Button>
         </div>
 

@@ -477,6 +477,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          is_hidden: boolean
           is_public: boolean | null
           location_name: string | null
           map_category: string | null
@@ -490,6 +491,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_hidden?: boolean
           is_public?: boolean | null
           location_name?: string | null
           map_category?: string | null
@@ -503,6 +505,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_hidden?: boolean
           is_public?: boolean | null
           location_name?: string | null
           map_category?: string | null
@@ -580,6 +583,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_hidden: boolean
           is_public: boolean | null
           latitude: number | null
           location_name: string | null
@@ -597,6 +601,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_hidden?: boolean
           is_public?: boolean | null
           latitude?: number | null
           location_name?: string | null
@@ -614,6 +619,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_hidden?: boolean
           is_public?: boolean | null
           latitude?: number | null
           location_name?: string | null
