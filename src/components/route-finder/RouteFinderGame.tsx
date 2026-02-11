@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
-import RouteDrawingCanvas from './RouteDrawingCanvas';
+import RouteDrawingCanvas, { type RouteDrawingCanvasHandle } from './RouteDrawingCanvas';
 import RouteFinderResult from './RouteFinderResult';
+import { Button } from '@/components/ui/button';
+import { Undo2, Trash2, Check, Maximize2, Minimize2, Bug } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { 
   scoreByProximity, 
   getScoreFeedback, 
@@ -38,6 +41,11 @@ interface RouteFinderGameProps {
   isWarmUp?: boolean;
   onWarmUpComplete?: () => void;
   onGameEnd?: (stats: { correct: number; total: number }) => void;
+  // Controls passed from parent
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+  isAdmin?: boolean;
+  onToggleDebug?: () => void;
 }
 
 const RouteFinderGame: React.FC<RouteFinderGameProps> = ({ 
@@ -45,9 +53,15 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   debugMode = false, 
   isWarmUp = false,
   onWarmUpComplete,
-  onGameEnd 
+  onGameEnd,
+  isFullscreen = false,
+  onToggleFullscreen,
+  isAdmin = false,
+  onToggleDebug,
 }) => {
   const { user } = useUser();
+  const { t } = useLanguage();
+  const canvasRef = useRef<RouteDrawingCanvasHandle>(null);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +77,21 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [currentMask, setCurrentMask] = useState<ImpassabilityMask | null>(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [showImpassableWarning, setShowImpassableWarning] = useState(false);
+  const [canvasState, setCanvasState] = useState({ hasDrawing: false, canUndo: false });
+
+  // Poll canvas state for button enable/disable
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (canvasRef.current) {
+        setCanvasState({
+          hasDrawing: canvasRef.current.hasDrawing,
+          canUndo: canvasRef.current.canUndo,
+        });
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load challenges
   const loadChallenges = useCallback(async () => {
@@ -91,11 +120,9 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
         return;
       }
 
-      // Transform data to include map name and merge optimal path into graph
       const transformedChallenges = data.map((c: any) => ({
         ...c,
         map_name: c.route_finder_maps?.name,
-        // Merge separate columns into the graph_data object
         graph_data: {
           nodes: c.graph_data?.nodes || [],
           edges: c.graph_data?.edges || [],
@@ -106,7 +133,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
         } as RouteFinderGraph,
       }));
 
-      // Shuffle challenges for variety
       const shuffled = [...transformedChallenges].sort(() => Math.random() - 0.5);
       setChallenges(shuffled);
       setStartTime(Date.now());
@@ -122,7 +148,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
     loadChallenges();
   }, [loadChallenges]);
 
-  // Load impassability mask when challenge changes
   const currentChallenge = challenges[currentIndex];
   
   useEffect(() => {
@@ -140,7 +165,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
     loadMask();
   }, [currentChallenge?.impassability_mask_path]);
 
-  // Load base image dimensions when challenge changes
   useEffect(() => {
     if (!currentChallenge?.base_image_path) return;
 
@@ -151,25 +175,21 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
     img.src = getImageUrl(currentChallenge.base_image_path);
   }, [currentChallenge?.base_image_path]);
 
-  // Get storage URL for image
   const getImageUrl = (path: string): string => {
     const { data } = supabase.storage.from('user-route-images').getPublicUrl(path);
     return data.publicUrl;
   };
 
-  // Handle path submission
   const handlePathComplete = async (points: Point[]) => {
     if (!currentChallenge) return;
 
     const responseTime = Date.now() - startTime;
 
-    // Get optimal path coordinates from graph
     const optimalCoords = getPathCoordinates(
       currentChallenge.graph_data.optimalPath,
       currentChallenge.graph_data
     );
 
-    // Get start and finish markers
     const startNode = currentChallenge.graph_data.nodes.find(
       n => n.id === currentChallenge.start_node_id
     );
@@ -182,17 +202,9 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       return;
     }
 
-    // Score using proximity-based system
-    const result = scoreByProximity(
-      points,
-      optimalCoords,
-      startNode,
-      finishNode,
-      100 // tolerance radius in pixels
-    );
-
+    const result = scoreByProximity(points, optimalCoords, startNode, finishNode, 100);
     const feedback = getScoreFeedback(result.score, result.reachedFinish);
-    const isCorrect = result.score >= 70; // Consider 70%+ as "correct" for stats
+    const isCorrect = result.score >= 70;
 
     setLastResult({
       score: result.score,
@@ -201,7 +213,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       responseTime,
     });
 
-    // Only update stats and save if NOT a warm-up round
     if (!isWarmUp) {
       const newStats = {
         correct: stats.correct + (isCorrect ? 1 : 0),
@@ -209,7 +220,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       };
       setStats(newStats);
 
-      // Save attempt to database
       if (user?.id) {
         try {
           await supabase.from('route_finder_attempts').insert([{
@@ -229,21 +239,17 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
     setShowResult(true);
   };
 
-  // Move to next challenge
   const handleNext = () => {
     setShowResult(false);
     setLastResult(null);
     setCurrentMask(null);
 
-    // If this was a warm-up, notify parent
     if (isWarmUp) {
       onWarmUpComplete?.();
     }
 
     if (currentIndex + 1 >= challenges.length) {
-      // Game complete
       onGameEnd?.(stats);
-      // Reload challenges for continuous play
       setCurrentIndex(0);
       loadChallenges();
     } else {
@@ -252,7 +258,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
     }
   };
 
-  // Find start and finish markers from graph
   const startMarker = currentChallenge?.graph_data?.nodes?.find(
     n => n.id === currentChallenge.start_node_id
   );
@@ -301,40 +306,117 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   }
 
   return (
-    <div className="relative w-full h-full bg-black">
-      {/* Progress indicator */}
-      <div className="absolute top-4 left-4 z-40 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
-        <span className="text-sm font-medium">
-          {currentIndex + 1} / {challenges.length}
-        </span>
-      </div>
-
-      {/* Stats */}
-      <div className="absolute top-12 right-4 z-40 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
-        <span className="text-sm font-medium text-green-500">{stats.correct}</span>
-        <span className="text-sm text-muted-foreground"> / {stats.total}</span>
-      </div>
-
-      {/* Map name */}
-      {currentChallenge.map_name && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
-          <span className="text-sm font-medium">{currentChallenge.map_name}</span>
+    <div className="flex flex-col w-full h-full bg-black">
+      {/* Top bar - map name, impassable warning, progress, controls */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-black/80 shrink-0">
+        {/* Left: progress + warm-up */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium">
+            {currentIndex + 1}/{challenges.length}
+          </span>
+          {isWarmUp && (
+            <span className="bg-amber-500 text-white px-2 py-0.5 rounded-full text-xs font-medium">
+              {t('warmUpRound')}
+            </span>
+          )}
         </div>
-      )}
 
-      {/* Drawing canvas */}
-      <RouteDrawingCanvas
-        imageUrl={getImageUrl(currentChallenge.base_image_path)}
-        onPathComplete={handlePathComplete}
-        disabled={showResult}
-        startMarker={startMarker}
-        finishMarker={finishMarker}
-        impassabilityMask={currentMask}
-        bboxWidth={currentChallenge.bbox_width ?? undefined}
-        bboxHeight={currentChallenge.bbox_height ?? undefined}
-        debugMode={debugMode}
-        graphNodes={debugMode ? currentChallenge.graph_data.nodes : undefined}
-      />
+        {/* Center: map name + impassable warning */}
+        <div className="flex items-center gap-2">
+          {currentChallenge.map_name && (
+            <span className="text-xs text-foreground font-medium">
+              {currentChallenge.map_name}
+            </span>
+          )}
+          {showImpassableWarning && (
+            <span className="bg-destructive/80 text-destructive-foreground px-2 py-0.5 rounded text-xs font-medium animate-in fade-in duration-200">
+              {t('impassableTerrain')}
+            </span>
+          )}
+        </div>
+
+        {/* Right: stats + controls */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium">
+            <span className="text-green-500">{stats.correct}</span>
+            <span className="text-muted-foreground">/{stats.total}</span>
+          </span>
+          {isAdmin && onToggleDebug && (
+            <Button
+              variant={debugMode ? "destructive" : "ghost"}
+              size="icon"
+              className="h-6 w-6"
+              onClick={onToggleDebug}
+            >
+              <Bug className="h-3 w-3" />
+            </Button>
+          )}
+          {onToggleFullscreen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={onToggleFullscreen}
+            >
+              {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Map area - takes remaining space */}
+      <div className="flex-1 relative min-h-0">
+        <RouteDrawingCanvas
+          ref={canvasRef}
+          imageUrl={getImageUrl(currentChallenge.base_image_path)}
+          onPathComplete={handlePathComplete}
+          disabled={showResult}
+          startMarker={startMarker}
+          finishMarker={finishMarker}
+          impassabilityMask={currentMask}
+          bboxWidth={currentChallenge.bbox_width ?? undefined}
+          bboxHeight={currentChallenge.bbox_height ?? undefined}
+          debugMode={debugMode}
+          graphNodes={debugMode ? currentChallenge.graph_data.nodes : undefined}
+          onImpassableWarning={setShowImpassableWarning}
+        />
+      </div>
+
+      {/* Bottom bar - drawing controls, centered */}
+      <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-black/80 shrink-0">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => canvasRef.current?.undo()}
+          disabled={showResult || !canvasState.canUndo}
+          className="h-7 px-2 text-xs"
+        >
+          <Undo2 className="h-3.5 w-3.5 mr-1" />
+          {t('undo')}
+        </Button>
+        
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => canvasRef.current?.clear()}
+          disabled={showResult || !canvasState.hasDrawing}
+          className="h-7 px-2 text-xs"
+        >
+          <Trash2 className="h-3.5 w-3.5 mr-1" />
+          {t('clear')}
+        </Button>
+
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => canvasRef.current?.submit()}
+          disabled={showResult || !canvasState.canUndo}
+          className="h-7 px-2 text-xs"
+        >
+          <Check className="h-3.5 w-3.5 mr-1" />
+          {t('submit')}
+        </Button>
+      </div>
     </div>
   );
 };
