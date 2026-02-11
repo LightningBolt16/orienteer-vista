@@ -7,7 +7,7 @@ import RouteFinderMapSelector from '@/components/route-finder/RouteFinderMapSele
 import PublishRouteFinderMapDialog from '@/components/route-finder/PublishRouteFinderMapDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Bug, Maximize2, Minimize2, LogIn, Globe } from 'lucide-react';
+import { Loader2, LogIn, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -230,52 +230,22 @@ const RouteFinder: React.FC = () => {
     return (
       <div 
         ref={gameContainerRef}
-        className="fixed inset-0 z-50 bg-black flex flex-col"
+        className="fixed inset-0 z-50 bg-black"
       >
-        {/* Controls bar - z-50 to stay above drawing canvas */}
-        <div className="absolute top-4 right-4 z-50 flex gap-2 pointer-events-auto">
-          {isAdmin && (
-            <Button
-              variant={debugMode ? "destructive" : "outline"}
-              size="icon"
-              onClick={(e) => { e.stopPropagation(); setDebugMode(!debugMode); }}
-              className="bg-black/50 border-white/30 hover:bg-black/70"
-              title="Toggle debug mode"
-            >
-              <Bug className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-            className="bg-black/50 border-white/30 hover:bg-black/70"
-            title={t('exitFullscreen')}
-          >
-            <Minimize2 className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Warm-up indicator */}
-        {isWarmUp && (
-          <div className="absolute top-4 left-4 z-50 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium pointer-events-none">
-            {t('warmUpRound')}
-          </div>
-        )}
-
-        {/* Game fills the entire screen - use same gameKey to preserve state */}
-        <div className="flex-1 w-full h-full">
-          <RouteFinderGame
-            key={`fullscreen-${selectedMapId}`}
-            mapId={selectedMapId || undefined}
-            debugMode={debugMode}
-            isWarmUp={isWarmUp}
-            onWarmUpComplete={() => setIsWarmUp(false)}
-            onGameEnd={(stats) => {
-              console.log('Game ended:', stats);
-            }}
-          />
-        </div>
+        <RouteFinderGame
+          key={`fullscreen-${selectedMapId}`}
+          mapId={selectedMapId || undefined}
+          debugMode={debugMode}
+          isWarmUp={isWarmUp}
+          onWarmUpComplete={() => setIsWarmUp(false)}
+          onGameEnd={(stats) => {
+            console.log('Game ended:', stats);
+          }}
+          isFullscreen={true}
+          onToggleFullscreen={toggleFullscreen}
+          isAdmin={isAdmin}
+          onToggleDebug={() => setDebugMode(!debugMode)}
+        />
       </div>
     );
   }
@@ -342,51 +312,23 @@ const RouteFinder: React.FC = () => {
         {/* Game Section - Always shows when maps are loaded */}
         {(maps.length > 0 || privateMaps.length > 0 || communityMaps.length > 0) && !isLoadingMaps && (
           <section className="max-w-4xl mx-auto">
-            <div className="relative">
-              {/* Controls - z-50 + pointer-events-auto to stay above drawing canvas */}
-              <div className="absolute top-2 right-2 z-50 flex gap-2 pointer-events-auto">
-                {isAdmin && (
-                  <Button
-                    variant={debugMode ? "destructive" : "outline"}
-                    size="icon"
-                    onClick={(e) => { e.stopPropagation(); setDebugMode(!debugMode); }}
-                    title="Toggle debug mode"
-                  >
-                    <Bug className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-                  title={t('enterFullscreen')}
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Warm-up indicator */}
-              {isWarmUp && (
-                <div className="absolute top-2 left-2 z-50 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium pointer-events-none">
-                  {t('warmUpRound')}
-                </div>
-              )}
-
-              {/* Use different aspect ratios for mobile vs desktop */}
-              <div className={`bg-black rounded-lg overflow-hidden ${
-                isMobile ? 'aspect-[3/4]' : 'aspect-video'
-              }`}>
-                <RouteFinderGame
-                  key={`inline-${selectedMapId || 'all'}`}
-                  mapId={selectedMapId || undefined}
-                  debugMode={debugMode}
-                  isWarmUp={isWarmUp}
-                  onWarmUpComplete={() => setIsWarmUp(false)}
-                  onGameEnd={(stats) => {
-                    console.log('Game ended:', stats);
-                  }}
-                />
-              </div>
+            <div className={`bg-black rounded-lg overflow-hidden ${
+              isMobile ? 'aspect-[3/4]' : 'aspect-video'
+            }`}>
+              <RouteFinderGame
+                key={`inline-${selectedMapId || 'all'}`}
+                mapId={selectedMapId || undefined}
+                debugMode={debugMode}
+                isWarmUp={isWarmUp}
+                onWarmUpComplete={() => setIsWarmUp(false)}
+                onGameEnd={(stats) => {
+                  console.log('Game ended:', stats);
+                }}
+                isFullscreen={false}
+                onToggleFullscreen={toggleFullscreen}
+                isAdmin={isAdmin}
+                onToggleDebug={() => setDebugMode(!debugMode)}
+              />
             </div>
           </section>
         )}
