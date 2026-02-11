@@ -414,36 +414,39 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
         </div>
       )}
 
-      {/* Impassable terrain warning - subtle corner flash */}
+      {/* Impassable terrain warning - red vignette + corner text */}
       {showImpassableWarning && (
         <div className="absolute inset-0 pointer-events-none z-20 animate-in fade-in duration-200">
           <div className="absolute inset-0 rounded-lg" style={{
             background: 'radial-gradient(ellipse at center, transparent 60%, rgba(239, 68, 68, 0.3) 100%)',
           }} />
+          <div className="absolute bottom-14 left-4 bg-red-600/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-white font-medium">
+            {t('impassableTerrain')}
+          </div>
         </div>
       )}
 
-      {/* Controls */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+      {/* Controls - bottom-right corner to minimize drawing obstruction */}
+      <div className="absolute bottom-3 right-3 z-30 flex gap-1.5 pointer-events-auto">
         <Button
           variant="secondary"
           size="sm"
-          onClick={handleUndo}
+          onClick={(e) => { e.stopPropagation(); handleUndo(); }}
           disabled={disabled || paths.length === 0}
-          className="bg-background/80 backdrop-blur-sm"
+          className="bg-background/80 backdrop-blur-sm h-8 px-2"
         >
-          <Undo2 className="h-4 w-4 mr-1" />
+          <Undo2 className="h-3.5 w-3.5 mr-1" />
           {t('undo')}
         </Button>
         
         <Button
           variant="secondary"
           size="sm"
-          onClick={handleClear}
+          onClick={(e) => { e.stopPropagation(); handleClear(); }}
           disabled={disabled || !hasDrawing}
-          className="bg-background/80 backdrop-blur-sm"
+          className="bg-background/80 backdrop-blur-sm h-8 px-2"
         >
-          <Trash2 className="h-4 w-4 mr-1" />
+          <Trash2 className="h-3.5 w-3.5 mr-1" />
           {t('clear')}
         </Button>
 
@@ -451,21 +454,21 @@ const RouteDrawingCanvas: React.FC<RouteDrawingCanvasProps> = ({
           <Button
             variant="default"
             size="sm"
-            onClick={handleSubmit}
+            onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
             disabled={disabled || paths.length === 0}
-            className="bg-primary/90 backdrop-blur-sm"
+            className="bg-primary/90 backdrop-blur-sm h-8 px-2"
           >
-            <Check className="h-4 w-4 mr-1" />
+            <Check className="h-3.5 w-3.5 mr-1" />
             {t('submit')}
           </Button>
         )}
       </div>
 
-      {/* Drawing instructions */}
+      {/* Drawing instructions - small corner hint instead of center overlay */}
       {!hasDrawing && !disabled && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-          <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-center">
-            <p className="text-sm text-muted-foreground">
+        <div className="absolute bottom-14 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="bg-background/60 backdrop-blur-sm px-3 py-1 rounded-full">
+            <p className="text-xs text-muted-foreground">
               {t('drawYourRoute')}
             </p>
           </div>

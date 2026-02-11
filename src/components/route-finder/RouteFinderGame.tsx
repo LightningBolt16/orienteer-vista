@@ -303,21 +303,21 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   return (
     <div className="relative w-full h-full bg-black">
       {/* Progress indicator */}
-      <div className="absolute top-4 left-4 z-10 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full">
+      <div className="absolute top-4 left-4 z-40 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
         <span className="text-sm font-medium">
           {currentIndex + 1} / {challenges.length}
         </span>
       </div>
 
       {/* Stats */}
-      <div className="absolute top-4 right-4 z-10 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full">
+      <div className="absolute top-12 right-4 z-40 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
         <span className="text-sm font-medium text-green-500">{stats.correct}</span>
         <span className="text-sm text-muted-foreground"> / {stats.total}</span>
       </div>
 
       {/* Map name */}
       {currentChallenge.map_name && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none">
           <span className="text-sm font-medium">{currentChallenge.map_name}</span>
         </div>
       )}

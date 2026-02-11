@@ -232,13 +232,13 @@ const RouteFinder: React.FC = () => {
         ref={gameContainerRef}
         className="fixed inset-0 z-50 bg-black flex flex-col"
       >
-        {/* Controls bar */}
-        <div className="absolute top-4 right-4 z-20 flex gap-2">
+        {/* Controls bar - z-50 to stay above drawing canvas */}
+        <div className="absolute top-4 right-4 z-50 flex gap-2 pointer-events-auto">
           {isAdmin && (
             <Button
               variant={debugMode ? "destructive" : "outline"}
               size="icon"
-              onClick={() => setDebugMode(!debugMode)}
+              onClick={(e) => { e.stopPropagation(); setDebugMode(!debugMode); }}
               className="bg-black/50 border-white/30 hover:bg-black/70"
               title="Toggle debug mode"
             >
@@ -248,7 +248,7 @@ const RouteFinder: React.FC = () => {
           <Button
             variant="outline"
             size="icon"
-            onClick={toggleFullscreen}
+            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
             className="bg-black/50 border-white/30 hover:bg-black/70"
             title={t('exitFullscreen')}
           >
@@ -258,7 +258,7 @@ const RouteFinder: React.FC = () => {
 
         {/* Warm-up indicator */}
         {isWarmUp && (
-          <div className="absolute top-4 left-4 z-20 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+          <div className="absolute top-4 left-4 z-50 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium pointer-events-none">
             {t('warmUpRound')}
           </div>
         )}
@@ -343,13 +343,13 @@ const RouteFinder: React.FC = () => {
         {(maps.length > 0 || privateMaps.length > 0 || communityMaps.length > 0) && !isLoadingMaps && (
           <section className="max-w-4xl mx-auto">
             <div className="relative">
-              {/* Controls */}
-              <div className="absolute top-2 right-2 z-20 flex gap-2">
+              {/* Controls - z-50 + pointer-events-auto to stay above drawing canvas */}
+              <div className="absolute top-2 right-2 z-50 flex gap-2 pointer-events-auto">
                 {isAdmin && (
                   <Button
                     variant={debugMode ? "destructive" : "outline"}
                     size="icon"
-                    onClick={() => setDebugMode(!debugMode)}
+                    onClick={(e) => { e.stopPropagation(); setDebugMode(!debugMode); }}
                     title="Toggle debug mode"
                   >
                     <Bug className="h-4 w-4" />
@@ -358,7 +358,7 @@ const RouteFinder: React.FC = () => {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={toggleFullscreen}
+                  onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
                   title={t('enterFullscreen')}
                 >
                   <Maximize2 className="h-4 w-4" />
@@ -367,7 +367,7 @@ const RouteFinder: React.FC = () => {
 
               {/* Warm-up indicator */}
               {isWarmUp && (
-                <div className="absolute top-2 left-2 z-20 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                <div className="absolute top-2 left-2 z-50 bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium pointer-events-none">
                   {t('warmUpRound')}
                 </div>
               )}
