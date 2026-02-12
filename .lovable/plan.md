@@ -1,199 +1,104 @@
 
-# Route Finder & User Profile Improvements Plan
 
-## Overview
-This plan addresses four distinct features/fixes:
+# Fix Plan: Route Game Cropping, Route Finder UI, and Map Overwrite Verification
 
-1. **Route Finder fullscreen exit broken** - Can't exit fullscreen mode on desktop
-2. **Public user profile statistics** - Show performance over time on public profiles
-3. **Country selection for profiles** - Add country field to user profiles
-4. **Onboarding tutorial** - Multi-step welcome guide for new users
+## Issue 1: Safe Zone Data Not Being Saved (Route Game Cropping)
 
----
+**Root Cause**: All `safe_zone` values in the database are NULL for every map, including Solang which was uploaded with the new CSV format. The parsing code and insert code look syntactically correct, so the most likely cause is one of:
 
-## Issue 1: Route Finder Fullscreen Exit Not Working
+- The TypeScript cast `(route.safeZone as unknown as Record<string, number>)` may be causing serialization issues with how Supabase JS SDK handles JSONB
+- The deployed code at the time of upload may not have included the safe_zone changes yet
 
-### Problem Analysis
-Comparing `RouteFinder.tsx` (lines 160-180) with `RouteGame.tsx` (lines 76-107):
+**Evidence**: Database query confirms all 500 Solang route_images have `safe_zone = NULL` despite the CSV containing Safe_X/Y/W/H columns.
 
-**RouteGame (working):**
-```typescript
-// Has fullscreenchange event listener (lines 98-107)
-useEffect(() => {
-  const handleFullscreenChange = () => {
-    if (!isMobile && document.fullscreenEnabled) {
-      setIsFullscreen(!!document.fullscreenElement);
-    }
-  };
-  document.addEventListener('fullscreenchange', handleFullscreenChange);
-  return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-}, [isMobile]);
-```
+**Fix**:
+1. Remove the unnecessary `as unknown as Record<string, number>` cast -- just pass the object directly, which Supabase SDK handles natively as JSONB
+2. Add a `console.log` during upload to confirm safe_zone values are being parsed from the CSV (for debugging future uploads)
+3. Improve `AdaptiveCropImage` fallback: when a 1:1 image has NO safe zone, use `object-cover` with a default centered safe zone (e.g., `{x: 0.1, y: 0.1, w: 0.8, h: 0.8}`) instead of `object-contain`, so the image still fills the screen reasonably
 
-**RouteFinder (broken):**
-- Missing the `fullscreenchange` event listener
-- The toggle logic tries to exit via `document.exitFullscreen()` but `document.fullscreenElement` is never set because we're using CSS-based fullscreen, not native fullscreen
-
-### Solution
-Fix the `toggleFullscreen` function to be consistent - use pure CSS-based fullscreen (simpler and more reliable). Remove the `document.exitFullscreen()` call since we're not using native fullscreen. Just toggle state:
-
-```typescript
-const toggleFullscreen = useCallback(() => {
-  setIsFullscreen(prev => !prev);
-}, []);
-```
-
-### Files to Modify
-- `src/pages/RouteFinder.tsx` - Simplify toggleFullscreen to just toggle state
+**Files**: `src/hooks/useMapUpload.ts`, `src/components/map/AdaptiveCropImage.tsx`
 
 ---
 
-## Issue 2: Public User Profile Statistics Over Time
+## Issue 2: Route Finder -- Fullscreen Button Not Working
 
-### Problem Analysis
-Currently `UserProfile.tsx` (the public profile viewed by others) only shows:
-- Overview stats (all-time accuracy, speed, attempts)
-- Per-map performance
+**Root Cause**: The button renders and hovers correctly but clicking does nothing. The `variant="ghost"` button is only 24x24px (`h-6 w-6`). Additionally, when `isFullscreen` toggles, the component key changes from `inline-${mapId}` to `fullscreen-${mapId}`, causing a full remount that loses game state.
 
-It does NOT show the "Progress" tab with performance graphs that exist in `Profile.tsx` (private profile). The user wants to make this data visible on public profiles.
+**Fix**:
+1. Make the fullscreen button larger (`h-8 w-8`) with `variant="secondary"` for visibility
+2. Add `e.stopPropagation()` to the onClick handler for safety
+3. Use the same key for both inline and fullscreen modes to preserve game state during transitions
 
-### Solution
-Add a "Progress" tab to `UserProfile.tsx` that fetches and displays performance over time for the viewed user, matching the graphs in `Profile.tsx`:
-- Fetch `route_attempts` for the viewed user (public data via RLS - already allows SELECT for all)
-- Add time filter selector (week/month/90days/all)
-- Add accuracy, speed, and daily attempts charts using Recharts
-
-### Technical Details
-
-The `route_attempts` table has RLS policy "Authenticated users can view route attempts" with `USING: true` - meaning anyone can read attempts for any user. This data is already public.
-
-### Files to Modify
-- `src/pages/UserProfile.tsx`:
-  - Add `performanceData` state and `timeFilter` state
-  - Add `fetchPerformanceData` function (copy from Profile.tsx)
-  - Add "Progress" tab with charts
-  - Import `LineChart`, `Line`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer` from recharts
-  - Import `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`
-  - Import date-fns utilities
+**Files**: `src/pages/RouteFinder.tsx`, `src/components/route-finder/RouteFinderGame.tsx`
 
 ---
 
-## Issue 3: Country Selection for User Profiles
+## Issue 3: Route Finder -- Layout Redesign
 
-### Problem Analysis
-The `user_profiles` table currently does not have a `country_code` column. Need to:
-1. Add the column to the database
-2. Add UI for users to select their country in Profile.tsx
-3. Display country flag on public profiles
-4. Enable country filtering on leaderboard
+**Current problem**: The game has a `bg-black` flex column with top bar, map area, and bottom bar. The map area still shows black bars (letterboxing) and the overall design feels cramped.
 
-### Database Migration
-Add `country_code` column to `user_profiles`:
+**Requested design**:
+- Map fills the entire map component area -- no black bars
+- Info bar (progress, map name, stats) sits ABOVE the map, outside it
+- Control buttons (Undo, Clear, Submit) sit BELOW the map, outside it, centered
 
-```sql
-ALTER TABLE public.user_profiles 
-ADD COLUMN country_code TEXT DEFAULT NULL;
-```
+**Fix**:
+1. In `RouteFinderGame.tsx`:
+   - Top bar: clean, minimal with white/muted background. Contains: progress counter (left), map name + impassable warning (center), stats + fullscreen/debug buttons (right)
+   - Map area: `flex-1` with the drawing canvas filling it entirely using `object-contain` for the background image
+   - Bottom bar: centered Undo/Clear/Submit buttons with proper styling, outside the map
+   - Remove `bg-black` from the outer container, use `bg-background` instead
 
-### Technical Details
+2. In `RouteDrawingCanvas.tsx`:
+   - Keep it as a pure drawing surface
+   - The image uses `object-contain` which already handles aspect ratios correctly
+   - Add the red vignette overlay when `onImpassableWarning` fires
 
-**Profile.tsx changes:**
-- Add country selector dropdown (using existing country codes from the app)
-- Save country_code to user_profiles on change
-- Update UserContext to include country_code in UserProfile type
-
-**UserProfile.tsx changes:**
-- Display country flag next to user name using existing COUNTRY_FLAG_IMAGES mapping
-
-**Leaderboard.tsx changes:**
-- Add optional `countryFilter` prop
-- Add country filter dropdown to leaderboard UI
-- Fetch and filter by country_code when filter is active
-
-### Files to Modify
-- Database: Add migration for country_code column
-- `src/context/UserContext.tsx` - Add country_code to UserProfile type and fetch/update logic
-- `src/pages/Profile.tsx` - Add country selector section
-- `src/pages/UserProfile.tsx` - Display country flag
-- `src/components/Leaderboard.tsx` - Add country filter dropdown and filtering logic
+**Files**: `src/components/route-finder/RouteFinderGame.tsx`, `src/components/route-finder/RouteDrawingCanvas.tsx`
 
 ---
 
-## Issue 4: Onboarding Tutorial
+## Issue 4: Impassable Terrain Feedback
 
-### Problem Analysis
-Need a multi-step onboarding flow for new users that:
-1. Welcomes them to the app
-2. Explains the game modes (Route Choice, Route Finder, Duel)
-3. Ends with "Set up your profile" call-to-action
+**Requested behavior**: When drawing over impassable terrain, show ALL THREE simultaneously:
+1. Text warning ("Impassable terrain!") in the top info bar, centered
+2. Red hue/vignette around the edges of the map
+3. A warning triangle icon next to the text
 
-### Technical Details
+**Fix**:
+1. In the top bar of `RouteFinderGame.tsx`: show `AlertTriangle` icon + "Impassable terrain!" text in red when `showImpassableWarning` is true
+2. In `RouteDrawingCanvas.tsx`: add a `pointer-events-none` overlay div with `radial-gradient(ellipse at center, transparent 60%, rgba(239, 68, 68, 0.3) 100%)` that appears when the warning is active
+3. The warning state is already managed via the `onImpassableWarning` callback -- just need to wire up all three visual indicators
 
-**New database column:**
-The existing `tutorial_seen` column tracks the Route Game tutorial. Need a new column for onboarding:
-
-```sql
-ALTER TABLE public.user_profiles 
-ADD COLUMN onboarding_completed BOOLEAN NOT NULL DEFAULT false;
-```
-
-**Component Structure:**
-Create `OnboardingTutorial.tsx` with:
-- Multi-step carousel/wizard (4 steps)
-- Step 1: Welcome - "Welcome to Route Choice Champions!"
-- Step 2: Route Choice - "Pick the faster route" game explanation
-- Step 3: Route Finder - "Draw your route" game explanation  
-- Step 4: Profile Setup - "Set up your profile" with country selection and call-to-action
-
-**Trigger Location:**
-- Show on Index.tsx when user is logged in but `onboarding_completed = false`
-- After completion, navigate to Profile page for setup
-
-### Files to Create/Modify
-- Database: Add migration for onboarding_completed column
-- Create `src/components/OnboardingTutorial.tsx` - Multi-step tutorial component
-- `src/pages/Index.tsx` - Check onboarding status and show tutorial
-- `src/context/LanguageContext.tsx` - Add translation keys for onboarding steps
+**Files**: `src/components/route-finder/RouteFinderGame.tsx`, `src/components/route-finder/RouteDrawingCanvas.tsx`
 
 ---
 
-## Summary of Database Changes
+## Issue 5: Map Overwrite Verification
 
-```sql
--- Migration: Add country and onboarding columns to user_profiles
-ALTER TABLE public.user_profiles 
-ADD COLUMN IF NOT EXISTS country_code TEXT DEFAULT NULL;
-
-ALTER TABLE public.user_profiles 
-ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT false;
-```
+**Status**: Ekeby and Matera exist in the database with new created_at timestamps (Feb 12 and Feb 11), suggesting the overwrite DID work -- old records were deleted and new ones inserted. However, the safe_zone is NULL for all of them, which means the overwrite succeeded but the safe_zone data wasn't saved (same root cause as Issue 1).
 
 ---
 
-## Files Summary
+## Verification Plan
+
+After implementing all changes, I will:
+1. Navigate to the Route Finder page in the sandbox browser
+2. Verify the fullscreen button is clickable and works
+3. Verify the layout has controls above and below the map, not overlaying it
+4. Navigate to the Route Game to verify AdaptiveCropImage fallback looks correct for 1:1 images without safe zones
+
+---
+
+## Technical Summary
 
 | File | Changes |
 |------|---------|
-| **Database Migration** | Add country_code and onboarding_completed columns |
-| `src/pages/RouteFinder.tsx` | Simplify toggleFullscreen to just toggle state |
-| `src/pages/UserProfile.tsx` | Add Progress tab with performance charts, display country flag |
-| `src/pages/Profile.tsx` | Add country selector section |
-| `src/pages/Index.tsx` | Check onboarding status and show OnboardingTutorial |
-| `src/context/UserContext.tsx` | Add country_code to UserProfile type |
-| `src/components/Leaderboard.tsx` | Add country filter dropdown |
-| `src/components/OnboardingTutorial.tsx` | New multi-step onboarding component |
-| `src/context/LanguageContext.tsx` | Add translation keys for onboarding |
+| `src/hooks/useMapUpload.ts` | Remove unnecessary type cast on safe_zone, add console.log for debugging |
+| `src/components/map/AdaptiveCropImage.tsx` | Better fallback for 1:1 images without safe zone: use cover with default safe zone instead of contain |
+| `src/pages/RouteFinder.tsx` | Use stable key for game component, fix fullscreen container |
+| `src/components/route-finder/RouteFinderGame.tsx` | Redesign layout: top bar (outside map), map area (full), bottom bar (outside map). Bigger fullscreen button. Add AlertTriangle + text for impassable warning |
+| `src/components/route-finder/RouteDrawingCanvas.tsx` | Add red vignette overlay for impassable warning |
 
----
-
-## Country Codes Reference
-The app already has country flag mappings in `src/utils/routeDataUtils.ts` and components. These same mappings will be reused:
-- SE (Sweden)
-- IT (Italy)  
-- BE (Belgium)
-- NO (Norway)
-- FI (Finland)
-- etc.
-
-A dropdown with common orienteering countries will be provided for selection.
+After implementing, you will need to re-upload Solang (and Ekeby/Matera if you want safe zones) with the updated code to get the safe_zone values saved correctly.
 
