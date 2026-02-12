@@ -226,14 +226,14 @@ const RouteFinder: React.FC = () => {
   }
 
   // Fullscreen mode - game takes over the entire screen
-  if (isFullscreen && selectedMapId) {
+  if (isFullscreen) {
     return (
       <div 
         ref={gameContainerRef}
-        className="fixed inset-0 z-50 bg-black"
+        className="fixed inset-0 z-50 bg-background"
       >
         <RouteFinderGame
-          key={`game-${selectedMapId}`}
+          key={`game-${selectedMapId || 'all'}`}
           mapId={selectedMapId || undefined}
           debugMode={debugMode}
           isWarmUp={isWarmUp}

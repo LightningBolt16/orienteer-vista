@@ -33,6 +33,12 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
     return seconds.toFixed(1) + 's';
   };
 
+  const getScoreColor = () => {
+    if (score >= 80) return 'text-green-500';
+    if (score >= 60) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
   // Calculate actual image bounds within the container (accounting for object-contain)
   const calculateImageBounds = useCallback(() => {
     const container = containerRef.current;
@@ -45,13 +51,11 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
     let renderWidth: number, renderHeight: number, offsetX: number, offsetY: number;
 
     if (imageRatio > containerRatio) {
-      // Image is wider - letterbox top/bottom
       renderWidth = containerRect.width;
       renderHeight = containerRect.width / imageRatio;
       offsetX = 0;
       offsetY = (containerRect.height - renderHeight) / 2;
     } else {
-      // Image is taller - letterbox left/right
       renderHeight = containerRect.height;
       renderWidth = containerRect.height * imageRatio;
       offsetX = (containerRect.width - renderWidth) / 2;
@@ -82,7 +86,6 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Scale user points to canvas coordinates (accounting for image bounds)
     const scaleX = imageBounds.width / imageDimensions.width;
     const scaleY = imageBounds.height / imageDimensions.height;
 
@@ -110,96 +113,60 @@ const RouteFinderResult: React.FC<RouteFinderResultProps> = ({
     drawUserPath();
   }, [drawUserPath]);
 
-  // Get score color
-  const getScoreColor = () => {
-    if (score >= 80) return 'text-green-500';
-    if (score >= 60) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
   return (
-    <div className="relative w-full h-full bg-black">
-      {/* Answer image (shows the pre-rendered correct route) */}
-      <img
-        src={answerImageUrl}
-        alt="Correct route"
-        className="absolute inset-0 w-full h-full object-contain"
-        draggable={false}
-      />
+    <div className="flex flex-col w-full h-full bg-background">
+      {/* Top bar - matches drawing screen layout */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/50 shrink-0">
+        {/* Left: score + feedback */}
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={`text-lg font-bold ${getScoreColor()}`}>
+            {score}%
+          </span>
+          <span className={`text-sm font-medium ${getScoreColor()} hidden sm:inline`}>
+            {feedback}
+          </span>
+        </div>
 
-      {/* Canvas overlay for user's path */}
-      <div
-        ref={containerRef}
-        className="absolute inset-0"
-      >
+        {/* Center: legend */}
+        <div className="flex items-center gap-4 justify-center flex-1">
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-4 h-1 bg-[#FF00FF] rounded" />
+            <span className="text-muted-foreground">Your route</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-4 h-1 bg-[#FF0000] rounded" />
+            <span className="text-muted-foreground">Correct route</span>
+          </div>
+        </div>
+
+        {/* Right: stats */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium">
+            <span className="text-green-600 dark:text-green-400">{stats.correct}</span>
+            <span className="text-muted-foreground">/{stats.total}</span>
+          </span>
+          <span className="text-sm text-muted-foreground font-mono">{formatTime(responseTime)}</span>
+        </div>
+      </div>
+
+      {/* Map area - takes remaining space, completely unobstructed */}
+      <div ref={containerRef} className="flex-1 relative min-h-0">
+        <img
+          src={answerImageUrl}
+          alt="Correct route"
+          className="absolute inset-0 w-full h-full object-contain"
+          draggable={false}
+        />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
         />
       </div>
 
-      {/* Score display */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div
-          className={`
-            w-28 h-28 rounded-full flex flex-col items-center justify-center
-            bg-background/90 backdrop-blur-sm
-            shadow-2xl animate-in zoom-in-50 duration-300
-          `}
-        >
-          <span className={`text-3xl font-bold ${getScoreColor()}`}>
-            {score}%
-          </span>
-          <span className="text-xs text-muted-foreground">Score</span>
-        </div>
-      </div>
-
-      {/* Stats panel */}
-      <div className="absolute top-4 right-4 z-10 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Correct:</span>
-            <span className="font-semibold text-green-500">{stats.correct}</span>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-semibold">{stats.total}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Time:</span>
-            <span className="font-mono font-medium">{formatTime(responseTime)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute top-4 left-4 z-10 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg">
-        <div className="flex flex-col gap-1 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-1 bg-[#FF00FF] rounded" />
-            <span className="text-muted-foreground">Your route</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-1 bg-[#FF0000] rounded" />
-            <span className="text-muted-foreground">Correct route</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Feedback message */}
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10">
-        <div className="bg-background/90 backdrop-blur-sm px-6 py-3 rounded-lg text-center max-w-sm">
-          <p className={`font-semibold ${getScoreColor()}`}>
-            {feedback}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Compare your route (magenta) with the correct one (red)
-          </p>
-        </div>
-      </div>
-
-      {/* Next button */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+      {/* Bottom bar - Next button, centered */}
+      <div className="flex items-center justify-center px-3 py-2 border-t border-border bg-muted/50 shrink-0">
         <Button
-          size="lg"
+          size="sm"
           onClick={onNext}
           className="gap-2"
         >
