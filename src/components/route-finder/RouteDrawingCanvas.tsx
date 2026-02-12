@@ -27,6 +27,7 @@ interface RouteDrawingCanvasProps {
   debugMode?: boolean;
   graphNodes?: GraphNode[];
   onImpassableWarning?: (show: boolean) => void;
+  showImpassableVignette?: boolean;
 }
 
 const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanvasProps>(({
@@ -41,6 +42,7 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
   debugMode = false,
   graphNodes,
   onImpassableWarning,
+  showImpassableVignette = false,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -364,6 +366,16 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
           className="absolute inset-0 w-full h-full pointer-events-none"
         />
       </div>
+
+      {/* Red vignette overlay for impassable terrain warning */}
+      {showImpassableVignette && (
+        <div
+          className="absolute inset-0 pointer-events-none z-10 transition-opacity duration-200"
+          style={{
+            background: 'radial-gradient(ellipse at center, transparent 50%, rgba(239, 68, 68, 0.35) 100%)',
+          }}
+        />
+      )}
 
       {/* Debug mode indicator */}
       {debugMode && (

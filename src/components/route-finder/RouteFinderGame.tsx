@@ -4,7 +4,7 @@ import { useUser } from '@/context/UserContext';
 import RouteDrawingCanvas, { type RouteDrawingCanvasHandle } from './RouteDrawingCanvas';
 import RouteFinderResult from './RouteFinderResult';
 import { Button } from '@/components/ui/button';
-import { Undo2, Trash2, Check, Maximize2, Minimize2, Bug } from 'lucide-react';
+import { Undo2, Trash2, Check, Maximize2, Minimize2, Bug, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
   scoreByProximity, 
@@ -41,7 +41,6 @@ interface RouteFinderGameProps {
   isWarmUp?: boolean;
   onWarmUpComplete?: () => void;
   onGameEnd?: (stats: { correct: number; total: number }) => void;
-  // Controls passed from parent
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   isAdmin?: boolean;
@@ -306,12 +305,12 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   }
 
   return (
-    <div className="flex flex-col w-full h-full bg-black">
-      {/* Top bar - map name, impassable warning, progress, controls */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-black/80 shrink-0">
+    <div className="flex flex-col w-full h-full bg-background">
+      {/* Top bar - outside the map */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/50 shrink-0">
         {/* Left: progress + warm-up */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground font-medium">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm text-muted-foreground font-medium">
             {currentIndex + 1}/{challenges.length}
           </span>
           {isWarmUp && (
@@ -322,43 +321,46 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
         </div>
 
         {/* Center: map name + impassable warning */}
-        <div className="flex items-center gap-2">
-          {currentChallenge.map_name && (
-            <span className="text-xs text-foreground font-medium">
+        <div className="flex items-center gap-2 justify-center flex-1">
+          {currentChallenge.map_name && !showImpassableWarning && (
+            <span className="text-sm text-foreground font-medium">
               {currentChallenge.map_name}
             </span>
           )}
           {showImpassableWarning && (
-            <span className="bg-destructive/80 text-destructive-foreground px-2 py-0.5 rounded text-xs font-medium animate-in fade-in duration-200">
-              {t('impassableTerrain')}
-            </span>
+            <div className="flex items-center gap-1.5 text-destructive animate-in fade-in duration-200">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-semibold">
+                {t('impassableTerrain')}
+              </span>
+            </div>
           )}
         </div>
 
         {/* Right: stats + controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium">
-            <span className="text-green-500">{stats.correct}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium">
+            <span className="text-green-600 dark:text-green-400">{stats.correct}</span>
             <span className="text-muted-foreground">/{stats.total}</span>
           </span>
           {isAdmin && onToggleDebug && (
             <Button
-              variant={debugMode ? "destructive" : "ghost"}
+              variant={debugMode ? "destructive" : "outline"}
               size="icon"
-              className="h-6 w-6"
-              onClick={onToggleDebug}
+              className="h-8 w-8"
+              onClick={(e) => { e.stopPropagation(); onToggleDebug(); }}
             >
-              <Bug className="h-3 w-3" />
+              <Bug className="h-4 w-4" />
             </Button>
           )}
           {onToggleFullscreen && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={onToggleFullscreen}
+              className="h-8 w-8"
+              onClick={(e) => { e.stopPropagation(); onToggleFullscreen(); }}
             >
-              {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
           )}
         </div>
@@ -379,41 +381,39 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
           debugMode={debugMode}
           graphNodes={debugMode ? currentChallenge.graph_data.nodes : undefined}
           onImpassableWarning={setShowImpassableWarning}
+          showImpassableVignette={showImpassableWarning}
         />
       </div>
 
-      {/* Bottom bar - drawing controls, centered */}
-      <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-black/80 shrink-0">
+      {/* Bottom bar - drawing controls, centered, outside the map */}
+      <div className="flex items-center justify-center gap-3 px-3 py-2 border-t border-border bg-muted/50 shrink-0">
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
-          onClick={() => canvasRef.current?.undo()}
+          onClick={(e) => { e.stopPropagation(); canvasRef.current?.undo(); }}
           disabled={showResult || !canvasState.canUndo}
-          className="h-7 px-2 text-xs"
         >
-          <Undo2 className="h-3.5 w-3.5 mr-1" />
+          <Undo2 className="h-4 w-4 mr-1.5" />
           {t('undo')}
         </Button>
         
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
-          onClick={() => canvasRef.current?.clear()}
+          onClick={(e) => { e.stopPropagation(); canvasRef.current?.clear(); }}
           disabled={showResult || !canvasState.hasDrawing}
-          className="h-7 px-2 text-xs"
         >
-          <Trash2 className="h-3.5 w-3.5 mr-1" />
+          <Trash2 className="h-4 w-4 mr-1.5" />
           {t('clear')}
         </Button>
 
         <Button
           variant="default"
           size="sm"
-          onClick={() => canvasRef.current?.submit()}
+          onClick={(e) => { e.stopPropagation(); canvasRef.current?.submit(); }}
           disabled={showResult || !canvasState.canUndo}
-          className="h-7 px-2 text-xs"
         >
-          <Check className="h-3.5 w-3.5 mr-1" />
+          <Check className="h-4 w-4 mr-1.5" />
           {t('submit')}
         </Button>
       </div>
