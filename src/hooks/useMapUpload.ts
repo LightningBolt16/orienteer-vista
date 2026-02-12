@@ -72,7 +72,9 @@ export const useMapUpload = () => {
     const delimiter = header.includes(';') ? ';' : ',';
     const headers = header.split(delimiter).map(h => h.trim());
 
-    const routes: ParsedRoute[] = [];
+      const routes: ParsedRoute[] = [];
+    
+    console.log('[CSV Parse] Headers:', headers.join(', '));
     
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(delimiter).map(v => v.trim());
@@ -447,7 +449,7 @@ export const useMapUpload = () => {
           main_route_length: route.mainLength,
           alt_route_length: route.altLength,
           image_path: `${folderName}/1_1/candidate_${route.candidateIndex}.webp`,
-          safe_zone: route.safeZone ? (route.safeZone as unknown as Record<string, number>) : null,
+          safe_zone: route.safeZone ? { x: route.safeZone.x, y: route.safeZone.y, w: route.safeZone.w, h: route.safeZone.h } : null,
         }));
 
         // Insert in batches

@@ -233,7 +233,7 @@ const RouteFinder: React.FC = () => {
         className="fixed inset-0 z-50 bg-black"
       >
         <RouteFinderGame
-          key={`fullscreen-${selectedMapId}`}
+          key={`game-${selectedMapId}`}
           mapId={selectedMapId || undefined}
           debugMode={debugMode}
           isWarmUp={isWarmUp}
@@ -316,7 +316,7 @@ const RouteFinder: React.FC = () => {
               isMobile ? 'aspect-[3/4]' : 'aspect-video'
             }`}>
               <RouteFinderGame
-                key={`inline-${selectedMapId || 'all'}`}
+                key={`game-${selectedMapId || 'all'}`}
                 mapId={selectedMapId || undefined}
                 debugMode={debugMode}
                 isWarmUp={isWarmUp}
