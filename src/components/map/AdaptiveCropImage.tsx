@@ -14,8 +14,6 @@ interface AdaptiveCropImageProps {
   safeZone?: SafeZone;
 }
 
-const DEFAULT_SAFE_ZONE: SafeZone = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
-
 function computeSafeObjectPosition(
   safeZone: SafeZone,
   containerRatio: number,
@@ -52,22 +50,43 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
 }) => {
   const screenAspect = useScreenAspect();
 
-  // For 1:1 images, always use cover with safe zone (real or default)
-  const effectiveSafeZone = sourceAspect === '1:1' ? (safeZone || DEFAULT_SAFE_ZONE) : undefined;
-
   const objectPosition = useMemo(() => {
-    if (!effectiveSafeZone) return '50% 50%';
-    return computeSafeObjectPosition(effectiveSafeZone, screenAspect.ratio);
-  }, [effectiveSafeZone, screenAspect.ratio]);
+    if (!safeZone) return '50% 50%';
+    return computeSafeObjectPosition(safeZone, screenAspect.ratio);
+  }, [safeZone, screenAspect.ratio]);
 
-  // For 1:1 source images: always use cover with smart positioning
-  if (sourceAspect === '1:1') {
+  // For 1:1 source images WITH safe zone data: use cover with smart positioning
+  if (sourceAspect === '1:1' && safeZone) {
     return (
       <img
         src={src}
         alt={alt}
         className={`w-full h-full object-cover ${className}`}
         style={{ objectPosition }}
+        onLoad={onLoad}
+      />
+    );
+  }
+
+  // For 1:1 source images WITHOUT safe zone: use contain to avoid cutting off routes
+  if (sourceAspect === '1:1') {
+    if (isFullscreen) {
+      return (
+        <img
+          src={src}
+          alt={alt}
+          className={`max-w-full max-h-full w-auto h-auto object-contain ${className}`}
+          onLoad={onLoad}
+        />
+      );
+    }
+    // Non-fullscreen: constrain height so square image isn't too tall
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`w-full object-contain ${className}`}
+        style={{ maxHeight: '75vh' }}
         onLoad={onLoad}
       />
     );
