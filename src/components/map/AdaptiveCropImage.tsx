@@ -83,18 +83,30 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
 }) => {
   const screenAspect = useScreenAspect();
 
+  const MAX_HEIGHT_VH = 0.75;
+
   const zoomData = useMemo(() => {
     if (!safeZone || sourceAspect !== '1:1') return null;
 
     const padded = getPaddedSafeZone(safeZone);
 
-    // For non-fullscreen: cap the container ratio so the zoom region
-    // always fits within image bounds (no letterboxing needed).
-    // maxRatio: regionW = ratio * padded.h ≤ 1 → ratio ≤ 1/padded.h
-    // minRatio: regionH = padded.w / ratio ≤ 1 → ratio ≥ padded.w
-    const effectiveRatio = isFullscreen
-      ? screenAspect.ratio
-      : Math.max(padded.w, Math.min(screenAspect.ratio, 1 / padded.h));
+    let effectiveRatio: number;
+
+    if (isFullscreen) {
+      effectiveRatio = screenAspect.ratio;
+    } else {
+      // Cap ratio so zoom region fits within image bounds (no letterboxing)
+      const cappedRatio = Math.max(padded.w, Math.min(screenAspect.ratio, 1 / padded.h));
+
+      // Account for maxHeight constraint: if the natural container height
+      // (screenWidth / cappedRatio) exceeds maxHeight, the actual displayed
+      // ratio becomes wider than cappedRatio, causing misaligned zoom.
+      const maxH = screenAspect.height * MAX_HEIGHT_VH;
+      const naturalH = screenAspect.width / cappedRatio;
+      effectiveRatio = naturalH > maxH
+        ? screenAspect.width / maxH
+        : cappedRatio;
+    }
 
     const { regionLeft, regionTop, regionW, regionH } = computeZoomRegion(
       safeZone,
@@ -112,7 +124,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
       containerRatio: effectiveRatio,
       hasLetterbox: regionW > 1 || regionH > 1,
     };
-  }, [safeZone, screenAspect.ratio, sourceAspect, isFullscreen]);
+  }, [safeZone, screenAspect.ratio, screenAspect.width, screenAspect.height, sourceAspect, isFullscreen]);
 
   // For 1:1 source images WITH safe zone: zoom into the safe zone area
   if (sourceAspect === '1:1' && zoomData) {
@@ -122,7 +134,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
 
     const containerStyle = isFullscreen
       ? undefined
-      : { aspectRatio: `${zoomData.containerRatio}`, maxHeight: '75vh' };
+      : { aspectRatio: `${zoomData.containerRatio}`, maxHeight: `${MAX_HEIGHT_VH * 100}vh` };
 
     return (
       <div className={`${containerClass} ${className}`} style={containerStyle}>
