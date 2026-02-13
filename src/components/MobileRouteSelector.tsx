@@ -307,7 +307,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
           <AdaptiveCropImage
             src={currentRoute.imagePath || ''}
             sourceAspect="1:1"
-            className={isFullscreen ? '' : 'w-full h-auto'}
+            className=""
             alt={`Route ${currentRoute.candidateIndex}`}
             isFullscreen={isFullscreen}
             safeZone={currentRoute.safeZone}
