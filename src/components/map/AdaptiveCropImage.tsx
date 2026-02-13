@@ -14,29 +14,41 @@ interface AdaptiveCropImageProps {
   safeZone?: SafeZone;
 }
 
-function computeSafeObjectPosition(
+/**
+ * Compute the visible region of a 1:1 image that:
+ * 1. Contains the entire safe zone
+ * 2. Matches the container aspect ratio
+ * 3. Zooms in as much as possible
+ */
+function computeZoomRegion(
   safeZone: SafeZone,
   containerRatio: number,
-): string {
-  if (containerRatio >= 1) {
-    const visibleH = 1 / containerRatio;
-    if (visibleH >= 1) return '50% 50%';
-    const safeCenterY = safeZone.y + safeZone.h / 2;
-    const maxShift = 1 - visibleH;
-    const idealTop = safeCenterY - visibleH / 2;
-    const clampedTop = Math.max(0, Math.min(maxShift, idealTop));
-    const posY = maxShift > 0 ? (clampedTop / maxShift) * 100 : 50;
-    return `50% ${posY}%`;
-  } else {
-    const visibleW = containerRatio;
-    if (visibleW >= 1) return '50% 50%';
-    const safeCenterX = safeZone.x + safeZone.w / 2;
-    const maxShift = 1 - visibleW;
-    const idealLeft = safeCenterX - visibleW / 2;
-    const clampedLeft = Math.max(0, Math.min(maxShift, idealLeft));
-    const posX = maxShift > 0 ? (clampedLeft / maxShift) * 100 : 50;
-    return `${posX}% 50%`;
+) {
+  // Region must have same aspect ratio as container
+  // For a 1:1 image: regionW / regionH = containerRatio
+  
+  // Minimum region size to contain the safe zone
+  let regionH = Math.max(safeZone.h, safeZone.w / containerRatio);
+  let regionW = containerRatio * regionH;
+
+  // Clamp so region doesn't exceed image bounds (0-1)
+  if (regionW > 1) {
+    regionW = 1;
+    regionH = regionW / containerRatio;
   }
+  if (regionH > 1) {
+    regionH = 1;
+    regionW = containerRatio * regionH;
+    if (regionW > 1) regionW = 1;
+  }
+
+  // Center the region on the safe zone center, clamped to image
+  const centerX = safeZone.x + safeZone.w / 2;
+  const centerY = safeZone.y + safeZone.h / 2;
+  const regionLeft = Math.max(0, Math.min(1 - regionW, centerX - regionW / 2));
+  const regionTop = Math.max(0, Math.min(1 - regionH, centerY - regionH / 2));
+
+  return { regionLeft, regionTop, regionW, regionH };
 }
 
 const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
@@ -50,21 +62,34 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
 }) => {
   const screenAspect = useScreenAspect();
 
-  const objectPosition = useMemo(() => {
-    if (!safeZone) return '50% 50%';
-    return computeSafeObjectPosition(safeZone, screenAspect.ratio);
-  }, [safeZone, screenAspect.ratio]);
+  const zoomStyle = useMemo(() => {
+    if (!safeZone || sourceAspect !== '1:1') return null;
 
-  // For 1:1 source images WITH safe zone data: use cover with smart positioning
-  if (sourceAspect === '1:1' && safeZone) {
+    const { regionLeft, regionTop, regionW, regionH } = computeZoomRegion(
+      safeZone,
+      screenAspect.ratio,
+    );
+
+    return {
+      width: `${100 / regionW}%`,
+      height: `${100 / regionH}%`,
+      marginLeft: `-${(regionLeft / regionW) * 100}%`,
+      marginTop: `-${(regionTop / regionH) * 100}%`,
+    };
+  }, [safeZone, screenAspect.ratio, sourceAspect]);
+
+  // For 1:1 source images WITH safe zone: zoom into the safe zone area
+  if (sourceAspect === '1:1' && zoomStyle) {
     return (
-      <img
-        src={src}
-        alt={alt}
-        className={`w-full h-full object-cover ${className}`}
-        style={{ objectPosition }}
-        onLoad={onLoad}
-      />
+      <div className={`w-full h-full overflow-hidden relative ${className}`}>
+        <img
+          src={src}
+          alt={alt}
+          className="block object-cover"
+          style={zoomStyle}
+          onLoad={onLoad}
+        />
+      </div>
     );
   }
 
