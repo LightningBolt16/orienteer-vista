@@ -97,6 +97,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     if (isTransitioning || routeData.length === 0 || isPaused || startTime === null) return;
     
     const currentRoute = routeData[currentRouteIndex];
+    if (!currentRoute) return;
     const numAlternates = currentRoute.numAlternates || 1;
     
     // Get the correct answer index
@@ -179,6 +180,9 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   }
 
   const currentRoute = routeData[currentRouteIndex];
+  if (!currentRoute) {
+    return <div className="flex items-center justify-center h-full text-muted-foreground">Loading...</div>;
+  }
   const numAlternates = currentRoute.numAlternates || 1;
   const totalRoutes = 1 + numAlternates;
   const mainRouteIndex = currentRoute.mainRouteIndex ?? (currentRoute.shortestSide === 'left' ? 0 : 1);
