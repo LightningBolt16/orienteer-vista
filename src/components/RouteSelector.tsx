@@ -213,6 +213,9 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
   }
 
   const currentRoute = routeData[currentRouteIndex];
+  if (!currentRoute) {
+    return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
+  }
   const numAlternates = currentRoute.numAlternates || 1;
   const totalRoutes = 1 + numAlternates;
   const mainRouteIndex = currentRoute.mainRouteIndex ?? (currentRoute.shortestSide === 'left' ? 0 : 1);
@@ -297,21 +300,66 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
                 setIsImageLoaded(true);
               }
             }}
-          />
+          >
+            {/* Result Overlay */}
+            {result && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className={`text-center p-6 rounded-lg ${
+                  result === 'win' ? 'bg-green-500/90' : 
+                  result === 'lose' ? 'bg-red-500/90' : 
+                  'bg-yellow-500/90'
+                }`}>
+                  {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
+                  {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
+                  <p className="text-white text-xl font-bold">{resultMessage}</p>
+                  {result === 'warmup' && (
+                    <p className="text-white/80 text-sm mt-1">
+                      Warmup {warmupCount}/{WARMUP_ROUTES}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Arrow Buttons */}
+            {!result && isImageLoaded && renderArrowButtons()}
+          </AdaptiveCropImage>
         ) : (
-          <img
-            src={currentRoute.imagePath}
-            alt={`Route ${currentRoute.candidateIndex}`}
-            className={isFullscreen 
-              ? 'max-w-full max-h-full w-auto h-auto object-contain' 
-              : 'w-full h-auto'
-            }
-            onLoad={() => {
-              if (pendingRouteIndex === null) {
-                setIsImageLoaded(true);
+          <div className="relative">
+            <img
+              src={currentRoute.imagePath}
+              alt={`Route ${currentRoute.candidateIndex}`}
+              className={isFullscreen 
+                ? 'max-w-full max-h-full w-auto h-auto object-contain' 
+                : 'w-full h-auto'
               }
-            }}
-          />
+              onLoad={() => {
+                if (pendingRouteIndex === null) {
+                  setIsImageLoaded(true);
+                }
+              }}
+            />
+            {/* Result Overlay */}
+            {result && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className={`text-center p-6 rounded-lg ${
+                  result === 'win' ? 'bg-green-500/90' : 
+                  result === 'lose' ? 'bg-red-500/90' : 
+                  'bg-yellow-500/90'
+                }`}>
+                  {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
+                  {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
+                  <p className="text-white text-xl font-bold">{resultMessage}</p>
+                  {result === 'warmup' && (
+                    <p className="text-white/80 text-sm mt-1">
+                      Warmup {warmupCount}/{WARMUP_ROUTES}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Arrow Buttons */}
+            {!result && isImageLoaded && renderArrowButtons()}
+          </div>
         )}
         
         {/* Hidden preload image for pending route */}
@@ -323,29 +371,6 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
             onLoad={() => setIsImageLoaded(true)}
           />
         )}
-
-        {/* Result Overlay */}
-        {result && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className={`text-center p-6 rounded-lg ${
-              result === 'win' ? 'bg-green-500/90' : 
-              result === 'lose' ? 'bg-red-500/90' : 
-              'bg-yellow-500/90'
-            }`}>
-              {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
-              {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
-              <p className="text-white text-xl font-bold">{resultMessage}</p>
-              {result === 'warmup' && (
-                <p className="text-white/80 text-sm mt-1">
-                  Warmup {warmupCount}/{WARMUP_ROUTES}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Arrow Buttons */}
-        {!result && isImageLoaded && renderArrowButtons()}
       </div>
 
       {/* Route Info - no colored dots that reveal answer */}
