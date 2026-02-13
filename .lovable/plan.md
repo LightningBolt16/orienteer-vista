@@ -1,68 +1,94 @@
 
 
-## Fix Route Game Mobile Display -- Proper Safe Zone Zoom
+## Fix Route Image Display -- The Real Root Cause and Solution
 
-### Root Cause Analysis
+### What's Actually Happening
 
-The current `AdaptiveCropImage` has a binary approach:
-- If the safe zone fits the container ratio within the 1x1 image bounds: zoom in (works well)
-- If it doesn't fit (needsLetterbox = true): show the **entire image** with `object-contain`
+I navigated to the route game on both desktop (1920x1080) and mobile (390x844) and can see the exact same bug: **the map image does not fill the full container width**. There's empty white space on the right side, and arrow buttons float outside the map.
 
-That second case is the bug. On mobile portrait (aspect ratio ~0.46), most safe zones trigger the letterbox path because the required vertical region exceeds the image height. The fallback shows the full 1:1 image squeezed into a portrait container, resulting in a tiny image offset to one side with large black bars.
+### The Root Cause: CSS `aspect-ratio` + `max-height` Conflict
 
-**A center point in the CSV is NOT needed** -- the center is already `(x + w/2, y + h/2)` from the existing safe zone data.
+The image container in `AdaptiveCropImage.tsx` currently uses these CSS properties together:
 
-### The Fix
-
-Replace the binary zoom-or-full-image logic with a single unified approach that **always zooms to the safe zone**, clamping to image bounds when needed:
-
-```text
-Given: padded safe zone {x, y, w, h}, container aspect ratio R
-
-Step 1: Compute minimum region containing safe zone with ratio R
-  if (w/h > R): regionW = w, regionH = w / R
-  else:         regionH = h, regionW = h * R
-
-Step 2: Clamp to image bounds
-  regionW = min(regionW, 1.0)
-  regionH = min(regionH, 1.0)
-  // Actual displayed ratio = regionW / regionH
-  // Thin letterbox bars appear only if this differs from R
-
-Step 3: Center region on safe zone center
-  cx = x + w/2, cy = y + h/2
-  left = clamp(cx - regionW/2, 0, 1 - regionW)
-  top  = clamp(cy - regionH/2, 0, 1 - regionH)
-
-Step 4: Render with absolute positioning (always zoomed)
-  img width  = (100 / regionW)%
-  img height = (100 / regionH)%
-  img left   = -(left / regionW * 100)%
-  img top    = -(top  / regionH * 100)%
-  container aspectRatio = regionW / regionH
+```css
+width: 100%;
+aspect-ratio: 0.54;  /* portrait ratio for a tall safe zone */
+max-height: 75vh;
 ```
 
-This means:
-- Routes always display zoomed into the safe zone area
-- No more falling back to showing the full tiny image
-- Thin letterbox bars only appear at container edges when the cropped region's ratio doesn't match the screen
-- The safe zone is always centered
+Here's what goes wrong:
+1. `width: 100%` makes the container e.g. 896px wide (on desktop)
+2. `aspect-ratio: 0.54` wants the height to be 896 / 0.54 = 1659px
+3. `max-height: 75vh` = 810px clips the height to 810px
+4. **But width stays at 896px** -- the aspect ratio is broken
+5. The image positioning math assumes the container maintains the exact ratio, so the image is positioned for a 0.54 ratio container, but the real container is 896x810 (ratio 1.1)
+6. Result: image is offset/misaligned with empty space on the right
 
-### Files to Change
+This is a fundamental CSS behavior: when `width`, `aspect-ratio`, and `max-height` all constrain a box, the browser does NOT shrink the width to maintain the ratio. It just clips the height.
 
-**1. `src/components/map/AdaptiveCropImage.tsx`**
-- Rewrite the `zoomData` calculation to use the unified approach above
-- Remove the `needsLetterbox` boolean and the fallback `object-contain` render path
-- Always render with absolute positioning zoom
-- Container uses `aspectRatio = regionW / regionH` with `bg-black` for any remaining bars
-- Fullscreen container uses `w-full h-full` with the image zoomed via absolute positioning
+### The Fix: Calculate Explicit Pixel Dimensions in JavaScript
 
-**2. `src/components/MobileRouteSelector.tsx`**
-- Ensure the fullscreen wrapper properly fills the screen without conflicting flex centering
-- The `flex items-center justify-center` on the wrapper should work with the new approach since the AdaptiveCropImage container will have the correct aspect ratio
+Instead of relying on CSS `aspect-ratio` + `max-height` (which conflict), compute the exact container width and height in pixels in the `useMemo`, and set them as inline styles. This guarantees the container always has the correct ratio.
+
+### Bonus Fix: RouteSelector Crash Guard
+
+The console shows a crash in `RouteSelector` (desktop) because `currentRoute` can be `undefined` when route data changes. `MobileRouteSelector` already has a guard for this, but `RouteSelector` does not.
+
+### Technical Details
+
+**File: `src/components/map/AdaptiveCropImage.tsx`**
+
+In the `zoomData` `useMemo`, after computing `containerRatio`, also compute `containerWidth` and `containerHeight` in pixels:
+
+```typescript
+// Calculate explicit pixel dimensions to avoid CSS aspect-ratio + max-height conflict
+const heightFromRatio = cw / containerRatio;
+let containerWidth: number, containerHeight: number;
+
+if (heightFromRatio <= maxH) {
+  // Fits within max height
+  containerWidth = cw;
+  containerHeight = heightFromRatio;
+} else {
+  // Height-limited: shrink width to maintain ratio
+  containerHeight = maxH;
+  containerWidth = maxH * containerRatio;
+}
+```
+
+Return these from `zoomData` and use them as inline styles:
+
+Non-fullscreen render:
+```html
+<div style={{
+  position: 'relative',
+  overflow: 'hidden',
+  width: `${containerWidth}px`,
+  height: `${containerHeight}px`,
+  margin: '0 auto',  /* center when narrower than parent */
+}}>
+  <img style={imgStyle} ... />
+</div>
+```
+
+For fullscreen, similar explicit calculation using screen dimensions instead of `cw`/`maxH`.
+
+The outer wrapper div keeps `w-full` for measuring, but the actual image container uses explicit pixel dimensions with `margin: 0 auto` for centering.
+
+**File: `src/components/RouteSelector.tsx`**
+
+Add a guard at line 215-216, same pattern as MobileRouteSelector:
+```typescript
+const currentRoute = routeData[currentRouteIndex];
+if (!currentRoute) {
+  return <div className="flex items-center justify-center h-full text-muted-foreground">Loading...</div>;
+}
+```
 
 ### What This Solves
-- Images left-aligned with black space on the right: gone (safe zone is always centered)
-- Background visible behind map in fullscreen: gone (container fills screen, image zooms to fill)
-- Routes showing too small: gone (always zooms to safe zone, never shows full image)
+
+- **No more white space on the right**: Container is exactly the right size, centered with `margin: 0 auto`
+- **Works on all screen sizes**: The JS calculation handles every aspect ratio correctly
+- **No CSS conflicts**: No reliance on CSS `aspect-ratio` property at all
+- **Desktop crash fixed**: Guard prevents `undefined` access on `currentRoute`
 
