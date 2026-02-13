@@ -71,10 +71,11 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     );
 
     return {
+      position: 'absolute' as const,
       width: `${100 / regionW}%`,
       height: `${100 / regionH}%`,
-      marginLeft: `-${(regionLeft / regionW) * 100}%`,
-      marginTop: `-${(regionTop / regionH) * 100}%`,
+      left: `-${(regionLeft / regionW) * 100}%`,
+      top: `-${(regionTop / regionH) * 100}%`,
     };
   }, [safeZone, screenAspect.ratio, sourceAspect]);
 
