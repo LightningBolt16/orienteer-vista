@@ -376,8 +376,14 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
         };
       });
 
-      routeCache.set(cacheKey, routes);
-      return routes;
+      // Sort by safe zone area ascending (shorter/compact routes first)
+      const sorted = [...routes].sort((a, b) => {
+        const areaA = a.safeZone ? a.safeZone.w * a.safeZone.h : 1;
+        const areaB = b.safeZone ? b.safeZone.w * b.safeZone.h : 1;
+        return areaA - areaB;
+      });
+      routeCache.set(cacheKey, sorted);
+      return sorted;
     }
   }
 
