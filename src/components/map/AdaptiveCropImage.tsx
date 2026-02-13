@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useScreenAspect } from '@/hooks/useScreenAspect';
 import type { SafeZone } from '@/utils/routeDataUtils';
 
@@ -14,8 +14,8 @@ interface AdaptiveCropImageProps {
   safeZone?: SafeZone;
 }
 
-// Add padding around the safe zone to ensure routes aren't clipped at edges
-const SAFE_ZONE_PADDING = 0.05; // 5% padding on each side
+const SAFE_ZONE_PADDING = 0.05;
+const MAX_HEIGHT_VH = 0.75;
 
 function getPaddedSafeZone(safeZone: SafeZone) {
   const padded = {
@@ -29,49 +29,6 @@ function getPaddedSafeZone(safeZone: SafeZone) {
   return padded;
 }
 
-/**
- * Compute the visible region of a 1:1 image that:
- * 1. Contains the entire safe zone (with padding)
- * 2. Matches the container aspect ratio
- * 3. Zooms in as much as possible
- * 
- * When the region exceeds image bounds (regionW > 1 or regionH > 1),
- * the image won't fill the container — background shows as letterboxing.
- */
-function computeZoomRegion(
-  safeZone: SafeZone,
-  containerRatio: number,
-) {
-  const padded = getPaddedSafeZone(safeZone);
-
-  const regionH = Math.max(padded.h, padded.w / containerRatio);
-  const regionW = containerRatio * regionH;
-
-  // NO clamping to ≤1 — allow letterboxing when image can't fill the view
-
-  const centerX = safeZone.x + safeZone.w / 2;
-  const centerY = safeZone.y + safeZone.h / 2;
-
-  let regionLeft: number;
-  let regionTop: number;
-
-  if (regionW <= 1) {
-    // Image fills or overflows container width — clamp to image edges
-    regionLeft = Math.max(0, Math.min(1 - regionW, centerX - regionW / 2));
-  } else {
-    // Image is narrower than container — center image in view
-    regionLeft = -(regionW - 1) / 2;
-  }
-
-  if (regionH <= 1) {
-    regionTop = Math.max(0, Math.min(1 - regionH, centerY - regionH / 2));
-  } else {
-    regionTop = -(regionH - 1) / 2;
-  }
-
-  return { regionLeft, regionTop, regionW, regionH };
-}
-
 const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
   src,
   sourceAspect,
@@ -81,132 +38,132 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
   isFullscreen = false,
   safeZone,
 }) => {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
   const screenAspect = useScreenAspect();
 
-  const MAX_HEIGHT_VH = 0.75;
+  // Measure actual available width
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 0) setMeasuredWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const zoomData = useMemo(() => {
     if (!safeZone || sourceAspect !== '1:1') return null;
 
+    const cw = isFullscreen ? screenAspect.width : measuredWidth;
+    if (cw === 0) return null;
+
     const padded = getPaddedSafeZone(safeZone);
+    const maxH = isFullscreen ? screenAspect.height : screenAspect.height * MAX_HEIGHT_VH;
+    const naturalRatio = cw / maxH;
 
-    let effectiveRatio: number;
-
+    let containerRatio: number;
     if (isFullscreen) {
-      effectiveRatio = screenAspect.ratio;
+      containerRatio = screenAspect.ratio;
     } else {
-      // Cap ratio so zoom region fits within image bounds (no letterboxing):
-      // - ratio >= padded.w ensures regionW <= 1
-      // - ratio <= 1/padded.h ensures regionH <= 1
-      const cappedRatio = Math.max(padded.w, Math.min(screenAspect.ratio, 1 / padded.h));
-
-      // Account for maxHeight constraint: the container has w-full + aspectRatio + maxHeight.
-      // If the height from aspectRatio exceeds maxHeight, the ACTUAL displayed ratio is wider.
-      // We must use the actual ratio so the zoom aligns with the real container dimensions.
-      const maxH = screenAspect.height * MAX_HEIGHT_VH;
-      const heightFromAspect = screenAspect.width / cappedRatio;
-      effectiveRatio = heightFromAspect > maxH
-        ? Math.max(cappedRatio, screenAspect.width / maxH)
-        : cappedRatio;
+      // Cap so zoom fits within image bounds
+      containerRatio = Math.max(padded.w, Math.min(naturalRatio, 1 / padded.h));
+      // Re-check maxHeight constraint
+      const heightFromRatio = cw / containerRatio;
+      if (heightFromRatio > maxH) {
+        containerRatio = Math.max(containerRatio, cw / maxH);
+      }
     }
 
-    const { regionLeft, regionTop, regionW, regionH } = computeZoomRegion(
-      safeZone,
-      effectiveRatio,
-    );
+    const regionH = Math.max(padded.h, padded.w / containerRatio);
+    const regionW = containerRatio * regionH;
+    const needsLetterbox = regionW > 1 || regionH > 1;
+
+    if (needsLetterbox) {
+      return { needsLetterbox: true as const, containerRatio };
+    }
+
+    const centerX = safeZone.x + safeZone.w / 2;
+    const centerY = safeZone.y + safeZone.h / 2;
+    const regionLeft = Math.max(0, Math.min(1 - regionW, centerX - regionW / 2));
+    const regionTop = Math.max(0, Math.min(1 - regionH, centerY - regionH / 2));
 
     return {
+      needsLetterbox: false as const,
+      containerRatio,
       imgStyle: {
         position: 'absolute' as const,
-        width: `${100 / regionW}%`,
-        height: `${100 / regionH}%`,
-        left: `${-(regionLeft / regionW) * 100}%`,
-        top: `${-(regionTop / regionH) * 100}%`,
+        width: `${(100 / regionW).toFixed(4)}%`,
+        height: `${(100 / regionH).toFixed(4)}%`,
+        left: `${(-(regionLeft / regionW) * 100).toFixed(4)}%`,
+        top: `${(-(regionTop / regionH) * 100).toFixed(4)}%`,
       },
-      containerRatio: effectiveRatio,
-      hasLetterbox: regionW > 1 || regionH > 1,
     };
-  }, [safeZone, screenAspect.ratio, screenAspect.width, screenAspect.height, sourceAspect, isFullscreen]);
+  }, [safeZone, screenAspect.ratio, screenAspect.width, screenAspect.height, sourceAspect, isFullscreen, measuredWidth]);
 
-  // For 1:1 source images WITH safe zone: zoom into the safe zone area
-  if (sourceAspect === '1:1' && zoomData) {
-    // Fullscreen + letterbox: use object-contain centered in flexbox (no absolute positioning)
-    if (isFullscreen && zoomData.hasLetterbox) {
+  // === 1:1 with safe zone ===
+  if (sourceAspect === '1:1' && safeZone) {
+    // Still measuring or letterbox
+    if (!zoomData || zoomData.needsLetterbox) {
       return (
-        <div className={`w-full h-full flex items-center justify-center bg-black ${className}`}>
-          <img
-            src={src}
-            alt={alt}
-            className="max-w-full max-h-full w-auto h-auto object-contain"
-            onLoad={onLoad}
-          />
+        <div ref={outerRef} className={`w-full ${className}`}>
+          <div className={`flex items-center justify-center ${isFullscreen ? 'w-full h-full bg-black' : 'w-full'}`}
+            style={isFullscreen ? undefined : { maxHeight: `${MAX_HEIGHT_VH * 100}vh` }}
+          >
+            <img src={src} alt={alt} className="max-w-full max-h-full w-auto h-auto object-contain" onLoad={onLoad} />
+          </div>
         </div>
       );
     }
 
-    const containerClass = isFullscreen
-      ? 'w-full h-full overflow-hidden relative'
-      : 'w-full overflow-hidden relative';
+    // Zoom case — fullscreen
+    if (isFullscreen) {
+      return (
+        <div ref={outerRef} className={className} style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%' }}>
+          <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} />
+        </div>
+      );
+    }
 
-    const containerStyle = isFullscreen
-      ? undefined
-      : { aspectRatio: `${zoomData.containerRatio}`, maxHeight: `${MAX_HEIGHT_VH * 100}vh` };
-
+    // Zoom case — non-fullscreen
     return (
-      <div className={`${containerClass} ${className}`} style={containerStyle}>
-        <img
-          src={src}
-          alt={alt}
-          className="block"
-          style={zoomData.imgStyle}
+      <div ref={outerRef} className={`w-full ${className}`}>
+        <div style={{
+          position: 'relative',
+          overflow: 'hidden',
+          width: '100%',
+          aspectRatio: `${zoomData.containerRatio}`,
+          maxHeight: `${MAX_HEIGHT_VH * 100}vh`,
+        }}>
+          <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} />
+        </div>
+      </div>
+    );
+  }
+
+  // === 1:1 without safe zone ===
+  if (sourceAspect === '1:1') {
+    return (
+      <div ref={outerRef} className={`flex items-center justify-center ${isFullscreen ? 'w-full h-full bg-black' : 'w-full'} ${className}`}>
+        <img src={src} alt={alt}
+          className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full object-contain'}
+          style={isFullscreen ? undefined : { maxHeight: `${MAX_HEIGHT_VH * 100}vh` }}
           onLoad={onLoad}
         />
       </div>
     );
   }
 
-  // For 1:1 source images WITHOUT safe zone: use contain to avoid cutting off routes
-  if (sourceAspect === '1:1') {
-    if (isFullscreen) {
-      return (
-        <img
-          src={src}
-          alt={alt}
-          className={`max-w-full max-h-full w-auto h-auto object-contain ${className}`}
-          onLoad={onLoad}
-        />
-      );
-    }
-    return (
-      <img
-        src={src}
-        alt={alt}
-        className={`w-full object-contain ${className}`}
-        style={{ maxHeight: '75vh' }}
-        onLoad={onLoad}
-      />
-    );
-  }
-
-  // For legacy 16:9 or 9:16 images, use contain
-  if (isFullscreen) {
-    return (
-      <img
-        src={src}
-        alt={alt}
-        className={`max-w-full max-h-full w-auto h-auto object-contain ${className}`}
-        onLoad={onLoad}
-      />
-    );
-  }
-
+  // === Legacy 16:9 / 9:16 ===
   return (
-    <img
-      src={src}
-      alt={alt}
-      className={`w-full h-auto object-contain ${className}`}
-      onLoad={onLoad}
-    />
+    <div ref={outerRef} className={`flex items-center justify-center ${isFullscreen ? 'w-full h-full bg-black' : 'w-full'} ${className}`}>
+      <img src={src} alt={alt}
+        className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full h-auto object-contain'}
+        onLoad={onLoad}
+      />
+    </div>
   );
 };
 
