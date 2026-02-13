@@ -5,7 +5,7 @@ import PauseOverlay from './PauseOverlay';
 import { useInactivityDetection } from '@/hooks/useInactivityDetection';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
-import AdaptiveCropImage from './map/AdaptiveCropImage';
+import SafeZoneImage from './map/SafeZoneImage';
 
 interface MobileRouteSelectorProps {
   routeData: RouteData[];
@@ -304,13 +304,11 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
       <div className={`relative ${isFullscreen ? 'w-full h-full flex items-center justify-center' : ''}`}>
         {/* Route Image - use AdaptiveCropImage for 1:1 sources */}
         {currentRoute.sourceAspect === '1:1' ? (
-          <AdaptiveCropImage
+          <SafeZoneImage
             src={currentRoute.imagePath || ''}
-            sourceAspect="1:1"
-            className=""
-            alt={`Route ${currentRoute.candidateIndex}`}
             isFullscreen={isFullscreen}
             safeZone={currentRoute.safeZone}
+            alt={`Route ${currentRoute.candidateIndex}`}
             onLoad={() => {
               if (pendingRouteIndex === null) {
                 setIsImageLoaded(true);
@@ -340,7 +338,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
                 </div>
               </div>
             )}
-          </AdaptiveCropImage>
+          </SafeZoneImage>
         ) : (
           <div className="relative">
             <img
