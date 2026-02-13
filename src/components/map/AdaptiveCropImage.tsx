@@ -12,6 +12,7 @@ interface AdaptiveCropImageProps {
   onLoad?: () => void;
   isFullscreen?: boolean;
   safeZone?: SafeZone;
+  children?: React.ReactNode;
 }
 
 const SAFE_ZONE_PADDING = 0.05;
@@ -37,6 +38,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
   onLoad,
   isFullscreen = false,
   safeZone,
+  children,
 }) => {
   const outerRef = useRef<HTMLDivElement>(null);
   const [measuredWidth, setMeasuredWidth] = useState(0);
@@ -62,8 +64,10 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     const padded = getPaddedSafeZone(safeZone);
     const maxH = isFullscreen ? screenAspect.height : screenAspect.height * MAX_HEIGHT_VH;
 
-    // R = ideal container aspect ratio (width / height)
-    const R = cw / maxH;
+    // Container is always full width, height capped at maxH
+    const containerWidth = isFullscreen ? screenAspect.width : cw;
+    const containerHeight = isFullscreen ? screenAspect.height : maxH;
+    const R = containerWidth / containerHeight;
 
     // Step 1: minimum region containing safe zone with ratio R
     let regionW: number, regionH: number;
@@ -75,13 +79,18 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
       regionW = padded.h * R;
     }
 
-    // Step 2: clamp to image bounds [0,1]
+    // Step 2: clamp to image bounds [0,1] — re-adjust to maintain R
+    if (regionW > 1.0) {
+      regionW = 1.0;
+      regionH = regionW / R;
+    }
+    if (regionH > 1.0) {
+      regionH = 1.0;
+      regionW = regionH * R;
+    }
+    // Final clamp (both can't exceed 1.0 simultaneously for valid R)
     regionW = Math.min(regionW, 1.0);
     regionH = Math.min(regionH, 1.0);
-
-    // The actual container ratio after clamping — may differ from R
-    // This ensures NO black bars: the image always fills the container completely
-    const containerRatio = regionW / regionH;
 
     // Step 3: center on safe zone center
     const cx = safeZone.x + safeZone.w / 2;
@@ -90,7 +99,8 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     const top = Math.max(0, Math.min(cy - regionH / 2, 1 - regionH));
 
     return {
-      containerRatio,
+      containerWidth,
+      containerHeight,
       imgStyle: {
         position: 'absolute' as const,
         width: `${(100 / regionW).toFixed(4)}%`,
@@ -104,6 +114,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
   // === 1:1 with safe zone ===
   if (sourceAspect === '1:1' && safeZone) {
     if (!zoomData) {
+      // Still measuring — render invisible placeholder
       return (
         <div ref={outerRef} className={`w-full ${className}`}>
           <div className="w-full bg-black" style={{ aspectRatio: '1' }} />
@@ -116,14 +127,17 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
         <div ref={outerRef} className={`w-full h-full bg-black flex items-center justify-center ${className}`}>
           <div style={{
             position: 'relative',
-            overflow: 'hidden',
-            width: '100%',
-            height: '100%',
-            maxWidth: `${screenAspect.height * zoomData.containerRatio}px`,
-            maxHeight: `${screenAspect.width / zoomData.containerRatio}px`,
-            aspectRatio: `${zoomData.containerRatio}`,
+            width: `${zoomData.containerWidth}px`,
+            height: `${zoomData.containerHeight}px`,
           }}>
-            <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} draggable={false} />
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              overflow: 'hidden',
+            }}>
+              <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} draggable={false} />
+            </div>
+            {children}
           </div>
         </div>
       );
@@ -133,12 +147,18 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
       <div ref={outerRef} className={`w-full ${className}`}>
         <div style={{
           position: 'relative',
-          overflow: 'hidden',
-          width: '100%',
-          aspectRatio: `${zoomData.containerRatio}`,
-          maxHeight: `${MAX_HEIGHT_VH * 100}vh`,
+          width: `${zoomData.containerWidth}px`,
+          height: `${zoomData.containerHeight}px`,
+          margin: '0 auto',
         }}>
-          <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} draggable={false} />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            overflow: 'hidden',
+          }}>
+            <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} draggable={false} />
+          </div>
+          {children}
         </div>
       </div>
     );

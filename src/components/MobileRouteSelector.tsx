@@ -316,21 +316,70 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
                 setIsImageLoaded(true);
               }
             }}
-          />
+          >
+            {/* Touch Zones */}
+            {!result && isImageLoaded && !isTransitioning && renderTouchZones()}
+            {/* Arrow Indicators */}
+            {!result && isImageLoaded && renderArrowIndicators()}
+            {/* Result Overlay */}
+            {result && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className={`text-center p-6 rounded-lg ${
+                  result === 'win' ? 'bg-green-500/90' : 
+                  result === 'lose' ? 'bg-red-500/90' : 
+                  'bg-yellow-500/90'
+                }`}>
+                  {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
+                  {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
+                  <p className="text-white text-xl font-bold">{resultMessage}</p>
+                  {result === 'warmup' && (
+                    <p className="text-white/80 text-sm mt-1">
+                      Warmup {warmupCount}/{WARMUP_ROUTES}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </AdaptiveCropImage>
         ) : (
-          <img
-            src={currentRoute.imagePath}
-            alt={`Route ${currentRoute.candidateIndex}`}
-            className={isFullscreen 
-              ? 'max-w-full max-h-full w-auto h-auto object-contain' 
-              : 'w-full h-auto'
-            }
-            onLoad={() => {
-              if (pendingRouteIndex === null) {
-                setIsImageLoaded(true);
+          <div className="relative">
+            <img
+              src={currentRoute.imagePath}
+              alt={`Route ${currentRoute.candidateIndex}`}
+              className={isFullscreen 
+                ? 'max-w-full max-h-full w-auto h-auto object-contain' 
+                : 'w-full h-auto'
               }
-            }}
-          />
+              onLoad={() => {
+                if (pendingRouteIndex === null) {
+                  setIsImageLoaded(true);
+                }
+              }}
+            />
+            {/* Touch Zones */}
+            {!result && isImageLoaded && !isTransitioning && renderTouchZones()}
+            {/* Arrow Indicators */}
+            {!result && isImageLoaded && renderArrowIndicators()}
+            {/* Result Overlay */}
+            {result && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className={`text-center p-6 rounded-lg ${
+                  result === 'win' ? 'bg-green-500/90' : 
+                  result === 'lose' ? 'bg-red-500/90' : 
+                  'bg-yellow-500/90'
+                }`}>
+                  {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
+                  {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
+                  <p className="text-white text-xl font-bold">{resultMessage}</p>
+                  {result === 'warmup' && (
+                    <p className="text-white/80 text-sm mt-1">
+                      Warmup {warmupCount}/{WARMUP_ROUTES}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
         
         {/* Hidden preload image for pending route */}
@@ -341,32 +390,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
             className="hidden"
             onLoad={() => setIsImageLoaded(true)}
           />
-        )}
-
-        {/* Touch Zones */}
-        {!result && isImageLoaded && !isTransitioning && renderTouchZones()}
-
-        {/* Arrow Indicators */}
-        {!result && isImageLoaded && renderArrowIndicators()}
-
-        {/* Result Overlay */}
-        {result && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className={`text-center p-6 rounded-lg ${
-              result === 'win' ? 'bg-green-500/90' : 
-              result === 'lose' ? 'bg-red-500/90' : 
-              'bg-yellow-500/90'
-            }`}>
-              {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
-              {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
-              <p className="text-white text-xl font-bold">{resultMessage}</p>
-              {result === 'warmup' && (
-                <p className="text-white/80 text-sm mt-1">
-                  Warmup {warmupCount}/{WARMUP_ROUTES}
-                </p>
-              )}
-            </div>
-          </div>
         )}
       </div>
 
