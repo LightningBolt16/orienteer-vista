@@ -69,7 +69,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     const containerHeight = isFullscreen ? screenAspect.height : maxH;
     const R = containerWidth / containerHeight;
 
-    // Step 1: minimum region containing safe zone with ratio R
+    // Step 1: minimum region containing padded safe zone with container aspect ratio R
     let regionW: number, regionH: number;
     if (padded.w / padded.h > R) {
       regionW = padded.w;
@@ -79,7 +79,8 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
       regionW = padded.h * R;
     }
 
-    // Step 2: clamp to image bounds [0,1] — re-adjust to maintain R
+    // Step 2: clamp to image bounds [0,1]
+    // After clamping one axis, ensure the safe zone still fits on the other.
     if (regionW > 1.0) {
       regionW = 1.0;
       regionH = regionW / R;
@@ -88,15 +89,36 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
       regionH = 1.0;
       regionW = regionH * R;
     }
-    // Final clamp (both can't exceed 1.0 simultaneously for valid R)
-    regionW = Math.min(regionW, 1.0);
-    regionH = Math.min(regionH, 1.0);
 
-    // Step 3: center on explicit center point if available, else safe zone center
+    // Step 3: guarantee the safe zone is NEVER cropped.
+    // If clamping shrank a dimension below the padded safe zone, expand it back.
+    if (regionW < padded.w) {
+      regionW = Math.min(padded.w, 1.0);
+    }
+    if (regionH < padded.h) {
+      regionH = Math.min(padded.h, 1.0);
+    }
+    // The region may no longer match R exactly — that's fine,
+    // the container will letterbox the difference.
+
+    // Step 4: center on explicit center point if available, else safe zone center
     const cx = safeZone.center_x ?? (safeZone.x + safeZone.w / 2);
     const cy = safeZone.center_y ?? (safeZone.y + safeZone.h / 2);
     const left = Math.max(0, Math.min(cx - regionW / 2, 1 - regionW));
     const top = Math.max(0, Math.min(cy - regionH / 2, 1 - regionH));
+
+    // Step 5: final safety — ensure entire padded safe zone is within [left, left+regionW] x [top, top+regionH]
+    // Shift if the safe zone extends beyond the visible region
+    let finalLeft = left;
+    let finalTop = top;
+    if (padded.x < finalLeft) finalLeft = Math.max(0, padded.x);
+    if (padded.y < finalTop) finalTop = Math.max(0, padded.y);
+    if (padded.x + padded.w > finalLeft + regionW) {
+      finalLeft = Math.min(1 - regionW, padded.x + padded.w - regionW);
+    }
+    if (padded.y + padded.h > finalTop + regionH) {
+      finalTop = Math.min(1 - regionH, padded.y + padded.h - regionH);
+    }
 
     return {
       containerWidth,
@@ -105,8 +127,8 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
         position: 'absolute' as const,
         width: `${(100 / regionW).toFixed(4)}%`,
         height: `${(100 / regionH).toFixed(4)}%`,
-        left: `${(-(left / regionW) * 100).toFixed(4)}%`,
-        top: `${(-(top / regionH) * 100).toFixed(4)}%`,
+        left: `${(-(finalLeft / regionW) * 100).toFixed(4)}%`,
+        top: `${(-(finalTop / regionH) * 100).toFixed(4)}%`,
       },
     };
   }, [safeZone, screenAspect.width, screenAspect.height, sourceAspect, isFullscreen, measuredWidth]);
