@@ -62,10 +62,10 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     const padded = getPaddedSafeZone(safeZone);
     const maxH = isFullscreen ? screenAspect.height : screenAspect.height * MAX_HEIGHT_VH;
 
-    // Container aspect ratio R
-    const R = isFullscreen ? screenAspect.ratio : cw / maxH;
+    // R = ideal container aspect ratio (width / height)
+    const R = cw / maxH;
 
-    // Step 1: minimum region containing padded safe zone with ratio R
+    // Step 1: minimum region containing safe zone with ratio R
     let regionW: number, regionH: number;
     if (padded.w / padded.h > R) {
       regionW = padded.w;
@@ -79,14 +79,15 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     regionW = Math.min(regionW, 1.0);
     regionH = Math.min(regionH, 1.0);
 
+    // The actual container ratio after clamping — may differ from R
+    // This ensures NO black bars: the image always fills the container completely
+    const containerRatio = regionW / regionH;
+
     // Step 3: center on safe zone center
     const cx = safeZone.x + safeZone.w / 2;
     const cy = safeZone.y + safeZone.h / 2;
     const left = Math.max(0, Math.min(cx - regionW / 2, 1 - regionW));
     const top = Math.max(0, Math.min(cy - regionH / 2, 1 - regionH));
-
-    // Actual displayed container ratio
-    const containerRatio = regionW / regionH;
 
     return {
       containerRatio,
@@ -98,12 +99,11 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
         top: `${(-(top / regionH) * 100).toFixed(4)}%`,
       },
     };
-  }, [safeZone, screenAspect.ratio, screenAspect.width, screenAspect.height, sourceAspect, isFullscreen, measuredWidth]);
+  }, [safeZone, screenAspect.width, screenAspect.height, sourceAspect, isFullscreen, measuredWidth]);
 
   // === 1:1 with safe zone ===
   if (sourceAspect === '1:1' && safeZone) {
     if (!zoomData) {
-      // Still measuring
       return (
         <div ref={outerRef} className={`w-full ${className}`}>
           <div className="w-full bg-black" style={{ aspectRatio: '1' }} />
@@ -123,7 +123,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
             maxHeight: `${screenAspect.width / zoomData.containerRatio}px`,
             aspectRatio: `${zoomData.containerRatio}`,
           }}>
-            <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} />
+            <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} draggable={false} />
           </div>
         </div>
       );
@@ -137,9 +137,8 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
           width: '100%',
           aspectRatio: `${zoomData.containerRatio}`,
           maxHeight: `${MAX_HEIGHT_VH * 100}vh`,
-          backgroundColor: 'black',
         }}>
-          <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} />
+          <img src={src} alt={alt} style={zoomData.imgStyle} onLoad={onLoad} draggable={false} />
         </div>
       </div>
     );
@@ -153,6 +152,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
           className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full object-contain'}
           style={isFullscreen ? undefined : { maxHeight: `${MAX_HEIGHT_VH * 100}vh` }}
           onLoad={onLoad}
+          draggable={false}
         />
       </div>
     );
@@ -164,6 +164,7 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
       <img src={src} alt={alt}
         className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full h-auto object-contain'}
         onLoad={onLoad}
+        draggable={false}
       />
     </div>
   );
