@@ -1,39 +1,35 @@
 
 
-# Fix: Route Finder Fullscreen + Result Screen Redesign
+## Fix Route Game Mobile Fullscreen Issues + Short Route Priority
 
-## Problem 1: Fullscreen button does nothing
+### Problems Identified
 
-The fullscreen toggle in `RouteFinder.tsx` (line 229) has this condition:
+1. **Header overlaps fullscreen**: The header uses `z-50` and the fullscreen container also uses `z-50`, so the header shows on top of the fullscreen game.
+2. **Left-aligned map with black space on right**: In fullscreen, the `AdaptiveCropImage` zoom calculation works correctly for the math, but the container hierarchy (MobileRouteSelector wrapping in `flex items-center justify-center` + AdaptiveCropImage's absolute positioning) causes misalignment. The image container gets `w-full h-full` but the parent flex centering conflicts with the absolute-positioned image inside.
+3. **Shorter routes first before fullscreen**: Safe zone area (`w * h`) correlates with route length -- smaller area = shorter, more compact route that displays well on small screens without fullscreen.
 
-```
-if (isFullscreen && selectedMapId)
-```
+### Plan
 
-When playing in "All Maps" mode, `selectedMapId` is `null`, so the fullscreen container never renders even though `isFullscreen` becomes `true`. The fix is to remove the `selectedMapId` requirement -- fullscreen should work regardless of map selection mode.
+#### 1. Fix fullscreen z-index (RouteGame.tsx)
+- Change fullscreen wrapper from `z-50` to `z-[60]` so it renders above the fixed header.
 
-## Problem 2: Result screen covers the map
+#### 2. Fix fullscreen image alignment (AdaptiveCropImage.tsx)
+- In fullscreen mode with `hasLetterbox`, center the image properly using `flex items-center justify-center` on the container and switch from absolute positioning to `object-contain` with max dimensions, so the image is always centered regardless of aspect mismatch.
+- When there's no letterbox (image fills container), keep the current absolute positioning zoom approach.
 
-The current `RouteFinderResult` component overlays everything (score circle, stats panel, legend, feedback message, next button) directly on top of the answer image, making it hard to see the correct route. The user wants it to match the drawing screen's clean three-section layout.
+#### 3. Sort routes by safe zone area for non-fullscreen (routeDataUtils.ts)
+- After loading routes, sort so that routes with smaller safe zone areas (shorter, compact routes) appear first. This ensures the initial routes shown before fullscreen are easy to see.
+- Only apply this sort when routes are first loaded (before shuffle/randomization).
 
-## Solution
+### Technical Details
 
-### File 1: `src/pages/RouteFinder.tsx`
-- Change line 229 from `if (isFullscreen && selectedMapId)` to just `if (isFullscreen)`
-- Update the fullscreen `RouteFinderGame` key and `mapId` to handle null `selectedMapId` (pass `undefined`)
+**File: `src/pages/RouteGame.tsx`**
+- Line 700: Change `z-50` to `z-[60]` on the fullscreen section wrapper.
 
-### File 2: `src/components/route-finder/RouteFinderResult.tsx`
-Redesign to match the drawing screen's three-section layout:
+**File: `src/components/map/AdaptiveCropImage.tsx`**
+- Fullscreen branch (line 132-151): When `hasLetterbox` is true, instead of using absolute positioning (which misaligns), render the image with `object-contain` + `max-w-full max-h-full` centered in the container. This guarantees centering without complex positioning math.
+- Keep the zoom approach (absolute positioning) only when the image can fully fill the container (`!hasLetterbox`).
 
-- **Top bar** (outside the map, solid background): Score percentage (color-coded), feedback text, stats (correct/total), response time, and the route legend -- all in a single compact bar
-- **Map area** (middle, flex-1): The answer image with user path canvas overlay fills the entire remaining space. No overlaid UI elements blocking the view
-- **Bottom bar** (outside the map, solid background): Centered "Next Challenge" button
+**File: `src/utils/routeDataUtils.ts`**
+- After building the routes array (around line 377), sort routes by safe zone area ascending (smallest safe zones first = shortest routes). Routes without safe zones go to the end.
 
-This keeps the map completely unobstructed so the user can clearly compare their magenta route against the correct red route.
-
-## Technical Details
-
-| File | Change |
-|------|--------|
-| `src/pages/RouteFinder.tsx` | Remove `selectedMapId` guard from fullscreen condition (line 229). Update key/mapId for null case. |
-| `src/components/route-finder/RouteFinderResult.tsx` | Complete redesign: move all overlay elements into top/bottom bars outside the map area, matching the drawing screen layout. |
