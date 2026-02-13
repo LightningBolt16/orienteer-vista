@@ -130,8 +130,22 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
 
   // For 1:1 source images WITH safe zone: zoom into the safe zone area
   if (sourceAspect === '1:1' && zoomData) {
+    // Fullscreen + letterbox: use object-contain centered in flexbox (no absolute positioning)
+    if (isFullscreen && zoomData.hasLetterbox) {
+      return (
+        <div className={`w-full h-full flex items-center justify-center bg-black ${className}`}>
+          <img
+            src={src}
+            alt={alt}
+            className="max-w-full max-h-full w-auto h-auto object-contain"
+            onLoad={onLoad}
+          />
+        </div>
+      );
+    }
+
     const containerClass = isFullscreen
-      ? `w-full h-full overflow-hidden relative ${zoomData.hasLetterbox ? 'bg-black' : ''}`
+      ? 'w-full h-full overflow-hidden relative'
       : 'w-full overflow-hidden relative';
 
     const containerStyle = isFullscreen

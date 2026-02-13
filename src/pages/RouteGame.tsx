@@ -697,7 +697,7 @@ const RouteGame: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
       ) : routeData.length > 0 && (
-        <section className={isFullscreen ? 'fixed inset-0 z-50' : 'max-w-4xl mx-auto'}>
+        <section className={isFullscreen ? 'fixed inset-0 z-[60]' : 'max-w-4xl mx-auto'}>
           <div 
             ref={gameContainerRef}
             className={`relative ${isFullscreen ? 'bg-black h-full w-full' : ''}`}
