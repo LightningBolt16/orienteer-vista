@@ -6,6 +6,8 @@ interface SafeZone {
   y: number;
   w: number;
   h: number;
+  center_x?: number;
+  center_y?: number;
 }
 
 interface ParsedRoute {
@@ -89,6 +91,8 @@ export const useMapUpload = () => {
       const safeYIdx = headers.findIndex(h => h === 'safe_y');
       const safeWIdx = headers.findIndex(h => h === 'safe_w');
       const safeHIdx = headers.findIndex(h => h === 'safe_h');
+      const centerXIdx = headers.findIndex(h => h === 'center_x');
+      const centerYIdx = headers.findIndex(h => h === 'center_y');
 
       // Parse safe zone if all 4 fields present
       let safeZone: SafeZone | undefined;
@@ -99,6 +103,15 @@ export const useMapUpload = () => {
         const sh = parseFloat(values[safeHIdx]);
         if (!isNaN(sx) && !isNaN(sy) && !isNaN(sw) && !isNaN(sh)) {
           safeZone = { x: sx, y: sy, w: sw, h: sh };
+          // Parse center coordinates if present
+          if (centerXIdx >= 0 && centerYIdx >= 0) {
+            const cx = parseFloat(values[centerXIdx]);
+            const cy = parseFloat(values[centerYIdx]);
+            if (!isNaN(cx) && !isNaN(cy)) {
+              safeZone.center_x = cx;
+              safeZone.center_y = cy;
+            }
+          }
         }
       }
 
@@ -449,7 +462,11 @@ export const useMapUpload = () => {
           main_route_length: route.mainLength,
           alt_route_length: route.altLength,
           image_path: `${folderName}/1_1/candidate_${route.candidateIndex}.webp`,
-          safe_zone: route.safeZone ? { x: route.safeZone.x, y: route.safeZone.y, w: route.safeZone.w, h: route.safeZone.h } : null,
+          safe_zone: route.safeZone ? {
+            x: route.safeZone.x, y: route.safeZone.y, w: route.safeZone.w, h: route.safeZone.h,
+            ...(route.safeZone.center_x !== undefined && { center_x: route.safeZone.center_x }),
+            ...(route.safeZone.center_y !== undefined && { center_y: route.safeZone.center_y }),
+          } : null,
         }));
 
         // Insert in batches
