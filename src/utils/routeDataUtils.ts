@@ -7,6 +7,8 @@ export interface SafeZone {
   y: number;
   w: number;
   h: number;
+  center_x?: number;
+  center_y?: number;
 }
 
 export interface RouteData {
@@ -357,6 +359,10 @@ export async function fetchRouteDataForMap(mapSource: MapSource): Promise<RouteD
           const sz = route.safe_zone as Record<string, number>;
           if (sz.x !== undefined && sz.y !== undefined && sz.w !== undefined && sz.h !== undefined) {
             safeZone = { x: sz.x, y: sz.y, w: sz.w, h: sz.h };
+            if (sz.center_x !== undefined && sz.center_y !== undefined) {
+              safeZone.center_x = sz.center_x;
+              safeZone.center_y = sz.center_y;
+            }
           }
         }
         

@@ -92,9 +92,9 @@ const AdaptiveCropImage: React.FC<AdaptiveCropImageProps> = ({
     regionW = Math.min(regionW, 1.0);
     regionH = Math.min(regionH, 1.0);
 
-    // Step 3: center on safe zone center
-    const cx = safeZone.x + safeZone.w / 2;
-    const cy = safeZone.y + safeZone.h / 2;
+    // Step 3: center on explicit center point if available, else safe zone center
+    const cx = safeZone.center_x ?? (safeZone.x + safeZone.w / 2);
+    const cy = safeZone.center_y ?? (safeZone.y + safeZone.h / 2);
     const left = Math.max(0, Math.min(cx - regionW / 2, 1 - regionW));
     const top = Math.max(0, Math.min(cy - regionH / 2, 1 - regionH));
 
