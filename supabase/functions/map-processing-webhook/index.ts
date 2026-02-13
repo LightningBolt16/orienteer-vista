@@ -84,6 +84,9 @@ Deno.serve(async (req) => {
         const routeImages: any[] = []
         const basePath = `${userMap.user_id}/${map_id}`
         
+        // Detect format: if first route has safe_zone, it's the new 1:1 format
+        const isSquareFormat = csv_data.length > 0 && csv_data[0].safe_zone != null
+        
         for (const route of csv_data) {
           // NEW FORMAT: Modal sends { id, lengths: [sorted lengths], colors, main_route_index, hardness }
           // lengths array is in shuffled order, main_route_index tells which is the correct answer
@@ -104,27 +107,44 @@ Deno.serve(async (req) => {
           const positionMap = ['left', 'center-left', 'center', 'center-right', 'right']
           const shortestSide = positionMap[mainRouteIndex] || 'left'
           
-          routeImages.push({
-            map_id: routeMap.id, 
-            candidate_index: route.id,
-            main_route_length: mainLength, 
-            alt_route_length: firstAltLength,
-            num_alternates: numAlternates,
-            alt_route_lengths: altLengths.length > 0 ? altLengths : null,
-            aspect_ratio: '16_9', 
-            shortest_side: shortestSide,
-            image_path: `${basePath}/16_9/candidate_${route.id}_ALL.webp`,
-          }, {
-            map_id: routeMap.id, 
-            candidate_index: route.id,
-            main_route_length: mainLength, 
-            alt_route_length: firstAltLength,
-            num_alternates: numAlternates,
-            alt_route_lengths: altLengths.length > 0 ? altLengths : null,
-            aspect_ratio: '9_16', 
-            shortest_side: shortestSide,
-            image_path: `${basePath}/9_16/candidate_${route.id}_ALL.webp`,
-          })
+          if (isSquareFormat) {
+            // 1:1 format: single image per route with safe_zone for adaptive cropping
+            routeImages.push({
+              map_id: routeMap.id, 
+              candidate_index: route.id,
+              main_route_length: mainLength, 
+              alt_route_length: firstAltLength,
+              num_alternates: numAlternates,
+              alt_route_lengths: altLengths.length > 0 ? altLengths : null,
+              aspect_ratio: '1:1', 
+              shortest_side: shortestSide,
+              image_path: `${basePath}/1_1/route_${route.id}.webp`,
+              safe_zone: route.safe_zone, // { x, y, w, h } normalized 0-1
+            })
+          } else {
+            // Legacy format: two images per route (16:9 and 9:16)
+            routeImages.push({
+              map_id: routeMap.id, 
+              candidate_index: route.id,
+              main_route_length: mainLength, 
+              alt_route_length: firstAltLength,
+              num_alternates: numAlternates,
+              alt_route_lengths: altLengths.length > 0 ? altLengths : null,
+              aspect_ratio: '16_9', 
+              shortest_side: shortestSide,
+              image_path: `${basePath}/16_9/candidate_${route.id}_ALL.webp`,
+            }, {
+              map_id: routeMap.id, 
+              candidate_index: route.id,
+              main_route_length: mainLength, 
+              alt_route_length: firstAltLength,
+              num_alternates: numAlternates,
+              alt_route_lengths: altLengths.length > 0 ? altLengths : null,
+              aspect_ratio: '9_16', 
+              shortest_side: shortestSide,
+              image_path: `${basePath}/9_16/candidate_${route.id}_ALL.webp`,
+            })
+          }
         }
         
         console.log('Route images to insert:', routeImages.length, 'Sample:', JSON.stringify(routeImages[0]))
