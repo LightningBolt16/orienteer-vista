@@ -38,7 +38,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     inactivityTimeout: 30000,
   });
 
-  // Reset on route data change and initialize preload pool
   useEffect(() => {
     setCurrentRouteIndex(0);
     setIsTransitioning(false);
@@ -47,7 +46,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     setWarmupCount(0);
     preloadedImages.current.clear();
     
-    // Initialize pool with PRELOAD_COUNT random indices
     if (routeData.length > 0) {
       const indices = routeData.map((_, i) => i);
       const shuffled = [...indices].sort(() => Math.random() - 0.5);
@@ -56,10 +54,8 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     }
   }, [routeData]);
 
-  // Preload all images in the pool
   useEffect(() => {
     if (preloadPool.length === 0 || routeData.length === 0) return;
-
     preloadPool.forEach(index => {
       const route = routeData[index];
       const imageUrl = route?.imagePath || '';
@@ -71,7 +67,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     });
   }, [preloadPool, routeData]);
 
-  // Start timer when image loads
   useEffect(() => {
     if (isImageLoaded && !isPaused && !isTransitioning) {
       setStartTime(Date.now());
@@ -80,7 +75,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
 
   const recordAttempt = async (isCorrect: boolean, responseTime: number, mapName: string) => {
     if (!user?.id) return;
-
     try {
       await supabase.from('route_attempts').insert({
         user_id: user.id,
@@ -98,9 +92,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     
     const currentRoute = routeData[currentRouteIndex];
     if (!currentRoute) return;
-    const numAlternates = currentRoute.numAlternates || 1;
     
-    // Get the correct answer index
     const correctIndex = currentRoute.mainRouteIndex ?? 
       (currentRoute.shortestSide === 'left' ? 0 : 1);
     
@@ -108,16 +100,13 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     const responseTime = Date.now() - startTime;
     const mapName = currentRoute.mapName || mapSource?.name;
     
-    // Reset inactivity timer on interaction
     resetTimer();
 
-    // Handle warmup period
     if (warmupCount < WARMUP_ROUTES) {
       setWarmupCount(prev => prev + 1);
       setResult('warmup');
       setResultMessage(isCorrect ? 'Nice!' : 'Keep practicing!');
     } else {
-      // Record actual attempt
       if (mapName) {
         recordAttempt(isCorrect, responseTime, mapName);
       }
@@ -128,13 +117,11 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     setIsTransitioning(true);
 
     setTimeout(() => {
-      // Pick next route FROM the preloaded pool
       let nextIndex: number;
       if (preloadPool.length > 0) {
         const poolIndex = Math.floor(Math.random() * preloadPool.length);
         nextIndex = preloadPool[poolIndex];
         
-        // Remove used index and add a new random one
         setPreloadPool(prev => {
           const newPool = prev.filter((_, i) => i !== poolIndex);
           const available = routeData
@@ -147,7 +134,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
           return newPool;
         });
       } else {
-        // Fallback to pure random if pool is empty
         nextIndex = Math.floor(Math.random() * routeData.length);
       }
       
@@ -155,7 +141,6 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     }, 350);
   };
 
-  // Complete transition when pending image is loaded
   useEffect(() => {
     if (pendingRouteIndex !== null && isImageLoaded) {
       setCurrentRouteIndex(pendingRouteIndex);
@@ -185,106 +170,127 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   }
   const numAlternates = currentRoute.numAlternates || 1;
   const totalRoutes = 1 + numAlternates;
-  const mainRouteIndex = currentRoute.mainRouteIndex ?? (currentRoute.shortestSide === 'left' ? 0 : 1);
 
-  // Define colors for routes
-  const ROUTE_COLORS = ['#FF5733', '#3357FF', '#33CC33', '#9933FF']; // Red, Blue, Green, Purple
+  const ROUTE_COLORS = ['#FF5733', '#3357FF', '#33CC33', '#9933FF'];
 
-  // Render touch zones: Red=Left, Blue=Right, Green=Up, Purple=Down
+  const handleImageLoad = () => {
+    if (pendingRouteIndex === null) {
+      setIsImageLoaded(true);
+    }
+  };
+
+  const renderResultOverlay = () => {
+    if (!result) return null;
+    return (
+      <div className="absolute inset-0 flex items-center justify-center z-20">
+        <div className={`text-center p-4 rounded-lg ${
+          result === 'win' ? 'bg-green-500/90' : 
+          result === 'lose' ? 'bg-red-500/90' : 
+          'bg-yellow-500/90'
+        }`}>
+          {result === 'win' && <Check className="h-10 w-10 text-white mx-auto mb-1" />}
+          {result === 'lose' && <X className="h-10 w-10 text-white mx-auto mb-1" />}
+          <p className="text-white text-lg font-bold">{resultMessage}</p>
+          {result === 'warmup' && (
+            <p className="text-white/80 text-xs mt-1">
+              Warmup {warmupCount}/{WARMUP_ROUTES}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderTouchZones = () => {
+    if (result || !isImageLoaded || isTransitioning) return null;
+
     if (totalRoutes === 2) {
-      // Traditional left/right split
       return (
         <>
           <div
-            className="absolute left-0 top-0 w-1/2 h-full cursor-pointer"
+            className="absolute left-0 top-0 w-1/2 h-full z-10"
             onClick={() => handleDirectionSelect(0)}
-            style={{ 
-              background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}20 0%, transparent 100%)` 
-            }}
           />
           <div
-            className="absolute right-0 top-0 w-1/2 h-full cursor-pointer"
+            className="absolute right-0 top-0 w-1/2 h-full z-10"
             onClick={() => handleDirectionSelect(1)}
-            style={{ 
-              background: `linear-gradient(270deg, ${ROUTE_COLORS[1]}20 0%, transparent 100%)` 
-            }}
           />
         </>
       );
     }
 
-    // 3-4 routes: Left, Right, Up, (Down)
     return (
       <>
-        {/* Left zone - Red (index 0) */}
         <div
-          className="absolute left-0 top-1/4 w-1/4 h-1/2 cursor-pointer rounded-r-lg"
+          className="absolute left-0 top-1/4 w-1/4 h-1/2 z-10"
           onClick={() => handleDirectionSelect(0)}
-          style={{ 
-            background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}30 0%, transparent 100%)` 
-          }}
         />
-        {/* Right zone - Blue (index 1) */}
         <div
-          className="absolute right-0 top-1/4 w-1/4 h-1/2 cursor-pointer rounded-l-lg"
+          className="absolute right-0 top-1/4 w-1/4 h-1/2 z-10"
           onClick={() => handleDirectionSelect(1)}
-          style={{ 
-            background: `linear-gradient(270deg, ${ROUTE_COLORS[1]}30 0%, transparent 100%)` 
-          }}
         />
-        {/* Up zone - Green (index 2) */}
         <div
-          className="absolute left-1/4 top-0 w-1/2 h-1/4 cursor-pointer rounded-b-lg"
+          className="absolute left-1/4 top-0 w-1/2 h-1/4 z-10"
           onClick={() => handleDirectionSelect(2)}
-          style={{ 
-            background: `linear-gradient(180deg, ${ROUTE_COLORS[2]}30 0%, transparent 100%)` 
-          }}
         />
-        {/* Down zone - Purple (index 3) - only for 4 routes */}
         {totalRoutes >= 4 && (
           <div
-            className="absolute left-1/4 bottom-0 w-1/2 h-1/4 cursor-pointer rounded-t-lg"
+            className="absolute left-1/4 bottom-0 w-1/2 h-1/4 z-10"
             onClick={() => handleDirectionSelect(3)}
-            style={{ 
-              background: `linear-gradient(0deg, ${ROUTE_COLORS[3]}30 0%, transparent 100%)` 
-            }}
           />
         )}
       </>
     );
   };
 
-  // Render arrow indicators: Red=Left, Blue=Right, Green=Up, Purple=Down
+  const renderEdgeGlows = () => {
+    if (result || !isImageLoaded) return null;
+    if (totalRoutes === 2) {
+      return (
+        <>
+          <div
+            className="absolute left-0 top-0 w-16 h-full pointer-events-none z-10"
+            style={{ background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}25 0%, transparent 100%)` }}
+          />
+          <div
+            className="absolute right-0 top-0 w-16 h-full pointer-events-none z-10"
+            style={{ background: `linear-gradient(270deg, ${ROUTE_COLORS[1]}25 0%, transparent 100%)` }}
+          />
+        </>
+      );
+    }
+    return null;
+  };
+
   const renderArrowIndicators = () => {
-    const getArrowStyle = (index: number) => {
-      const baseStyle = {
+    if (result || !isImageLoaded) return null;
+
+    const getArrowStyle = (index: number): React.CSSProperties => {
+      const base: React.CSSProperties = {
         backgroundColor: `${ROUTE_COLORS[index]}CC`,
         padding: '8px',
         borderRadius: '50%',
-        position: 'absolute' as const,
+        position: 'absolute',
       };
-
-      // Position: 0=Left, 1=Right, 2=Up, 3=Down
-      if (index === 0) return { ...baseStyle, left: '8px', top: '50%', transform: 'translateY(-50%)' };
-      if (index === 1) return { ...baseStyle, right: '8px', top: '50%', transform: 'translateY(-50%)' };
-      if (index === 2) return { ...baseStyle, left: '50%', top: '8px', transform: 'translateX(-50%)' };
-      return { ...baseStyle, left: '50%', bottom: '8px', transform: 'translateX(-50%)' };
+      if (index === 0) return { ...base, left: '8px', top: '50%', transform: 'translateY(-50%)' };
+      if (index === 1) return { ...base, right: '8px', top: '50%', transform: 'translateY(-50%)' };
+      if (index === 2) return { ...base, left: '50%', top: '8px', transform: 'translateX(-50%)' };
+      return { ...base, left: '50%', bottom: '8px', transform: 'translateX(-50%)' };
     };
 
     const getArrowRotation = (index: number) => {
-      if (index === 0) return 'rotate-180'; // Left arrow
-      if (index === 1) return ''; // Right arrow
-      if (index === 2) return '-rotate-90'; // Up arrow
-      return 'rotate-90'; // Down arrow
+      if (index === 0) return 'rotate-180';
+      if (index === 1) return '';
+      if (index === 2) return '-rotate-90';
+      return 'rotate-90';
     };
 
     return (
       <>
         {Array.from({ length: totalRoutes }, (_, i) => (
-          <div key={i} style={getArrowStyle(i)} className="pointer-events-none">
+          <div key={i} style={getArrowStyle(i)} className="pointer-events-none z-10">
             <svg
-              className={`w-6 h-6 text-white ${getArrowRotation(i)}`}
+              className={`w-5 h-5 text-white ${getArrowRotation(i)}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -297,90 +303,47 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
     );
   };
 
-  return (
-    <div className={`relative ${isFullscreen ? 'h-screen w-screen bg-black flex items-center justify-center' : ''}`}>
-      {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
-      
-      <div className={`relative ${isFullscreen ? 'w-full h-full flex items-center justify-center' : ''}`}>
-        {/* Route Image - use AdaptiveCropImage for 1:1 sources */}
-        {currentRoute.sourceAspect === '1:1' ? (
+  const is1x1 = currentRoute.sourceAspect === '1:1';
+
+  // === FULLSCREEN MODE ===
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-black">
+        {/* Layer 1: Image (with zoom transform) */}
+        {is1x1 ? (
           <SafeZoneImage
             src={currentRoute.imagePath || ''}
-            isFullscreen={isFullscreen}
+            isFullscreen
             safeZone={currentRoute.safeZone}
             alt={`Route ${currentRoute.candidateIndex}`}
-            onLoad={() => {
-              if (pendingRouteIndex === null) {
-                setIsImageLoaded(true);
-              }
-            }}
-          >
-            {/* Touch Zones */}
-            {!result && isImageLoaded && !isTransitioning && renderTouchZones()}
-            {/* Arrow Indicators */}
-            {!result && isImageLoaded && renderArrowIndicators()}
-            {/* Result Overlay */}
-            {result && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <div className={`text-center p-6 rounded-lg ${
-                  result === 'win' ? 'bg-green-500/90' : 
-                  result === 'lose' ? 'bg-red-500/90' : 
-                  'bg-yellow-500/90'
-                }`}>
-                  {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
-                  {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
-                  <p className="text-white text-xl font-bold">{resultMessage}</p>
-                  {result === 'warmup' && (
-                    <p className="text-white/80 text-sm mt-1">
-                      Warmup {warmupCount}/{WARMUP_ROUTES}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </SafeZoneImage>
+            onLoad={handleImageLoad}
+          />
         ) : (
-          <div className="relative">
+          <div className="w-full h-full flex items-center justify-center">
             <img
               src={currentRoute.imagePath}
               alt={`Route ${currentRoute.candidateIndex}`}
-              className={isFullscreen 
-                ? 'max-w-full max-h-full w-auto h-auto object-contain' 
-                : 'w-full h-auto'
-              }
-              onLoad={() => {
-                if (pendingRouteIndex === null) {
-                  setIsImageLoaded(true);
-                }
-              }}
+              className="max-w-full max-h-full object-contain"
+              onLoad={handleImageLoad}
             />
-            {/* Touch Zones */}
-            {!result && isImageLoaded && !isTransitioning && renderTouchZones()}
-            {/* Arrow Indicators */}
-            {!result && isImageLoaded && renderArrowIndicators()}
-            {/* Result Overlay */}
-            {result && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <div className={`text-center p-6 rounded-lg ${
-                  result === 'win' ? 'bg-green-500/90' : 
-                  result === 'lose' ? 'bg-red-500/90' : 
-                  'bg-yellow-500/90'
-                }`}>
-                  {result === 'win' && <Check className="h-16 w-16 text-white mx-auto mb-2" />}
-                  {result === 'lose' && <X className="h-16 w-16 text-white mx-auto mb-2" />}
-                  <p className="text-white text-xl font-bold">{resultMessage}</p>
-                  {result === 'warmup' && (
-                    <p className="text-white/80 text-sm mt-1">
-                      Warmup {warmupCount}/{WARMUP_ROUTES}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
-        
-        {/* Hidden preload image for pending route */}
+
+        {/* Layer 2: UI overlay (NO transform, fixed to viewport) */}
+        <div className="absolute inset-0">
+          {/* Pause overlay */}
+          {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
+          {/* Edge glows */}
+          {renderEdgeGlows()}
+          {/* Touch zones */}
+          {renderTouchZones()}
+          {/* Arrow indicators */}
+          {renderArrowIndicators()}
+          {/* Result overlay — always centered in viewport */}
+          {renderResultOverlay()}
+        </div>
+
+        {/* Hidden preload */}
         {pendingRouteIndex !== null && routeData[pendingRouteIndex] && (
           <img
             src={routeData[pendingRouteIndex].imagePath}
@@ -390,19 +353,56 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
           />
         )}
       </div>
+    );
+  }
 
-      {/* Route Info - no colored dots that reveal answer */}
-      {!isFullscreen && (
-        <div className="mt-4 p-4 bg-muted rounded-lg">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">
-              {warmupCount < WARMUP_ROUTES 
-                ? `Warmup: ${WARMUP_ROUTES - warmupCount} remaining`
-                : `Route ${currentRouteIndex + 1}/${routeData.length}`}
-            </span>
-          </div>
-        </div>
+  // === NON-FULLSCREEN MODE ===
+  return (
+    <div className="relative">
+      <div className="relative">
+        {is1x1 ? (
+          <SafeZoneImage
+            src={currentRoute.imagePath || ''}
+            isFullscreen={false}
+            safeZone={currentRoute.safeZone}
+            alt={`Route ${currentRoute.candidateIndex}`}
+            onLoad={handleImageLoad}
+          />
+        ) : (
+          <img
+            src={currentRoute.imagePath}
+            alt={`Route ${currentRoute.candidateIndex}`}
+            className="w-full h-auto"
+            onLoad={handleImageLoad}
+          />
+        )}
+
+        {/* Overlays on top */}
+        {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
+        {renderEdgeGlows()}
+        {renderTouchZones()}
+        {renderArrowIndicators()}
+        {renderResultOverlay()}
+      </div>
+
+      {pendingRouteIndex !== null && routeData[pendingRouteIndex] && (
+        <img
+          src={routeData[pendingRouteIndex].imagePath}
+          alt="preload"
+          className="hidden"
+          onLoad={() => setIsImageLoaded(true)}
+        />
       )}
+
+      <div className="mt-4 p-4 bg-muted rounded-lg">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">
+            {warmupCount < WARMUP_ROUTES 
+              ? `Warmup: ${WARMUP_ROUTES - warmupCount} remaining`
+              : `Route ${currentRouteIndex + 1}/${routeData.length}`}
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
