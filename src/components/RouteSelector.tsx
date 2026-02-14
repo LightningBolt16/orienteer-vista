@@ -140,6 +140,9 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
         nextIndex = Math.floor(Math.random() * routeData.length);
       }
       
+      // Reset isImageLoaded BEFORE setting pendingRouteIndex to prevent
+      // the transition effect from firing immediately with stale state
+      setIsImageLoaded(false);
       setPendingRouteIndex(nextIndex);
     }, 350);
   }, [isTransitioning, routeData, isPaused, currentRouteIndex, startTime, mapSource, resetTimer, warmupCount, preloadPool]);
@@ -171,10 +174,10 @@ const RouteSelector: React.FC<RouteSelectorProps> = ({
       const numAlternates = currentRoute.numAlternates || 1;
       const totalRoutes = 1 + numAlternates;
       
-      if (e.key === 'ArrowLeft') handleDirectionSelect(0);
-      else if (e.key === 'ArrowRight') handleDirectionSelect(1);
-      else if (e.key === 'ArrowUp' && totalRoutes >= 3) handleDirectionSelect(2);
-      else if (e.key === 'ArrowDown' && totalRoutes >= 4) handleDirectionSelect(3);
+      if (e.key === 'ArrowLeft') { e.preventDefault(); handleDirectionSelect(0); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); handleDirectionSelect(1); }
+      else if (e.key === 'ArrowUp' && totalRoutes >= 3) { e.preventDefault(); handleDirectionSelect(2); }
+      else if (e.key === 'ArrowDown' && totalRoutes >= 4) { e.preventDefault(); handleDirectionSelect(3); }
     };
 
     window.addEventListener('keydown', handleKeyDown);
