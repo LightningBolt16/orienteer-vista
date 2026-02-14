@@ -697,29 +697,32 @@ const RouteGame: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
       ) : routeData.length > 0 && (
-        <section className={isFullscreen ? 'fixed inset-0 z-[60] bg-black' : 'max-w-4xl mx-auto'}>
+        <section className={isFullscreen && !isMobile ? 'fixed inset-0 z-[60] bg-black' : isFullscreen ? '' : 'max-w-4xl mx-auto'}>
           <div 
             ref={gameContainerRef}
-            className={`relative ${isFullscreen ? 'h-full w-full' : ''}`}
+            className={`relative ${isFullscreen && !isMobile ? 'h-full w-full' : ''}`}
           >
-            {/* Fullscreen Toggle Button */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleFullscreen}
-              className={`absolute z-20 ${isFullscreen ? 'top-4 right-4 bg-black/50 border-white/30 hover:bg-black/70' : 'top-2 right-2'}`}
-              title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
-            >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
+            {/* Fullscreen Toggle Button (desktop always, mobile only when not fullscreen) */}
+            {(!isMobile || !isFullscreen) && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleFullscreen}
+                className={`absolute z-20 ${isFullscreen ? 'top-4 right-4 bg-black/50 border-white/30 hover:bg-black/70' : 'top-2 right-2'}`}
+                title={isFullscreen ? t('exitFullscreen') : t('enterFullscreen')}
+              >
+                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+            )}
 
-            <div className={isFullscreen ? 'h-full w-full' : ''}>
+            <div className={isFullscreen && !isMobile ? 'h-full w-full' : ''}>
               {isMobile ? (
                 <MobileRouteSelector 
                   routeData={routeData} 
                   mapSource={selectedMap}
                   allMaps={allMapsForRoutes}
                   isFullscreen={isFullscreen}
+                  onExitFullscreen={isFullscreen ? toggleFullscreen : undefined}
                 />
               ) : (
                 <RouteSelector 

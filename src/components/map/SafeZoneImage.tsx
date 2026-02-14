@@ -92,10 +92,11 @@ const SafeZoneImage: React.FC<SafeZoneImageProps> = ({
     const vpCenterX = viewport.width / 2;
     const vpCenterY = viewport.height / 2;
 
+    // Translate AFTER scale so offset is in screen pixels, not scaled pixels
     const tx = vpCenterX - szCenterPxX;
     const ty = vpCenterY - szCenterPxY;
 
-    return { scale, tx, ty };
+    return { scale, tx, ty, originX: szCenterPxX, originY: szCenterPxY };
   }, [isFullscreen, safeZone, viewport.width, viewport.height]);
 
   // === NON-FULLSCREEN ===
@@ -139,8 +140,8 @@ const SafeZoneImage: React.FC<SafeZoneImageProps> = ({
         style={{
           width: '100%',
           height: '100%',
-          transform: `scale(${transform.scale}) translate(${transform.tx}px, ${transform.ty}px)`,
-          transformOrigin: `${viewport.width / 2}px ${viewport.height / 2}px`,
+          transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`,
+          transformOrigin: `${transform.originX}px ${transform.originY}px`,
         }}
       >
         <img

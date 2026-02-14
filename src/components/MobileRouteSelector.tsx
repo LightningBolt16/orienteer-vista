@@ -1,23 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X, Minimize2 } from 'lucide-react';
 import { RouteData, MapSource, getArrowColorForIndex } from '@/utils/routeDataUtils';
 import PauseOverlay from './PauseOverlay';
 import { useInactivityDetection } from '@/hooks/useInactivityDetection';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import SafeZoneImage from './map/SafeZoneImage';
+import { Button } from './ui/button';
 
 interface MobileRouteSelectorProps {
   routeData: RouteData[];
   mapSource: MapSource | null;
   allMaps?: MapSource[];
   isFullscreen?: boolean;
+  onExitFullscreen?: () => void;
 }
 
 const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   routeData,
   mapSource,
-  isFullscreen = false
+  isFullscreen = false,
+  onExitFullscreen
 }) => {
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -249,12 +252,12 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
       return (
         <>
           <div
-            className="absolute left-0 top-0 w-16 h-full pointer-events-none z-10"
-            style={{ background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}25 0%, transparent 100%)` }}
+            className="absolute left-0 top-0 w-24 h-full pointer-events-none z-10"
+            style={{ background: `linear-gradient(90deg, ${ROUTE_COLORS[0]}40 0%, transparent 100%)` }}
           />
           <div
-            className="absolute right-0 top-0 w-16 h-full pointer-events-none z-10"
-            style={{ background: `linear-gradient(270deg, ${ROUTE_COLORS[1]}25 0%, transparent 100%)` }}
+            className="absolute right-0 top-0 w-24 h-full pointer-events-none z-10"
+            style={{ background: `linear-gradient(270deg, ${ROUTE_COLORS[1]}40 0%, transparent 100%)` }}
           />
         </>
       );
@@ -331,14 +334,23 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
 
         {/* Layer 2: UI overlay (NO transform, fixed to viewport) */}
         <div className="absolute inset-0">
+          {/* Exit fullscreen button */}
+          {onExitFullscreen && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onExitFullscreen}
+              className="absolute top-4 right-4 z-30 bg-black/50 border-white/30 hover:bg-black/70"
+            >
+              <Minimize2 className="h-4 w-4 text-white" />
+            </Button>
+          )}
           {/* Pause overlay */}
           {isPaused && <PauseOverlay reason={pauseReason} onResume={handleResume} />}
           {/* Edge glows */}
           {renderEdgeGlows()}
           {/* Touch zones */}
           {renderTouchZones()}
-          {/* Arrow indicators */}
-          {renderArrowIndicators()}
           {/* Result overlay — always centered in viewport */}
           {renderResultOverlay()}
         </div>
