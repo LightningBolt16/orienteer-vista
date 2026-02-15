@@ -107,6 +107,9 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
 
       if (mapId) {
         query = query.eq('map_id', mapId);
+      } else {
+        // When loading all maps, exclude hidden maps
+        query = query.eq('route_finder_maps.is_hidden', false);
       }
 
       const { data, error: queryError } = await query.order('challenge_index');

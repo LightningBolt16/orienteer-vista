@@ -169,7 +169,7 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
       mapCategory: 'official',
       gameType: 'routes',
       routeCount: 10,
-      gameMode: playMode === 'online' ? 'speed' : 'speed',
+      gameMode: (isMobile && playMode === 'local') ? 'wait' : 'speed',
       timeLimit: undefined,
       playerName: playerName.trim() || undefined,
       maxPlayers: 2,
