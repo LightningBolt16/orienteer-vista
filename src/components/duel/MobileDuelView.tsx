@@ -65,7 +65,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
           <div className="absolute inset-0 flex">
             {/* P2 Left button (blue - swapped for P2's perspective) */}
             <button
-              onClick={() => onPlayerAnswer(2, 'left')}
+              onClick={() => onPlayerAnswer(2, 'right')}
               disabled={isTransitioning || player2.hasAnswered}
               className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/40 transition-colors"
               style={{
@@ -79,7 +79,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             
             {/* P2 Right button (red - swapped for P2's perspective) */}
             <button
-              onClick={() => onPlayerAnswer(2, 'right')}
+              onClick={() => onPlayerAnswer(2, 'left')}
               disabled={isTransitioning || player2.hasAnswered}
               className="w-1/2 h-full flex items-center justify-center active:bg-red-500/40 transition-colors"
               style={{
