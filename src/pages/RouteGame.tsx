@@ -13,7 +13,7 @@ import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../u
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
 import { toast as sonnerToast } from 'sonner';
-import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin, Star, Check, Layers } from 'lucide-react';
+import { AlertCircle, Map, Shuffle, Maximize2, Minimize2, LogIn, ArrowLeft, ChevronDown, ChevronUp, Lock, Users, MapPin, Star, Check, Layers, Globe } from 'lucide-react';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import kartkompanietLogo from '@/assets/kartkompaniet-logo.png';
 import flagItaly from '@/assets/flag-italy.png';
@@ -22,6 +22,7 @@ import flagBelgium from '@/assets/flag-belgium.png';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
 import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
+import PublishRouteMapDialog from '@/components/sharing/PublishRouteMapDialog';
 
 type MapSelection = 'all' | string;
 type MapCategory = 'official' | 'private' | 'community';
@@ -64,6 +65,8 @@ const RouteGame: React.FC = () => {
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
   const gameContainerRef = useRef<HTMLDivElement>(null);
+  const [publishMapId, setPublishMapId] = useState<string | null>(null);
+  const [publishMapName, setPublishMapName] = useState('');
 
   // Get available maps from cache - only official maps for the main grid
   const cache = isMobile ? mobileCache : desktopCache;
@@ -541,6 +544,7 @@ const RouteGame: React.FC = () => {
                             </button>
                           )}
                           {uniqueUserMapNames.map(mapName => {
+                            const userMapSource = userMaps.find(m => m.name === mapName);
                             const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                             const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'private';
                             return (
@@ -555,6 +559,21 @@ const RouteGame: React.FC = () => {
                                 {multiSelectMode && isMultiSelected && (
                                   <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
                                     <Check className="h-3 w-3 text-primary-foreground" />
+                                  </div>
+                                )}
+                                {/* Publish to community button */}
+                                {userMapSource && (
+                                  <div
+                                    role="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPublishMapId(userMapSource.id);
+                                      setPublishMapName(mapName);
+                                    }}
+                                    className="absolute top-1 right-1 p-1 rounded-full hover:bg-green-500/20 transition-colors cursor-pointer"
+                                    title="Publish to Community"
+                                  >
+                                    <Globe className="h-4 w-4 text-green-500" />
                                   </div>
                                 )}
                                 <Map className="h-8 w-8 mb-2 text-muted-foreground" />
@@ -761,6 +780,17 @@ const RouteGame: React.FC = () => {
         <section className="max-w-lg mx-auto">
           <PwtAttribution variant="footer" />
         </section>
+      )}
+
+      {/* Publish to Community Dialog */}
+      {publishMapId && (
+        <PublishRouteMapDialog
+          open={!!publishMapId}
+          onOpenChange={(open) => { if (!open) setPublishMapId(null); }}
+          mapId={publishMapId}
+          mapName={publishMapName}
+          onPublished={() => setPublishMapId(null)}
+        />
       )}
     </div>
   );
