@@ -80,16 +80,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
           } else {
             // Leaderboard not loaded yet, fetch directly
             const { supabase } = await import('../integrations/supabase/client');
-            let query = supabase
+            const { data, error } = await (supabase
               .from('user_profiles' as any)
               .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total, country_code')
-              .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD);
-            
-            if (countryFilter) {
-              query = query.eq('country_code', countryFilter);
-            }
-            
-            const { data, error } = await (query
+              .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
               .order('accuracy', { ascending: false })
               .order('speed', { ascending: true })
               .limit(50) as any);
@@ -135,16 +129,22 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
     };
     
     loadLeaderboard();
-  }, [mapFilter, leaderboard, fetchMapLeaderboard, countryFilter]);
+  }, [mapFilter, leaderboard, fetchMapLeaderboard]);
 
   // Calculate combined score using new formula with accuracy multiplier
   const calculateCombinedScore = (accuracy: number, speed: number) => {
     return calcCombinedScore(accuracy, speed);
   };
 
+  // Apply country filter client-side
+  const filteredLeaderboard = useMemo(() => {
+    if (!countryFilter) return displayLeaderboard;
+    return displayLeaderboard.filter(entry => entry.countryCode === countryFilter);
+  }, [displayLeaderboard, countryFilter]);
+
   // Get the ranked leaderboard based on current sort field (always descending for ranking)
   const rankedLeaderboard = useMemo(() => {
-    const sorted = [...displayLeaderboard].sort((a, b) => {
+    const sorted = [...filteredLeaderboard].sort((a, b) => {
       if (sortField === 'accuracy') {
         return b.accuracy - a.accuracy;
       } else if (sortField === 'speed') {
@@ -162,7 +162,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
       ...entry,
       currentSortRank: index + 1
     }));
-  }, [displayLeaderboard, sortField]);
+  }, [filteredLeaderboard, sortField]);
 
   // Get rank change indicator - currently we only have previousRank for combined/overall score
   // For accuracy and speed, we don't have historical rank data, so we show neutral
@@ -193,7 +193,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
       if (mapFilter === 'all') {
         const { data, error } = await (supabase
           .from('user_profiles' as any)
-          .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total')
+          .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total, country_code')
           .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
           .order('accuracy', { ascending: false })
           .order('speed', { ascending: true })
@@ -219,7 +219,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ mapFilter = 'all', showAll = 
             speed: entry.speed || 0,
             rank: index + 1,
             previousRank: entry.previous_rank || null,
-            profileImage: entry.profile_image
+            profileImage: entry.profile_image,
+            countryCode: entry.country_code
           }));
           
           setDisplayLeaderboard(rankedLeaderboard);

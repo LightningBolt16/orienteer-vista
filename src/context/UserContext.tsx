@@ -489,12 +489,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           user_id,
           accuracy,
           speed,
-          user_profiles!inner(name, profile_image)
+          user_profiles!inner(name, profile_image, country_code)
         `)
         .eq('map_name', mapName)
         .order('accuracy', { ascending: false })
         .order('speed', { ascending: true })
-        .limit(10) as any);
+        .limit(50) as any);
       
       if (error) {
         console.error('Error fetching map leaderboard:', error);
@@ -508,7 +508,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           accuracy: entry.accuracy || 0,
           speed: entry.speed || 0,
           rank: index + 1,
-          profileImage: entry.user_profiles?.profile_image
+          profileImage: entry.user_profiles?.profile_image,
+          countryCode: entry.user_profiles?.country_code
         }));
       }
       
