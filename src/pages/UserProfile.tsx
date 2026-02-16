@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, CheckCircle, XCircle, Map, ArrowLeft, TrendingUp } from 'lucide-react';
+import { User, CheckCircle, XCircle, Map, ArrowLeft, TrendingUp, MapPin, Route } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -9,41 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays, subMonths, parseISO } from 'date-fns';
-
-// Country flag mapping
-const COUNTRY_FLAGS: Record<string, string> = {
-  SE: '🇸🇪',
-  NO: '🇳🇴',
-  FI: '🇫🇮',
-  DK: '🇩🇰',
-  DE: '🇩🇪',
-  CH: '🇨🇭',
-  AT: '🇦🇹',
-  FR: '🇫🇷',
-  GB: '🇬🇧',
-  CZ: '🇨🇿',
-  PL: '🇵🇱',
-  IT: '🇮🇹',
-  ES: '🇪🇸',
-  BE: '🇧🇪',
-  NL: '🇳🇱',
-  US: '🇺🇸',
-  AU: '🇦🇺',
-  NZ: '🇳🇿',
-  JP: '🇯🇵',
-  EE: '🇪🇪',
-  LV: '🇱🇻',
-  LT: '🇱🇹',
-  RU: '🇷🇺',
-  UA: '🇺🇦',
-  HU: '🇭🇺',
-  SK: '🇸🇰',
-  SI: '🇸🇮',
-  HR: '🇭🇷',
-  PT: '🇵🇹',
-  IE: '🇮🇪',
-  CA: '🇨🇦',
-};
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { getCountryFlag } from '@/components/CountrySelector';
 
 interface PublicUserProfile {
   user_id: string;
@@ -84,6 +52,10 @@ const UserProfile: React.FC = () => {
   const [performanceData, setPerformanceData] = useState<PerformanceDataPoint[]>([]);
   const [timeFilter, setTimeFilter] = useState<'week' | 'month' | '90days' | 'all'>('month');
   const [loading, setLoading] = useState(true);
+  const [gameMode, setGameMode] = useState<'routeChoice' | 'routeFinder'>('routeChoice');
+  const [rfStats, setRfStats] = useState<{ total: number; correct: number; timeSum: number }>({ total: 0, correct: 0, timeSum: 0 });
+  const [rfMapStats, setRfMapStats] = useState<MapStats[]>([]);
+  const [rfPerformanceData, setRfPerformanceData] = useState<PerformanceDataPoint[]>([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -123,73 +95,89 @@ const UserProfile: React.FC = () => {
     fetchProfile();
   }, [userId, navigate]);
 
-  // Fetch performance data based on time filter
+  // Fetch performance data based on time filter and game mode
   useEffect(() => {
     const fetchPerformanceData = async () => {
       if (!userId) return;
+      const table = gameMode === 'routeChoice' ? 'route_attempts' : 'route_finder_attempts';
 
       try {
         let startDate: Date | null = null;
-        
-        if (timeFilter === 'week') {
-          startDate = subDays(new Date(), 7);
-        } else if (timeFilter === 'month') {
-          startDate = subMonths(new Date(), 1);
-        } else if (timeFilter === '90days') {
-          startDate = subDays(new Date(), 90);
-        }
+        if (timeFilter === 'week') startDate = subDays(new Date(), 7);
+        else if (timeFilter === 'month') startDate = subMonths(new Date(), 1);
+        else if (timeFilter === '90days') startDate = subDays(new Date(), 90);
 
         let query = supabase
-          .from('route_attempts' as any)
+          .from(table as any)
           .select('created_at, is_correct, response_time')
           .eq('user_id', userId)
           .order('created_at', { ascending: true });
 
-        if (startDate) {
-          query = query.gte('created_at', startDate.toISOString());
-        }
-
+        if (startDate) query = query.gte('created_at', startDate.toISOString());
         const { data: attempts, error } = await (query as any);
-
-        if (error) {
-          console.error('Error fetching performance data:', error);
-          return;
-        }
+        if (error) { console.error('Error fetching performance data:', error); return; }
 
         if (attempts && attempts.length > 0) {
-          // Group by date and calculate daily stats
           const dailyStats: Record<string, { correct: number; total: number; timeSum: number }> = {};
-
           attempts.forEach((attempt: any) => {
             const date = format(parseISO(attempt.created_at), 'yyyy-MM-dd');
-            if (!dailyStats[date]) {
-              dailyStats[date] = { correct: 0, total: 0, timeSum: 0 };
-            }
+            if (!dailyStats[date]) dailyStats[date] = { correct: 0, total: 0, timeSum: 0 };
             dailyStats[date].total++;
-            if (attempt.is_correct) {
-              dailyStats[date].correct++;
-              dailyStats[date].timeSum += attempt.response_time;
-            }
+            if (attempt.is_correct) { dailyStats[date].correct++; dailyStats[date].timeSum += attempt.response_time; }
           });
-
-          const chartData: PerformanceDataPoint[] = Object.entries(dailyStats).map(([date, stats]) => ({
+          const chartData = Object.entries(dailyStats).map(([date, stats]) => ({
             date: format(parseISO(date), 'MMM d'),
             accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
             speed: stats.correct > 0 ? Math.round(stats.timeSum / stats.correct) : 0,
             attempts: stats.total,
           }));
-
-          setPerformanceData(chartData);
+          if (gameMode === 'routeChoice') setPerformanceData(chartData);
+          else setRfPerformanceData(chartData);
         } else {
-          setPerformanceData([]);
+          if (gameMode === 'routeChoice') setPerformanceData([]);
+          else setRfPerformanceData([]);
         }
       } catch (error) {
         console.error('Error fetching performance data:', error);
       }
     };
-
     fetchPerformanceData();
-  }, [timeFilter, userId]);
+  }, [timeFilter, userId, gameMode]);
+
+  // Fetch Route Finder aggregate stats
+  useEffect(() => {
+    const fetchRFStats = async () => {
+      if (!userId) return;
+      try {
+        const { data: attempts } = await (supabase
+          .from('route_finder_attempts')
+          .select('user_id, is_correct, response_time, map_name')
+          .eq('user_id', userId) as any);
+        
+        if (attempts && attempts.length > 0) {
+          let total = 0, correct = 0, timeSum = 0;
+          const mapAgg: Record<string, { total: number; correct: number; timeSum: number }> = {};
+          for (const a of attempts) {
+            total++;
+            if (a.is_correct) { correct++; timeSum += a.response_time || 0; }
+            if (!mapAgg[a.map_name]) mapAgg[a.map_name] = { total: 0, correct: 0, timeSum: 0 };
+            mapAgg[a.map_name].total++;
+            if (a.is_correct) { mapAgg[a.map_name].correct++; mapAgg[a.map_name].timeSum += a.response_time || 0; }
+          }
+          setRfStats({ total, correct, timeSum });
+          setRfMapStats(Object.entries(mapAgg).map(([name, s]) => ({
+            map_name: name,
+            accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
+            speed: s.correct > 0 ? Math.round(s.timeSum / s.correct) : 0,
+            attempts: { total: s.total, correct: s.correct, timeSum: s.timeSum }
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching RF stats:', error);
+      }
+    };
+    fetchRFStats();
+  }, [userId]);
 
   if (loading) {
     return (
@@ -251,9 +239,9 @@ const UserProfile: React.FC = () => {
             <div>
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <h1 className="text-2xl font-bold">{profile.name}</h1>
-                {profile.country_code && COUNTRY_FLAGS[profile.country_code] && (
+                {profile.country_code && (
                   <span className="text-2xl" title={profile.country_code}>
-                    {COUNTRY_FLAGS[profile.country_code]}
+                    {getCountryFlag(profile.country_code)}
                   </span>
                 )}
               </div>
@@ -262,8 +250,22 @@ const UserProfile: React.FC = () => {
           </div>
         </div>
         
-        {/* Stats Tabs */}
+        {/* Game Mode Toggle */}
         <div className="mt-10 border-t border-muted pt-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <MapPin className={`h-4 w-4 ${gameMode === 'routeChoice' ? 'text-orienteering' : 'text-muted-foreground'}`} />
+              <Label htmlFor="up-game-mode-toggle" className="text-sm">{t('routeChoice') || 'Route Choice'}</Label>
+              <Switch
+                id="up-game-mode-toggle"
+                checked={gameMode === 'routeFinder'}
+                onCheckedChange={(checked) => setGameMode(checked ? 'routeFinder' : 'routeChoice')}
+              />
+              <Label htmlFor="up-game-mode-toggle" className="text-sm">{t('routeFinder') || 'Route Finder'}</Label>
+              <Route className={`h-4 w-4 ${gameMode === 'routeFinder' ? 'text-orienteering' : 'text-muted-foreground'}`} />
+            </div>
+          </div>
+
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="overview">{t('overview') || 'Overview'}</TabsTrigger>
@@ -271,63 +273,79 @@ const UserProfile: React.FC = () => {
               <TabsTrigger value="progress">{t('progress') || 'Progress'}</TabsTrigger>
             </TabsList>
 
-            {/* Overview Tab - All Time Stats */}
             <TabsContent value="overview">
               <h2 className="text-xl font-semibold mb-6">{t('allTimeStatistics') || 'All-Time Statistics'}</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-lg bg-secondary/50">
-                  <div className="text-3xl font-bold text-orienteering flex items-center">
-                    {allTimeAvgSpeed}
-                    <span className="text-sm ml-1">ms</span>
+              {gameMode === 'routeChoice' ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg bg-secondary/50">
+                      <div className="text-3xl font-bold text-orienteering flex items-center">{allTimeAvgSpeed}<span className="text-sm ml-1">ms</span></div>
+                      <div className="text-sm text-muted-foreground">{t('avgResponseTime')}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-secondary/50">
+                      <div className="text-3xl font-bold text-orienteering">{allTimeTotal}</div>
+                      <div className="text-sm text-muted-foreground">{t('totalAttempts')}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-secondary/50">
+                      <div className="text-3xl font-bold text-orienteering">{allTimeAccuracy}%</div>
+                      <div className="text-sm text-muted-foreground">{t('accuracy')}</div>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">{t('avgResponseTime')}</div>
-                </div>
-                
-                <div className="p-4 rounded-lg bg-secondary/50">
-                  <div className="text-3xl font-bold text-orienteering">{allTimeTotal}</div>
-                  <div className="text-sm text-muted-foreground">{t('totalAttempts')}</div>
-                </div>
-                
-                <div className="p-4 rounded-lg bg-secondary/50">
-                  <div className="text-3xl font-bold text-orienteering">
-                    {allTimeAccuracy}%
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 rounded-lg border border-border flex items-center">
+                      <CheckCircle className="h-10 w-10 text-green-500 mr-4" />
+                      <div><div className="text-lg font-medium">{allTimeCorrect}</div><div className="text-sm text-muted-foreground">{t('correctChoices')}</div></div>
+                    </div>
+                    <div className="p-4 rounded-lg border border-border flex items-center">
+                      <XCircle className="h-10 w-10 text-red-500 mr-4" />
+                      <div><div className="text-lg font-medium">{allTimeIncorrect}</div><div className="text-sm text-muted-foreground">{t('incorrectChoices')}</div></div>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">{t('accuracy')}</div>
-                </div>
-              </div>
-              
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 rounded-lg border border-border flex items-center">
-                  <CheckCircle className="h-10 w-10 text-green-500 mr-4" />
-                  <div>
-                    <div className="text-lg font-medium">{allTimeCorrect}</div>
-                    <div className="text-sm text-muted-foreground">{t('correctChoices')}</div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg bg-secondary/50">
+                      <div className="text-3xl font-bold text-orienteering flex items-center">{rfStats.correct > 0 ? Math.round(rfStats.timeSum / rfStats.correct) : 0}<span className="text-sm ml-1">ms</span></div>
+                      <div className="text-sm text-muted-foreground">{t('avgResponseTime')}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-secondary/50">
+                      <div className="text-3xl font-bold text-orienteering">{rfStats.total}</div>
+                      <div className="text-sm text-muted-foreground">{t('totalAttempts')}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-secondary/50">
+                      <div className="text-3xl font-bold text-orienteering">{rfStats.total > 0 ? Math.round((rfStats.correct / rfStats.total) * 100) : 0}%</div>
+                      <div className="text-sm text-muted-foreground">{t('accuracy')}</div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="p-4 rounded-lg border border-border flex items-center">
-                  <XCircle className="h-10 w-10 text-red-500 mr-4" />
-                  <div>
-                    <div className="text-lg font-medium">{allTimeIncorrect}</div>
-                    <div className="text-sm text-muted-foreground">{t('incorrectChoices')}</div>
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 rounded-lg border border-border flex items-center">
+                      <CheckCircle className="h-10 w-10 text-green-500 mr-4" />
+                      <div><div className="text-lg font-medium">{rfStats.correct}</div><div className="text-sm text-muted-foreground">{t('correctChoices')}</div></div>
+                    </div>
+                    <div className="p-4 rounded-lg border border-border flex items-center">
+                      <XCircle className="h-10 w-10 text-red-500 mr-4" />
+                      <div><div className="text-lg font-medium">{rfStats.total - rfStats.correct}</div><div className="text-sm text-muted-foreground">{t('incorrectChoices')}</div></div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </TabsContent>
 
             {/* Per Map Tab */}
             <TabsContent value="maps">
               <h2 className="text-xl font-semibold mb-6">{t('performanceByMap') || 'Performance by Map'}</h2>
               
-              {mapStats.length === 0 ? (
+              {(() => {
+                const statsToShow = gameMode === 'routeChoice' ? mapStats : rfMapStats;
+                return statsToShow.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Map className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>{t('noMapStats') || 'No map statistics available.'}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {mapStats.map((stat) => (
+                  {statsToShow.map((stat) => (
                     <div key={stat.map_name} className="p-4 rounded-lg border border-border">
                       <div className="flex items-center mb-3">
                         <Map className="h-5 w-5 text-orienteering mr-2" />
@@ -350,7 +368,8 @@ const UserProfile: React.FC = () => {
                     </div>
                   ))}
                 </div>
-              )}
+              );
+              })()}
             </TabsContent>
 
             {/* Progress Tab */}
@@ -370,7 +389,7 @@ const UserProfile: React.FC = () => {
                 </Select>
               </div>
 
-              {performanceData.length === 0 ? (
+              {(gameMode === 'routeChoice' ? performanceData : rfPerformanceData).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>{t('noPerformanceData') || 'No performance data available for this period.'}</p>
@@ -382,7 +401,7 @@ const UserProfile: React.FC = () => {
                     <h3 className="text-lg font-medium mb-4">{t('accuracyOverTime') || 'Accuracy Over Time'}</h3>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={performanceData}>
+                        <LineChart data={gameMode === 'routeChoice' ? performanceData : rfPerformanceData}>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis dataKey="date" className="text-xs" />
                           <YAxis domain={[0, 100]} className="text-xs" />
@@ -411,7 +430,7 @@ const UserProfile: React.FC = () => {
                     <h3 className="text-lg font-medium mb-4">{t('speedOverTime') || 'Average Speed Over Time'}</h3>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={performanceData}>
+                        <LineChart data={gameMode === 'routeChoice' ? performanceData : rfPerformanceData}>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis dataKey="date" className="text-xs" />
                           <YAxis className="text-xs" />
@@ -440,7 +459,7 @@ const UserProfile: React.FC = () => {
                     <h3 className="text-lg font-medium mb-4">{t('dailyAttempts') || 'Daily Attempts'}</h3>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={performanceData}>
+                        <LineChart data={gameMode === 'routeChoice' ? performanceData : rfPerformanceData}>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis dataKey="date" className="text-xs" />
                           <YAxis className="text-xs" />

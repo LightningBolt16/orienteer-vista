@@ -26,7 +26,11 @@ interface MapOption {
   name: string;
 }
 
-const RouteFinderLeaderboardInline: React.FC = () => {
+interface RouteFinderLeaderboardInlineProps {
+  countryFilter?: string;
+}
+
+const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> = ({ countryFilter }) => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { t } = useLanguage();
@@ -136,7 +140,12 @@ const RouteFinderLeaderboardInline: React.FC = () => {
         return a.speed - b.speed;
       });
       
-      setLeaderboard(entries);
+      // Apply country filter client-side
+      const filtered = countryFilter 
+        ? entries.filter(e => e.countryCode === countryFilter)
+        : entries;
+      
+      setLeaderboard(filtered);
     } catch (err: any) {
       console.error('Error loading leaderboard:', err);
       setError(err.message || 'Failed to load leaderboard');
@@ -147,7 +156,7 @@ const RouteFinderLeaderboardInline: React.FC = () => {
 
   useEffect(() => {
     loadLeaderboard(selectedMap);
-  }, [selectedMap]);
+  }, [selectedMap, countryFilter]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
