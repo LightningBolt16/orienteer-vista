@@ -441,6 +441,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       tryAgain: 'Try Again',
       noDataYet: 'No data yet',
       beFirstRouteFinder: 'Be the first to complete Route Finder challenges!',
+      communityLeaderboards: 'Community Leaderboards',
+      communityLeaderboardsDesc: 'Rankings for community-created maps',
+      favoritedMaps: 'Your Favorited Maps',
+      discoverMaps: 'Discover Maps',
+      noFavoritedMaps: 'No favorited maps yet',
+      noFavoritedMapsDesc: 'Use the map browser below to discover and favorite community maps',
     },
     sv: {
       // Navigation & Common Elements
@@ -855,6 +861,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       tryAgain: 'Försök igen',
       noDataYet: 'Ingen data än',
       beFirstRouteFinder: 'Bli först med att slutföra Ruttfinnare-utmaningar!',
+      communityLeaderboards: 'Community-topplista',
+      communityLeaderboardsDesc: 'Ranking för community-skapade kartor',
+      favoritedMaps: 'Dina favoritkartor',
+      discoverMaps: 'Utforska kartor',
+      noFavoritedMaps: 'Inga favoritkartor än',
+      noFavoritedMapsDesc: 'Använd kartbläddraren nedan för att utforska och favoritmarkera community-kartor',
     },
   };
 

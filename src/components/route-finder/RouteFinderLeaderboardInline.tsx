@@ -28,9 +28,10 @@ interface MapOption {
 
 interface RouteFinderLeaderboardInlineProps {
   countryFilter?: string;
+  mapCategory?: string;
 }
 
-const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> = ({ countryFilter }) => {
+const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> = ({ countryFilter, mapCategory }) => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { t } = useLanguage();
@@ -47,10 +48,16 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
   useEffect(() => {
     const loadMaps = async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('route_finder_maps')
           .select('id, name')
           .eq('is_public', true);
+        
+        if (mapCategory) {
+          query = query.eq('map_category', mapCategory);
+        }
+        
+        const { data, error } = await query;
         
         if (error) throw error;
         setMaps(data || []);
@@ -59,7 +66,7 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
       }
     };
     loadMaps();
-  }, []);
+  }, [mapCategory]);
 
   // Load leaderboard data
   const loadLeaderboard = async (mapFilter: string) => {

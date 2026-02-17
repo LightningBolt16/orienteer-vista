@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Globe, MapPin, Route, Users } from 'lucide-react';
+import { Trophy, Globe, MapPin, Route, Users, Star } from 'lucide-react';
 import Leaderboard from '../components/Leaderboard';
 import { useLanguage } from '../context/LanguageContext';
 import { getAvailableMaps, getUniqueMapNames } from '../utils/routeDataUtils';
@@ -8,46 +8,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTRIES, getCountryFlag, getCountryName } from '@/components/CountrySelector';
 import RouteFinderLeaderboardInline from '@/components/route-finder/RouteFinderLeaderboardInline';
-
-interface MapInfo {
-  name: string;
-  category: string;
-}
+import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
+import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
 
 const LeaderboardPage: React.FC = () => {
   const { t } = useLanguage();
   const [officialMapNames, setOfficialMapNames] = useState<string[]>([]);
-  const [communityRouteChoiceNames, setCommunityRouteChoiceNames] = useState<string[]>([]);
-  const [communityRouteFinderNames, setCommunityRouteFinderNames] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string>('all');
-  const [selectedCommunityRCMap, setSelectedCommunityRCMap] = useState<string>('all');
-  const [selectedCommunityRFMap, setSelectedCommunityRFMap] = useState<string>('all');
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [gameMode, setGameMode] = useState<'routeChoice' | 'routeFinder'>('routeChoice');
+  const { favoriteMaps, favorites, toggleFavorite } = useCommunityFavorites();
+  const [selectedCommunityMap, setSelectedCommunityMap] = useState<string>('');
 
   useEffect(() => {
     const loadMaps = async () => {
-      // Load route choice maps and split by category
       const maps = await getAvailableMaps();
       const official = maps.filter(m => m.mapCategory === 'official');
-      const community = maps.filter(m => m.mapCategory === 'community');
       setOfficialMapNames(getUniqueMapNames(official));
-      setCommunityRouteChoiceNames(getUniqueMapNames(community));
-
-      // Load route finder community maps
-      const { data: rfMaps } = await supabase
-        .from('route_finder_maps')
-        .select('name, map_category')
-        .eq('is_public', true);
-      
-      if (rfMaps) {
-        const rfCommunity = rfMaps.filter(m => m.map_category === 'community').map(m => m.name);
-        setCommunityRouteFinderNames(rfCommunity);
-      }
     };
     loadMaps();
   }, []);
+
+  // Set default community map when favorites load
+  useEffect(() => {
+    if (favoriteMaps.length > 0 && !selectedCommunityMap) {
+      setSelectedCommunityMap(favoriteMaps[0].name);
+    }
+  }, [favoriteMaps, selectedCommunityMap]);
 
   // Fetch available countries from user_profiles
   useEffect(() => {
@@ -75,6 +63,10 @@ const LeaderboardPage: React.FC = () => {
 
   const activeCountryFilter = countryFilter !== 'all' ? countryFilter : undefined;
 
+  const handleCommunityMapSelect = (mapName: string) => {
+    setSelectedCommunityMap(mapName);
+  };
+
   return (
     <div className="animate-fade-in pb-12">
       <div className="glass-card p-8 md:p-12 rounded-3xl mb-8">
@@ -87,17 +79,17 @@ const LeaderboardPage: React.FC = () => {
           {t('competeWithOthers')}
         </p>
 
-        {/* Country Filter - shared across all */}
+        {/* Country Filter */}
         <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">{t('filterByCountry') || 'Filter by country'}:</span>
+            <span className="text-sm text-muted-foreground">{t('filterByCountry')}:</span>
           </div>
           <Select value={countryFilter} onValueChange={setCountryFilter}>
             <SelectTrigger className="w-48">
               <SelectValue>
                 {countryFilter === 'all' ? (
-                  <span>{t('allCountries') || 'All Countries'}</span>
+                  <span>{t('allCountries')}</span>
                 ) : (
                   <span className="flex items-center gap-2">
                     <span>{getCountryFlag(countryFilter)}</span>
@@ -107,7 +99,7 @@ const LeaderboardPage: React.FC = () => {
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t('allCountries') || 'All Countries'}</SelectItem>
+              <SelectItem value="all">{t('allCountries')}</SelectItem>
               {availableCountries.map(code => (
                 <SelectItem key={code} value={code}>
                   <span className="flex items-center gap-2">
@@ -125,140 +117,126 @@ const LeaderboardPage: React.FC = () => {
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
             <TabsTrigger value="routeChoice" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
-              {t('routeChoice') || 'Route Choice'}
+              {t('routeChoice')}
             </TabsTrigger>
             <TabsTrigger value="routeFinder" className="flex items-center gap-2">
               <Route className="h-4 w-4" />
-              {t('routeFinder') || 'Route Finder'}
+              {t('routeFinder')}
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
         {gameMode === 'routeChoice' ? (
-          <>
-            {/* Official Map Filter Tabs */}
-            <Tabs value={selectedMap} onValueChange={setSelectedMap} className="w-full">
-              <TabsList className="w-full flex flex-wrap justify-center gap-2 h-auto bg-transparent mb-6">
+          <Tabs value={selectedMap} onValueChange={setSelectedMap} className="w-full">
+            <TabsList className="w-full flex flex-wrap justify-center gap-2 h-auto bg-transparent mb-6">
+              <TabsTrigger 
+                value="all" 
+                className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
+              >
+                {t('allMaps')}
+              </TabsTrigger>
+              {officialMapNames.map(mapName => (
                 <TabsTrigger 
-                  value="all" 
+                  key={mapName} 
+                  value={mapName}
                   className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
                 >
-                  {t('allMaps') || 'All Maps'}
+                  {mapName}
                 </TabsTrigger>
-                {officialMapNames.map(mapName => (
-                  <TabsTrigger 
-                    key={mapName} 
-                    value={mapName}
-                    className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
-                  >
-                    {mapName}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              ))}
+            </TabsList>
 
-              <TabsContent value="all" className="mt-0">
+            <TabsContent value="all" className="mt-0">
+              <Leaderboard 
+                mapFilter="all" 
+                countryFilter={activeCountryFilter}
+                showAll
+              />
+            </TabsContent>
+            
+            {officialMapNames.map(mapName => (
+              <TabsContent key={mapName} value={mapName} className="mt-0">
                 <Leaderboard 
-                  mapFilter="all" 
+                  mapFilter={mapName}
                   countryFilter={activeCountryFilter}
                   showAll
                 />
               </TabsContent>
-              
-              {officialMapNames.map(mapName => (
-                <TabsContent key={mapName} value={mapName} className="mt-0">
-                  <Leaderboard 
-                    mapFilter={mapName}
-                    countryFilter={activeCountryFilter}
-                    showAll
-                  />
-                </TabsContent>
-              ))}
-            </Tabs>
-          </>
+            ))}
+          </Tabs>
         ) : (
-          <RouteFinderLeaderboardInline countryFilter={activeCountryFilter} />
+          <RouteFinderLeaderboardInline countryFilter={activeCountryFilter} mapCategory="official" />
         )}
       </div>
 
       {/* Community Leaderboards Section */}
-      {(communityRouteChoiceNames.length > 0 || communityRouteFinderNames.length > 0) && (
-        <div className="glass-card p-8 md:p-12 rounded-3xl">
-          <div className="flex items-center justify-center mb-6">
-            <Users className="h-8 w-8 text-orienteering mr-3" />
-            <h2 className="text-3xl md:text-4xl font-bold">{t('communityLeaderboards') || 'Community Leaderboards'}</h2>
-          </div>
-          <p className="text-lg text-muted-foreground text-center mb-8">
-            {t('communityLeaderboardsDesc') || 'Rankings for community-created maps'}
-          </p>
-
-          {/* Community Route Choice */}
-          {communityRouteChoiceNames.length > 0 && (
-            <div className="mb-10">
-              <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-orienteering" />
-                {t('routeChoice') || 'Route Choice'}
-              </h3>
-              <Tabs value={selectedCommunityRCMap} onValueChange={setSelectedCommunityRCMap} className="w-full">
-                <TabsList className="w-full flex flex-wrap justify-center gap-2 h-auto bg-transparent mb-6">
-                  <TabsTrigger 
-                    value="all" 
-                    className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
-                  >
-                    {t('allMaps') || 'All Maps'}
-                  </TabsTrigger>
-                  {communityRouteChoiceNames.map(mapName => (
-                    <TabsTrigger 
-                      key={mapName} 
-                      value={mapName}
-                      className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
-                    >
-                      {mapName}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-
-                {/* For community "all", we show each community map's leaderboard separately since 
-                    the main "all" leaderboard mixes official + community */}
-                <TabsContent value="all" className="mt-0">
-                  <div className="space-y-6">
-                    {communityRouteChoiceNames.map(mapName => (
-                      <div key={mapName}>
-                        <h4 className="text-lg font-medium mb-2">{mapName}</h4>
-                        <Leaderboard 
-                          mapFilter={mapName}
-                          countryFilter={activeCountryFilter}
-                          showAll
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-                
-                {communityRouteChoiceNames.map(mapName => (
-                  <TabsContent key={mapName} value={mapName} className="mt-0">
-                    <Leaderboard 
-                      mapFilter={mapName}
-                      countryFilter={activeCountryFilter}
-                      showAll
-                    />
-                  </TabsContent>
-                ))}
-              </Tabs>
-            </div>
-          )}
-
-          {/* Community Route Finder */}
-          {communityRouteFinderNames.length > 0 && (
-            <div>
-              <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Route className="h-5 w-5 text-orienteering" />
-                {t('routeFinder') || 'Route Finder'}
-              </h3>
-              <RouteFinderLeaderboardInline countryFilter={activeCountryFilter} />
-            </div>
-          )}
+      <div className="glass-card p-8 md:p-12 rounded-3xl">
+        <div className="flex items-center justify-center mb-6">
+          <Users className="h-8 w-8 text-orienteering mr-3" />
+          <h2 className="text-3xl md:text-4xl font-bold">{t('communityLeaderboards')}</h2>
         </div>
-      )}
+        <p className="text-lg text-muted-foreground text-center mb-8">
+          {t('communityLeaderboardsDesc')}
+        </p>
+
+        {gameMode === 'routeChoice' ? (
+          <div>
+            {favoriteMaps.length > 0 ? (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                  {t('favoritedMaps')}
+                </h3>
+                <Tabs value={selectedCommunityMap} onValueChange={setSelectedCommunityMap} className="w-full">
+                  <TabsList className="w-full flex flex-wrap justify-center gap-2 h-auto bg-transparent mb-6">
+                    {favoriteMaps.map(map => (
+                      <TabsTrigger 
+                        key={map.id} 
+                        value={map.name}
+                        className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
+                      >
+                        {map.name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {favoriteMaps.map(map => (
+                    <TabsContent key={map.id} value={map.name} className="mt-0">
+                      <Leaderboard 
+                        mapFilter={map.name}
+                        countryFilter={activeCountryFilter}
+                        showAll
+                      />
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </div>
+            ) : (
+              <div className="text-center py-8 mb-8">
+                <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">{t('noFavoritedMaps')}</h3>
+                <p className="text-muted-foreground">{t('noFavoritedMapsDesc')}</p>
+              </div>
+            )}
+
+            {/* Map Browser for discovery */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-orienteering" />
+                {t('discoverMaps')}
+              </h3>
+              <CommunityMapBrowser
+                onSelectMap={handleCommunityMapSelect}
+                selectedMapName={selectedCommunityMap}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+              />
+            </div>
+          </div>
+        ) : (
+          <RouteFinderLeaderboardInline countryFilter={activeCountryFilter} mapCategory="community" />
+        )}
+      </div>
     </div>
   );
 };

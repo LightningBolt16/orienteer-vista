@@ -31,6 +31,7 @@ type LeaderboardEntry = {
   rank?: number;
   previousRank?: number;
   profileImage?: string;
+  countryCode?: string;
 };
 
 interface UserContextType {
@@ -194,7 +195,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         async () => {
           const { data, error } = await (supabase
             .from('user_profiles' as any)
-            .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total')
+            .select('user_id, name, accuracy, speed, profile_image, previous_rank, alltime_total, country_code')
             .gte('alltime_total', MIN_ATTEMPTS_FOR_LEADERBOARD)
             .order('accuracy', { ascending: false })
             .order('speed', { ascending: true })
@@ -224,7 +225,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           speed: entry.speed || 0,
           rank: index + 1,
           previousRank: entry.previous_rank || null,
-          profileImage: entry.profile_image
+          profileImage: entry.profile_image,
+          countryCode: entry.country_code
         }));
       
         setLeaderboard(rankedLeaderboard);
