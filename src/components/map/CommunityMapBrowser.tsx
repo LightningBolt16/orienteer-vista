@@ -35,6 +35,7 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
   const [communityMaps, setCommunityMaps] = useState<CommunityMap[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [hoveredMap, setHoveredMap] = useState<CommunityMap | null>(null);
+  const [pinnedMap, setPinnedMap] = useState<CommunityMap | null>(null);
   
   const { config, loading, error, refetch } = usePublicConfig();
   const mapboxToken = config?.mapboxToken || '';
@@ -140,13 +141,14 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
       
       el.addEventListener('mouseleave', () => {
         img.style.transform = 'scale(1)';
-        setHoveredMap(null);
+        // Only clear hover if this map isn't pinned
+        setHoveredMap(prev => prev?.id === cm.id ? null : prev);
       });
       
       el.addEventListener('click', () => {
         onSelectMap(cm.name);
-        setHoveredMap(cm); // Keep the info visible instead of closing
-        // Don't close the map - let user see info and favorite if they want
+        setPinnedMap(cm);
+        setHoveredMap(cm);
       });
 
       // Use bottom-center anchor so marker stays fixed at the coordinate point
@@ -228,20 +230,22 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
         className="w-full h-[300px]"
       />
       
-      {hoveredMap && (
+      {(pinnedMap || hoveredMap) && (() => {
+        const displayMap = hoveredMap || pinnedMap!;
+        return (
         <div className="absolute bottom-2 left-2 right-2 z-10 bg-background/95 backdrop-blur-sm rounded-lg p-3 border border-border">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-sm">{hoveredMap.name}</h4>
-              {hoveredMap.location_name && (
+              <h4 className="font-semibold text-sm">{displayMap.name}</h4>
+              {displayMap.location_name && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                   <MapPin className="h-3 w-3" />
-                  {hoveredMap.location_name}
+                  {displayMap.location_name}
                 </p>
               )}
-              {hoveredMap.description && (
+              {displayMap.description && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {hoveredMap.description}
+                  {displayMap.description}
                 </p>
               )}
               <p className="text-xs text-primary mt-1">Click to select</p>
@@ -251,18 +255,19 @@ const CommunityMapBrowser: React.FC<CommunityMapBrowserProps> = ({
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleFavorite(hoveredMap.id, hoveredMap.name);
+                onToggleFavorite(displayMap.id, displayMap.name);
               }}
               className="flex-shrink-0 h-8 w-8 p-0"
-              title={isFavorite(hoveredMap.id) ? 'Remove from favorites' : 'Add to favorites'}
+              title={isFavorite(displayMap.id) ? 'Remove from favorites' : 'Add to favorites'}
             >
               <Star 
-                className={`h-5 w-5 ${isFavorite(hoveredMap.id) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                className={`h-5 w-5 ${isFavorite(displayMap.id) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
               />
             </Button>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

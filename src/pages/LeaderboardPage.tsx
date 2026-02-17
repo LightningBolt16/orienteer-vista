@@ -181,41 +181,43 @@ const LeaderboardPage: React.FC = () => {
 
         {gameMode === 'routeChoice' ? (
           <div>
-            {favoriteMaps.length > 0 ? (
+            {/* Show leaderboard for currently selected community map */}
+            {selectedCommunityMap && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-orienteering" />
+                  {selectedCommunityMap}
+                </h3>
+                <Leaderboard 
+                  mapFilter={selectedCommunityMap}
+                  countryFilter={activeCountryFilter}
+                  showAll
+                />
+              </div>
+            )}
+
+            {/* Favorited maps quick-select tabs */}
+            {favoriteMaps.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
                   {t('favoritedMaps')}
                 </h3>
-                <Tabs value={selectedCommunityMap} onValueChange={setSelectedCommunityMap} className="w-full">
-                  <TabsList className="w-full flex flex-wrap justify-center gap-2 h-auto bg-transparent mb-6">
-                    {favoriteMaps.map(map => (
-                      <TabsTrigger 
-                        key={map.id} 
-                        value={map.name}
-                        className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
-                      >
-                        {map.name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-
+                <div className="flex flex-wrap gap-2">
                   {favoriteMaps.map(map => (
-                    <TabsContent key={map.id} value={map.name} className="mt-0">
-                      <Leaderboard 
-                        mapFilter={map.name}
-                        countryFilter={activeCountryFilter}
-                        showAll
-                      />
-                    </TabsContent>
+                    <button 
+                      key={map.id}
+                      onClick={() => setSelectedCommunityMap(map.name)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        selectedCommunityMap === map.name 
+                          ? 'bg-orienteering text-white' 
+                          : 'bg-secondary hover:bg-secondary/80'
+                      }`}
+                    >
+                      {map.name}
+                    </button>
                   ))}
-                </Tabs>
-              </div>
-            ) : (
-              <div className="text-center py-8 mb-8">
-                <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">{t('noFavoritedMaps')}</h3>
-                <p className="text-muted-foreground">{t('noFavoritedMapsDesc')}</p>
+                </div>
               </div>
             )}
 
