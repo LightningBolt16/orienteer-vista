@@ -1,70 +1,62 @@
 
 
-## Fixes and Features Plan
+## Leaderboard Fixes and Improvements
 
-### Issue 1: Route Finder "All Maps" includes hidden maps (Erikslund)
+### Issue 1: "All Maps" country filter not working
 
-**Root Cause**: In `RouteFinderGame.tsx`, when no `mapId` is provided (All Maps mode), the query fetches all challenges via `route_finder_challenges` joined with `route_finder_maps` but never filters out hidden maps. The RLS policy allows viewing challenges for any public map regardless of `is_hidden`.
+**Root cause**: The `fetchLeaderboard()` function in `UserContext.tsx` (line 197) does not include `country_code` in its select query. The context `leaderboard` state therefore has no `countryCode` field on entries. When the "All Maps" Leaderboard component uses this data, country filtering silently returns zero results.
 
-**Fix**: Add `.eq('route_finder_maps.is_hidden', false)` to the query when loading all challenges (no specific `mapId`).
+**Fix** (two files):
+- **`UserContext.tsx`**: Add `country_code` to the `fetchLeaderboard` select query (line 197) and include `countryCode` in the mapped entries (line 220-228). Also add `countryCode` to the `LeaderboardEntry` type (line 26-34).
+- This ensures the context leaderboard has `countryCode` on every entry, making the client-side filter in `Leaderboard.tsx` work for "All Maps".
 
-**File**: `src/components/route-finder/RouteFinderGame.tsx` (lines 101-112)
+### Issue 2: Community Leaderboard text showing raw translation keys
 
----
+**Root cause**: `t('communityLeaderboards')`, `t('communityLeaderboardsDesc')` are not defined in `LanguageContext.tsx`.
 
-### Issue 2: Publish to Community button for Route Game private maps
+**Fix**: Add the following translation keys to both English and Swedish in `LanguageContext.tsx`:
+- `communityLeaderboards` -- "Community Leaderboards" / "Community-topplista"
+- `communityLeaderboardsDesc` -- "Rankings for community-created maps" / "Ranking for community-skapade kartor"
+- `favoritedMaps` -- "Your Favorited Maps" / "Dina favoritkartor"
+- `discoverMaps` -- "Discover Maps" / "Utforska kartor"
+- `noFavoritedMaps` -- "No favorited maps yet" / "Inga favoritkartor an"
+- `noFavoritedMapsDesc` -- "Use the map browser below to discover and favorite community maps" / "Anvand kartblaseraren nedan for att utforska och favoritmarkera community-kartor"
 
-**What exists**: The Route Finder already has a `PublishRouteFinderMapDialog` that updates `route_finder_maps` to set `is_public: true` and `map_category: 'community'`. The standard Route Game has a `PublishMapDialog` in `src/components/user-maps/` but it's only wired up in the UserMaps page (My Maps), not in the Route Game map selector.
+### Issue 3: Redesign Community Leaderboard section
 
-**Solution**: Add a "Publish to Community" button on each private map card in the Route Game's map selector (in `RouteGame.tsx`). Since the existing `PublishMapDialog` expects a `user_maps.id` (looks up via `source_map_id`), we'll create a new lightweight `PublishRouteMapDialog` component that works directly with `route_maps.id`, similar to how the Route Finder dialog works.
+**Current behavior**: Shows an "All Maps" tab that lists every community map's leaderboard stacked, plus individual map tabs. Always shows both Route Choice and Route Finder subsections regardless of the game mode toggle.
 
-**Files**:
-- New file: `src/components/sharing/PublishRouteMapDialog.tsx` -- Dialog with title, description, location picker, and optional logo upload, updating `route_maps` directly by its ID
-- `src/pages/RouteGame.tsx` -- Add publish dialog state, a Globe icon button on private map cards, and render the dialog
+**New behavior**:
+- Remove the "All Maps" tab from the community section
+- Show only favorited community maps as tabs (from `useCommunityFavorites` hook)
+- Below the tabs, embed the `CommunityMapBrowser` (Mapbox world map) so users can discover and favorite more maps directly from the leaderboard page
+- The community section switches based on the `gameMode` toggle:
+  - When "Route Choice" is selected: show Route Choice community leaderboards
+  - When "Route Finder" is selected: show Route Finder community leaderboards
+- If user has no favorites and no community maps exist, hide the section entirely
 
----
+**Files to modify**:
+- `src/pages/LeaderboardPage.tsx` -- Major refactor of the community section, import `useCommunityFavorites` and `CommunityMapBrowser`, wire gameMode to control which community leaderboard is shown
+- `src/context/UserContext.tsx` -- Add `country_code` to `fetchLeaderboard` query and `LeaderboardEntry` type
+- `src/context/LanguageContext.tsx` -- Add missing translation keys
 
-### Issue 3: Local Duel Quick Play broken on mobile
+### Technical Details
 
-**Root Cause**: `buildQuickPlaySettings()` in `DuelSetupWizard.tsx` always sets `gameMode: 'speed'`. On mobile local mode, speed race is disabled (it requires two separate screens). When DuelGame receives `gameMode: 'speed'`, it enters independent mode where each player has their own route index. The `MobileDuelIndependentView` is rendered, which likely doesn't receive proper routes.
+**UserContext.tsx changes:**
+```text
+Line 26-34: Add countryCode?: string to LeaderboardEntry type
+Line 197: Change select to include country_code
+Line 220-228: Add countryCode: entry.country_code to mapped entries
+```
 
-**Fix**: In `buildQuickPlaySettings()`, set `gameMode` to `'wait'` when `playMode === 'local'` and the device is mobile.
+**LeaderboardPage.tsx changes:**
+- Import `useCommunityFavorites` and `CommunityMapBrowser`
+- Use the `gameMode` state to control which community content is rendered (Route Choice or Route Finder)
+- Replace "All Maps" community tab with favorited maps only
+- Add CommunityMapBrowser below the favorited leaderboard tabs for discovery
+- When no favorites exist, show a message prompting the user to use the map browser
+- For Route Finder community mode, use `RouteFinderLeaderboardInline` filtered to community maps only (pass a `mapCategory` or specific map names)
 
-**File**: `src/components/duel/DuelSetupWizard.tsx` (line 172)
-
----
-
-### Issue 4: Mobile Local Duel -- SafeZoneImage zoom not applied
-
-**Root Cause**: `MobileDuelView.tsx` renders a plain `<img>` tag without using the `SafeZoneImage` component. The solo Route Game's mobile fullscreen uses `SafeZoneImage` for the two-layer architecture (transformed image + static UI overlay).
-
-**Solution**: Integrate `SafeZoneImage` into `MobileDuelView` using the same two-layer approach:
-- Image layer: `SafeZoneImage` with `isFullscreen={true}` renders the zoomed/centered map
-- UI overlay: Static `absolute inset-0` div containing the L/R touch zones, score badges, and result indicators (unchanged positioning)
-
-The `MobileDuelView` already receives `currentRoute` which contains `safeZone` data.
-
-**File**: `src/components/duel/MobileDuelView.tsx`
-
----
-
-### Issue 5: Swap L/R button colors for Player 2 in Mobile Local Duel
-
-**Current behavior**: Both players have red=left, blue=right. Since Player 2 is rotated 180 degrees (sitting at the opposite end of the phone), their left/right are visually mirrored. The user wants the colors swapped for P2 so when both players look at the phone from their perspective, the spatial color mapping is consistent.
-
-**Fix**: In the P2 section of `MobileDuelView.tsx`, swap the colors: left button becomes blue, right button becomes red. This means from P2's visual perspective (rotated), red is on their left and blue is on their right -- matching P1's perspective.
-
-**File**: `src/components/duel/MobileDuelView.tsx` (lines 66-92)
-
----
-
-### Summary of Changes
-
-| File | Change |
-|------|--------|
-| `RouteFinderGame.tsx` | Filter out hidden maps in All Maps query |
-| `PublishRouteMapDialog.tsx` (new) | Publish dialog for Route Game private maps |
-| `RouteGame.tsx` | Wire up publish dialog on private map cards |
-| `DuelSetupWizard.tsx` | Fix Quick Play to use `wait` mode on mobile local |
-| `MobileDuelView.tsx` | Integrate SafeZoneImage zoom + swap P2 button colors |
+**LanguageContext.tsx changes:**
+- Add all missing translation keys for both EN and SV
 
