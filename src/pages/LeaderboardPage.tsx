@@ -181,29 +181,14 @@ const LeaderboardPage: React.FC = () => {
 
         {gameMode === 'routeChoice' ? (
           <div>
-            {/* Show leaderboard for currently selected community map */}
-            {selectedCommunityMap && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-orienteering" />
-                  {selectedCommunityMap}
-                </h3>
-                <Leaderboard 
-                  mapFilter={selectedCommunityMap}
-                  countryFilter={activeCountryFilter}
-                  showAll
-                />
-              </div>
-            )}
-
             {/* Favorited maps quick-select tabs */}
             {favoriteMaps.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-center gap-2">
                   <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
                   {t('favoritedMaps')}
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   {favoriteMaps.map(map => (
                     <button 
                       key={map.id}
@@ -222,7 +207,7 @@ const LeaderboardPage: React.FC = () => {
             )}
 
             {/* Map Browser for discovery */}
-            <div>
+            <div className="mb-8">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-orienteering" />
                 {t('discoverMaps')}
@@ -234,6 +219,21 @@ const LeaderboardPage: React.FC = () => {
                 onToggleFavorite={toggleFavorite}
               />
             </div>
+
+            {/* Show leaderboard for currently selected community map */}
+            {selectedCommunityMap && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-orienteering" />
+                  {selectedCommunityMap}
+                </h3>
+                <Leaderboard 
+                  mapFilter={selectedCommunityMap}
+                  countryFilter={activeCountryFilter}
+                  showAll
+                />
+              </div>
+            )}
           </div>
         ) : (
           <RouteFinderLeaderboardInline countryFilter={activeCountryFilter} mapCategory="community" />
