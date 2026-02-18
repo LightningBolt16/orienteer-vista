@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Compass, AlertCircle, Mail, CheckCircle2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { z } from 'zod';
@@ -68,6 +69,7 @@ const AuthPage: React.FC = () => {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   
   // Forgot password form state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -124,6 +126,11 @@ const AuthPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     
+    if (!acceptedTerms) {
+      setError('You must accept the Terms of Service to create an account');
+      return;
+    }
+
     // Validate with Zod
     const result = registerSchema.safeParse({ 
       name: registerName, 
@@ -482,7 +489,26 @@ const AuthPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-muted-foreground">{t('passwordRequirements')}</p>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="accept-terms"
+                    checked={acceptedTerms}
+                    onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="accept-terms" className="text-sm font-normal leading-snug cursor-pointer">
+                    I agree to the{' '}
+                    <a
+                      href="/docs/terms_of_service.pdf"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Terms of Service and Privacy Policy
+                    </a>
+                  </Label>
+                </div>
+                <Button type="submit" className="w-full" disabled={loading || !acceptedTerms}>
                   {loading ? t('registering') : t('register')}
                 </Button>
               </form>
