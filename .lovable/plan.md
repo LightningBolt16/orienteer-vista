@@ -1,62 +1,89 @@
 
 
-## Leaderboard Fixes and Improvements
+## Freemium Subscription Model with Stripe
 
-### Issue 1: "All Maps" country filter not working
+### Overview
 
-**Root cause**: The `fetchLeaderboard()` function in `UserContext.tsx` (line 197) does not include `country_code` in its select query. The context `leaderboard` state therefore has no `countryCode` field on entries. When the "All Maps" Leaderboard component uses this data, country filtering silently returns zero results.
+Integrate Stripe payments to power a freemium subscription model with three tiers: **Free**, **Personal** (29-49 SEK/month), and **Club** (for club admins). This connects the existing role system (`user_roles` table) with Stripe subscriptions for automated access management.
 
-**Fix** (two files):
-- **`UserContext.tsx`**: Add `country_code` to the `fetchLeaderboard` select query (line 197) and include `countryCode` in the mapped entries (line 220-228). Also add `countryCode` to the `LeaderboardEntry` type (line 26-34).
-- This ensures the context leaderboard has `countryCode` on every entry, making the client-side filter in `Leaderboard.tsx` work for "All Maps".
+### Tier Summary (from Business Plan)
 
-### Issue 2: Community Leaderboard text showing raw translation keys
+| Tier | Price | Key Limits |
+|------|-------|-----------|
+| Free | 0 kr | 100 plays/day, 5 projects, 3 maps, limited default maps |
+| Personal | 29-49 SEK/month | Unlimited plays, projects, maps, sharing, expanded map library |
+| Club | TBD/month | Everything in Personal for all club members, role-based access |
 
-**Root cause**: `t('communityLeaderboards')`, `t('communityLeaderboardsDesc')` are not defined in `LanguageContext.tsx`.
+### Implementation Steps
 
-**Fix**: Add the following translation keys to both English and Swedish in `LanguageContext.tsx`:
-- `communityLeaderboards` -- "Community Leaderboards" / "Community-topplista"
-- `communityLeaderboardsDesc` -- "Rankings for community-created maps" / "Ranking for community-skapade kartor"
-- `favoritedMaps` -- "Your Favorited Maps" / "Dina favoritkartor"
-- `discoverMaps` -- "Discover Maps" / "Utforska kartor"
-- `noFavoritedMaps` -- "No favorited maps yet" / "Inga favoritkartor an"
-- `noFavoritedMapsDesc` -- "Use the map browser below to discover and favorite community maps" / "Anvand kartblaseraren nedan for att utforska och favoritmarkera community-kartor"
+#### 1. Enable Stripe Integration
+- Use Lovable's built-in Stripe integration tool to connect the user's Stripe account
+- This will expose additional Stripe tools for creating products, prices, and checkout sessions
 
-### Issue 3: Redesign Community Leaderboard section
+#### 2. Database Changes
+- Add a `subscriptions` table to track active Stripe subscriptions:
+  - `id`, `user_id`, `stripe_customer_id`, `stripe_subscription_id`, `plan_type` (free/personal/club), `status` (active/canceled/past_due), `current_period_end`, `created_at`, `updated_at`
+- Add a `club_id` column (nullable) to link club subscriptions to specific clubs
+- RLS policies: users can read their own subscription; service role manages writes via webhook
 
-**Current behavior**: Shows an "All Maps" tab that lists every community map's leaderboard stacked, plus individual map tabs. Always shows both Route Choice and Route Finder subsections regardless of the game mode toggle.
+#### 3. Stripe Products and Prices
+- Create two Stripe products: "Personal Plan" and "Club Plan"
+- Create recurring prices in SEK (monthly billing)
 
-**New behavior**:
-- Remove the "All Maps" tab from the community section
-- Show only favorited community maps as tabs (from `useCommunityFavorites` hook)
-- Below the tabs, embed the `CommunityMapBrowser` (Mapbox world map) so users can discover and favorite more maps directly from the leaderboard page
-- The community section switches based on the `gameMode` toggle:
-  - When "Route Choice" is selected: show Route Choice community leaderboards
-  - When "Route Finder" is selected: show Route Finder community leaderboards
-- If user has no favorites and no community maps exist, hide the section entirely
+#### 4. Edge Functions
+- **create-checkout-session**: Creates a Stripe Checkout session for Personal or Club plan. Requires authenticated user. Stores `stripe_customer_id` on the subscription record.
+- **stripe-webhook**: Handles Stripe events (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`). On successful payment, inserts/updates the `subscriptions` table and grants the appropriate role in `user_roles`. On cancellation, removes the role.
+- **create-portal-session**: Creates a Stripe Customer Portal session so users can manage billing, cancel, or update payment methods.
 
-**Files to modify**:
-- `src/pages/LeaderboardPage.tsx` -- Major refactor of the community section, import `useCommunityFavorites` and `CommunityMapBrowser`, wire gameMode to control which community leaderboard is shown
-- `src/context/UserContext.tsx` -- Add `country_code` to `fetchLeaderboard` query and `LeaderboardEntry` type
-- `src/context/LanguageContext.tsx` -- Add missing translation keys
+#### 5. Subscription Hook (`useSubscription`)
+- New hook that queries the `subscriptions` table for the current user
+- Returns: `plan` (free/personal/club), `status`, `isActive`, `currentPeriodEnd`, `loading`
+- Replaces or augments `useProAccess` -- pro access = personal or club subscription (or admin role)
 
-### Technical Details
+#### 6. Update `useProAccess`
+- Modify to also check the `subscriptions` table, not just `user_roles`
+- A user has pro access if they have an active personal/club subscription OR an admin/pro role
 
-**UserContext.tsx changes:**
-```text
-Line 26-34: Add countryCode?: string to LeaderboardEntry type
-Line 197: Change select to include country_code
-Line 220-228: Add countryCode: entry.country_code to mapped entries
-```
+#### 7. Profile Page -- Subscription Management
+- Add a "Subscription" section to the Profile page
+- Shows current plan, next billing date, and a "Manage Subscription" button (opens Stripe Customer Portal)
+- If on free tier, show an upgrade CTA linking to the Subscription page
 
-**LeaderboardPage.tsx changes:**
-- Import `useCommunityFavorites` and `CommunityMapBrowser`
-- Use the `gameMode` state to control which community content is rendered (Route Choice or Route Finder)
-- Replace "All Maps" community tab with favorited maps only
-- Add CommunityMapBrowser below the favorited leaderboard tabs for discovery
-- When no favorites exist, show a message prompting the user to use the map browser
-- For Route Finder community mode, use `RouteFinderLeaderboardInline` filtered to community maps only (pass a `mapCategory` or specific map names)
+#### 8. Update Subscription Page (`Subscription.tsx`)
+- Wire the existing "Subscribe" buttons to call `create-checkout-session` edge function
+- After successful checkout, redirect back to profile with a success toast
+- Add monthly/yearly toggle if desired (start with monthly only)
 
-**LanguageContext.tsx changes:**
-- Add all missing translation keys for both EN and SV
+#### 9. Enforce Free Tier Limits (Future enforcement, scaffolding now)
+- The infrastructure will be in place to check `plan` from the hook
+- Actual enforcement of limits (100 plays/day, 3 maps, 5 projects) can be added incrementally
+- Add a `useSubscriptionLimits` helper that returns limit values based on plan
+
+#### 10. Club Plan Logic
+- When a club admin subscribes to the Club plan, all members of their club get pro access
+- The webhook checks `plan_type === 'club'` and grants access to the club's `club_id`
+- `useProAccess` checks if the user belongs to a club with an active club subscription
+
+### Files to Create
+- `supabase/functions/create-checkout-session/index.ts`
+- `supabase/functions/stripe-webhook/index.ts`
+- `supabase/functions/create-portal-session/index.ts`
+- `src/hooks/useSubscription.ts`
+- Database migration for `subscriptions` table
+
+### Files to Modify
+- `src/pages/Subscription.tsx` -- wire buttons to Stripe checkout
+- `src/pages/Profile.tsx` -- add subscription management section
+- `src/hooks/useProAccess.ts` -- check subscriptions table
+- `supabase/config.toml` -- add new edge function configs
+
+### Sequence
+
+1. Enable Stripe (requires user input for secret key)
+2. Create `subscriptions` table migration
+3. Create edge functions (checkout, webhook, portal)
+4. Create `useSubscription` hook
+5. Update `useProAccess` to include subscription checks
+6. Wire Subscription page buttons to checkout
+7. Add subscription management to Profile page
 
