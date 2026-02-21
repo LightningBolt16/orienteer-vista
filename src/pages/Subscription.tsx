@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, CreditCard, Shield, Users, Award, Clock, X, Star, MapPin, FolderPlus, Share2, Trophy, Crown, Map } from 'lucide-react';
+import { Check, CreditCard, Shield, Users, Award, Clock, X, Star, MapPin, FolderPlus, Share2, Trophy, Crown, Map, Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { toast } from '@/components/ui/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -10,6 +10,9 @@ import { useNavigate } from 'react-router-dom';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from '@/integrations/supabase/client';
+import { useSubscription, STRIPE_PLANS } from '@/hooks/useSubscription';
+import { useUser } from '@/context/UserContext';
 
 // Feature comparison type
 interface PlanFeature {
@@ -24,13 +27,37 @@ const Subscription: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { user } = useUser();
+  const { plan, isActive, loading: subLoading } = useSubscription();
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
-  const handleSubscribe = (planType: string) => {
-    // This would connect to a payment processor in a real implementation
-    toast({
-      title: t('comingSoon'),
-      description: 'Payment functionality will be available soon.',
-    });
+  const handleSubscribe = async (planType: 'personal' | 'club') => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    setCheckoutLoading(planType);
+    try {
+      const priceId = STRIPE_PLANS[planType].price_id;
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { priceId },
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to start checkout',
+        variant: 'destructive',
+      });
+    } finally {
+      setCheckoutLoading(null);
+    }
   };
 
   // Feature comparison data
@@ -246,9 +273,10 @@ const Subscription: React.FC = () => {
                     <Button 
                       onClick={() => handleSubscribe('personal')} 
                       className="w-full bg-orienteering hover:bg-orienteering/90"
+                      disabled={checkoutLoading !== null || (isActive && plan === 'personal')}
                     >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      {t('subscribe')}
+                      {checkoutLoading === 'personal' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
+                      {isActive && plan === 'personal' ? 'Current Plan' : t('subscribe')}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -301,9 +329,10 @@ const Subscription: React.FC = () => {
                     <Button 
                       onClick={() => handleSubscribe('club')} 
                       className="w-full bg-orienteering hover:bg-orienteering/90"
+                      disabled={checkoutLoading !== null || (isActive && plan === 'club')}
                     >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      {t('subscribe')}
+                      {checkoutLoading === 'club' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
+                      {isActive && plan === 'club' ? 'Current Plan' : t('subscribe')}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -389,9 +418,10 @@ const Subscription: React.FC = () => {
             <Button 
               onClick={() => handleSubscribe('personal')} 
               className="w-full bg-orienteering hover:bg-orienteering/90"
+              disabled={checkoutLoading !== null || (isActive && plan === 'personal')}
             >
-              <CreditCard className="h-4 w-4 mr-2" />
-              {t('subscribe')}
+              {checkoutLoading === 'personal' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
+              {isActive && plan === 'personal' ? 'Current Plan' : t('subscribe')}
             </Button>
           </CardFooter>
         </Card>
@@ -435,9 +465,10 @@ const Subscription: React.FC = () => {
             <Button 
               onClick={() => handleSubscribe('club')} 
               className="w-full bg-orienteering hover:bg-orienteering/90"
+              disabled={checkoutLoading !== null || (isActive && plan === 'club')}
             >
-              <CreditCard className="h-4 w-4 mr-2" />
-              {t('subscribe')}
+              {checkoutLoading === 'club' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
+              {isActive && plan === 'club' ? 'Current Plan' : t('subscribe')}
             </Button>
           </CardFooter>
         </Card>

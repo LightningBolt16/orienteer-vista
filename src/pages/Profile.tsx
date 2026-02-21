@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2 } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
@@ -14,6 +14,10 @@ import { Label } from '@/components/ui/label';
 import { format, subDays, subMonths, startOfDay, parseISO } from 'date-fns';
 import { ImageCropper } from '../components/ImageCropper';
 import CountrySelector from '@/components/CountrySelector';
+import { useSubscription, STRIPE_PLANS } from '@/hooks/useSubscription';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface MapStats {
   map_name: string;
@@ -54,6 +58,32 @@ const Profile: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { plan, isActive, subscriptionEnd, loading: subLoading, refetch: refetchSub } = useSubscription();
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  // Handle checkout success redirect
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') {
+      toast({ title: 'Subscription activated!', description: 'Your plan has been upgraded successfully.' });
+      refetchSub();
+      // Clean URL
+      window.history.replaceState({}, '', '/profile');
+    }
+  }, [searchParams]);
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      if (error) throw error;
+      if (data?.url) window.open(data.url, '_blank');
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to open billing portal', variant: 'destructive' });
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   // Update userName and country when user data loads
   useEffect(() => {
@@ -575,6 +605,59 @@ const Profile: React.FC = () => {
           </div>
         </div>
         
+        {/* Subscription Section */}
+        <div className="mt-10 border-t border-muted pt-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Subscription
+              </CardTitle>
+              {isActive && (
+                <Badge variant="default" className="bg-orienteering">
+                  {plan === 'personal' ? 'Personal' : 'Club'} Plan
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {subLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking subscription...
+                </div>
+              ) : isActive ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Your {plan === 'personal' ? 'Personal' : 'Club'} plan is active.
+                    {subscriptionEnd && ` Next billing: ${new Date(subscriptionEnd).toLocaleDateString()}`}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleManageSubscription} 
+                    disabled={portalLoading}
+                  >
+                    {portalLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crown className="h-4 w-4 mr-2" />}
+                    Manage Subscription
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    You're on the Free plan. Upgrade to unlock unlimited features.
+                  </p>
+                  <Button 
+                    onClick={() => navigate('/subscription')}
+                    className="bg-orienteering hover:bg-orienteering/90"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Upgrade Plan
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Game Mode Toggle */}
         <div className="mt-10 border-t border-muted pt-8">
           <div className="flex items-center justify-between mb-6">
