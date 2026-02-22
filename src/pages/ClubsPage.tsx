@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown, Minus, MapIcon, BarChart3 } from 'lucide-react';
+import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown, Minus, MapIcon } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import ImageCropper from '@/components/ImageCropper';
 import { calculateCombinedScore as calcCombinedScore } from '@/utils/scoringUtils';
@@ -72,17 +72,22 @@ const ClubsPage: React.FC = () => {
     description: string | null;
     logo_path: string | null;
     location_name: string | null;
+    type: 'route_choice' | 'route_finder';
   }
 
-  interface ClubMapStat {
-    map_name: string;
-    total_plays: number;
-    unique_players: number;
-    avg_accuracy: number;
+  interface ClubMapLeaderboardEntry {
+    user_id: string;
+    name: string;
+    profile_image: string | null;
+    accuracy: number;
+    speed: number;
+    totalAttempts: number;
   }
 
   const [clubMaps, setClubMaps] = useState<ClubMap[]>([]);
-  const [clubMapStats, setClubMapStats] = useState<ClubMapStat[]>([]);
+  const [clubMapLeaderboards, setClubMapLeaderboards] = useState<Record<string, ClubMapLeaderboardEntry[]>>({});
+  const [expandedMapId, setExpandedMapId] = useState<string | null>(null);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState<string | null>(null);
 
   const isAdmin = userMembership?.role === 'admin';
 
@@ -191,37 +196,24 @@ const ClubsPage: React.FC = () => {
 
           if (clubUserMaps && clubUserMaps.length > 0) {
             const sourceMapIds = clubUserMaps.map((m: any) => m.id);
+            
+            // Fetch route choice maps
             const { data: routeMaps } = await supabase
               .from('route_maps')
               .select('id, name, description, logo_path, location_name')
               .in('source_map_id', sourceMapIds);
             
-            if (routeMaps) setClubMaps(routeMaps);
+            // Fetch route finder maps
+            const { data: rfMaps } = await supabase
+              .from('route_finder_maps')
+              .select('id, name, description, location_name')
+              .in('source_map_id', sourceMapIds);
 
-            // Fetch stats for club maps
-            const mapNames = routeMaps?.map(m => m.name) || [];
-            if (mapNames.length > 0) {
-              const { data: attempts } = await supabase
-                .from('route_attempts')
-                .select('map_name, user_id, is_correct')
-                .in('map_name', mapNames);
-              
-              if (attempts && attempts.length > 0) {
-                const statsMap: Record<string, { total: number; correct: number; players: Set<string> }> = {};
-                attempts.forEach((a: any) => {
-                  if (!statsMap[a.map_name]) statsMap[a.map_name] = { total: 0, correct: 0, players: new Set() };
-                  statsMap[a.map_name].total++;
-                  if (a.is_correct) statsMap[a.map_name].correct++;
-                  statsMap[a.map_name].players.add(a.user_id);
-                });
-                setClubMapStats(Object.entries(statsMap).map(([name, s]) => ({
-                  map_name: name,
-                  total_plays: s.total,
-                  unique_players: s.players.size,
-                  avg_accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
-                })));
-              }
-            }
+            const allClubMaps: ClubMap[] = [
+              ...(routeMaps || []).map(m => ({ ...m, type: 'route_choice' as const })),
+              ...(rfMaps || []).map(m => ({ ...m, logo_path: null, type: 'route_finder' as const })),
+            ];
+            setClubMaps(allClubMaps);
           }
         }
 
@@ -400,6 +392,86 @@ const ClubsPage: React.FC = () => {
     } else {
       setMemberSortField(field);
       setMemberSortDirection('desc');
+    }
+  };
+
+  // Load per-map leaderboard when a map is expanded
+  const loadMapLeaderboard = async (map: ClubMap) => {
+    if (clubMapLeaderboards[map.id]) {
+      // Already loaded, just toggle
+      setExpandedMapId(expandedMapId === map.id ? null : map.id);
+      return;
+    }
+
+    setLoadingLeaderboard(map.id);
+    setExpandedMapId(map.id);
+
+    try {
+      const table = map.type === 'route_choice' ? 'route_attempts' : 'route_finder_attempts';
+      const { data: attempts } = await supabase
+        .from(table)
+        .select('user_id, is_correct, response_time')
+        .eq('map_name', map.name);
+
+      if (!attempts || attempts.length === 0) {
+        setClubMapLeaderboards(prev => ({ ...prev, [map.id]: [] }));
+        setLoadingLeaderboard(null);
+        return;
+      }
+
+      // Aggregate per user
+      const userStats = new Map<string, { correct: number; total: number; timeSum: number }>();
+      for (const a of attempts) {
+        const existing = userStats.get(a.user_id) || { correct: 0, total: 0, timeSum: 0 };
+        userStats.set(a.user_id, {
+          correct: existing.correct + (a.is_correct ? 1 : 0),
+          total: existing.total + 1,
+          timeSum: existing.timeSum + (a.response_time || 0),
+        });
+      }
+
+      // Only include club members
+      const clubMemberIds = clubMembers.map(m => m.user_id);
+      const filteredUserIds = Array.from(userStats.keys()).filter(id => clubMemberIds.includes(id));
+
+      if (filteredUserIds.length === 0) {
+        setClubMapLeaderboards(prev => ({ ...prev, [map.id]: [] }));
+        setLoadingLeaderboard(null);
+        return;
+      }
+
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('user_id, name, profile_image')
+        .in('user_id', filteredUserIds);
+
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+
+      const entries: ClubMapLeaderboardEntry[] = filteredUserIds
+        .map(userId => {
+          const stats = userStats.get(userId)!;
+          const profile = profileMap.get(userId);
+          return {
+            user_id: userId,
+            name: profile?.name || 'Unknown',
+            profile_image: profile?.profile_image || null,
+            accuracy: Math.round((stats.correct / stats.total) * 100),
+            speed: stats.correct > 0 ? Math.round(stats.timeSum / stats.correct) : 0,
+            totalAttempts: stats.total,
+          };
+        })
+        .filter(e => e.totalAttempts >= 1)
+        .sort((a, b) => {
+          if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+          return a.speed - b.speed;
+        });
+
+      setClubMapLeaderboards(prev => ({ ...prev, [map.id]: entries }));
+    } catch (err) {
+      console.error('Error loading map leaderboard:', err);
+      setClubMapLeaderboards(prev => ({ ...prev, [map.id]: [] }));
+    } finally {
+      setLoadingLeaderboard(null);
     }
   };
 
@@ -866,77 +938,104 @@ const ClubsPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                {/* Club Maps Section - only for club plan */}
-                {plan === 'club' && isActive && (
+                {/* Club Maps with Per-Map Leaderboards */}
+                {clubMaps.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <MapIcon className="h-5 w-5 text-orienteering" />
-                        Club Maps
+                        <MapIcon className="h-5 w-5 text-primary" />
+                        {t('clubMaps') || 'Club Maps'}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      {clubMaps.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <MapIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No club maps yet. Upload maps with your club to see them here.</p>
-                        </div>
-                      ) : (
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {clubMaps.map((map) => (
-                            <div key={map.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                              <Avatar className="h-10 w-10">
+                    <CardContent className="space-y-2">
+                      {clubMaps.map((map) => {
+                        const isExpanded = expandedMapId === map.id;
+                        const leaderboard = clubMapLeaderboards[map.id];
+                        const isLoadingThis = loadingLeaderboard === map.id;
+
+                        return (
+                          <div key={map.id} className="rounded-lg border bg-card">
+                            <button
+                              className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left"
+                              onClick={() => loadMapLeaderboard(map)}
+                            >
+                              <Avatar className="h-10 w-10 flex-shrink-0">
                                 <AvatarImage src={userClub?.logo_url || ''} />
                                 <AvatarFallback>{userClub?.name?.[0] || 'C'}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">{map.name}</p>
-                                {map.location_name && (
-                                  <p className="text-xs text-muted-foreground truncate">{map.location_name}</p>
-                                )}
-                                {map.description && (
-                                  <p className="text-xs text-muted-foreground truncate">{map.description}</p>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {map.location_name && (
+                                    <p className="text-xs text-muted-foreground truncate">{map.location_name}</p>
+                                  )}
+                                  <span className="text-xs bg-secondary px-1.5 py-0.5 rounded">
+                                    {map.type === 'route_choice' ? t('routeChoice') || 'Route Choice' : t('routeFinder') || 'Route Finder'}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+                              <Trophy className={`h-4 w-4 transition-transform ${isExpanded ? 'text-primary' : 'text-muted-foreground'}`} />
+                            </button>
 
-                {/* Club Map Statistics - only for club plan */}
-                {plan === 'club' && isActive && clubMapStats.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-orienteering" />
-                        Club Map Statistics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {clubMapStats.map((stat) => (
-                          <div key={stat.map_name} className="p-3 rounded-lg bg-muted/50">
-                            <p className="font-medium text-sm mb-2">{stat.map_name}</p>
-                            <div className="grid grid-cols-3 gap-2 text-sm">
-                              <div>
-                                <p className="font-semibold text-orienteering">{stat.total_plays}</p>
-                                <p className="text-xs text-muted-foreground">Total Plays</p>
+                            {isExpanded && (
+                              <div className="border-t px-3 pb-3 pt-2">
+                                {isLoadingThis ? (
+                                  <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                  </div>
+                                ) : !leaderboard || leaderboard.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    {t('noDataYet') || 'No data yet'}
+                                  </p>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    {leaderboard.map((entry, index) => {
+                                      const rank = index + 1;
+                                      const isCurrentUser = entry.user_id === user?.id;
+
+                                      return (
+                                        <div
+                                          key={entry.user_id}
+                                          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                                            isCurrentUser ? 'bg-primary/10' : 'hover:bg-muted/50'
+                                          }`}
+                                          onClick={() => navigate(isCurrentUser ? '/profile' : `/user/${entry.user_id}`)}
+                                        >
+                                          <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0 ${
+                                            rank <= 3 ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+                                          }`}>
+                                            {rank}
+                                          </div>
+                                          <Avatar className="h-7 w-7 flex-shrink-0">
+                                            <AvatarImage src={entry.profile_image || ''} />
+                                            <AvatarFallback className="text-[10px]">{entry.name?.[0] || '?'}</AvatarFallback>
+                                          </Avatar>
+                                          <div className="flex-1 min-w-0">
+                                            <span className="text-sm font-medium truncate block">
+                                              {entry.name}
+                                              {isCurrentUser && <span className="text-primary ml-1 text-xs">({t('you')})</span>}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                                            <div className="flex items-center" title={t('accuracy')}>
+                                              <Target className="h-3 w-3 text-primary mr-0.5" />
+                                              <span className="font-medium">{entry.accuracy}%</span>
+                                            </div>
+                                            <div className="flex items-center" title={t('speed')}>
+                                              <Zap className="h-3 w-3 text-amber-500 mr-0.5" />
+                                              <span className="font-medium">{(entry.speed / 1000).toFixed(1)}s</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
-                              <div>
-                                <p className="font-semibold text-orienteering">{stat.unique_players}</p>
-                                <p className="text-xs text-muted-foreground">Players</p>
-                              </div>
-                              <div>
-                                <p className="font-semibold text-orienteering">{stat.avg_accuracy}%</p>
-                                <p className="text-xs text-muted-foreground">Avg Accuracy</p>
-                              </div>
-                            </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </CardContent>
                   </Card>
                 )}
