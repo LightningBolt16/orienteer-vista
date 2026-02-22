@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Globe, Loader2, Upload, X, Image } from 'lucide-react';
+import { Globe, Loader2, X, Image } from 'lucide-react';
 import LocationPicker from '@/components/map/LocationPicker';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +24,8 @@ interface PublishMapDialogProps {
   mapId: string;
   mapName: string;
   onPublished: () => void;
+  clubId?: string | null;
+  clubName?: string | null;
 }
 
 interface LocationData {
@@ -37,6 +40,8 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
   mapId,
   mapName,
   onPublished,
+  clubId,
+  clubName,
 }) => {
   const { user } = useUser();
   const [title, setTitle] = useState(mapName);
@@ -45,13 +50,13 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
   const [publishing, setPublishing] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [publishTarget, setPublishTarget] = useState<'community' | 'club'>(clubId ? 'club' : 'community');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({
         title: 'Invalid file type',
@@ -61,7 +66,6 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
       return;
     }
     
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast({
         title: 'File too large',
@@ -96,7 +100,7 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
       return;
     }
 
-    if (!location) {
+    if (publishTarget === 'community' && !location) {
       toast({
         title: 'Location required',
         description: 'Please select a location on the map',
@@ -138,26 +142,36 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
         logoPath = fileName;
       }
 
-      // Update the route_maps entry to make it public
+      // Build update data based on publish target
+      const updateData: Record<string, any> = {
+        name: title.trim(),
+        description: description.trim() || null,
+        ...(logoPath && { logo_path: logoPath }),
+      };
+
+      if (publishTarget === 'club' && clubId) {
+        updateData.club_id = clubId;
+        updateData.is_public = false;
+        updateData.map_category = 'club';
+      } else {
+        updateData.is_public = true;
+        updateData.map_category = 'community';
+        updateData.latitude = location?.lat;
+        updateData.longitude = location?.lng;
+        updateData.location_name = location?.name;
+      }
+
       const { error: updateError } = await supabase
         .from('route_maps')
-        .update({
-          name: title.trim(),
-          description: description.trim() || null,
-          is_public: true,
-          map_category: 'community',
-          latitude: location.lat,
-          longitude: location.lng,
-          location_name: location.name,
-          ...(logoPath && { logo_path: logoPath }),
-        })
+        .update(updateData)
         .eq('id', routeMap.id);
 
       if (updateError) throw updateError;
 
+      const targetLabel = publishTarget === 'club' ? clubName || 'your club' : 'Community Maps';
       toast({
         title: 'Map Published!',
-        description: 'Your map is now available in the Community Maps section.',
+        description: `Your map is now available in ${targetLabel}.`,
       });
 
       onPublished();
@@ -179,16 +193,44 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-green-500" />
-            Share to Community
+            <Globe className="h-5 w-5 text-primary" />
+            Share Map
           </DialogTitle>
           <DialogDescription>
-            Make your map available for other orienteers to practice with. 
-            Once published, it will appear in the Community Maps section.
+            Share your map with the community or your club members.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Publish target selector */}
+          {clubId && (
+            <div className="space-y-2">
+              <Label>Publish to</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={publishTarget === 'community' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPublishTarget('community')}
+                  className="gap-2"
+                >
+                  <Globe className="h-4 w-4" />
+                  Community
+                </Button>
+                <Button
+                  type="button"
+                  variant={publishTarget === 'club' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPublishTarget('club')}
+                  className="gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  {clubName || 'Club'}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="title">Map Title *</Label>
             <Input
@@ -210,13 +252,15 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Location *</Label>
-            <LocationPicker
-              value={location || undefined}
-              onChange={setLocation}
-            />
-          </div>
+          {publishTarget === 'community' && (
+            <div className="space-y-2">
+              <Label>Location *</Label>
+              <LocationPicker
+                value={location || undefined}
+                onChange={setLocation}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Map Logo (optional)</Label>
@@ -271,7 +315,7 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
           <Button
             type="button"
             onClick={handlePublish}
-            disabled={publishing || !title.trim() || !location}
+            disabled={publishing || !title.trim() || (publishTarget === 'community' && !location)}
           >
             {publishing ? (
               <>
@@ -280,8 +324,8 @@ const PublishMapDialog: React.FC<PublishMapDialogProps> = ({
               </>
             ) : (
               <>
-                <Globe className="h-4 w-4 mr-2" />
-                Publish to Community
+                {publishTarget === 'club' ? <Users className="h-4 w-4 mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
+                Publish to {publishTarget === 'club' ? (clubName || 'Club') : 'Community'}
               </>
             )}
           </Button>
