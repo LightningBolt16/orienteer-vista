@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2 } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
@@ -18,6 +18,8 @@ import { useSubscription, STRIPE_PLANS } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
 interface MapStats {
   map_name: string;
@@ -28,6 +30,14 @@ interface MapStats {
     correct: number;
     timeSum: number;
   };
+}
+
+interface FeatureRequest {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
 }
 
 interface PerformanceDataPoint {
@@ -61,6 +71,10 @@ const Profile: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { plan, isActive, subscriptionEnd, loading: subLoading, refetch: refetchSub } = useSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>([]);
+  const [newFeatureTitle, setNewFeatureTitle] = useState('');
+  const [newFeatureDescription, setNewFeatureDescription] = useState('');
+  const [submittingFeature, setSubmittingFeature] = useState(false);
 
   // Handle checkout success redirect
   useEffect(() => {
@@ -71,6 +85,41 @@ const Profile: React.FC = () => {
       window.history.replaceState({}, '', '/profile');
     }
   }, [searchParams]);
+
+  // Fetch feature requests for pro/club users
+  useEffect(() => {
+    const fetchFeatureRequests = async () => {
+      if (!user || user.id === '1' || plan === 'free') return;
+      const { data } = await (supabase
+        .from('feature_requests' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }) as any);
+      if (data) setFeatureRequests(data);
+    };
+    if (!subLoading) fetchFeatureRequests();
+  }, [user, plan, subLoading]);
+
+  const handleSubmitFeatureRequest = async () => {
+    if (!user || !newFeatureTitle.trim()) return;
+    setSubmittingFeature(true);
+    try {
+      const { data, error } = await (supabase
+        .from('feature_requests' as any)
+        .insert({ user_id: user.id, title: newFeatureTitle.trim(), description: newFeatureDescription.trim() || null })
+        .select()
+        .single() as any);
+      if (error) throw error;
+      setFeatureRequests(prev => [data, ...prev]);
+      setNewFeatureTitle('');
+      setNewFeatureDescription('');
+      toast({ title: 'Feature request submitted!', description: 'Thank you for your feedback.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setSubmittingFeature(false);
+    }
+  };
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -657,6 +706,59 @@ const Profile: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Feature Requests Section - only for pro/club users */}
+        {(plan === 'personal' || plan === 'club') && isActive && (
+          <div className="mt-10 border-t border-muted pt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5" />
+                  Feature Requests
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <Input
+                    placeholder="Feature title..."
+                    value={newFeatureTitle}
+                    onChange={(e) => setNewFeatureTitle(e.target.value)}
+                  />
+                  <Textarea
+                    placeholder="Describe the feature you'd like to see..."
+                    value={newFeatureDescription}
+                    onChange={(e) => setNewFeatureDescription(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                  <Button 
+                    onClick={handleSubmitFeatureRequest} 
+                    disabled={submittingFeature || !newFeatureTitle.trim()}
+                    className="bg-orienteering hover:bg-orienteering/90"
+                  >
+                    {submittingFeature ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                    Submit Request
+                  </Button>
+                </div>
+
+                {featureRequests.length > 0 && (
+                  <div className="mt-6 space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground">Your Requests</h4>
+                    {featureRequests.map((fr) => (
+                      <div key={fr.id} className="p-3 rounded-lg border border-border">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{fr.title}</p>
+                          <Badge variant="outline" className="text-xs capitalize">{fr.status}</Badge>
+                        </div>
+                        {fr.description && <p className="text-sm text-muted-foreground mt-1">{fr.description}</p>}
+                        <p className="text-xs text-muted-foreground mt-2">{new Date(fr.created_at).toLocaleDateString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Game Mode Toggle */}
         <div className="mt-10 border-t border-muted pt-8">

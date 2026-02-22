@@ -11,10 +11,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { Users, Trophy, Plus, LogIn, Building2, Medal, Clock, Upload, UserMinus, Target, Zap, ArrowUp, ArrowDown, Minus, MapIcon, BarChart3 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import ImageCropper from '@/components/ImageCropper';
 import { calculateCombinedScore as calcCombinedScore } from '@/utils/scoringUtils';
+import { useSubscription } from '@/hooks/useSubscription';
 
 type MemberSortField = 'accuracy' | 'speed' | 'combined';
 type SortDirection = 'asc' | 'desc';
@@ -63,6 +64,25 @@ const ClubsPage: React.FC = () => {
   const [memberSortField, setMemberSortField] = useState<MemberSortField>('combined');
   const [memberSortDirection, setMemberSortDirection] = useState<SortDirection>('desc');
   const [activeTab, setActiveTab] = useState<string>(userClub ? 'my-club' : 'leaderboard');
+  const { plan, isActive } = useSubscription();
+
+  interface ClubMap {
+    id: string;
+    name: string;
+    description: string | null;
+    logo_path: string | null;
+    location_name: string | null;
+  }
+
+  interface ClubMapStat {
+    map_name: string;
+    total_plays: number;
+    unique_players: number;
+    avg_accuracy: number;
+  }
+
+  const [clubMaps, setClubMaps] = useState<ClubMap[]>([]);
+  const [clubMapStats, setClubMapStats] = useState<ClubMapStat[]>([]);
 
   const isAdmin = userMembership?.role === 'admin';
 
@@ -161,6 +181,47 @@ const ClubsPage: React.FC = () => {
               };
             }));
             setClubMembers(memberDetails);
+          }
+
+          // Fetch club maps (route_maps linked to club user_maps)
+          const { data: clubUserMaps } = await (supabase
+            .from('user_maps' as any)
+            .select('id')
+            .eq('club_id', membership.club_id) as any);
+
+          if (clubUserMaps && clubUserMaps.length > 0) {
+            const sourceMapIds = clubUserMaps.map((m: any) => m.id);
+            const { data: routeMaps } = await supabase
+              .from('route_maps')
+              .select('id, name, description, logo_path, location_name')
+              .in('source_map_id', sourceMapIds);
+            
+            if (routeMaps) setClubMaps(routeMaps);
+
+            // Fetch stats for club maps
+            const mapNames = routeMaps?.map(m => m.name) || [];
+            if (mapNames.length > 0) {
+              const { data: attempts } = await supabase
+                .from('route_attempts')
+                .select('map_name, user_id, is_correct')
+                .in('map_name', mapNames);
+              
+              if (attempts && attempts.length > 0) {
+                const statsMap: Record<string, { total: number; correct: number; players: Set<string> }> = {};
+                attempts.forEach((a: any) => {
+                  if (!statsMap[a.map_name]) statsMap[a.map_name] = { total: 0, correct: 0, players: new Set() };
+                  statsMap[a.map_name].total++;
+                  if (a.is_correct) statsMap[a.map_name].correct++;
+                  statsMap[a.map_name].players.add(a.user_id);
+                });
+                setClubMapStats(Object.entries(statsMap).map(([name, s]) => ({
+                  map_name: name,
+                  total_plays: s.total,
+                  unique_players: s.players.size,
+                  avg_accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
+                })));
+              }
+            }
           }
         }
 
@@ -804,6 +865,81 @@ const ClubsPage: React.FC = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Club Maps Section - only for club plan */}
+                {plan === 'club' && isActive && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MapIcon className="h-5 w-5 text-orienteering" />
+                        Club Maps
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {clubMaps.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <MapIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No club maps yet. Upload maps with your club to see them here.</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {clubMaps.map((map) => (
+                            <div key={map.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={userClub?.logo_url || ''} />
+                                <AvatarFallback>{userClub?.name?.[0] || 'C'}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{map.name}</p>
+                                {map.location_name && (
+                                  <p className="text-xs text-muted-foreground truncate">{map.location_name}</p>
+                                )}
+                                {map.description && (
+                                  <p className="text-xs text-muted-foreground truncate">{map.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Club Map Statistics - only for club plan */}
+                {plan === 'club' && isActive && clubMapStats.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5 text-orienteering" />
+                        Club Map Statistics
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {clubMapStats.map((stat) => (
+                          <div key={stat.map_name} className="p-3 rounded-lg bg-muted/50">
+                            <p className="font-medium text-sm mb-2">{stat.map_name}</p>
+                            <div className="grid grid-cols-3 gap-2 text-sm">
+                              <div>
+                                <p className="font-semibold text-orienteering">{stat.total_plays}</p>
+                                <p className="text-xs text-muted-foreground">Total Plays</p>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-orienteering">{stat.unique_players}</p>
+                                <p className="text-xs text-muted-foreground">Players</p>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-orienteering">{stat.avg_accuracy}%</p>
+                                <p className="text-xs text-muted-foreground">Avg Accuracy</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             ) : (
               <div className="text-center py-12">
