@@ -24,6 +24,55 @@ const PRODUCTS = {
   },
 };
 
+// Check for manual/free subscriptions in the database (e.g. gifted plans)
+async function checkManualSubscription(supabaseClient: any, userId: string) {
+  // Direct subscription for this user
+  const { data: directSub } = await supabaseClient
+    .from("subscriptions")
+    .select("plan_type, status, current_period_end, club_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .like("stripe_subscription_id", "manual_%")
+    .maybeSingle();
+
+  if (directSub) {
+    logStep("Found manual subscription", { plan: directSub.plan_type });
+    return {
+      subscribed: true,
+      plan: directSub.plan_type,
+      subscription_end: directSub.current_period_end,
+    };
+  }
+
+  // Check if user is in a club with an active club subscription
+  const { data: clubSub } = await supabaseClient
+    .from("club_members")
+    .select("club_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (clubSub?.club_id) {
+    const { data: clubSubscription } = await supabaseClient
+      .from("subscriptions")
+      .select("plan_type, status, current_period_end")
+      .eq("club_id", clubSub.club_id)
+      .eq("status", "active")
+      .eq("plan_type", "club")
+      .maybeSingle();
+
+    if (clubSubscription) {
+      logStep("Found club subscription for user's club", { plan: "club" });
+      return {
+        subscribed: true,
+        plan: "club",
+        subscription_end: clubSubscription.current_period_end,
+      };
+    }
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,7 +104,15 @@ serve(async (req) => {
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
     if (customers.data.length === 0) {
-      logStep("No Stripe customer found");
+      logStep("No Stripe customer found, checking manual subscriptions");
+      // Check for manual/free subscriptions in the database
+      const manualSub = await checkManualSubscription(supabaseClient, user.id);
+      if (manualSub) {
+        return new Response(JSON.stringify(manualSub), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
       return new Response(JSON.stringify({ subscribed: false, plan: "free" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -72,7 +129,14 @@ serve(async (req) => {
     });
 
     if (subscriptions.data.length === 0) {
-      logStep("No active subscription");
+      logStep("No active Stripe subscription, checking manual subscriptions");
+      const manualSub = await checkManualSubscription(supabaseClient, user.id);
+      if (manualSub) {
+        return new Response(JSON.stringify(manualSub), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
       return new Response(JSON.stringify({ subscribed: false, plan: "free" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
