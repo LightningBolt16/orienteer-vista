@@ -12,6 +12,7 @@ import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
 import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
 import PublishMapDialog from '@/components/user-maps/PublishMapDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscription } from '@/hooks/useSubscription';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,17 +32,29 @@ const UserMaps: React.FC = () => {
   const { user, loading: userLoading } = useUser();
   const { userMaps, loading, fetchUserMaps, deleteUserMap } = useUserMaps();
   const { isAdmin, loading: adminLoading } = useAdmin();
+  const { clubId: subClubId } = useSubscription();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
   const [showAdminRequest, setShowAdminRequest] = useState(false);
   const [deleteMapId, setDeleteMapId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [publishMapData, setPublishMapData] = useState<{ id: string; name: string } | null>(null);
+  const [clubName, setClubName] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchUserMaps();
     }
   }, [user, fetchUserMaps]);
+
+  // Load club name for publish dialog
+  useEffect(() => {
+    if (!subClubId) return;
+    const loadClubName = async () => {
+      const { data } = await supabase.from('clubs').select('name').eq('id', subClubId).single();
+      if (data) setClubName(data.name);
+    };
+    loadClubName();
+  }, [subClubId]);
 
   // Subscribe to realtime updates for user_maps
   useEffect(() => {
@@ -302,6 +315,8 @@ const UserMaps: React.FC = () => {
             setPublishMapData(null);
             fetchUserMaps();
           }}
+          clubId={subClubId}
+          clubName={clubName}
         />
       )}
 
