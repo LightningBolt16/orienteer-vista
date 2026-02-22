@@ -9,7 +9,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useRouteCache } from '../context/RouteCache';
 import { useUser } from '../context/UserContext';
-import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes } from '../utils/routeDataUtils';
+import { MapSource, RouteData, getUniqueMapNames, loadUserMapRoutes, fetchRouteDataForMap } from '../utils/routeDataUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from '../components/ui/use-toast';
 import { toast as sonnerToast } from 'sonner';
@@ -27,7 +27,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
 
 type MapSelection = 'all' | string;
-type MapCategory = 'official' | 'private' | 'community';
+type MapCategory = 'official' | 'private' | 'community' | 'club';
 
 // Country code to flag image mapping for reliable cross-platform display
 const COUNTRY_FLAG_IMAGES: Record<string, string> = {
@@ -103,7 +103,7 @@ const RouteGame: React.FC = () => {
           mapType: m.map_type,
           locationName: m.location_name,
           isDbMap: true,
-          mapCategory: 'community' as const,
+          mapCategory: 'club' as const,
         }));
         setClubMapSources(clubSources);
       }
@@ -210,6 +210,26 @@ const RouteGame: React.FC = () => {
           if (selectedMapId !== 'all') {
             routes = routes.filter(r => r.mapName?.toLowerCase() === selectedMapId.toLowerCase());
           }
+        } else if (selectedMapCategory === 'club') {
+          // Load club map routes
+          const aspect = isMobile ? '9_16' : '16_9';
+          if (selectedMapId === 'all') {
+            const allRoutes: RouteData[] = [];
+            for (const mapSource of clubMapSources) {
+              const mapWithAspect = { ...mapSource, aspect };
+              const fetched = await fetchRouteDataForMap(mapWithAspect);
+              allRoutes.push(...fetched);
+            }
+            routes = allRoutes.sort(() => Math.random() - 0.5);
+            maps = clubMapSources;
+          } else {
+            const mapSource = clubMapSources.find(m => m.name.toLowerCase() === selectedMapId.toLowerCase());
+            if (mapSource) {
+              const mapWithAspect = { ...mapSource, aspect };
+              routes = await fetchRouteDataForMap(mapWithAspect);
+              maps = [mapSource];
+            }
+          }
         } else if (selectedMapCategory === 'community') {
           // Load community map routes - filter by favorites when 'all' is selected
           if (selectedMapId === 'all') {
@@ -277,7 +297,7 @@ const RouteGame: React.FC = () => {
     };
     
     loadRoutes();
-  }, [selectedMapId, selectedMapCategory, isMobile, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, t, isUserMapMode, favoriteMaps]);
+  }, [selectedMapId, selectedMapCategory, isMobile, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, t, isUserMapMode, favoriteMaps, clubMapSources]);
   
   const handleMapSelect = (mapName: MapSelection) => {
     if (multiSelectMode && mapName !== 'all') {
@@ -323,6 +343,15 @@ const RouteGame: React.FC = () => {
         if (selectedMapCategory === 'private') {
           result = await getUserRoutes(isMobile);
           result.routes = result.routes.filter(r => r.mapName?.toLowerCase() === mapName.toLowerCase());
+        } else if (selectedMapCategory === 'club') {
+          const aspect = isMobile ? '9_16' : '16_9';
+          const mapSource = clubMapSources.find(m => m.name.toLowerCase() === mapName.toLowerCase());
+          if (mapSource) {
+            const fetched = await fetchRouteDataForMap({ ...mapSource, aspect });
+            result = { routes: fetched, maps: [mapSource] };
+          } else {
+            result = { routes: [], maps: [] };
+          }
         } else if (selectedMapCategory === 'community') {
           result = await getCommunityRoutes(mapName, isMobile);
         } else {
@@ -659,11 +688,11 @@ const RouteGame: React.FC = () => {
                           {uniqueClubMapNames.map(mapName => {
                             const mapSource = clubMapSources.find(m => m.name === mapName);
                             const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
-                            const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'community';
+                            const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'club';
                             return (
                               <button
                                 key={mapName}
-                                onClick={() => { handleMapSelect(mapName); if (!multiSelectMode) setSelectedMapCategory('community'); }}
+                                onClick={() => { handleMapSelect(mapName); if (!multiSelectMode) setSelectedMapCategory('club'); }}
                                 className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
                                   isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
                                 }`}

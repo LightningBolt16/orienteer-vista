@@ -39,7 +39,7 @@ export interface MapSource {
   namingScheme?: 'new' | 'old';
   isDbMap?: boolean;
   isUserMap?: boolean;
-  mapCategory?: 'official' | 'private' | 'community';
+  mapCategory?: 'official' | 'private' | 'community' | 'club';
   latitude?: number;
   longitude?: number;
   locationName?: string;
@@ -161,7 +161,7 @@ export async function getAvailableMaps(userId?: string | null): Promise<MapSourc
       
       const maps: MapSource[] = dbMaps.map(map => {
         // Determine map category
-        let mapCategory: 'official' | 'private' | 'community' = 'official';
+        let mapCategory: 'official' | 'private' | 'community' | 'club' = 'official';
         if ((map as any).map_category) {
           mapCategory = (map as any).map_category;
         } else if (map.user_id !== null && !map.is_public) {
