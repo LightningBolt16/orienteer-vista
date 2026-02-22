@@ -503,6 +503,7 @@ export type Database = {
       }
       route_finder_maps: {
         Row: {
+          club_id: string | null
           country_code: string | null
           created_at: string | null
           description: string | null
@@ -517,6 +518,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          club_id?: string | null
           country_code?: string | null
           created_at?: string | null
           description?: string | null
@@ -531,6 +533,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          club_id?: string | null
           country_code?: string | null
           created_at?: string | null
           description?: string | null
@@ -545,6 +548,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "route_finder_maps_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "route_finder_maps_source_map_id_fkey"
             columns: ["source_map_id"]
@@ -609,6 +619,7 @@ export type Database = {
       }
       route_maps: {
         Row: {
+          club_id: string | null
           country_code: string | null
           created_at: string
           description: string | null
@@ -627,6 +638,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          club_id?: string | null
           country_code?: string | null
           created_at?: string
           description?: string | null
@@ -645,6 +657,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          club_id?: string | null
           country_code?: string | null
           created_at?: string
           description?: string | null
@@ -668,6 +681,13 @@ export type Database = {
             columns: ["source_map_id"]
             isOneToOne: false
             referencedRelation: "user_maps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_maps_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
         ]

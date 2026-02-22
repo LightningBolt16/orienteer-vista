@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,8 @@ interface PublishRouteFinderMapDialogProps {
   mapId: string;
   mapName: string;
   onPublished: () => void;
+  clubId?: string | null;
+  clubName?: string | null;
 }
 
 interface LocationData {
@@ -37,6 +40,8 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
   mapId,
   mapName,
   onPublished,
+  clubId,
+  clubName,
 }) => {
   const { user } = useUser();
   const [title, setTitle] = useState(mapName);
@@ -45,6 +50,7 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
   const [publishing, setPublishing] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [publishTarget, setPublishTarget] = useState<'community' | 'club'>(clubId ? 'club' : 'community');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +100,7 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
       return;
     }
 
-    if (!location) {
+    if (publishTarget === 'community' && !location) {
       toast({
         title: 'Location required',
         description: 'Please select a location on the map',
@@ -105,23 +111,33 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
 
     setPublishing(true);
     try {
-      // Update the route_finder_maps entry to make it public
+      // Update the route_finder_maps entry
+      const updateData: Record<string, any> = {
+        name: title.trim(),
+        description: description.trim() || null,
+      };
+
+      if (publishTarget === 'club' && clubId) {
+        updateData.club_id = clubId;
+        updateData.is_public = false;
+        updateData.map_category = 'club';
+      } else {
+        updateData.is_public = true;
+        updateData.map_category = 'community';
+        updateData.location_name = location?.name || null;
+      }
+
       const { error: updateError } = await supabase
         .from('route_finder_maps')
-        .update({
-          name: title.trim(),
-          description: description.trim() || null,
-          is_public: true,
-          map_category: 'community',
-          location_name: location.name,
-        })
+        .update(updateData)
         .eq('id', mapId);
 
       if (updateError) throw updateError;
 
+      const targetLabel = publishTarget === 'club' ? clubName || 'your club' : 'Community Maps';
       toast({
         title: 'Map Published!',
-        description: 'Your Route Finder map is now available in the Community Maps section.',
+        description: `Your Route Finder map is now available in ${targetLabel}.`,
       });
 
       onPublished();
@@ -143,16 +159,44 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-green-500" />
-            Share Route Finder Map to Community
+            <Globe className="h-5 w-5 text-primary" />
+            Share Route Finder Map
           </DialogTitle>
           <DialogDescription>
-            Make your Route Finder map available for other orienteers to practice with. 
-            Once published, it will appear in the Community Maps section.
+            Share your map with the community or your club members.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Publish target selector */}
+          {clubId && (
+            <div className="space-y-2">
+              <Label>Publish to</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={publishTarget === 'community' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPublishTarget('community')}
+                  className="gap-2"
+                >
+                  <Globe className="h-4 w-4" />
+                  Community
+                </Button>
+                <Button
+                  type="button"
+                  variant={publishTarget === 'club' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPublishTarget('club')}
+                  className="gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  {clubName || 'Club'}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="title">Map Title *</Label>
             <Input
@@ -174,13 +218,15 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Location *</Label>
-            <LocationPicker
-              value={location || undefined}
-              onChange={setLocation}
-            />
-          </div>
+          {publishTarget === 'community' && (
+            <div className="space-y-2">
+              <Label>Location *</Label>
+              <LocationPicker
+                value={location || undefined}
+                onChange={setLocation}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Map Logo (optional)</Label>
@@ -235,7 +281,7 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
           <Button
             type="button"
             onClick={handlePublish}
-            disabled={publishing || !title.trim() || !location}
+            disabled={publishing || !title.trim() || (publishTarget === 'community' && !location)}
           >
             {publishing ? (
               <>
@@ -244,8 +290,8 @@ const PublishRouteFinderMapDialog: React.FC<PublishRouteFinderMapDialogProps> = 
               </>
             ) : (
               <>
-                <Globe className="h-4 w-4 mr-2" />
-                Publish to Community
+                {publishTarget === 'club' ? <Users className="h-4 w-4 mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
+                Publish to {publishTarget === 'club' ? (clubName || 'Club') : 'Community'}
               </>
             )}
           </Button>

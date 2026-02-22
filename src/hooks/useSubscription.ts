@@ -7,6 +7,8 @@ export type PlanType = 'free' | 'personal' | 'club';
 export interface SubscriptionState {
   plan: PlanType;
   isActive: boolean;
+  isManual: boolean;
+  clubId: string | null;
   subscriptionEnd: string | null;
   loading: boolean;
   refetch: () => Promise<void>;
@@ -32,6 +34,8 @@ export function useSubscription(): SubscriptionState {
   const { user } = useUser();
   const [plan, setPlan] = useState<PlanType>('free');
   const [isActive, setIsActive] = useState(false);
+  const [isManual, setIsManual] = useState(false);
+  const [clubId, setClubId] = useState<string | null>(null);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +43,8 @@ export function useSubscription(): SubscriptionState {
     if (!user) {
       setPlan('free');
       setIsActive(false);
+      setIsManual(false);
+      setClubId(null);
       setSubscriptionEnd(null);
       setLoading(false);
       return;
@@ -51,15 +57,21 @@ export function useSubscription(): SubscriptionState {
         console.error('Error checking subscription:', error);
         setPlan('free');
         setIsActive(false);
+        setIsManual(false);
+        setClubId(null);
       } else if (data) {
         setPlan(data.plan || 'free');
         setIsActive(data.subscribed === true);
+        setIsManual(data.is_manual === true);
+        setClubId(data.club_id || null);
         setSubscriptionEnd(data.subscription_end || null);
       }
     } catch (error) {
       console.error('Error checking subscription:', error);
       setPlan('free');
       setIsActive(false);
+      setIsManual(false);
+      setClubId(null);
     } finally {
       setLoading(false);
     }
@@ -76,5 +88,5 @@ export function useSubscription(): SubscriptionState {
     return () => clearInterval(interval);
   }, [user, checkSubscription]);
 
-  return { plan, isActive, subscriptionEnd, loading, refetch: checkSubscription };
+  return { plan, isActive, isManual, clubId, subscriptionEnd, loading, refetch: checkSubscription };
 }
