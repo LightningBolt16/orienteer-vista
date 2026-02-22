@@ -41,6 +41,8 @@ async function checkManualSubscription(supabaseClient: any, userId: string) {
       subscribed: true,
       plan: directSub.plan_type,
       subscription_end: directSub.current_period_end,
+      is_manual: true,
+      club_id: directSub.club_id,
     };
   }
 
@@ -66,6 +68,8 @@ async function checkManualSubscription(supabaseClient: any, userId: string) {
         subscribed: true,
         plan: "club",
         subscription_end: clubSubscription.current_period_end,
+        is_manual: true,
+        club_id: clubSub.club_id,
       };
     }
   }

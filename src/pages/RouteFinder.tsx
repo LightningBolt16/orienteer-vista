@@ -11,6 +11,7 @@ import { Loader2, LogIn, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSubscription } from '@/hooks/useSubscription';
 import Layout from '@/components/Layout';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import { toast as sonnerToast } from 'sonner';
@@ -30,9 +31,11 @@ const RouteFinder: React.FC = () => {
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { plan, isActive, clubId: subClubId } = useSubscription();
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapOption[]>([]);
   const [privateMaps, setPrivateMaps] = useState<MapOption[]>([]);
+  const [clubMaps, setClubMaps] = useState<MapOption[]>([]);
   const [communityMaps, setCommunityMaps] = useState<MapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
   const [debugMode, setDebugMode] = useState(false);
@@ -47,16 +50,31 @@ const RouteFinder: React.FC = () => {
   
   // Collapsible sections
   const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
+  const [clubMapsOpen, setClubMapsOpen] = useState(false);
   const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
   
   // Warm-up state - first challenge doesn't count
   const [isWarmUp, setIsWarmUp] = useState(true);
   const [gameKey] = useState(0);
 
+  // Club info
+  const [clubName, setClubName] = useState<string | null>(null);
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+
   // Publishing dialog
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishingMapId, setPublishingMapId] = useState<string>('');
   const [publishingMapName, setPublishingMapName] = useState<string>('');
+
+  // Load club info
+  useEffect(() => {
+    if (!subClubId) return;
+    const loadClub = async () => {
+      const { data } = await supabase.from('clubs').select('name, logo_url').eq('id', subClubId).single();
+      if (data) { setClubName(data.name); setClubLogoUrl(data.logo_url); }
+    };
+    loadClub();
+  }, [subClubId]);
 
   // Determine if a PWT map is selected (for showing footer)
   const selectedMap = selectedMapId ? maps.find(m => m.id === selectedMapId) : null;
@@ -121,28 +139,36 @@ const RouteFinder: React.FC = () => {
           setPrivateMaps(userPrivateMaps);
         }
 
+        // Load club maps if user is in a club with active subscription
+        if (subClubId) {
+          const { data: clubData, error: clubError } = await supabase
+            .from('route_finder_maps')
+            .select(`id, name, description, country_code, location_name, route_finder_challenges(id)`)
+            .eq('club_id', subClubId)
+            .eq('map_category', 'club');
+
+          if (!clubError && clubData) {
+            const clubMapsList: MapOption[] = clubData.map((m: any) => ({
+              id: m.id, name: m.name, description: m.description,
+              country_code: m.country_code, location_name: m.location_name,
+              challenge_count: m.route_finder_challenges?.length || 0,
+            })).filter(m => m.challenge_count > 0);
+            setClubMaps(clubMapsList);
+          }
+        }
+
         // Load community maps (public, community category)
         const { data: communityData, error: communityError } = await supabase
           .from('route_finder_maps')
-          .select(`
-            id,
-            name,
-            description,
-            country_code,
-            location_name,
-            route_finder_challenges(id)
-          `)
+          .select(`id, name, description, country_code, location_name, route_finder_challenges(id)`)
           .eq('is_public', true)
           .eq('map_category', 'community')
           .eq('is_hidden', false);
 
         if (!communityError && communityData) {
           const commMaps: MapOption[] = communityData.map((m: any) => ({
-            id: m.id,
-            name: m.name,
-            description: m.description,
-            country_code: m.country_code,
-            location_name: m.location_name,
+            id: m.id, name: m.name, description: m.description,
+            country_code: m.country_code, location_name: m.location_name,
             challenge_count: m.route_finder_challenges?.length || 0,
           })).filter(m => m.challenge_count > 0);
           setCommunityMaps(commMaps);
@@ -153,7 +179,7 @@ const RouteFinder: React.FC = () => {
     } finally {
       setIsLoadingMaps(false);
     }
-  }, [user]);
+  }, [user, subClubId]);
 
   useEffect(() => {
     loadMaps();

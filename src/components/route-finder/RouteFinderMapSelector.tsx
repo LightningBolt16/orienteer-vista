@@ -34,6 +34,12 @@ interface RouteFinderMapSelectorProps {
   privateMaps?: MapOption[];
   privateMapsOpen?: boolean;
   onPrivateMapsOpenChange?: (open: boolean) => void;
+  // Club maps
+  clubMaps?: MapOption[];
+  clubMapsOpen?: boolean;
+  onClubMapsOpenChange?: (open: boolean) => void;
+  clubName?: string | null;
+  clubLogoUrl?: string | null;
   // Community maps
   communityMaps?: MapOption[];
   communityMapsOpen?: boolean;
@@ -58,6 +64,11 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
   privateMaps = [],
   privateMapsOpen = false,
   onPrivateMapsOpenChange,
+  clubMaps = [],
+  clubMapsOpen = false,
+  onClubMapsOpenChange,
+  clubName,
+  clubLogoUrl,
   communityMaps = [],
   communityMapsOpen = false,
   onCommunityMapsOpenChange,
@@ -282,6 +293,57 @@ const RouteFinderMapSelector: React.FC<RouteFinderMapSelectorProps> = ({
                 })}
               </div>
             )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Club Maps - Collapsible */}
+      {clubMaps.length > 0 && onClubMapsOpenChange && (
+        <Collapsible open={clubMapsOpen} onOpenChange={onClubMapsOpenChange}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+              <div className="flex items-center gap-2">
+                {clubLogoUrl ? (
+                  <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-4 w-4 object-contain rounded-sm" />
+                ) : (
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="font-medium">{clubName || 'Club'} Maps</span>
+                <span className="text-xs text-muted-foreground">({clubMaps.length})</span>
+              </div>
+              {clubMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {clubMaps.map((map) => {
+                const isMapSelected = isSelected(map.id);
+                return (
+                  <button
+                    key={map.id}
+                    onClick={() => handleMapClick(map.id)}
+                    className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                      isMapSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                    }`}
+                  >
+                    {multiSelectMode && isMapSelected && (
+                      <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                        <Check className="h-3 w-3 text-primary-foreground" />
+                      </div>
+                    )}
+                    {clubLogoUrl ? (
+                      <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-8 w-8 mb-2 object-contain rounded" />
+                    ) : (
+                      <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+                    )}
+                    <span className="font-medium text-sm">{map.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {map.challenge_count} challenge{map.challenge_count !== 1 ? 's' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </CollapsibleContent>
         </Collapsible>
       )}

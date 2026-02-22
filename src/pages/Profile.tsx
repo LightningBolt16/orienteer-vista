@@ -69,7 +69,7 @@ const Profile: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { plan, isActive, subscriptionEnd, loading: subLoading, refetch: refetchSub } = useSubscription();
+  const { plan, isActive, isManual, subscriptionEnd, loading: subLoading, refetch: refetchSub } = useSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
   const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>([]);
   const [newFeatureTitle, setNewFeatureTitle] = useState('');
@@ -678,16 +678,25 @@ const Profile: React.FC = () => {
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     Your {plan === 'personal' ? 'Personal' : 'Club'} plan is active.
-                    {subscriptionEnd && ` Next billing: ${new Date(subscriptionEnd).toLocaleDateString()}`}
+                    {!isManual && subscriptionEnd && ` Next billing: ${new Date(subscriptionEnd).toLocaleDateString()}`}
                   </p>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleManageSubscription} 
-                    disabled={portalLoading}
-                  >
-                    {portalLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crown className="h-4 w-4 mr-2" />}
-                    Manage Subscription
-                  </Button>
+                  {isManual ? (
+                    <div className="p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                      <p className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+                        <Crown className="h-4 w-4" />
+                        You have a complimentary {plan === 'club' ? 'Club' : 'Personal'} licence. No billing required.
+                      </p>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleManageSubscription} 
+                      disabled={portalLoading}
+                    >
+                      {portalLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crown className="h-4 w-4 mr-2" />}
+                      Manage Subscription
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
