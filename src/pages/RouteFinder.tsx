@@ -320,6 +320,11 @@ const RouteFinder: React.FC = () => {
                 privateMaps={privateMaps}
                 privateMapsOpen={privateMapsOpen}
                 onPrivateMapsOpenChange={setPrivateMapsOpen}
+                clubMaps={clubMaps}
+                clubMapsOpen={clubMapsOpen}
+                onClubMapsOpenChange={setClubMapsOpen}
+                clubName={clubName}
+                clubLogoUrl={clubLogoUrl}
                 communityMaps={communityMaps}
                 communityMapsOpen={communityMapsOpen}
                 onCommunityMapsOpenChange={setCommunityMapsOpen}
@@ -390,6 +395,8 @@ const RouteFinder: React.FC = () => {
           mapId={publishingMapId}
           mapName={publishingMapName}
           onPublished={handlePublished}
+          clubId={subClubId}
+          clubName={clubName}
         />
       </div>
     </Layout>

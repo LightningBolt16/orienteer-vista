@@ -23,6 +23,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
 import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
 import PublishRouteMapDialog from '@/components/sharing/PublishRouteMapDialog';
+import { useSubscription } from '@/hooks/useSubscription';
+import { supabase } from '@/integrations/supabase/client';
 
 type MapSelection = 'all' | string;
 type MapCategory = 'official' | 'private' | 'community';
@@ -46,6 +48,7 @@ const RouteGame: React.FC = () => {
   const { desktopCache, mobileCache, isPreloading, getRoutesForMap, getUserRoutes, getCommunityRoutes, officialMaps, userMaps, communityMaps } = useRouteCache();
   const { showTutorial, closeTutorial } = useRouteGameTutorial();
   const { favorites, favoriteMaps, toggleFavorite, isFavorite, loading: favoritesLoading } = useCommunityFavorites();
+  const { clubId: subClubId } = useSubscription();
   
   // Check for user map parameter
   const userMapId = searchParams.get('map');
@@ -61,12 +64,52 @@ const RouteGame: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [userMapName, setUserMapName] = useState<string>('');
   const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
+  const [clubMapsOpen, setClubMapsOpen] = useState(false);
   const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const [publishMapId, setPublishMapId] = useState<string | null>(null);
   const [publishMapName, setPublishMapName] = useState('');
+
+  // Club info
+  const [clubName, setClubName] = useState<string | null>(null);
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [clubMapSources, setClubMapSources] = useState<MapSource[]>([]);
+  const uniqueClubMapNames = getUniqueMapNames(clubMapSources);
+
+  // Load club info and club maps
+  useEffect(() => {
+    if (!subClubId) return;
+    const loadClubData = async () => {
+      const { data: club } = await supabase.from('clubs').select('name, logo_url').eq('id', subClubId).single();
+      if (club) { setClubName(club.name); setClubLogoUrl(club.logo_url); }
+
+      // Load club route_maps
+      const { data: clubRouteMaps } = await supabase
+        .from('route_maps')
+        .select('id, name, description, country_code, logo_path, map_type, location_name')
+        .eq('club_id', subClubId)
+        .eq('map_category', 'club');
+
+      if (clubRouteMaps) {
+        const clubSources: MapSource[] = clubRouteMaps.map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          aspect: '16:9',
+          description: m.description,
+          countryCode: m.country_code,
+          logoPath: m.logo_path,
+          mapType: m.map_type,
+          locationName: m.location_name,
+          isDbMap: true,
+          mapCategory: 'community' as const,
+        }));
+        setClubMapSources(clubSources);
+      }
+    };
+    loadClubData();
+  }, [subClubId]);
 
   // Get available maps from cache - only official maps for the main grid
   const cache = isMobile ? mobileCache : desktopCache;
@@ -594,6 +637,57 @@ const RouteGame: React.FC = () => {
                     </Collapsible>
                   )}
 
+                  {/* Club Maps - Collapsible (only for club subscribers) */}
+                  {subClubId && uniqueClubMapNames.length > 0 && (
+                    <Collapsible open={clubMapsOpen} onOpenChange={setClubMapsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
+                          <div className="flex items-center gap-2">
+                            {clubLogoUrl ? (
+                              <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-4 w-4 object-contain rounded-sm" />
+                            ) : (
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="font-medium">{clubName || 'Club'} Maps</span>
+                            <span className="text-xs text-muted-foreground">({uniqueClubMapNames.length})</span>
+                          </div>
+                          {clubMapsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {uniqueClubMapNames.map(mapName => {
+                            const mapSource = clubMapSources.find(m => m.name === mapName);
+                            const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
+                            const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'community';
+                            return (
+                              <button
+                                key={mapName}
+                                onClick={() => { handleMapSelect(mapName); if (!multiSelectMode) setSelectedMapCategory('community'); }}
+                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
+                                  isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                                }`}
+                              >
+                                {multiSelectMode && isMultiSelected && (
+                                  <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
+                                    <Check className="h-3 w-3 text-primary-foreground" />
+                                  </div>
+                                )}
+                                {clubLogoUrl ? (
+                                  <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-8 w-8 mb-2 object-contain rounded" />
+                                ) : (
+                                  <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+                                )}
+                                <span className="font-medium text-sm">{mapName}</span>
+                                <span className="text-xs text-muted-foreground">{mapSource?.description || 'Club map'}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
                   {/* Community Maps - Collapsible */}
                   <Collapsible open={communityMapsOpen} onOpenChange={setCommunityMapsOpen}>
                     <CollapsibleTrigger asChild>
@@ -790,6 +884,8 @@ const RouteGame: React.FC = () => {
           mapId={publishMapId}
           mapName={publishMapName}
           onPublished={() => setPublishMapId(null)}
+          clubId={subClubId}
+          clubName={clubName}
         />
       )}
     </div>
