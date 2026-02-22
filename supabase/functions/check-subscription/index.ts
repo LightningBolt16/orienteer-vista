@@ -15,12 +15,12 @@ const logStep = (step: string, details?: any) => {
 // Stripe product/price mapping
 const PRODUCTS = {
   personal: {
-    product_id: "prod_U1DUQzYIDkyKaw",
-    price_id: "price_1T3B3QGrzNv0iKS9XxXnLwFY",
+    product_id: "prod_U1gEfKft0U0MEA",
+    price_id: "price_1T3crbGrzNv0iKS9FcNOBmtP",
   },
   club: {
-    product_id: "prod_U1DZvSaAlZjkI4",
-    price_id: "price_1T3B8NGrzNv0iKS9IO3tIol0",
+    product_id: "prod_U1gHySCgj6lLk2",
+    price_id: "price_1T3cudGrzNv0iKS9fjTNLdrC",
   },
 };
 

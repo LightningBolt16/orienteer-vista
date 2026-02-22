@@ -2,10 +2,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, CreditCard, Shield, Users, Award, Clock, X, Star, MapPin, FolderPlus, Share2, Trophy, Crown, Map, Loader2 } from 'lucide-react';
+import { Check, CreditCard, Shield, Users, Award, X, Star, Map, Loader2, Heart, MessageSquare, MapPin, Compass } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { toast } from '@/components/ui/use-toast';
-import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -63,55 +62,43 @@ const Subscription: React.FC = () => {
   // Feature comparison data
   const features: PlanFeature[] = [
     {
-      title: "Route Choice Game",
-      free: "100 plays per day",
+      title: "Route Game / Route Finder",
+      free: "Unlimited",
       personal: "Unlimited",
       club: "Unlimited for all members",
-      icon: <Trophy className="h-5 w-5 text-orange-500" />
+      icon: <Compass className="h-5 w-5 text-orange-500" />
     },
     {
-      title: "Course Projects",
-      free: "Up to 5 projects",
-      personal: "Unlimited",
+      title: "Private Map Processing",
+      free: "Limited (5 lifetime uploads)",
+      personal: "Unlimited (Pro parameters)",
       club: "Unlimited for all members",
-      icon: <FolderPlus className="h-5 w-5 text-blue-500" />
-    },
-    {
-      title: "Map Storage",
-      free: "Up to 3 maps",
-      personal: "Unlimited",
-      club: "Unlimited",
       icon: <Map className="h-5 w-5 text-green-500" />
     },
     {
-      title: "Project Sharing",
-      free: false,
-      personal: true,
-      club: true,
-      icon: <Share2 className="h-5 w-5 text-purple-500" />
-    },
-    {
-      title: "Role-Based Access Control",
+      title: "Club-Shared Private Maps",
       free: false,
       personal: false,
       club: true,
-      icon: <Crown className="h-5 w-5 text-yellow-500" />
+      icon: <Users className="h-5 w-5 text-blue-500" />
     },
-    {
-      title: "Project Manager Access",
-      free: false,
-      personal: "Basic",
-      club: "Advanced",
-      icon: <MapPin className="h-5 w-5 text-red-500" />
-    }
   ];
+
+  const FeatureCell = ({ value }: { value: boolean | string }) => {
+    if (typeof value === 'boolean') {
+      return value ? 
+        <Check className="mx-auto h-5 w-5 text-green-500" /> : 
+        <X className="mx-auto h-5 w-5 text-muted-foreground/40" />;
+    }
+    return <span className="text-sm">{value}</span>;
+  };
 
   return (
     <div className="container max-w-6xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
         <h1 className="text-3xl font-bold tracking-tight">{t('pricingPlans')}</h1>
         <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
-          Choose the perfect plan to enhance your orienteering experience with premium features.
+          Choose the perfect plan to enhance your orienteering training with private map processing and more.
         </p>
       </div>
       
@@ -129,11 +116,11 @@ const Subscription: React.FC = () => {
             </div>
             <div className="p-6 border-r text-center bg-orienteering/5">
               <h3 className="text-lg font-semibold">Personal</h3>
-              <p className="font-medium text-orienteering">{t('personalPlanPrice')}</p>
+              <p className="font-medium text-orienteering">29 kr/mo</p>
             </div>
             <div className="p-6 text-center">
               <h3 className="text-lg font-semibold">Club</h3>
-              <p className="font-medium text-orienteering">{t('clubPlanPrice')}</p>
+              <p className="font-medium text-orienteering">100 kr/mo</p>
             </div>
             
             {/* Feature rows */}
@@ -143,35 +130,14 @@ const Subscription: React.FC = () => {
                   {feature.icon}
                   <span className="font-medium">{feature.title}</span>
                 </div>
-                {/* Free plan */}
                 <div className={`p-6 text-center border-t border-r ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
-                  {typeof feature.free === 'boolean' ? (
-                    feature.free ? 
-                      <Check className="mx-auto h-5 w-5 text-green-500" /> : 
-                      <X className="mx-auto h-5 w-5 text-red-500" />
-                  ) : (
-                    <span className="text-sm">{feature.free}</span>
-                  )}
+                  <FeatureCell value={feature.free} />
                 </div>
-                {/* Personal plan */}
                 <div className={`p-6 text-center border-t border-r ${idx % 2 === 0 ? 'bg-muted/20 bg-orienteering/5' : 'bg-orienteering/5'}`}>
-                  {typeof feature.personal === 'boolean' ? (
-                    feature.personal ? 
-                      <Check className="mx-auto h-5 w-5 text-green-500" /> : 
-                      <X className="mx-auto h-5 w-5 text-red-500" />
-                  ) : (
-                    <span className="text-sm">{feature.personal}</span>
-                  )}
+                  <FeatureCell value={feature.personal} />
                 </div>
-                {/* Club plan */}
                 <div className={`p-6 text-center border-t ${idx % 2 === 0 ? 'bg-muted/20' : ''}`}>
-                  {typeof feature.club === 'boolean' ? (
-                    feature.club ? 
-                      <Check className="mx-auto h-5 w-5 text-green-500" /> : 
-                      <X className="mx-auto h-5 w-5 text-red-500" />
-                  ) : (
-                    <span className="text-sm">{feature.club}</span>
-                  )}
+                  <FeatureCell value={feature.club} />
                 </div>
               </React.Fragment>
             ))}
@@ -209,7 +175,7 @@ const Subscription: React.FC = () => {
                               {typeof feature.free === 'boolean' ? (
                                 feature.free ? 
                                   <Check className="h-5 w-5 text-green-500" /> : 
-                                  <X className="h-5 w-5 text-red-500" />
+                                  <X className="h-5 w-5 text-muted-foreground/40" />
                               ) : (
                                 <span>{feature.free}</span>
                               )}
@@ -237,7 +203,7 @@ const Subscription: React.FC = () => {
                   <CardHeader className="text-center pb-2">
                     <CardTitle>{t('personalPlan')}</CardTitle>
                     <CardDescription className="text-lg font-semibold text-orienteering">
-                      {t('personalPlanPrice')}
+                      29 kr/mo
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -259,7 +225,7 @@ const Subscription: React.FC = () => {
                               {typeof feature.personal === 'boolean' ? (
                                 feature.personal ? 
                                   <Check className="h-5 w-5 text-green-500" /> : 
-                                  <X className="h-5 w-5 text-red-500" />
+                                  <X className="h-5 w-5 text-muted-foreground/40" />
                               ) : (
                                 <span>{feature.personal}</span>
                               )}
@@ -293,7 +259,7 @@ const Subscription: React.FC = () => {
                       </span>
                     </div>
                     <CardDescription className="text-lg font-semibold text-orienteering">
-                      {t('clubPlanPrice')}
+                      100 kr/mo
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -315,7 +281,7 @@ const Subscription: React.FC = () => {
                               {typeof feature.club === 'boolean' ? (
                                 feature.club ? 
                                   <Check className="h-5 w-5 text-green-500" /> : 
-                                  <X className="h-5 w-5 text-red-500" />
+                                  <X className="h-5 w-5 text-muted-foreground/40" />
                               ) : (
                                 <span>{feature.club}</span>
                               )}
@@ -357,19 +323,19 @@ const Subscription: React.FC = () => {
             <CardDescription>Perfect for beginners to try the platform</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow">
-            <div className="text-4xl font-bold mb-6">₀ kr</div>
+            <div className="text-4xl font-bold mb-6">0 kr</div>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Access to route choice game (100 plays per day)</span>
+                <span>Unlimited route game and route finder plays</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Create up to 5 course projects</span>
+                <span>Limited map processing (basic parameters)</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Upload up to 3 maps</span>
+                <span>Up to 5 lifetime map uploads</span>
               </li>
             </ul>
           </CardContent>
@@ -391,26 +357,26 @@ const Subscription: React.FC = () => {
               <Shield className="h-5 w-5 text-orienteering mr-2" />
               {t('personalPlan')}
             </CardTitle>
-            <CardDescription>{t('personalPlanDescription')}</CardDescription>
+            <CardDescription>For dedicated orienteers who want to train on their own maps</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow">
-            <div className="text-4xl font-bold mb-6">{t('personalPlanPrice')}</div>
+            <div className="text-4xl font-bold mb-6">29 kr/mo</div>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Unlimited route choice plays</span>
+                <span>Everything in Free</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Unlimited course projects</span>
+                <span>Unlimited private map processing with pro parameters</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Unlimited map uploads</span>
+                <span>Support development and request features</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Share projects with others</span>
+                <span>Practice on your own maps, prepare for competitions</span>
               </li>
             </ul>
           </CardContent>
@@ -438,26 +404,22 @@ const Subscription: React.FC = () => {
                 Popular
               </span>
             </div>
-            <CardDescription>{t('clubPlanDescription')}</CardDescription>
+            <CardDescription>Pro access for your entire club with shared maps</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow">
-            <div className="text-4xl font-bold mb-6">{t('clubPlanPrice')}</div>
+            <div className="text-4xl font-bold mb-6">100 kr/mo</div>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Everything in Personal Plan for all club members</span>
+                <span>Everything in Personal for all club members</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Role-based access control</span>
+                <span>Club-shared private maps (visible only to your club)</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Advanced project management</span>
-              </li>
-              <li className="flex items-start">
-                <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 shrink-0" />
-                <span>Priority support</span>
+                <span>Manage club training with shared map library</span>
               </li>
             </ul>
           </CardContent>
@@ -473,132 +435,32 @@ const Subscription: React.FC = () => {
           </CardFooter>
         </Card>
       </div>
-
-      <div className="mt-16">
-        <h2 className="text-2xl font-bold mb-8 flex items-center">
-          <Award className="h-6 w-6 text-orienteering mr-3" />
-          Role-Based Access in Club Plan
-        </h2>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Club Roles</h3>
-                <p className="text-muted-foreground mb-4">
-                  The Club Plan includes a sophisticated permission system that allows for granular control over who can access what:
-                </p>
-                
-                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Shield className="h-4 w-4 text-orienteering mr-2" />
-                      Admin
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Full access to all club projects, maps, and member management</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Users className="h-4 w-4 text-blue-500 mr-2" />
-                      Coach
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Can manage training projects and share with members</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Map className="h-4 w-4 text-green-500 mr-2" />
-                      Course Setter
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Can create/edit projects according to assigned category</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Trophy className="h-4 w-4 text-yellow-500 mr-2" />
-                      Event Organizer
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Can manage competition projects and event schedules</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Clock className="h-4 w-4 text-purple-500 mr-2" />
-                      Reviewer
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Can view and suggest changes to projects</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Star className="h-4 w-4 text-orange-500 mr-2" />
-                      Member
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Basic access to club resources as assigned by other roles</p>
-                  </div>
-                </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Project Access Categories</h3>
-                <p className="text-muted-foreground mb-4">
-                  Different project types have different access requirements:
-                </p>
-                
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <FolderPlus className="h-4 w-4 text-blue-500 mr-2" />
-                      Training
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Broadly shared within the club, coaches can manage</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <FolderPlus className="h-4 w-4 text-green-500 mr-2" />
-                      Club Events
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Controlled access with review process</p>
-                  </div>
-                  
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <FolderPlus className="h-4 w-4 text-red-500 mr-2" />
-                      Competitions
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Restricted access with manually assigned permissions</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
       
       <div className="mt-16 bg-muted/50 rounded-lg p-8">
         <h2 className="text-2xl font-bold mb-6 flex items-center">
           <Award className="h-6 w-6 text-orienteering mr-3" />
           Premium benefits
         </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-background p-5 rounded-lg shadow-sm">
-            <Clock className="h-8 w-8 text-orienteering mb-3" />
-            <h3 className="font-medium text-lg mb-2">Early Access</h3>
-            <p className="text-muted-foreground">Get access to new features and maps before they're publicly available.</p>
+            <Heart className="h-8 w-8 text-orienteering mb-3" />
+            <h3 className="font-medium text-lg mb-2">Support Development</h3>
+            <p className="text-muted-foreground">Help us build new features and improve the platform for the orienteering community.</p>
           </div>
           <div className="bg-background p-5 rounded-lg shadow-sm">
-            <Users className="h-8 w-8 text-orienteering mb-3" />
-            <h3 className="font-medium text-lg mb-2">Community Sharing</h3>
-            <p className="text-muted-foreground">Share your courses and route choices with the community.</p>
+            <MessageSquare className="h-8 w-8 text-orienteering mb-3" />
+            <h3 className="font-medium text-lg mb-2">Request Features</h3>
+            <p className="text-muted-foreground">Get a voice in what we build next — your input shapes the roadmap.</p>
           </div>
           <div className="bg-background p-5 rounded-lg shadow-sm">
-            <Shield className="h-8 w-8 text-orienteering mb-3" />
-            <h3 className="font-medium text-lg mb-2">Priority Support</h3>
-            <p className="text-muted-foreground">Get dedicated support for any questions or issues.</p>
+            <Map className="h-8 w-8 text-orienteering mb-3" />
+            <h3 className="font-medium text-lg mb-2">Train on Your Maps</h3>
+            <p className="text-muted-foreground">Process your own maps for personalized route choice training.</p>
+          </div>
+          <div className="bg-background p-5 rounded-lg shadow-sm">
+            <Compass className="h-8 w-8 text-orienteering mb-3" />
+            <h3 className="font-medium text-lg mb-2">Prepare for Competitions</h3>
+            <p className="text-muted-foreground">Practice route choices on real competition terrain before race day.</p>
           </div>
         </div>
       </div>

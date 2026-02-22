@@ -736,6 +736,7 @@ export type Database = {
       user_maps: {
         Row: {
           bw_tif_path: string
+          club_id: string | null
           color_tif_path: string
           created_at: string
           error_message: string | null
@@ -756,6 +757,7 @@ export type Database = {
         }
         Insert: {
           bw_tif_path: string
+          club_id?: string | null
           color_tif_path: string
           created_at?: string
           error_message?: string | null
@@ -776,6 +778,7 @@ export type Database = {
         }
         Update: {
           bw_tif_path?: string
+          club_id?: string | null
           color_tif_path?: string
           created_at?: string
           error_message?: string | null
@@ -794,7 +797,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_maps_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {

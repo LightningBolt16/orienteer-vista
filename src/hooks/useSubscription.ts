@@ -15,16 +15,16 @@ export interface SubscriptionState {
 // Stripe product/price mapping
 export const STRIPE_PLANS = {
   personal: {
-    product_id: "prod_U1DUQzYIDkyKaw",
-    price_id: "price_1T3B3QGrzNv0iKS9XxXnLwFY",
+    product_id: "prod_U1gEfKft0U0MEA",
+    price_id: "price_1T3crbGrzNv0iKS9FcNOBmtP",
     name: "Personal",
-    price: "49 kr/mo",
+    price: "29 kr/mo",
   },
   club: {
-    product_id: "prod_U1DZvSaAlZjkI4",
-    price_id: "price_1T3B8NGrzNv0iKS9IO3tIol0",
+    product_id: "prod_U1gHySCgj6lLk2",
+    price_id: "price_1T3cudGrzNv0iKS9fjTNLdrC",
     name: "Club",
-    price: "149 kr/mo",
+    price: "100 kr/mo",
   },
 } as const;
 
