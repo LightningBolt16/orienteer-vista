@@ -1,75 +1,50 @@
 
 
-## Subscription Model Overhaul
+## Plan: Fix Play Routes, Mobile Route Length Filter, and Club Maps Leaderboard
 
-### 1. Create New Stripe Prices
-The current products exist but have wrong prices. We need to create new prices:
-- **Personal Plan**: 29 SEK/month (currently 49 SEK) -- new price on existing product `prod_U1DUQzYIDkyKaw`
-- **Club Plan**: 100 SEK/month (currently 149 SEK) -- new price on existing product `prod_U1DZvSaAlZjkI4`
+### Issue 1: "Play Routes" from My Maps shows "No routes available"
 
-### 2. Update Price References
-Update `useSubscription.ts` and `check-subscription` edge function with the new price IDs returned from Stripe.
+**Root Cause:** When clicking "Play Routes" on the `/my-maps` page, it navigates to `/route-game?map={user_maps.id}`. The `loadUserMapRoutes` function in `routeDataUtils.ts` queries `route_images` filtered by `aspect_ratio = '16_9'` (desktop) or `'9_16'` (mobile). However, newer user maps (like "SOLTEST") only have images in `1:1` aspect ratio. Unlike `fetchRouteDataForMap`, `loadUserMapRoutes` does not check for `1:1` images as a fallback.
 
-### 3. Rework Subscription Page Features
-**Remove** these features from the comparison table:
-- Course Projects
-- Project Sharing
-- Role-Based Access Control
-- Project Manager Access
+**Fix:** Update `loadUserMapRoutes` in `src/utils/routeDataUtils.ts` to first check if `1:1` images exist for the map (same pattern used in `fetchRouteDataForMap`), and if so, query those instead of the requested aspect ratio.
 
-**Replace with accurate features:**
+**Files changed:**
+- `src/utils/routeDataUtils.ts` -- Add `1:1` fallback logic to `loadUserMapRoutes` (around line 509-514)
 
-| Feature | Free | Personal | Club |
-|---------|------|----------|------|
-| Route Game / Route Finder | Unlimited | Unlimited | Unlimited for all members |
-| Private Map Processing | Limited (5 lifetime uploads) | Unlimited (Pro parameters) | Unlimited for all members |
-| Club-Shared Private Maps | -- | -- | Yes (shared with club only) |
+---
 
-### 4. Rework Plan Card Descriptions
-**Free Plan card:**
-- Unlimited route game and route finder plays
-- Limited map processing (basic parameters)
-- Up to 5 lifetime map uploads
+### Issue 2: Limit routes shown on mobile to under 1500m in length
 
-**Personal Plan card:**
-- Everything in Free
-- Unlimited private map processing with pro parameters
-- Support development and request features
-- Practice on your own maps, prepare for competitions
+**What:** On mobile devices, filter out routes where `mainRouteLength >= 1500` to keep the game manageable on smaller screens.
 
-**Club Plan card:**
-- Everything in Personal for all club members
-- Club-shared private maps (visible only to your club)
-- Manage club training with shared map library
+**Where to apply:** In `src/pages/RouteGame.tsx`, after routes are loaded (in the route-loading `useEffect` around line 192-300), apply a filter on mobile. Also apply the same filter in `loadUserMapRoutes` results and in the `playSelectedMaps` function.
 
-### 5. Remove "Role-Based Access in Club Plan" Section
-The entire bottom section (lines 477-580) with club roles (Admin, Coach, Course Setter, Event Organizer, Reviewer, Member) and project access categories is removed -- these features don't exist yet.
+**Files changed:**
+- `src/pages/RouteGame.tsx` -- After setting `routes`, filter by `mainRouteLength < 1500` when `isMobile` is true. Apply in:
+  1. The main route-loading effect (after all category branches resolve routes)
+  2. The `loadUserMapRoutes` user-map-mode effect
+  3. The `playSelectedMaps` function
 
-### 6. Rework Premium Benefits Section
-**Remove:** "Community Sharing" and "Priority Support"
+---
 
-**Replace with:**
-- **Support Development** -- Help us build new features and improve the platform
-- **Request Features** -- Get a voice in what we build next
-- **Train on Your Maps** -- Process your own maps for personalized training
-- **Prepare for Competitions** -- Practice route choices on real competition terrain
+### Issue 3: Club maps leaderboard on My Club page
 
-### 7. Club-Shared Private Maps (New Feature Scaffolding)
-Add a `club_id` column (nullable) to the `user_maps` table so maps can be associated with a club. Update RLS policies so club members can view maps shared with their club. This enables the club-exclusive map sharing feature promoted in the Club plan.
+**Status:** This is already implemented in `ClubsPage.tsx` (lines 69-476). The "Club Maps" section with expandable per-map leaderboards exists. However, the club maps are fetched by looking up `user_maps` with the club's `club_id`, then finding `route_maps`/`route_finder_maps` by `source_map_id`. This should work if the maps were published correctly.
 
-### Technical Details
+Let me verify the query is matching club maps by also directly querying `route_maps` and `route_finder_maps` by `club_id` (which is set during the publish-to-club flow) as a fallback/additional source. Currently it only looks at `user_maps.club_id -> source_map_id`, but the publish flow sets `club_id` on `route_maps`/`route_finder_maps` directly.
 
-**Files to modify:**
-- `src/hooks/useSubscription.ts` -- update price IDs and display prices
-- `supabase/functions/check-subscription/index.ts` -- update price IDs
-- `src/pages/Subscription.tsx` -- full content rework (features, cards, benefits section)
+**Fix:** Update the club maps fetching in `ClubsPage.tsx` `fetchData` to also query `route_maps` and `route_finder_maps` directly by `club_id` (in addition to or instead of the `source_map_id` approach), since that is how publish-to-club stores the association.
 
-**New Stripe prices to create:**
-- Personal: 2900 ore (29 SEK) monthly on `prod_U1DUQzYIDkyKaw`
-- Club: 10000 ore (100 SEK) monthly on `prod_U1DZvSaAlZjkI4`
+**Files changed:**
+- `src/pages/ClubsPage.tsx` -- Replace or supplement the club maps query (lines 192-216) to also fetch maps where `club_id = membership.club_id` directly from `route_maps` and `route_finder_maps`
 
-**Database migration:**
-- Add `club_id` column to `user_maps` table (nullable UUID, references clubs)
-- Add RLS policy: club members can SELECT user_maps where club_id matches their club
-- Add RLS policy: club admins can INSERT user_maps with their club_id
+---
+
+### Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/utils/routeDataUtils.ts` | Add `1:1` aspect ratio fallback in `loadUserMapRoutes` |
+| `src/pages/RouteGame.tsx` | Filter routes by `mainRouteLength < 1500` on mobile |
+| `src/pages/ClubsPage.tsx` | Query club maps by `club_id` directly from `route_maps` and `route_finder_maps` |
 
