@@ -403,7 +403,7 @@ const RouteGame: React.FC = () => {
   };
 
   const handleBackToPublicMaps = () => {
-    navigate('/route-game');
+    navigate('/my-maps');
   };
 
   // Show loading spinner while checking auth
