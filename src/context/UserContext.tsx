@@ -69,6 +69,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (newSession?.user) {
           setTimeout(() => {
             fetchUserProfile(newSession.user.id);
+            fetchLeaderboard();
           }, 0);
         } else {
           setUserState(null);
