@@ -160,7 +160,8 @@ const RouteGame: React.FC = () => {
       setIsLoading(true);
       try {
         const { routes, map, userMapName: mapName } = await loadUserMapRoutes(userMapId, isMobile);
-        setRouteData(routes);
+        const filteredRoutes = isMobile ? routes.filter(r => r.mainRouteLength < 1500) : routes;
+        setRouteData(filteredRoutes);
         setSelectedMap(map);
         setUserMapName(mapName);
         if (map) {
@@ -267,7 +268,9 @@ const RouteGame: React.FC = () => {
           maps = result.maps;
         }
         
-        setRouteData(routes);
+        // Filter routes by length on mobile
+        const filteredRoutes = isMobile ? routes.filter(r => r.mainRouteLength < 1500) : routes;
+        setRouteData(filteredRoutes);
         setAllMapsForRoutes(maps);
         
         if (selectedMapId !== 'all') {
@@ -366,8 +369,9 @@ const RouteGame: React.FC = () => {
         });
       }
       
-      // Shuffle the combined routes for random mix
-      const shuffledRoutes = [...allRoutes].sort(() => Math.random() - 0.5);
+      // Filter by length on mobile, then shuffle
+      const lengthFiltered = isMobile ? allRoutes.filter(r => r.mainRouteLength < 1500) : allRoutes;
+      const shuffledRoutes = [...lengthFiltered].sort(() => Math.random() - 0.5);
       
       setRouteData(shuffledRoutes);
       setAllMapsForRoutes(allMaps);

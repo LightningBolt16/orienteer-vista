@@ -505,12 +505,23 @@ export async function loadUserMapRoutes(
     return { routes: [], map: null, userMapName: userMap.name };
   }
 
+  // Check if 1:1 images exist (preferred for adaptive cropping), fallback to requested aspect
+  const { data: check1to1 } = await supabase
+    .from('route_images')
+    .select('id')
+    .eq('map_id', routeMap.id)
+    .eq('aspect_ratio', '1:1')
+    .limit(1);
+
+  const use1to1 = check1to1 && check1to1.length > 0;
+  const queryAspect = use1to1 ? '1:1' : aspect;
+
   // Get route images
   const { data: routeImages, error: routeImagesError } = await supabase
     .from('route_images')
     .select('candidate_index, shortest_side, main_route_length, alt_route_length, alt_route_lengths, num_alternates, image_path, safe_zone')
     .eq('map_id', routeMap.id)
-    .eq('aspect_ratio', aspect)
+    .eq('aspect_ratio', queryAspect)
     .order('candidate_index');
 
   if (routeImagesError || !routeImages || routeImages.length === 0) {
@@ -536,6 +547,23 @@ export async function loadUserMapRoutes(
     const numAlternates = route.num_alternates || 1;
     const mainRouteIndex = getMainRouteIndexFromSide(route.shortest_side, numAlternates);
     
+    // Determine source aspect from the actual stored aspect ratio
+    const sourceAspect: SourceAspect = queryAspect === '1:1' ? '1:1' : 
+      (aspect === '9_16' ? '9_16' : '16_9');
+
+    // Parse safe zone
+    let safeZone: SafeZone | undefined;
+    if (route.safe_zone && typeof route.safe_zone === 'object' && !Array.isArray(route.safe_zone)) {
+      const sz = route.safe_zone as Record<string, number>;
+      if (sz.x !== undefined && sz.y !== undefined && sz.w !== undefined && sz.h !== undefined) {
+        safeZone = { x: sz.x, y: sz.y, w: sz.w, h: sz.h };
+        if (sz.center_x !== undefined && sz.center_y !== undefined) {
+          safeZone.center_x = sz.center_x;
+          safeZone.center_y = sz.center_y;
+        }
+      }
+    }
+
     return {
       candidateIndex: route.candidate_index,
       shortestSide: (route.shortest_side === 'left' ? 'left' : 'right') as 'left' | 'right',
@@ -547,6 +575,8 @@ export async function loadUserMapRoutes(
       mainRouteIndex,
       mapName: userMap.name,
       imagePath: imageUrl,
+      sourceAspect,
+      safeZone,
     };
   });
 

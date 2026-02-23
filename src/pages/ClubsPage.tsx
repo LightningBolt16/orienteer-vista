@@ -188,33 +188,22 @@ const ClubsPage: React.FC = () => {
             setClubMembers(memberDetails);
           }
 
-          // Fetch club maps (route_maps linked to club user_maps)
-          const { data: clubUserMaps } = await (supabase
-            .from('user_maps' as any)
-            .select('id')
-            .eq('club_id', membership.club_id) as any);
+          // Fetch club maps directly by club_id (set during publish-to-club flow)
+          const { data: routeMaps } = await supabase
+            .from('route_maps')
+            .select('id, name, description, logo_path, location_name')
+            .eq('club_id', membership.club_id);
+          
+          const { data: rfMaps } = await supabase
+            .from('route_finder_maps')
+            .select('id, name, description, location_name')
+            .eq('club_id', membership.club_id);
 
-          if (clubUserMaps && clubUserMaps.length > 0) {
-            const sourceMapIds = clubUserMaps.map((m: any) => m.id);
-            
-            // Fetch route choice maps
-            const { data: routeMaps } = await supabase
-              .from('route_maps')
-              .select('id, name, description, logo_path, location_name')
-              .in('source_map_id', sourceMapIds);
-            
-            // Fetch route finder maps
-            const { data: rfMaps } = await supabase
-              .from('route_finder_maps')
-              .select('id, name, description, location_name')
-              .in('source_map_id', sourceMapIds);
-
-            const allClubMaps: ClubMap[] = [
-              ...(routeMaps || []).map(m => ({ ...m, type: 'route_choice' as const })),
-              ...(rfMaps || []).map(m => ({ ...m, logo_path: null, type: 'route_finder' as const })),
-            ];
-            setClubMaps(allClubMaps);
-          }
+          const allClubMaps: ClubMap[] = [
+            ...(routeMaps || []).map(m => ({ ...m, type: 'route_choice' as const })),
+            ...(rfMaps || []).map(m => ({ ...m, logo_path: null, type: 'route_finder' as const })),
+          ];
+          setClubMaps(allClubMaps);
         }
 
         // Check for pending club request
