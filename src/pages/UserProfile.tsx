@@ -11,7 +11,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, subDays, subMonths, parseISO } from 'date-fns';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { getCountryFlag } from '@/components/CountrySelector';
+import { CountryFlagImage } from '@/components/CountrySelector';
 
 interface PublicUserProfile {
   user_id: string;
@@ -240,9 +240,7 @@ const UserProfile: React.FC = () => {
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <h1 className="text-2xl font-bold">{profile.name}</h1>
                 {profile.country_code && (
-                  <span className="text-2xl" title={profile.country_code}>
-                    {getCountryFlag(profile.country_code)}
-                  </span>
+                  <CountryFlagImage code={profile.country_code} size={24} />
                 )}
               </div>
               <p className="text-muted-foreground mt-1">{t('orienteeringEnthusiast')}</p>
