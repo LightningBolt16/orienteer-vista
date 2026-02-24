@@ -932,25 +932,25 @@ const ClubsPage: React.FC = () => {
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <MapIcon className="h-5 w-5 text-primary" />
-                        {t('clubMaps') || 'Club Maps'}
+                        <Trophy className="h-5 w-5 text-orienteering" />
+                        {t('clubMapsLeaderboard') || 'Club Maps Leaderboard'}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
+                    <CardContent className="space-y-3">
                       {clubMaps.map((map) => {
                         const isExpanded = expandedMapId === map.id;
                         const leaderboard = clubMapLeaderboards[map.id];
                         const isLoadingThis = loadingLeaderboard === map.id;
 
                         return (
-                          <div key={map.id} className="rounded-lg border bg-card">
+                          <div key={map.id} className="rounded-lg border bg-card overflow-hidden">
                             <button
                               className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left"
                               onClick={() => loadMapLeaderboard(map)}
                             >
-                              <Avatar className="h-10 w-10 flex-shrink-0">
-                                <AvatarImage src={userClub?.logo_url || ''} />
-                                <AvatarFallback>{userClub?.name?.[0] || 'C'}</AvatarFallback>
+                              <Avatar className="h-10 w-10 flex-shrink-0 bg-white ring-1 ring-border">
+                                <AvatarImage src={userClub?.logo_url || ''} className="object-contain p-0.5" />
+                                <AvatarFallback className="bg-white text-foreground">{userClub?.name?.[0] || 'C'}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">{map.name}</p>
@@ -963,14 +963,14 @@ const ClubsPage: React.FC = () => {
                                   </span>
                                 </div>
                               </div>
-                              <Trophy className={`h-4 w-4 transition-transform ${isExpanded ? 'text-primary' : 'text-muted-foreground'}`} />
+                              <Trophy className={`h-4 w-4 transition-transform ${isExpanded ? 'text-orienteering' : 'text-muted-foreground'}`} />
                             </button>
 
                             {isExpanded && (
                               <div className="border-t px-3 pb-3 pt-2">
                                 {isLoadingThis ? (
                                   <div className="flex items-center justify-center py-4">
-                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                    <Loader2 className="h-5 w-5 animate-spin text-orienteering" />
                                   </div>
                                 ) : !leaderboard || leaderboard.length === 0 ? (
                                   <p className="text-sm text-muted-foreground text-center py-4">
@@ -986,28 +986,28 @@ const ClubsPage: React.FC = () => {
                                         <div
                                           key={entry.user_id}
                                           className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-                                            isCurrentUser ? 'bg-primary/10' : 'hover:bg-muted/50'
+                                            isCurrentUser ? 'bg-orienteering/10 border border-orienteering/20' : 'hover:bg-muted/50'
                                           }`}
                                           onClick={() => navigate(isCurrentUser ? '/profile' : `/user/${entry.user_id}`)}
                                         >
-                                          <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0 ${
-                                            rank <= 3 ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+                                          <div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0 ${
+                                            rank <= 3 ? 'bg-orienteering text-white' : 'bg-secondary'
                                           }`}>
                                             {rank}
                                           </div>
                                           <Avatar className="h-7 w-7 flex-shrink-0">
                                             <AvatarImage src={entry.profile_image || ''} />
-                                            <AvatarFallback className="text-[10px]">{entry.name?.[0] || '?'}</AvatarFallback>
+                                            <AvatarFallback className="text-[10px] bg-secondary">{entry.name?.[0] || '?'}</AvatarFallback>
                                           </Avatar>
                                           <div className="flex-1 min-w-0">
                                             <span className="text-sm font-medium truncate block">
                                               {entry.name}
-                                              {isCurrentUser && <span className="text-primary ml-1 text-xs">({t('you')})</span>}
+                                              {isCurrentUser && <span className="text-orienteering ml-1 text-xs">({t('you')})</span>}
                                             </span>
                                           </div>
                                           <div className="flex items-center gap-3 flex-shrink-0 text-xs">
                                             <div className="flex items-center" title={t('accuracy')}>
-                                              <Target className="h-3 w-3 text-primary mr-0.5" />
+                                              <Target className="h-3 w-3 text-orienteering mr-0.5" />
                                               <span className="font-medium">{entry.accuracy}%</span>
                                             </div>
                                             <div className="flex items-center" title={t('speed')}>
