@@ -6,7 +6,7 @@ import { getAvailableMaps, getUniqueMapNames } from '../utils/routeDataUtils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { COUNTRIES, getCountryFlag, getCountryName } from '@/components/CountrySelector';
+import { COUNTRIES, CountryFlagImage, getCountryName } from '@/components/CountrySelector';
 import RouteFinderLeaderboardInline from '@/components/route-finder/RouteFinderLeaderboardInline';
 import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
 import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
@@ -92,7 +92,7 @@ const LeaderboardPage: React.FC = () => {
                   <span>{t('allCountries')}</span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <span>{getCountryFlag(countryFilter)}</span>
+                    <CountryFlagImage code={countryFilter} size={16} />
                     <span>{getCountryName(countryFilter)}</span>
                   </span>
                 )}
@@ -103,7 +103,7 @@ const LeaderboardPage: React.FC = () => {
               {availableCountries.map(code => (
                 <SelectItem key={code} value={code}>
                   <span className="flex items-center gap-2">
-                    <span>{getCountryFlag(code)}</span>
+                    <CountryFlagImage code={code} size={16} />
                     <span>{getCountryName(code)}</span>
                   </span>
                 </SelectItem>

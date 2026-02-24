@@ -213,11 +213,28 @@ export const COUNTRIES = [
   { code: 'ZW', name: 'Zimbabwe', flag: '🇿🇼' },
 ];
 
-// Helper function to get flag by code
+// Helper function to get flag by code (returns emoji for fallback)
 export const getCountryFlag = (code: string | null | undefined): string => {
   if (!code) return '';
   const country = COUNTRIES.find(c => c.code === code);
   return country?.flag || '';
+};
+
+// Helper component to render flag as an image (works on Windows)
+export const CountryFlagImage: React.FC<{ code: string; size?: number; className?: string }> = ({ code, size = 20, className = '' }) => {
+  const lowerCode = code.toLowerCase();
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${lowerCode}.png`}
+      srcSet={`https://flagcdn.com/w80/${lowerCode}.png 2x`}
+      width={size}
+      height={Math.round(size * 0.75)}
+      alt={getCountryName(code)}
+      className={`inline-block ${className}`}
+      style={{ verticalAlign: 'middle' }}
+      loading="lazy"
+    />
+  );
 };
 
 // Helper function to get country name by code
@@ -271,7 +288,7 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({
         >
           {selectedCountry ? (
             <span className="flex items-center gap-2">
-              <span className="text-lg">{selectedCountry.flag}</span>
+              <CountryFlagImage code={selectedCountry.code} size={20} />
               <span>{selectedCountry.name}</span>
             </span>
           ) : (
@@ -308,7 +325,7 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({
                       value === country.code ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <span className="text-lg mr-2">{country.flag}</span>
+                  <CountryFlagImage code={country.code} size={20} className="mr-2" />
                   <span>{country.name}</span>
                 </CommandItem>
               ))}

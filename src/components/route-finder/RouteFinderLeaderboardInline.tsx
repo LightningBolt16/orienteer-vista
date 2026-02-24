@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { getCountryFlag } from '@/components/CountrySelector';
+import { CountryFlagImage } from '@/components/CountrySelector';
 
 interface LeaderboardEntry {
   id: string;
@@ -204,7 +204,7 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
         <div className="flex-1 min-w-0 mr-2">
           <div className="flex items-center gap-1">
             {entry.countryCode && (
-              <span className="text-sm">{getCountryFlag(entry.countryCode)}</span>
+              <CountryFlagImage code={entry.countryCode} size={14} />
             )}
             <span className="font-medium text-xs truncate">{entry.name}</span>
             {isCurrentUser && (
@@ -260,7 +260,7 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
             </Avatar>
             <div className="flex items-center gap-2">
               {entry.countryCode && (
-                <span className="text-lg">{getCountryFlag(entry.countryCode)}</span>
+                <CountryFlagImage code={entry.countryCode} size={20} />
               )}
               <span className="font-medium">{entry.name}</span>
               {isCurrentUser && (
