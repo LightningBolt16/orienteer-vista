@@ -677,7 +677,7 @@ const RouteGame: React.FC = () => {
                         <Button variant="ghost" className="w-full justify-between p-3 h-auto border rounded-lg">
                           <div className="flex items-center gap-2">
                             {clubLogoUrl ? (
-                              <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-4 w-4 object-contain rounded-sm" />
+                              <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-4 w-4 object-contain rounded-sm bg-white ring-1 ring-border p-px" />
                             ) : (
                               <Users className="h-4 w-4 text-muted-foreground" />
                             )}
