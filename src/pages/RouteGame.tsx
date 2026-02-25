@@ -707,7 +707,7 @@ const RouteGame: React.FC = () => {
                                   </div>
                                 )}
                                 {clubLogoUrl ? (
-                                  <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-8 w-8 mb-2 object-contain rounded" />
+                                  <img src={clubLogoUrl} alt={clubName || 'Club'} className="h-8 w-8 mb-2 object-contain rounded bg-white ring-1 ring-border" />
                                 ) : (
                                   <Users className="h-8 w-8 mb-2 text-muted-foreground" />
                                 )}
