@@ -592,9 +592,9 @@ const ClubsPage: React.FC = () => {
                               </div>
                               <Minus className="h-4 w-4 text-muted-foreground" />
                             </div>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={club.logo_url || ''} />
-                              <AvatarFallback>{club.name[0]}</AvatarFallback>
+                            <Avatar className="h-10 w-10 bg-white ring-1 ring-border">
+                              <AvatarImage src={club.logo_url || ''} className="object-contain p-0.5" />
+                              <AvatarFallback className="bg-white text-foreground">{club.name[0]}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <p className="font-medium">{club.name}</p>
@@ -638,9 +638,9 @@ const ClubsPage: React.FC = () => {
                               </div>
                               <Minus className="h-4 w-4 text-muted-foreground" />
                             </div>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={club.logo_url || ''} />
-                              <AvatarFallback>{club.name[0]}</AvatarFallback>
+                            <Avatar className="h-10 w-10 bg-white ring-1 ring-border">
+                              <AvatarImage src={club.logo_url || ''} className="object-contain p-0.5" />
+                              <AvatarFallback className="bg-white text-foreground">{club.name[0]}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <p className="font-medium">{club.name}</p>
@@ -718,9 +718,9 @@ const ClubsPage: React.FC = () => {
               {clubs.map((club) => (
                 <Card key={club.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="flex flex-row items-center gap-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={club.logo_url || ''} />
-                      <AvatarFallback>{club.name[0]}</AvatarFallback>
+                    <Avatar className="h-12 w-12 bg-white ring-1 ring-border">
+                      <AvatarImage src={club.logo_url || ''} className="object-contain p-0.5" />
+                      <AvatarFallback className="bg-white text-foreground">{club.name[0]}</AvatarFallback>
                     </Avatar>
                     <div>
                       <CardTitle className="text-lg">{club.name}</CardTitle>
@@ -760,9 +760,9 @@ const ClubsPage: React.FC = () => {
                 <Card>
                   <CardHeader className="flex flex-row items-center gap-4">
                     <div className="relative group">
-                      <Avatar className="h-16 w-16">
-                        <AvatarImage src={userClub.logo_url || ''} />
-                        <AvatarFallback className="text-xl">{userClub.name[0]}</AvatarFallback>
+                      <Avatar className="h-16 w-16 bg-white ring-1 ring-border">
+                        <AvatarImage src={userClub.logo_url || ''} className="object-contain p-1" />
+                        <AvatarFallback className="text-xl bg-white text-foreground">{userClub.name[0]}</AvatarFallback>
                       </Avatar>
                       {isAdmin && (
                         <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
