@@ -142,7 +142,7 @@ const SafeZoneImage: React.FC<SafeZoneImageProps> = ({
           height: '100%',
           transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`,
           transformOrigin: `${transform.originX}px ${transform.originY}px`,
-          transition: 'transform 0.25s ease-out',
+          /* no transition — instant snap between routes */
         }}
       >
         <img
