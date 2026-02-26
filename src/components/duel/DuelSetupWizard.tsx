@@ -809,24 +809,13 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header with back button */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold flex items-center gap-2">
-              <Swords className="h-5 w-5 text-primary" />
-              Duel Setup
-            </h1>
-          </div>
-        </div>
-      </div>
-
+    <div className="bg-background">
       {/* Stacked Steps Content */}
       <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <h1 className="text-lg font-semibold flex items-center gap-2 mb-2">
+          <Swords className="h-5 w-5 text-primary" />
+          Duel Setup
+        </h1>
         {renderPlayModeStep()}
         
         {isMapStepUnlocked && (
