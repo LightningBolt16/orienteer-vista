@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRouteCache } from '../context/RouteCache';
 import { RouteData } from '../utils/routeDataUtils';
 import DuelIntro from '../components/duel/DuelIntro';
+import Layout from '../components/Layout';
 import DuelSetupWizard, { DuelSettings } from '../components/duel/DuelSetupWizard';
 import DuelGame from '../components/duel/DuelGame';
 import OnlineDuelLobby from '../components/duel/OnlineDuelLobby';
@@ -188,12 +189,14 @@ const DuelMode: React.FC = () => {
       )}
       
       {phase === 'setup' && (
-        <DuelSetupWizard 
-          onStart={handleSetupComplete}
-          onStartOnline={handleStartOnline}
-          onJoinRoom={handleJoinRoom}
-          onBack={handleExit}
-        />
+        <Layout>
+          <DuelSetupWizard 
+            onStart={handleSetupComplete}
+            onStartOnline={handleStartOnline}
+            onJoinRoom={handleJoinRoom}
+            onBack={handleExit}
+          />
+        </Layout>
       )}
 
       {phase === 'online-join' && (
