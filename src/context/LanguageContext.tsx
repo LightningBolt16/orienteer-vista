@@ -572,6 +572,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       speed: 'Hastighet',
       leaderboard: 'Topplista',
       leaderboardTooltip: 'Endast dina senaste 100 försök räknas. Försök äldre än 30 dagar börjar tappa värde (helt borta efter 120 dagar). Träffsäkerhet över 50% ger exponentiell bonus, under 50% ger straff. Totalpoäng = (1000 ÷ Hastighet) × Träffsäkerhetsmultiplikator × 100.',
+      overall: 'Totalt',
       rank: 'Rang',
       selectMap: 'Välj karta',
       selectMapDescription: 'Välj en karta för att träna vägval på',
