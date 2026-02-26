@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
@@ -48,7 +48,7 @@ interface PerformanceDataPoint {
 }
 
 const Profile: React.FC = () => {
-  const { user, setUser, getUserRank, loading } = useUser();
+  const { user, setUser, getUserRank, loading, signOut } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [userName, setUserName] = useState('');
@@ -649,6 +649,23 @@ const Profile: React.FC = () => {
             {alltimeTotal > 0 && (
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-orienteering/10 text-orienteering mt-4">
                 <span className="font-semibold">{t('rank')} {rank}</span>
+              </div>
+            )}
+
+            {user.id !== '1' && (
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await signOut();
+                    navigate('/');
+                  }}
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {t('signOut')}
+                </Button>
               </div>
             )}
           </div>
