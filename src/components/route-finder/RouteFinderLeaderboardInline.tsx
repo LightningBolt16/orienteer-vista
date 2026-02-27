@@ -291,43 +291,25 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
   };
 
   return (
-    <div className="w-full">
-      {/* Header with refresh */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Trophy className="h-5 w-5 text-primary mr-2" />
-          <h2 className="text-xl font-medium">{t('routeFinderLeaderboard') || 'Route Finder Leaderboard'}</h2>
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
+    <Tabs value={selectedMap} onValueChange={setSelectedMap} className="w-full">
+      {/* Map Filter Tabs - centered, above leaderboard block (matching Route Choice layout) */}
+      <TabsList className="w-full flex flex-wrap justify-center gap-2 h-auto bg-transparent mb-6">
+        <TabsTrigger 
+          value="all" 
+          className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
         >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
-
-      {/* Map Filter Tabs */}
-      <Tabs value={selectedMap} onValueChange={setSelectedMap} className="mb-6">
-        <TabsList className="flex flex-wrap justify-start gap-2 h-auto bg-transparent">
+          {t('allMaps') || 'All Maps'}
+        </TabsTrigger>
+        {maps.map(map => (
           <TabsTrigger 
-            value="all" 
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            key={map.id} 
+            value={map.name}
+            className="data-[state=active]:bg-orienteering data-[state=active]:text-white"
           >
-            {t('allMaps') || 'All Maps'}
+            {map.name}
           </TabsTrigger>
-          {maps.map(map => (
-            <TabsTrigger 
-              key={map.id} 
-              value={map.name}
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
-              {map.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+        ))}
+      </TabsList>
 
       {/* Content */}
       {isLoading ? (
@@ -357,24 +339,22 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
           {leaderboard.map((entry, index) => renderMobileEntry(entry, index + 1))}
         </div>
       ) : (
-        <div className="glass-card p-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">{t('rank') || 'Rank'}</TableHead>
-                <TableHead>{t('player') || 'Player'}</TableHead>
-                <TableHead>{t('accuracy') || 'Accuracy'}</TableHead>
-                <TableHead>{t('avgTime') || 'Avg Time'}</TableHead>
-                <TableHead>{t('attempts') || 'Attempts'}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leaderboard.map((entry, index) => renderDesktopEntry(entry, index + 1))}
-            </TableBody>
-          </Table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">{t('rank') || 'Rank'}</TableHead>
+              <TableHead>{t('player') || 'Player'}</TableHead>
+              <TableHead>{t('accuracy') || 'Accuracy'}</TableHead>
+              <TableHead>{t('avgTime') || 'Avg Time'}</TableHead>
+              <TableHead>{t('attempts') || 'Attempts'}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leaderboard.map((entry, index) => renderDesktopEntry(entry, index + 1))}
+          </TableBody>
+        </Table>
       )}
-    </div>
+    </Tabs>
   );
 };
 
