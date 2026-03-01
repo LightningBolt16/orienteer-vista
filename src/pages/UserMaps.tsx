@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw, Crown, Globe } from 'lucide-react';
+import { Plus, Map, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw, Crown, Globe, Lock, AlertTriangle } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -13,6 +13,7 @@ import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
 import PublishMapDialog from '@/components/user-maps/PublishMapDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useProAccess } from '@/hooks/useProAccess';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ const UserMaps: React.FC = () => {
   const { userMaps, loading, fetchUserMaps, deleteUserMap } = useUserMaps();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { clubId: subClubId } = useSubscription();
+  const { hasPro, loading: proLoading } = useProAccess();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
   const [showAdminRequest, setShowAdminRequest] = useState(false);
   const [deleteMapId, setDeleteMapId] = useState<string | null>(null);
@@ -222,81 +224,132 @@ const UserMaps: React.FC = () => {
         </Card>
       ) : (
         <div className="space-y-4">
-          {userMaps.map((map) => (
-            <Card key={map.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{map.name}</CardTitle>
-                    <CardDescription>
-                      Created {new Date(map.created_at).toLocaleDateString()}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(map.status)}
-                    {isMapStale(map) && user && (
-                      <RecoverMapButton
-                        mapId={map.id}
-                        userId={user.id}
-                        onRecovered={fetchUserMaps}
-                      />
+          {/* Warning banner when maps are locked */}
+          {!hasPro && !proLoading && userMaps.length > 5 && (
+            <div className="border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-300">Some maps are locked</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  You have {userMaps.length} maps but only 5 are accessible on the free tier. 
+                  Subscribe to unlock all your maps.
+                </p>
+                <Button variant="link" className="px-0 text-orienteering" onClick={() => navigate('/subscription')}>
+                  View Plans →
+                </Button>
+              </div>
+            </div>
+          )}
+          {(() => {
+            // Sort by created_at ascending to determine free-tier maps (first 5)
+            const sortedByCreation = [...userMaps].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            const freeMapIds = new Set(sortedByCreation.slice(0, 5).map(m => m.id));
+
+            return userMaps.map((map) => {
+              const isLocked = !hasPro && !proLoading && !freeMapIds.has(map.id);
+
+              return (
+                <Card key={map.id} className={isLocked ? 'opacity-60' : ''}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {map.name}
+                          {isLocked && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-400">
+                              <Lock className="h-3 w-3 mr-1" /> Locked
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription>
+                          Created {new Date(map.created_at).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(map.status)}
+                        {isMapStale(map) && user && (
+                          <RecoverMapButton
+                            mapId={map.id}
+                            userId={user.id}
+                            onRecovered={fetchUserMaps}
+                          />
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteMapId(map.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLocked ? (
+                      <div className="flex items-center gap-3 py-2">
+                        <Lock className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            This map was processed with a paid subscription. Subscribe to regain access.
+                          </p>
+                          <Button variant="link" className="px-0 text-sm text-orienteering" onClick={() => navigate('/subscription')}>
+                            Upgrade Plan →
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">ROI Points</p>
+                            <p className="font-medium">{map.roi_coordinates?.length || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Routes</p>
+                            <p className="font-medium">{map.processing_parameters?.num_output_routes || 50}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Distance Range</p>
+                            <p className="font-medium">
+                              {map.processing_parameters?.candidate_min_dist || 300}m - {map.processing_parameters?.candidate_max_dist || 1500}m
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Updated</p>
+                            <p className="font-medium">{new Date(map.updated_at).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        {map.error_message && (
+                          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                            <p className="text-sm text-destructive">{map.error_message}</p>
+                          </div>
+                        )}
+                        {map.status === 'completed' && (
+                          <div className="mt-4 flex gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => navigate(`/route-game?map=${map.id}`)}
+                            >
+                              Play Routes
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => setPublishMapData({ id: map.id, name: map.name })}
+                            >
+                              <Globe className="h-4 w-4 mr-2" />
+                              Share to Community
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteMapId(map.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">ROI Points</p>
-                    <p className="font-medium">{map.roi_coordinates?.length || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Routes</p>
-                    <p className="font-medium">{map.processing_parameters?.num_output_routes || 50}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Distance Range</p>
-                    <p className="font-medium">
-                      {map.processing_parameters?.candidate_min_dist || 300}m - {map.processing_parameters?.candidate_max_dist || 1500}m
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Updated</p>
-                    <p className="font-medium">{new Date(map.updated_at).toLocaleDateString()}</p>
-                  </div>
-                </div>
-                {map.error_message && (
-                  <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                    <p className="text-sm text-destructive">{map.error_message}</p>
-                  </div>
-                )}
-                {map.status === 'completed' && (
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate(`/route-game?map=${map.id}`)}
-                    >
-                      Play Routes
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPublishMapData({ id: map.id, name: map.name })}
-                    >
-                      <Globe className="h-4 w-4 mr-2" />
-                      Share to Community
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  </CardContent>
+                </Card>
+              );
+            });
+          })()}
         </div>
       )}
 
