@@ -225,13 +225,13 @@ const UserMaps: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {/* Warning banner when maps are locked */}
-          {!hasPro && !proLoading && userMaps.length > 5 && (
+          {!hasPro && !proLoading && userMaps.length > 3 && (
             <div className="border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg p-4 flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-amber-800 dark:text-amber-300">Some maps are locked</p>
                 <p className="text-sm text-amber-700 dark:text-amber-400">
-                  You have {userMaps.length} maps but only 5 are accessible on the free tier. 
+                  You have {userMaps.length} maps but only 3 are accessible on the free tier. 
                   Subscribe to unlock all your maps.
                 </p>
                 <Button variant="link" className="px-0 text-orienteering" onClick={() => navigate('/subscription')}>
@@ -241,11 +241,11 @@ const UserMaps: React.FC = () => {
             </div>
           )}
           {(() => {
-            // Sort by created_at ascending to determine free-tier maps (first 5)
+            // Sort by created_at ascending to determine free-tier maps (first 3)
             const sortedByCreation = [...userMaps].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
-            const freeMapIds = new Set(sortedByCreation.slice(0, 5).map(m => m.id));
+            const freeMapIds = new Set(sortedByCreation.slice(0, 3).map(m => m.id));
 
             return userMaps.map((map) => {
               const isLocked = !hasPro && !proLoading && !freeMapIds.has(map.id);
