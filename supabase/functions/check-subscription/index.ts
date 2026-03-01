@@ -149,7 +149,18 @@ serve(async (req) => {
 
     const subscription = subscriptions.data[0];
     const productId = subscription.items.data[0].price.product as string;
-    const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
+    
+    // Handle current_period_end which may be a unix timestamp (number) or ISO string
+    let subscriptionEnd: string;
+    const periodEnd = subscription.current_period_end;
+    if (typeof periodEnd === 'number') {
+      subscriptionEnd = new Date(periodEnd * 1000).toISOString();
+    } else if (typeof periodEnd === 'string') {
+      subscriptionEnd = new Date(periodEnd).toISOString();
+    } else {
+      subscriptionEnd = new Date().toISOString();
+      logStep("Warning: unexpected current_period_end type", { type: typeof periodEnd, value: periodEnd });
+    }
 
     // Determine plan type from product ID
     let plan = "personal";
