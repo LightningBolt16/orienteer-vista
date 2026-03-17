@@ -93,8 +93,30 @@ const SafeZoneImage: React.FC<SafeZoneImageProps> = ({
     const vpCenterY = viewport.height / 2;
 
     // Translate AFTER scale so offset is in screen pixels, not scaled pixels
-    const tx = vpCenterX - szCenterPxX;
-    const ty = vpCenterY - szCenterPxY;
+    let tx = vpCenterX - szCenterPxX;
+    let ty = vpCenterY - szCenterPxY;
+
+    // Clamp so the scaled image always covers the viewport.
+    // Without this, safe zones near edges pull the image past the viewport,
+    // showing empty space. For centered routes this is a no-op.
+    const scaledImgW = imgSize * scale;
+    const scaledImgH = imgSize * scale;
+
+    // After transform, the image left edge in screen coords:
+    //   screenLeft = originX + (imgLeft - originX) * scale + tx
+    // We need screenLeft <= 0  and  screenRight >= viewport.width
+    const screenLeft = szCenterPxX + (imgLeft - szCenterPxX) * scale + tx;
+    const screenRight = szCenterPxX + (imgLeft + imgSize - szCenterPxX) * scale + tx;
+    const screenTop = szCenterPxY + (imgTop - szCenterPxY) * scale + ty;
+    const screenBottom = szCenterPxY + (imgTop + imgSize - szCenterPxY) * scale + ty;
+
+    // If image left edge is inside viewport, push right
+    if (screenLeft > 0) tx -= screenLeft;
+    // If image right edge is inside viewport, push left
+    if (screenRight < viewport.width) tx += (viewport.width - screenRight);
+    // Same vertically
+    if (screenTop > 0) ty -= screenTop;
+    if (screenBottom < viewport.height) ty += (viewport.height - screenBottom);
 
     return { scale, tx, ty, originX: szCenterPxX, originY: szCenterPxY };
   }, [isFullscreen, safeZone, viewport.width, viewport.height]);
