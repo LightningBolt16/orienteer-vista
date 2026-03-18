@@ -100,8 +100,12 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   const [multiRouteOnlyMapIds, setMultiRouteOnlyMapIds] = useState<Set<string>>(new Set());
   
   useEffect(() => {
-    getMultiRouteOnlyMapIds().then(setMultiRouteOnlyMapIds);
-  }, []);
+    getMultiRouteOnlyMapIds().then(ids => {
+      console.log('Loaded multi-route-only IDs:', Array.from(ids));
+      console.log('Community maps available:', communityMaps.map(m => `${m.name} (${m.id})`));
+      setMultiRouteOnlyMapIds(ids);
+    });
+  }, [communityMaps]);
   
   const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
   const isSpeedRaceDisabled = isMobile && playMode === 'local';
