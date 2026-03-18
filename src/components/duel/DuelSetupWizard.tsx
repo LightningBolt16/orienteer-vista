@@ -431,15 +431,25 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                     {uniqueUserMapNames.map(mapName => {
                       const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                       const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'private';
+                      const isLocked = isMapLockedForMobileLocal(mapName, 'private');
                       return (
                         <button
                           key={mapName}
                           onClick={() => handleMapSelect(mapName, 'private')}
-                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                            isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                          disabled={isLocked}
+                          title={isLocked ? 'Multi-route maps require desktop or online play' : undefined}
+                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all relative ${
+                            isLocked
+                              ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
+                              : (isMultiSelected || isSingleSelected) ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
                           }`}
                         >
-                          {multiSelectMode && isMultiSelected && (
+                          {isLocked && (
+                            <div className="absolute top-1 left-1">
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          )}
+                          {multiSelectMode && isMultiSelected && !isLocked && (
                             <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
                               <Check className="h-2.5 w-2.5 text-primary-foreground" />
                             </div>
