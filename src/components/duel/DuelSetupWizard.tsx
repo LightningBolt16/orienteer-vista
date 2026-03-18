@@ -96,6 +96,13 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
   const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
   
+  // Multi-route map detection (for locking on mobile local)
+  const [multiRouteOnlyMapIds, setMultiRouteOnlyMapIds] = useState<Set<string>>(new Set());
+  
+  useEffect(() => {
+    getMultiRouteOnlyMapIds().then(setMultiRouteOnlyMapIds);
+  }, []);
+  
   const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
   const isSpeedRaceDisabled = isMobile && playMode === 'local';
   const isOnlineMode = playMode === 'online';
