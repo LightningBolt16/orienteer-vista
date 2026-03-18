@@ -221,34 +221,40 @@ export async function getCommunityMaps(): Promise<MapSource[]> {
 // Returns a Set of map IDs that are multi-route-only
 export async function getMultiRouteOnlyMapIds(): Promise<Set<string>> {
   try {
-    // Get all route_images with their map_id and num_alternates
-    const { data, error } = await supabase
+    // Query only distinct map_id + num_alternates combinations to avoid 1000-row limit
+    // We just need to know if a map has any standard routes (num_alternates IS NULL or <= 1)
+    const { data: multiRouteData, error: multiErr } = await supabase
       .from('route_images')
-      .select('map_id, num_alternates')
-      .order('map_id');
+      .select('map_id')
+      .gt('num_alternates', 1);
     
-    if (error || !data) return new Set();
+    if (multiErr || !multiRouteData) return new Set();
     
-    // Group by map_id: check if ALL routes for a map have num_alternates > 1
-    const mapRouteInfo = new Map<string, { hasStandard: boolean; hasMulti: boolean }>();
+    // Get unique map IDs that have multi-route content
+    const mapsWithMulti = new Set(multiRouteData.map(r => r.map_id));
     
-    for (const row of data) {
-      const info = mapRouteInfo.get(row.map_id) || { hasStandard: false, hasMulti: false };
-      if (row.num_alternates && row.num_alternates > 1) {
-        info.hasMulti = true;
-      } else {
-        info.hasStandard = true;
-      }
-      mapRouteInfo.set(row.map_id, info);
-    }
+    if (mapsWithMulti.size === 0) return new Set();
     
+    // Now check which of those maps also have standard routes
+    const { data: standardData, error: stdErr } = await supabase
+      .from('route_images')
+      .select('map_id')
+      .in('map_id', Array.from(mapsWithMulti))
+      .or('num_alternates.is.null,num_alternates.lte.1');
+    
+    if (stdErr) return new Set();
+    
+    const mapsWithStandard = new Set((standardData || []).map(r => r.map_id));
+    
+    // Multi-route-only = has multi but no standard
     const multiRouteOnlyIds = new Set<string>();
-    for (const [mapId, info] of mapRouteInfo) {
-      if (info.hasMulti && !info.hasStandard) {
+    for (const mapId of mapsWithMulti) {
+      if (!mapsWithStandard.has(mapId)) {
         multiRouteOnlyIds.add(mapId);
       }
     }
     
+    console.log('Multi-route-only map IDs:', Array.from(multiRouteOnlyIds));
     return multiRouteOnlyIds;
   } catch (error) {
     console.error('Error checking multi-route maps:', error);
