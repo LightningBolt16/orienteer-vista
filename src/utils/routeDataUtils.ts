@@ -217,6 +217,45 @@ export async function getCommunityMaps(): Promise<MapSource[]> {
   return allMaps.filter(m => m.mapCategory === 'community');
 }
 
+// Check which maps have ONLY multi-route content (all routes have num_alternates > 1)
+// Returns a Set of map IDs that are multi-route-only
+export async function getMultiRouteOnlyMapIds(): Promise<Set<string>> {
+  try {
+    // Get all route_images with their map_id and num_alternates
+    const { data, error } = await supabase
+      .from('route_images')
+      .select('map_id, num_alternates')
+      .order('map_id');
+    
+    if (error || !data) return new Set();
+    
+    // Group by map_id: check if ALL routes for a map have num_alternates > 1
+    const mapRouteInfo = new Map<string, { hasStandard: boolean; hasMulti: boolean }>();
+    
+    for (const row of data) {
+      const info = mapRouteInfo.get(row.map_id) || { hasStandard: false, hasMulti: false };
+      if (row.num_alternates && row.num_alternates > 1) {
+        info.hasMulti = true;
+      } else {
+        info.hasStandard = true;
+      }
+      mapRouteInfo.set(row.map_id, info);
+    }
+    
+    const multiRouteOnlyIds = new Set<string>();
+    for (const [mapId, info] of mapRouteInfo) {
+      if (info.hasMulti && !info.hasStandard) {
+        multiRouteOnlyIds.add(mapId);
+      }
+    }
+    
+    return multiRouteOnlyIds;
+  } catch (error) {
+    console.error('Error checking multi-route maps:', error);
+    return new Set();
+  }
+}
+
 async function getLocalMaps(): Promise<MapSource[]> {
   // Try to detect local maps
   const localMaps: MapSource[] = [];
