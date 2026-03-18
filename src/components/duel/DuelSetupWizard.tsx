@@ -149,7 +149,12 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   };
   const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
     // Block selection of multi-route-only maps on mobile local
-    if (isMapLockedForMobileLocal(mapName, category)) return;
+    if (isMapLockedForMobileLocal(mapName, category)) {
+      import('sonner').then(({ toast }) => {
+        toast.error('This map has multi-route choices and requires desktop or online play');
+      });
+      return;
+    }
     
     if (multiSelectMode && mapName !== 'all') {
       setSelectedMaps(prev => 
