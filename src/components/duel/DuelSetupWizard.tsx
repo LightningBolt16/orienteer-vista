@@ -144,6 +144,9 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
     return multiRouteOnlyMapIds.has(mapEntry.id);
   };
   const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
+    // Block selection of multi-route-only maps on mobile local
+    if (isMapLockedForMobileLocal(mapName, category)) return;
+    
     if (multiSelectMode && mapName !== 'all') {
       setSelectedMaps(prev => 
         prev.includes(mapName) 
