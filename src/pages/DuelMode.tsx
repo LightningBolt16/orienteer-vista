@@ -104,6 +104,13 @@ const DuelMode: React.FC = () => {
         routes = routes.filter(r => !r.numAlternates || r.numAlternates <= 1);
       }
       
+      if (routes.length === 0) {
+        const { toast } = await import('sonner');
+        toast.error('No compatible routes found for this map in the current mode.');
+        setIsLoading(false);
+        return;
+      }
+      
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
       const selectedRoutes = shuffled.slice(0, newSettings.routeCount);
       

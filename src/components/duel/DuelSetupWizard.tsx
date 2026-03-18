@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useRouteCache } from '../../context/RouteCache';
 import { useUser } from '../../context/UserContext';
 import { useCommunityFavorites } from '../../hooks/useCommunityFavorites';
-import { getUniqueMapNames } from '../../utils/routeDataUtils';
+import { getUniqueMapNames, getMultiRouteOnlyMapIds } from '../../utils/routeDataUtils';
 import { 
   Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, 
   Wifi, Users, Lock, ChevronDown, ChevronUp, Star, Check, 
@@ -96,6 +96,13 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   const [privateMapsOpen, setPrivateMapsOpen] = useState(false);
   const [communityMapsOpen, setCommunityMapsOpen] = useState(false);
   
+  // Multi-route map detection (for locking on mobile local)
+  const [multiRouteOnlyMapIds, setMultiRouteOnlyMapIds] = useState<Set<string>>(new Set());
+  
+  useEffect(() => {
+    getMultiRouteOnlyMapIds().then(setMultiRouteOnlyMapIds);
+  }, []);
+  
   const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
   const isSpeedRaceDisabled = isMobile && playMode === 'local';
   const isOnlineMode = playMode === 'online';
@@ -123,7 +130,23 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   const uniqueUserMapNames = getUniqueMapNames(userMaps);
   const uniqueFavoriteMapNames = favoriteMaps.map(m => m.name);
 
+  // Helper to check if a map is multi-route-only (locked on mobile local)
+  const isMapLockedForMobileLocal = (mapName: string, category: MapCategory): boolean => {
+    if (!isMobile || playMode !== 'local') return false;
+    // Find the map's ID from the appropriate maps list
+    const allMapsLists = [...availableMaps, ...userMaps, ...communityMaps];
+    const mapEntry = allMapsLists.find(m => m.name === mapName && (
+      (category === 'official' && m.mapCategory === 'official') ||
+      (category === 'private' && m.mapCategory === 'private') ||
+      (category === 'community' && m.mapCategory === 'community')
+    ));
+    if (!mapEntry) return false;
+    return multiRouteOnlyMapIds.has(mapEntry.id);
+  };
   const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
+    // Block selection of multi-route-only maps on mobile local
+    if (isMapLockedForMobileLocal(mapName, category)) return;
+    
     if (multiSelectMode && mapName !== 'all') {
       setSelectedMaps(prev => 
         prev.includes(mapName) 
@@ -344,18 +367,28 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                 const countryFlag = isPwt ? flagItaly : (isKnivsta || isEkeby) ? flagSweden : (isBelgien || isGeel) ? flagBelgium : null;
                 const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                 const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'official';
+                const isLocked = isMapLockedForMobileLocal(mapName, 'official');
                 
                 return (
                   <button
                     key={mapName}
                     onClick={() => handleMapSelect(mapName, 'official')}
-                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                      isMultiSelected || isSingleSelected
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-card'
+                    disabled={isLocked}
+                    title={isLocked ? 'Multi-route maps require desktop or online play' : undefined}
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all relative ${
+                      isLocked
+                        ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
+                        : (isMultiSelected || isSingleSelected)
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-card hover:border-primary/50'
                     }`}
                   >
-                    {multiSelectMode && isMultiSelected && (
+                    {isLocked && (
+                      <div className="absolute top-1 left-1">
+                        <Lock className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    {multiSelectMode && isMultiSelected && !isLocked && (
                       <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
                         <Check className="h-2.5 w-2.5 text-primary-foreground" />
                       </div>
@@ -398,15 +431,25 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                     {uniqueUserMapNames.map(mapName => {
                       const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                       const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'private';
+                      const isLocked = isMapLockedForMobileLocal(mapName, 'private');
                       return (
                         <button
                           key={mapName}
                           onClick={() => handleMapSelect(mapName, 'private')}
-                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                            isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                          disabled={isLocked}
+                          title={isLocked ? 'Multi-route maps require desktop or online play' : undefined}
+                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all relative ${
+                            isLocked
+                              ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
+                              : (isMultiSelected || isSingleSelected) ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
                           }`}
                         >
-                          {multiSelectMode && isMultiSelected && (
+                          {isLocked && (
+                            <div className="absolute top-1 left-1">
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          )}
+                          {multiSelectMode && isMultiSelected && !isLocked && (
                             <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
                               <Check className="h-2.5 w-2.5 text-primary-foreground" />
                             </div>
@@ -450,15 +493,25 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
                     {uniqueFavoriteMapNames.map(mapName => {
                       const isMultiSelected = multiSelectMode && selectedMaps.includes(mapName);
                       const isSingleSelected = !multiSelectMode && selectedMapId === mapName && selectedMapCategory === 'community';
+                      const isLocked = isMapLockedForMobileLocal(mapName, 'community');
                       return (
                         <button
                           key={mapName}
                           onClick={() => handleMapSelect(mapName, 'community')}
-                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:border-primary/50 relative ${
-                            isMultiSelected || isSingleSelected ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                          disabled={isLocked}
+                          title={isLocked ? 'Multi-route maps require desktop or online play' : undefined}
+                          className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all relative ${
+                            isLocked
+                              ? 'border-border bg-muted/50 opacity-50 cursor-not-allowed'
+                              : (isMultiSelected || isSingleSelected) ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
                           }`}
                         >
-                          {multiSelectMode && isMultiSelected && (
+                          {isLocked && (
+                            <div className="absolute top-1 left-1">
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          )}
+                          {multiSelectMode && isMultiSelected && !isLocked && (
                             <div className="absolute top-1 left-1 bg-primary rounded-full p-0.5">
                               <Check className="h-2.5 w-2.5 text-primary-foreground" />
                             </div>
