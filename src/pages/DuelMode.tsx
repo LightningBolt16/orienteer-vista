@@ -96,7 +96,14 @@ const DuelMode: React.FC = () => {
     setSettings(newSettings);
     
     try {
-      const routes = await loadRoutesForSettings(newSettings);
+      let routes = await loadRoutesForSettings(newSettings);
+      
+      // Filter out multi-route maps (numAlternates > 1) for mobile local play
+      const isMobileLocal = window.innerWidth <= 768 && !newSettings.isOnline;
+      if (isMobileLocal) {
+        routes = routes.filter(r => !r.numAlternates || r.numAlternates <= 1);
+      }
+      
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
       const selectedRoutes = shuffled.slice(0, newSettings.routeCount);
       
@@ -145,7 +152,14 @@ const DuelMode: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const routes = await loadRoutesForSettings(settings);
+      let routes = await loadRoutesForSettings(settings);
+      
+      // Filter out multi-route maps for mobile local play
+      const isMobileLocal = window.innerWidth <= 768 && !settings.isOnline;
+      if (isMobileLocal) {
+        routes = routes.filter(r => !r.numAlternates || r.numAlternates <= 1);
+      }
+      
       const shuffled = [...routes].sort(() => Math.random() - 0.5);
       const selectedRoutes = shuffled.slice(0, settings.routeCount);
       

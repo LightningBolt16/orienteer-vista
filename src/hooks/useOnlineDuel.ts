@@ -35,7 +35,7 @@ export interface OnlineDuelRoom {
 
 interface UseOnlineDuelProps {
   onGameStart?: (room: OnlineDuelRoom) => void;
-  onOpponentAnswer?: (routeIndex: number, answer: 'left' | 'right') => void;
+  onOpponentAnswer?: (routeIndex: number, answer: string) => void;
   onGameEnd?: () => void;
 }
 
@@ -485,7 +485,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   }, [room, playerSlot]);
 
   // Submit an answer
-  const submitAnswer = useCallback(async (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => {
+  const submitAnswer = useCallback(async (routeIndex: number, answer: string, answerTimeMs: number, isCorrect: boolean) => {
     if (!room || !playerId) return;
 
     const { error } = await supabase
