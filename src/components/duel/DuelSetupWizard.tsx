@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useRouteCache } from '../../context/RouteCache';
 import { useUser } from '../../context/UserContext';
 import { useCommunityFavorites } from '../../hooks/useCommunityFavorites';
-import { getUniqueMapNames } from '../../utils/routeDataUtils';
+import { getUniqueMapNames, getMultiRouteOnlyMapIds } from '../../utils/routeDataUtils';
 import { 
   Map, Shuffle, Swords, AlertCircle, Zap, Clock, Timer, Pause, 
   Wifi, Users, Lock, ChevronDown, ChevronUp, Star, Check, 
