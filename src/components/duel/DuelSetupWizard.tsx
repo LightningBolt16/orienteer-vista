@@ -137,15 +137,31 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   // Helper to check if a map is multi-route-only (locked on mobile local)
   const isMapLockedForMobileLocal = (mapName: string, category: MapCategory): boolean => {
     if (!isMobile || playMode !== 'local') return false;
-    // Find the map's ID from the appropriate maps list
+    if (multiRouteOnlyMapIds.size === 0) return false;
+    
+    // Find the map's ID from all available maps lists
     const allMapsLists = [...availableMaps, ...userMaps, ...communityMaps];
-    const mapEntry = allMapsLists.find(m => m.name === mapName && (
+    
+    // Try exact match with category first
+    let mapEntry = allMapsLists.find(m => m.name === mapName && (
       (category === 'official' && m.mapCategory === 'official') ||
       (category === 'private' && m.mapCategory === 'private') ||
       (category === 'community' && m.mapCategory === 'community')
     ));
+    
+    // Fallback: match by name only (for maps selected via CommunityMapBrowser)
+    if (!mapEntry) {
+      mapEntry = allMapsLists.find(m => m.name === mapName);
+    }
+    
     if (!mapEntry) return false;
-    return multiRouteOnlyMapIds.has(mapEntry.id);
+    
+    // Check if this specific map ID is multi-route-only
+    if (multiRouteOnlyMapIds.has(mapEntry.id)) return true;
+    
+    // Also check if any map with this name is multi-route-only (handles same-name different IDs)
+    const allMatchingMaps = allMapsLists.filter(m => m.name === mapName);
+    return allMatchingMaps.some(m => multiRouteOnlyMapIds.has(m.id));
   };
   const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
     // Block selection of multi-route-only maps on mobile local
