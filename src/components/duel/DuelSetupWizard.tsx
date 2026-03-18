@@ -130,6 +130,19 @@ const DuelSetupWizard: React.FC<DuelSetupWizardProps> = ({ onStart, onStartOnlin
   const uniqueUserMapNames = getUniqueMapNames(userMaps);
   const uniqueFavoriteMapNames = favoriteMaps.map(m => m.name);
 
+  // Helper to check if a map is multi-route-only (locked on mobile local)
+  const isMapLockedForMobileLocal = (mapName: string, category: MapCategory): boolean => {
+    if (!isMobile || playMode !== 'local') return false;
+    // Find the map's ID from the appropriate maps list
+    const allMapsLists = [...availableMaps, ...userMaps, ...communityMaps];
+    const mapEntry = allMapsLists.find(m => m.name === mapName && (
+      (category === 'official' && m.mapCategory === 'official') ||
+      (category === 'private' && m.mapCategory === 'private') ||
+      (category === 'community' && m.mapCategory === 'community')
+    ));
+    if (!mapEntry) return false;
+    return multiRouteOnlyMapIds.has(mapEntry.id);
+  };
   const handleMapSelect = (mapName: string, category: MapCategory = 'official') => {
     if (multiSelectMode && mapName !== 'all') {
       setSelectedMaps(prev => 
