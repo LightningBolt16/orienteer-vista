@@ -485,7 +485,7 @@ export const useOnlineDuel = ({ onGameStart, onOpponentAnswer, onGameEnd }: UseO
   }, [room, playerSlot]);
 
   // Submit an answer
-  const submitAnswer = useCallback(async (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => {
+  const submitAnswer = useCallback(async (routeIndex: number, answer: string, answerTimeMs: number, isCorrect: boolean) => {
     if (!room || !playerId) return;
 
     const { error } = await supabase
