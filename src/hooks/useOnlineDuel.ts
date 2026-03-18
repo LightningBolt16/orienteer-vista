@@ -35,7 +35,7 @@ export interface OnlineDuelRoom {
 
 interface UseOnlineDuelProps {
   onGameStart?: (room: OnlineDuelRoom) => void;
-  onOpponentAnswer?: (routeIndex: number, answer: 'left' | 'right') => void;
+  onOpponentAnswer?: (routeIndex: number, answer: string) => void;
   onGameEnd?: () => void;
 }
 

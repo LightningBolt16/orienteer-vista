@@ -19,12 +19,12 @@ interface MobileDuelViewProps {
   isTimedMode: boolean;
   routesCompleted: number;
   totalRoutes: number;
-  onPlayerAnswer: (player: 1 | 2, direction: 'left' | 'right') => void;
+  onPlayerAnswer: (player: 1 | 2, answerIndex: number) => void;
   onExit: () => void;
 }
 
 // Portrait mode: Player 1 at bottom (charging port), Player 2 at top (notch)
-// Two-layer architecture: SafeZoneImage for map + static UI overlay for buttons
+// Mobile local always has 2-option routes (multi-route filtered out upstream)
 const MobileDuelView: React.FC<MobileDuelViewProps> = ({
   currentRoute,
   player1,
@@ -65,7 +65,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
           <div className="absolute inset-0 flex">
             {/* P2 Left button (blue - swapped for P2's perspective) */}
             <button
-              onClick={() => onPlayerAnswer(2, 'right')}
+              onClick={() => onPlayerAnswer(2, 1)}
               disabled={isTransitioning || player2.hasAnswered}
               className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/40 transition-colors"
               style={{
@@ -79,7 +79,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             
             {/* P2 Right button (red - swapped for P2's perspective) */}
             <button
-              onClick={() => onPlayerAnswer(2, 'left')}
+              onClick={() => onPlayerAnswer(2, 0)}
               disabled={isTransitioning || player2.hasAnswered}
               className="w-1/2 h-full flex items-center justify-center active:bg-red-500/40 transition-colors"
               style={{
@@ -117,7 +117,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
           )}
         </div>
 
-        {/* Center HUD - Route counter and Exit */}
+        {/* Center HUD */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 flex items-center gap-3">
           <div className="bg-background/90 backdrop-blur-sm rounded-lg px-3 py-2 border border-border shadow-lg">
             <div className="text-foreground font-mono font-bold text-sm text-center">
@@ -143,7 +143,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
           <div className="absolute inset-0 flex">
             {/* P1 Left button (red) */}
             <button
-              onClick={() => onPlayerAnswer(1, 'left')}
+              onClick={() => onPlayerAnswer(1, 0)}
               disabled={isTransitioning || player1.hasAnswered}
               className="w-1/2 h-full flex items-center justify-center active:bg-red-500/40 transition-colors"
               style={{
@@ -157,7 +157,7 @@ const MobileDuelView: React.FC<MobileDuelViewProps> = ({
             
             {/* P1 Right button (blue) */}
             <button
-              onClick={() => onPlayerAnswer(1, 'right')}
+              onClick={() => onPlayerAnswer(1, 1)}
               disabled={isTransitioning || player1.hasAnswered}
               className="w-1/2 h-full flex items-center justify-center active:bg-blue-500/40 transition-colors"
               style={{

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Trophy, RotateCcw, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, CheckCircle, XCircle, Trophy, RotateCcw, Home } from 'lucide-react';
 import { RouteData } from '@/utils/routeDataUtils';
 import { Button } from '../ui/button';
 import { OnlineDuelRoom, PlayerSlot } from '@/hooks/useOnlineDuel';
 import SafeZoneImage from '../map/SafeZoneImage';
+
+const ROUTE_COLORS = ['#FF5733', '#3357FF', '#33CC33', '#9933FF'];
 
 interface PlayerScore {
   slot: PlayerSlot;
@@ -17,7 +19,7 @@ interface OnlineDuelGameViewProps {
   room: OnlineDuelRoom;
   playerSlot: PlayerSlot;
   isMobile: boolean;
-  onAnswer: (routeIndex: number, answer: 'left' | 'right', answerTimeMs: number, isCorrect: boolean) => Promise<void>;
+  onAnswer: (routeIndex: number, answer: string, answerTimeMs: number, isCorrect: boolean) => Promise<void>;
   onExit: () => void;
   onFinishGame: () => Promise<void>;
   onRematch?: () => void;
@@ -32,8 +34,15 @@ const PLAYER_COLORS = {
   player_4: '#a855f7',
 };
 
-const RED_COLOR = '#FF5733';
-const BLUE_COLOR = '#3357FF';
+/** Get the correct answer index for a route */
+const getCorrectIndex = (route: RouteData): number => {
+  return route.mainRouteIndex ?? (route.shortestSide === 'left' ? 0 : 1);
+};
+
+/** Get the number of answer options for a route */
+const getRouteOptionCount = (route: RouteData): number => {
+  return 1 + (route.numAlternates || 1);
+};
 
 const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   routes,
@@ -58,36 +67,24 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const currentRoute = routes[currentRouteIndex % routes.length];
+  const totalOptions = currentRoute ? getRouteOptionCount(currentRoute) : 2;
 
   const getPlayerScores = (): PlayerScore[] => {
     const scores: PlayerScore[] = [
       { slot: 'host', name: room.host_name || 'Host', score: room.host_score, color: PLAYER_COLORS.host },
     ];
-    if (room.guest_id) {
-      scores.push({ slot: 'guest', name: room.guest_name || 'Player 2', score: room.guest_score, color: PLAYER_COLORS.guest });
-    }
-    if (room.player_3_id) {
-      scores.push({ slot: 'player_3', name: room.player_3_name || 'Player 3', score: room.player_3_score, color: PLAYER_COLORS.player_3 });
-    }
-    if (room.player_4_id) {
-      scores.push({ slot: 'player_4', name: room.player_4_name || 'Player 4', score: room.player_4_score, color: PLAYER_COLORS.player_4 });
-    }
+    if (room.guest_id) scores.push({ slot: 'guest', name: room.guest_name || 'Player 2', score: room.guest_score, color: PLAYER_COLORS.guest });
+    if (room.player_3_id) scores.push({ slot: 'player_3', name: room.player_3_name || 'Player 3', score: room.player_3_score, color: PLAYER_COLORS.player_3 });
+    if (room.player_4_id) scores.push({ slot: 'player_4', name: room.player_4_name || 'Player 4', score: room.player_4_score, color: PLAYER_COLORS.player_4 });
     return scores;
   };
 
   const getImageUrl = (route: RouteData): string => route.imagePath || '';
 
-  // Check game over from server
-  useEffect(() => {
-    if (room.status === 'finished') setGameOver(true);
-  }, [room.status]);
+  useEffect(() => { if (room.status === 'finished') setGameOver(true); }, [room.status]);
 
-  // Check if all routes completed locally
   useEffect(() => {
-    if (currentRouteIndex >= routes.length && !gameOver) {
-      onFinishGame();
-      setGameOver(true);
-    }
+    if (currentRouteIndex >= routes.length && !gameOver) { onFinishGame(); setGameOver(true); }
   }, [currentRouteIndex, routes.length, gameOver, onFinishGame]);
 
   // Preload images
@@ -95,26 +92,18 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
     if (!currentRoute) return;
     const currentImageUrl = getImageUrl(currentRoute);
     const existingImg = preloadedImages.current.get(currentImageUrl);
-    if (existingImg?.complete) {
-      setIsImageLoaded(true);
-    } else {
+    if (existingImg?.complete) { setIsImageLoaded(true); }
+    else {
       setIsImageLoaded(false);
       const img = new Image();
-      img.onload = () => {
-        setIsImageLoaded(true);
-        preloadedImages.current.set(currentImageUrl, img);
-      };
+      img.onload = () => { setIsImageLoaded(true); preloadedImages.current.set(currentImageUrl, img); };
       img.src = currentImageUrl;
     }
     for (let i = 1; i < PRELOAD_AHEAD_COUNT; i++) {
       const index = (currentRouteIndex + i) % routes.length;
       const route = routes[index];
       const imageUrl = getImageUrl(route);
-      if (!preloadedImages.current.has(imageUrl)) {
-        const img = new Image();
-        img.src = imageUrl;
-        preloadedImages.current.set(imageUrl, img);
-      }
+      if (!preloadedImages.current.has(imageUrl)) { const img = new Image(); img.src = imageUrl; preloadedImages.current.set(imageUrl, img); }
     }
     return () => {
       if (resultTimeout.current) window.clearTimeout(resultTimeout.current);
@@ -122,16 +111,14 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
     };
   }, [currentRouteIndex, routes, currentRoute]);
 
-  // Start timer when image loads
-  useEffect(() => {
-    if (isImageLoaded && !isTransitioning) setStartTime(Date.now());
-  }, [isImageLoaded, currentRouteIndex, isTransitioning]);
+  useEffect(() => { if (isImageLoaded && !isTransitioning) setStartTime(Date.now()); }, [isImageLoaded, currentRouteIndex, isTransitioning]);
 
-  const handleDirectionSelect = (direction: 'left' | 'right') => {
+  const handleAnswerSelect = (answerIndex: number) => {
     if (isTransitioning || routes.length === 0 || startTime === null) return;
-    const isCorrect = direction === currentRoute.shortestSide;
+    const correctIndex = getCorrectIndex(currentRoute);
+    const isCorrect = answerIndex === correctIndex;
     const responseTime = Date.now() - startTime;
-    onAnswer(currentRouteIndex, direction, responseTime, isCorrect);
+    onAnswer(currentRouteIndex, String(answerIndex), responseTime, isCorrect);
 
     if (isCorrect) {
       setResultMessage(responseTime < 1000 ? 'Excellent!' : responseTime < 2000 ? 'Good!' : 'Correct!');
@@ -159,12 +146,14 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   useEffect(() => {
     if (isMobile) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') { e.preventDefault(); handleDirectionSelect('left'); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); handleDirectionSelect('right'); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); handleAnswerSelect(0); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); handleAnswerSelect(1); }
+      else if (e.key === 'ArrowUp' && totalOptions >= 3) { e.preventDefault(); handleAnswerSelect(2); }
+      else if (e.key === 'ArrowDown' && totalOptions >= 4) { e.preventDefault(); handleAnswerSelect(3); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMobile, isTransitioning, startTime, currentRouteIndex]);
+  }, [isMobile, isTransitioning, startTime, currentRouteIndex, totalOptions]);
 
   // Game over screen
   if (gameOver) {
@@ -192,21 +181,15 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
                     </div>
                     <span className="font-medium">{isMe ? 'You' : player.name}</span>
                   </div>
-                  <span className="font-bold text-lg">
-                    {player.score % 1 === 0 ? player.score : player.score.toFixed(1)}
-                  </span>
+                  <span className="font-bold text-lg">{player.score % 1 === 0 ? player.score : player.score.toFixed(1)}</span>
                 </div>
               );
             })}
           </div>
           <div className="flex gap-4">
-            <Button variant="outline" onClick={onExit} className="flex-1">
-              <Home className="h-4 w-4 mr-2" />Exit
-            </Button>
+            <Button variant="outline" onClick={onExit} className="flex-1"><Home className="h-4 w-4 mr-2" />Exit</Button>
             {playerSlot === 'host' && onRematch && (
-              <Button onClick={onRematch} className="flex-1">
-                <RotateCcw className="h-4 w-4 mr-2" />Rematch
-              </Button>
+              <Button onClick={onRematch} className="flex-1"><RotateCcw className="h-4 w-4 mr-2" />Rematch</Button>
             )}
           </div>
         </div>
@@ -221,6 +204,24 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   const currentImageUrl = getImageUrl(currentRoute);
   const playerScores = getPlayerScores();
   const is1x1 = currentRoute.sourceAspect === '1:1';
+
+  const getArrowIcon = (index: number, size = 'h-8 w-8') => {
+    if (index === 0) return <ChevronLeft className={size} />;
+    if (index === 1) return <ChevronRight className={size} />;
+    if (index === 2) return <ChevronUp className={size} />;
+    return <ChevronDown className={size} />;
+  };
+
+  const getButtonPosition = (index: number, total: number) => {
+    if (total === 2) {
+      if (index === 0) return 'left-4 top-1/2 -translate-y-1/2';
+      return 'right-4 top-1/2 -translate-y-1/2';
+    }
+    if (index === 0) return 'left-4 top-1/2 -translate-y-1/2';
+    if (index === 1) return 'right-4 top-1/2 -translate-y-1/2';
+    if (index === 2) return 'left-1/2 top-4 -translate-x-1/2';
+    return 'left-1/2 bottom-4 -translate-x-1/2';
+  };
 
   // Score Bar
   const ScoreBar = ({ compact = false }: { compact?: boolean }) => (
@@ -243,13 +244,10 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
           );
         })}
       </div>
-      <div className={`text-muted-foreground ${compact ? 'text-xs' : 'text-sm'}`}>
-        Route {currentRouteIndex + 1}
-      </div>
+      <div className={`text-muted-foreground ${compact ? 'text-xs' : 'text-sm'}`}>Route {currentRouteIndex + 1}</div>
     </div>
   );
 
-  // Result overlay (always viewport-centered, no transform)
   const renderResultOverlay = (iconSize = 'w-20 h-20') => {
     if (!showResult) return null;
     return (
@@ -257,84 +255,72 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
         {showResult === 'win' ? (
           <>
             <CheckCircle className={`text-green-500 ${iconSize} animate-[win-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]`} />
-            <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
-              {resultMessage}
-            </div>
+            <div className="mt-4 px-4 py-2 bg-green-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">{resultMessage}</div>
           </>
         ) : (
           <>
             <XCircle className={`text-red-500 ${iconSize} animate-[lose-animation_0.4s_ease-out] drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]`} />
-            <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">
-              {resultMessage}
-            </div>
+            <div className="mt-4 px-4 py-2 bg-red-500/80 rounded-full text-white font-bold animate-fade-in shadow-lg">{resultMessage}</div>
           </>
         )}
       </div>
     );
   };
 
+  const renderArrowButtons = (size = 'h-8 w-8', padding = 'p-4') => (
+    <>
+      {Array.from({ length: totalOptions }, (_, i) => (
+        <button
+          key={i}
+          onClick={() => handleAnswerSelect(i)}
+          style={{ backgroundColor: `${ROUTE_COLORS[i]}CC` }}
+          className={`absolute ${getButtonPosition(i, totalOptions)} text-white ${padding} rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 z-10`}
+          disabled={isTransitioning}
+        >
+          {getArrowIcon(i, size)}
+        </button>
+      ))}
+    </>
+  );
+
   // === MOBILE VIEW ===
   if (isMobile) {
     return (
       <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <ScoreBar compact />
-
-        {/* Game Area */}
         <div className="flex-1 relative overflow-hidden">
-          {/* Layer 1: Image with SafeZone zoom */}
           {is1x1 ? (
-            <SafeZoneImage
-              src={currentImageUrl}
-              isFullscreen
-              safeZone={currentRoute.safeZone}
-              alt="Route"
-              onLoad={() => setIsImageLoaded(true)}
-            />
+            <SafeZoneImage src={currentImageUrl} isFullscreen safeZone={currentRoute.safeZone} alt="Route" onLoad={() => setIsImageLoaded(true)} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <img
-                src={currentImageUrl}
-                alt="Route"
-                className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}
-                onLoad={() => setIsImageLoaded(true)}
-              />
+              <img src={currentImageUrl} alt="Route" className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`} onLoad={() => setIsImageLoaded(true)} />
             </div>
           )}
-
-          {/* Layer 2: Static UI overlay (no transform) */}
           <div className="absolute inset-0 pointer-events-none">
-            {/* Edge glows */}
-            <div
-              className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none"
-              style={{
-                background: `linear-gradient(to right, ${RED_COLOR}40, transparent)`,
-              }}
-            />
-            <div
-              className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none"
-              style={{
-                background: `linear-gradient(to left, ${BLUE_COLOR}40, transparent)`,
-              }}
-            />
-
-            {/* Result overlay */}
+            {/* Edge glows for 2-option routes */}
+            {totalOptions === 2 && (
+              <>
+                <div className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none" style={{ background: `linear-gradient(to right, ${ROUTE_COLORS[0]}40, transparent)` }} />
+                <div className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none" style={{ background: `linear-gradient(to left, ${ROUTE_COLORS[1]}40, transparent)` }} />
+              </>
+            )}
             {renderResultOverlay('w-10 h-10')}
-
-            {/* Touch zones */}
             {isImageLoaded && !showResult && (
-              <div className="absolute inset-0 flex pointer-events-auto">
-                <div className="w-1/2 h-full cursor-pointer" onClick={() => handleDirectionSelect('left')} />
-                <div className="w-1/2 h-full cursor-pointer" onClick={() => handleDirectionSelect('right')} />
+              <div className="absolute inset-0 pointer-events-auto">
+                {totalOptions === 2 ? (
+                  <div className="absolute inset-0 flex">
+                    <div className="w-1/2 h-full cursor-pointer" onClick={() => handleAnswerSelect(0)} />
+                    <div className="w-1/2 h-full cursor-pointer" onClick={() => handleAnswerSelect(1)} />
+                  </div>
+                ) : (
+                  renderArrowButtons('h-6 w-6', 'p-3')
+                )}
               </div>
             )}
           </div>
         </div>
-
-        {/* Exit Button */}
         <div className="absolute top-2 right-2 z-30">
-          <Button variant="ghost" size="sm" onClick={onExit} className="text-white">
-            Exit
-          </Button>
+          <Button variant="ghost" size="sm" onClick={onExit} className="text-white">Exit</Button>
         </div>
       </div>
     );
@@ -343,26 +329,18 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
   // === DESKTOP VIEW ===
   return (
     <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-      {/* Score Bar */}
       <div className="flex items-center justify-between px-6 py-3 bg-muted/50 border-b border-border">
         <div className="flex items-center gap-4">
           {playerScores.map((player) => {
             const isMe = player.slot === playerSlot;
             return (
               <div key={player.slot} className="flex items-center gap-2">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${isMe ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
-                  style={{ backgroundColor: player.color }}
-                >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${isMe ? 'ring-2 ring-offset-2 ring-primary' : ''}`} style={{ backgroundColor: player.color }}>
                   {player.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex flex-col">
-                  <span className={`text-xs ${isMe ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                    {isMe ? 'You' : player.name}
-                  </span>
-                  <span className="font-bold text-lg">
-                    {player.score % 1 === 0 ? player.score : player.score.toFixed(1)}
-                  </span>
+                  <span className={`text-xs ${isMe ? 'text-primary font-medium' : 'text-muted-foreground'}`}>{isMe ? 'You' : player.name}</span>
+                  <span className="font-bold text-lg">{player.score % 1 === 0 ? player.score : player.score.toFixed(1)}</span>
                 </div>
               </div>
             );
@@ -371,63 +349,26 @@ const OnlineDuelGameView: React.FC<OnlineDuelGameViewProps> = ({
         <div className="text-lg text-muted-foreground">Route {currentRouteIndex + 1}</div>
       </div>
 
-      {/* Game Area - Two-layer architecture */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Layer 1: Image with SafeZone zoom */}
         {is1x1 ? (
-          <SafeZoneImage
-            src={currentImageUrl}
-            isFullscreen
-            safeZone={currentRoute.safeZone}
-            alt="Route"
-            onLoad={() => setIsImageLoaded(true)}
-          />
+          <SafeZoneImage src={currentImageUrl} isFullscreen safeZone={currentRoute.safeZone} alt="Route" onLoad={() => setIsImageLoaded(true)} />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <img
-              src={currentImageUrl}
-              alt="Route"
-              className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}
-              onLoad={() => setIsImageLoaded(true)}
-            />
+            <img src={currentImageUrl} alt="Route" className={`max-w-full max-h-full object-contain transition-all duration-300 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`} onLoad={() => setIsImageLoaded(true)} />
           </div>
         )}
-
-        {/* Layer 2: Static UI overlay (no transform) */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Result overlay */}
           {renderResultOverlay('w-32 h-32')}
-
-          {/* Arrow buttons at viewport edges */}
           {isImageLoaded && !showResult && (
             <div className="pointer-events-auto">
-              <button
-                onClick={() => handleDirectionSelect('left')}
-                style={{ backgroundColor: `${RED_COLOR}CC` }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 z-10"
-                disabled={isTransitioning}
-              >
-                <ChevronLeft className="h-8 w-8" />
-              </button>
-
-              <button
-                onClick={() => handleDirectionSelect('right')}
-                style={{ backgroundColor: `${BLUE_COLOR}CC` }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 z-10"
-                disabled={isTransitioning}
-              >
-                <ChevronRight className="h-8 w-8" />
-              </button>
+              {renderArrowButtons()}
             </div>
           )}
         </div>
       </div>
 
-      {/* Exit Button */}
       <div className="absolute top-2 right-2 z-30">
-        <Button variant="ghost" size="sm" onClick={onExit} className="text-white">
-          Exit
-        </Button>
+        <Button variant="ghost" size="sm" onClick={onExit} className="text-white">Exit</Button>
       </div>
     </div>
   );

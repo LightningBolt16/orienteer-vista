@@ -14,12 +14,12 @@ interface MobileDuelIndependentViewProps {
   player2: PlayerState;
   gameTimeRemaining: number | null;
   totalRoutes: number;
-  onPlayerAnswer: (player: 1 | 2, direction: 'left' | 'right') => void;
+  onPlayerAnswer: (player: 1 | 2, answerIndex: number) => void;
   onExit: () => void;
 }
 
 // Independent mode: Each player has their own route progression
-// Portrait mode with split screen (top/bottom)
+// Mobile local always has 2-option routes (multi-route filtered out upstream)
 const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
   routes,
   player1,
@@ -41,9 +41,8 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
 
   return (
     <div className="fixed inset-0 bg-background overflow-hidden flex flex-col">
-      {/* Player 2 area - TOP half (rotated 180 for person at notch end) */}
+      {/* Player 2 area - TOP half (rotated 180) */}
       <div className="relative h-1/2 border-b border-border" style={{ transform: 'rotate(180deg)' }}>
-        {/* Route image for P2 */}
         <div className="absolute inset-0 flex items-center justify-center z-0">
           <img
             src={player2ImageUrl}
@@ -54,9 +53,8 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
           />
         </div>
 
-        {/* Touch zone covering entire half */}
         <button
-          onClick={() => onPlayerAnswer(2, 'left')}
+          onClick={() => onPlayerAnswer(2, 0)}
           disabled={player2.isTransitioning}
           className="absolute inset-0 w-full h-full z-10"
           style={{
@@ -64,14 +62,12 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
           }}
         />
 
-        {/* P2 Score - at their bottom (appears at top of screen after rotation) */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-blue-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
             <span className="text-white font-bold text-lg">P2: {player2.score.toFixed(1)}</span>
           </div>
         </div>
 
-        {/* P2 Result */}
         {player2.showResult && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
             <span className={`text-7xl font-bold ${player2.showResult === 'win' ? 'text-green-500' : 'text-destructive'}`}>
@@ -81,7 +77,7 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
         )}
       </div>
 
-      {/* Center HUD - Timer and Exit */}
+      {/* Center HUD */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 flex items-center gap-3">
         {gameTimeRemaining !== null && (
           <div className="bg-background/90 backdrop-blur-sm rounded-lg px-3 py-2 border border-border shadow-lg">
@@ -102,7 +98,6 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
 
       {/* Player 1 area - BOTTOM half */}
       <div className="relative h-1/2 border-t border-border">
-        {/* Route image for P1 */}
         <div className="absolute inset-0 flex items-center justify-center z-0">
           <img
             src={player1ImageUrl}
@@ -113,9 +108,8 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
           />
         </div>
 
-        {/* Touch zone covering entire half */}
         <button
-          onClick={() => onPlayerAnswer(1, 'left')}
+          onClick={() => onPlayerAnswer(1, 0)}
           disabled={player1.isTransitioning}
           className="absolute inset-0 w-full h-full z-10"
           style={{
@@ -123,14 +117,12 @@ const MobileDuelIndependentView: React.FC<MobileDuelIndependentViewProps> = ({
           }}
         />
 
-        {/* P1 Score - at bottom */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
           <div className="bg-red-500/90 backdrop-blur-sm rounded-full px-5 py-2 shadow-lg">
             <span className="text-white font-bold text-lg">P1: {player1.score.toFixed(1)}</span>
           </div>
         </div>
 
-        {/* P1 Result */}
         {player1.showResult && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
             <span className={`text-7xl font-bold ${player1.showResult === 'win' ? 'text-green-500' : 'text-destructive'}`}>
