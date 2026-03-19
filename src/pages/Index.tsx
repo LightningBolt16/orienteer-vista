@@ -88,7 +88,7 @@ const Index: React.FC = () => {
           {t('competeWithOthers')}
         </p>
         
-        <div className="flex justify-center gap-4 mb-8">
+        <div className="flex flex-wrap justify-center gap-4 mb-8">
           <Link to="/route-game">
             <Button size="lg">
               {t('joinCompetition')}
