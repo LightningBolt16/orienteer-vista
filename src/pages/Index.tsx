@@ -99,6 +99,11 @@ const Index: React.FC = () => {
               Duel Mode
             </Button>
           </Link>
+          <Link to="/route-finder">
+            <Button size="lg" variant="outline">
+              Route Finder
+            </Button>
+          </Link>
         </div>
         
         <div className="w-full">
