@@ -382,7 +382,7 @@ const UserMaps: React.FC = () => {
               )}
 
               {/* Play button */}
-              <Button size="sm" variant="default" onClick={() => playMap(table, map.name)} className="gap-1">
+              <Button size="sm" variant="default" onClick={() => playMap(table, map)} className="gap-1">
                 <Play className="h-3 w-3" /> Play
               </Button>
 
