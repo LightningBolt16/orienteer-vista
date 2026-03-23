@@ -197,7 +197,8 @@ const RouteFinderUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onComp
       setStep('complete');
       toast({ title: 'Upload Complete', description: `${validation.challenges.length} challenges uploaded for ${mapName}` });
     } catch (err: any) {
-      toast({ title: 'Upload Failed', description: err.message, variant: 'destructive' });
+      console.error('Route Finder upload error:', err);
+      toast({ title: 'Upload Failed', description: err.message || JSON.stringify(err), variant: 'destructive' });
       setStep('validate');
     }
   }, [validation, mapName, countryCode]);
