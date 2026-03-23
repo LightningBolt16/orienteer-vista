@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin, Trash2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const COUNTRIES = [
   { code: 'IT', name: 'Italy', flag: '🇮🇹' },
@@ -41,6 +45,8 @@ const MAP_TYPES = [
   { value: 'park', label: 'Park' },
 ];
 
+export { COUNTRIES, MAP_TYPES };
+
 export interface AdminMapItem {
   id: string;
   name: string;
@@ -58,12 +64,15 @@ interface AdminMapCardProps {
   map: AdminMapItem;
   table: 'route_maps' | 'route_finder_maps';
   onUpdate: () => void;
+  showDelete?: boolean;
 }
 
-const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate }) => {
+const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showDelete = true }) => {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(map.name);
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const toggleVisibility = async () => {
@@ -121,110 +130,150 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate }) => 
     toast({ title: 'Logo updated' });
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      // Delete associated data first
+      if (table === 'route_maps') {
+        await supabase.from('route_images').delete().eq('map_id', map.id);
+      } else {
+        await supabase.from('route_finder_challenges').delete().eq('map_id', map.id);
+      }
+      const { error } = await supabase.from(table).delete().eq('id', map.id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: `${map.name} has been deleted.` });
+      onUpdate();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to delete map', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const countryInfo = COUNTRIES.find(c => c.code === map.country_code);
 
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg border ${map.is_hidden ? 'bg-muted/50 border-dashed' : 'bg-card'}`}>
-      {/* Visibility icon */}
-      {map.is_hidden ? (
-        <EyeOff className="h-4 w-4 text-muted-foreground shrink-0" />
-      ) : (
-        <Eye className="h-4 w-4 text-primary shrink-0" />
-      )}
-
-      {/* Name */}
-      <div className="flex-1 min-w-0">
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-7 text-sm"
-              onKeyDown={(e) => e.key === 'Enter' && saveName()}
-              autoFocus
-            />
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={saveName} disabled={saving}>
-              <Check className="h-3 w-3" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(false); setName(map.name); }}>
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
+    <>
+      <div className={`flex items-center gap-3 p-3 rounded-lg border ${map.is_hidden ? 'bg-muted/50 border-dashed' : 'bg-card'}`}>
+        {map.is_hidden ? (
+          <EyeOff className="h-4 w-4 text-muted-foreground shrink-0" />
         ) : (
-          <div className="flex items-center gap-2">
-            <span className={`font-medium text-sm truncate ${map.is_hidden ? 'text-muted-foreground' : ''}`}>
-              {map.name}
-            </span>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(true)}>
-              <Pencil className="h-3 w-3" />
-            </Button>
-          </div>
+          <Eye className="h-4 w-4 text-primary shrink-0" />
         )}
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {countryInfo && (
-            <span className="text-xs text-muted-foreground">{countryInfo.flag} {countryInfo.code}</span>
+
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-7 text-sm"
+                onKeyDown={(e) => e.key === 'Enter' && saveName()}
+                autoFocus
+              />
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={saveName} disabled={saving}>
+                <Check className="h-3 w-3" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(false); setName(map.name); }}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className={`font-medium text-sm truncate ${map.is_hidden ? 'text-muted-foreground' : ''}`}>
+                {map.name}
+              </span>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(true)}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </div>
           )}
-          {map.map_category && (
-            <Badge variant="outline" className="text-xs py-0 h-5">{map.map_category}</Badge>
-          )}
-          {map.location_name && (
-            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-              <MapPin className="h-3 w-3" />{map.location_name}
-            </span>
-          )}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {countryInfo && (
+              <span className="text-xs text-muted-foreground">{countryInfo.flag} {countryInfo.code}</span>
+            )}
+            {map.map_category && (
+              <Badge variant="outline" className="text-xs py-0 h-5">{map.map_category}</Badge>
+            )}
+            {map.location_name && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                <MapPin className="h-3 w-3" />{map.location_name}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Country selector */}
-      <Select
-        value={map.country_code || ''}
-        onValueChange={(val) => updateField('country_code', val || null)}
-      >
-        <SelectTrigger className="w-24 h-8 text-xs">
-          <SelectValue placeholder="Country" />
-        </SelectTrigger>
-        <SelectContent>
-          {COUNTRIES.map(c => (
-            <SelectItem key={c.code} value={c.code}>
-              <span className="flex items-center gap-1 text-xs">{c.flag} {c.code}</span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Map type (route_maps only) */}
-      {'map_type' in map && table === 'route_maps' && (
         <Select
-          value={(map as any).map_type || 'forest'}
-          onValueChange={(val) => updateField('map_type', val)}
+          value={map.country_code || ''}
+          onValueChange={(val) => updateField('country_code', val || null)}
         >
           <SelectTrigger className="w-24 h-8 text-xs">
-            <SelectValue />
+            <SelectValue placeholder="Country" />
           </SelectTrigger>
           <SelectContent>
-            {MAP_TYPES.map(t => (
-              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            {COUNTRIES.map(c => (
+              <SelectItem key={c.code} value={c.code}>
+                <span className="flex items-center gap-1 text-xs">{c.flag} {c.code}</span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      )}
 
-      {/* Logo button (route_maps only) */}
-      {table === 'route_maps' && (
-        <>
-          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRef.current?.click()}>
-            {map.logo_path ? <Image className="h-4 w-4 text-primary" /> : <Flag className="h-4 w-4 text-muted-foreground" />}
+        {'map_type' in map && table === 'route_maps' && (
+          <Select
+            value={(map as any).map_type || 'forest'}
+            onValueChange={(val) => updateField('map_type', val)}
+          >
+            <SelectTrigger className="w-24 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MAP_TYPES.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {table === 'route_maps' && (
+          <>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRef.current?.click()}>
+              {map.logo_path ? <Image className="h-4 w-4 text-primary" /> : <Flag className="h-4 w-4 text-muted-foreground" />}
+            </Button>
+            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+          </>
+        )}
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">{map.is_hidden ? 'Hidden' : 'Visible'}</span>
+          <Switch checked={!map.is_hidden} onCheckedChange={toggleVisibility} />
+        </div>
+
+        {showDelete && (
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setShowDeleteConfirm(true)}>
+            <Trash2 className="h-4 w-4" />
           </Button>
-          <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-        </>
-      )}
-
-      {/* Visibility toggle */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground">{map.is_hidden ? 'Hidden' : 'Visible'}</span>
-        <Switch checked={!map.is_hidden} onCheckedChange={toggleVisibility} />
+        )}
       </div>
-    </div>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{map.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this map and all its associated routes/challenges. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground">
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
