@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Plus, Map, Route, Clock, CheckCircle2, XCircle, Loader2, Trash2, RefreshCw, Crown,
-  Globe, Lock, AlertTriangle, Pencil, Check, X, Eye, EyeOff, Image, MapPin,
+  Globe, Lock, AlertTriangle, Pencil, Check, X, Eye, EyeOff, Image, MapPin, Flag, Play,
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
@@ -19,6 +20,7 @@ import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useProAccess } from '@/hooks/useProAccess';
 import { toast } from '@/components/ui/use-toast';
+import { COUNTRIES, MAP_TYPES } from '@/components/admin/AdminMapCard';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -36,6 +38,7 @@ interface ResultMap {
   location_name: string | null;
   description: string | null;
   logo_path?: string | null;
+  map_type?: string | null;
   source_map_id: string | null;
   created_at: string;
 }
@@ -48,17 +51,18 @@ const UserMaps: React.FC = () => {
   const { hasPro, loading: proLoading } = useProAccess();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
   const [showAdminRequest, setShowAdminRequest] = useState(false);
-  const [deleteMapId, setDeleteMapId] = useState<string | null>(null);
+  const [deleteSourceMapId, setDeleteSourceMapId] = useState<string | null>(null);
+  const [deleteResultMap, setDeleteResultMap] = useState<{ id: string; name: string; table: 'route_maps' | 'route_finder_maps' } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Result maps
   const [routeChoiceMaps, setRouteChoiceMaps] = useState<ResultMap[]>([]);
   const [routeFinderMaps, setRouteFinderMaps] = useState<ResultMap[]>([]);
   const [loadingResults, setLoadingResults] = useState(true);
 
-  // Editing states
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
+  const logoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (user) {
@@ -73,7 +77,7 @@ const UserMaps: React.FC = () => {
     try {
       const [{ data: rc }, { data: rf }] = await Promise.all([
         supabase.from('route_maps')
-          .select('id, name, is_public, is_hidden, map_category, country_code, location_name, description, logo_path, source_map_id, created_at')
+          .select('id, name, is_public, is_hidden, map_category, country_code, location_name, description, logo_path, map_type, source_map_id, created_at')
           .eq('user_id', user.id)
           .or('map_category.eq.private,map_category.eq.community')
           .order('created_at', { ascending: false }),
@@ -92,7 +96,6 @@ const UserMaps: React.FC = () => {
     }
   }, [user]);
 
-  // Realtime for user_maps
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -105,7 +108,6 @@ const UserMaps: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user, fetchUserMaps, loadResultMaps]);
 
-  // Polling for processing
   useEffect(() => {
     if (!user) return;
     const processing = userMaps.filter(m => m.status === 'processing');
@@ -125,7 +127,6 @@ const UserMaps: React.FC = () => {
     return Date.now() - new Date(map.updated_at).getTime() > STALE_THRESHOLD_MS;
   };
 
-  // Actions on result maps
   const updateResultMap = async (table: 'route_maps' | 'route_finder_maps', id: string, data: Record<string, any>) => {
     const { error } = await supabase.from(table).update(data).eq('id', id);
     if (error) {
@@ -160,11 +161,54 @@ const UserMaps: React.FC = () => {
     toast({ title: 'Unpublished', description: `${map.name} is now private.` });
   };
 
-  const handleDeleteConfirm = async () => {
-    if (deleteMapId) {
-      await deleteUserMap(deleteMapId);
-      setDeleteMapId(null);
+  const handleDeleteSourceConfirm = async () => {
+    if (deleteSourceMapId) {
+      await deleteUserMap(deleteSourceMapId);
+      setDeleteSourceMapId(null);
       loadResultMaps();
+    }
+  };
+
+  const handleDeleteResultConfirm = async () => {
+    if (!deleteResultMap) return;
+    setDeleting(true);
+    try {
+      if (deleteResultMap.table === 'route_maps') {
+        await supabase.from('route_images').delete().eq('map_id', deleteResultMap.id);
+      } else {
+        await supabase.from('route_finder_challenges').delete().eq('map_id', deleteResultMap.id);
+      }
+      const { error } = await supabase.from(deleteResultMap.table).delete().eq('id', deleteResultMap.id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: `${deleteResultMap.name} has been deleted.` });
+      loadResultMaps();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to delete', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+      setDeleteResultMap(null);
+    }
+  };
+
+  const handleLogoUpload = async (table: 'route_maps' | 'route_finder_maps', mapId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop();
+    const path = `user/${mapId}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('map-logos').upload(path, file, { upsert: true });
+    if (upErr) {
+      toast({ title: 'Upload failed', description: upErr.message, variant: 'destructive' });
+      return;
+    }
+    await updateResultMap(table, mapId, { logo_path: path });
+    toast({ title: 'Logo updated' });
+  };
+
+  const playMap = (table: 'route_maps' | 'route_finder_maps', mapName: string) => {
+    if (table === 'route_maps') {
+      navigate(`/game?map=${encodeURIComponent(mapName)}`);
+    } else {
+      navigate(`/route-finder?map=${encodeURIComponent(mapName)}`);
     }
   };
 
@@ -201,6 +245,7 @@ const UserMaps: React.FC = () => {
   const renderMapCard = (map: ResultMap, table: 'route_maps' | 'route_finder_maps') => {
     const isCommunity = map.map_category === 'community';
     const isEditing = editingName === map.id;
+    const isRouteChoice = table === 'route_maps';
 
     return (
       <Card key={map.id} className={map.is_hidden ? 'opacity-60' : ''}>
@@ -247,6 +292,13 @@ const UserMaps: React.FC = () => {
                     <EyeOff className="h-3 w-3 mr-1" /> Hidden
                   </Badge>
                 )}
+                {map.country_code && (() => {
+                  const c = COUNTRIES.find(c => c.code === map.country_code);
+                  return c ? <span className="text-xs text-muted-foreground">{c.flag} {c.code}</span> : null;
+                })()}
+                {map.map_type && isRouteChoice && (
+                  <Badge variant="outline" className="text-xs py-0 h-5 capitalize">{map.map_type}</Badge>
+                )}
                 {map.location_name && (
                   <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                     <MapPin className="h-3 w-3" />{map.location_name}
@@ -259,7 +311,55 @@ const UserMaps: React.FC = () => {
             </div>
 
             {/* Right: actions */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              {/* Country selector */}
+              <Select
+                value={map.country_code || ''}
+                onValueChange={(val) => updateResultMap(table, map.id, { country_code: val || null })}
+              >
+                <SelectTrigger className="w-20 h-8 text-xs">
+                  <SelectValue placeholder="🌍" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map(c => (
+                    <SelectItem key={c.code} value={c.code}>
+                      <span className="flex items-center gap-1 text-xs">{c.flag} {c.code}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Map type (route_maps only) */}
+              {isRouteChoice && (
+                <Select
+                  value={map.map_type || 'forest'}
+                  onValueChange={(val) => updateResultMap(table, map.id, { map_type: val })}
+                >
+                  <SelectTrigger className="w-20 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAP_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Logo upload (route_maps only) */}
+              {isRouteChoice && (
+                <>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRefs.current[map.id]?.click()}>
+                    {map.logo_path ? <Image className="h-4 w-4 text-primary" /> : <Flag className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
+                  <input
+                    ref={el => { logoInputRefs.current[map.id] = el; }}
+                    type="file" accept="image/*" className="hidden"
+                    onChange={(e) => handleLogoUpload(table, map.id, e)}
+                  />
+                </>
+              )}
+
               {/* Hide toggle (private only) */}
               {!isCommunity && (
                 <div className="flex items-center gap-1">
@@ -278,6 +378,16 @@ const UserMaps: React.FC = () => {
                   <Globe className="h-3 w-3" /> Publish
                 </Button>
               )}
+
+              {/* Play button */}
+              <Button size="sm" variant="default" onClick={() => playMap(table, map.name)} className="gap-1">
+                <Play className="h-3 w-3" /> Play
+              </Button>
+
+              {/* Delete */}
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteResultMap({ id: map.id, name: map.name, table })}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -285,7 +395,6 @@ const UserMaps: React.FC = () => {
     );
   };
 
-  // Processing queue — user_maps that are still pending/processing
   const processingMaps = userMaps.filter(m => m.status === 'pending' || m.status === 'processing' || m.status === 'failed');
 
   return (
@@ -313,7 +422,6 @@ const UserMaps: React.FC = () => {
         </div>
       </div>
 
-      {/* Processing queue */}
       {processingMaps.length > 0 && (
         <Card className="mb-6">
           <CardHeader className="pb-3">
@@ -336,7 +444,7 @@ const UserMaps: React.FC = () => {
                     {isMapStale(map) && user && (
                       <RecoverMapButton mapId={map.id} userId={user.id} onRecovered={() => { fetchUserMaps(); loadResultMaps(); }} />
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteMapId(map.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteSourceMapId(map.id)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -347,7 +455,6 @@ const UserMaps: React.FC = () => {
         </Card>
       )}
 
-      {/* Tabs for result maps */}
       <Tabs defaultValue="route-choice">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="route-choice" className="gap-2">
@@ -397,17 +504,36 @@ const UserMaps: React.FC = () => {
 
       <AdminRequestDialog open={showAdminRequest} onOpenChange={setShowAdminRequest} />
 
-      <AlertDialog open={!!deleteMapId} onOpenChange={() => setDeleteMapId(null)}>
+      {/* Delete source map dialog */}
+      <AlertDialog open={!!deleteSourceMapId} onOpenChange={() => setDeleteSourceMapId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Map</AlertDialogTitle>
+            <AlertDialogTitle>Delete Source Map</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure? This will delete all generated routes and cannot be undone.
+              Are you sure? This will delete the source files and cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteSourceConfirm} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete result map dialog */}
+      <AlertDialog open={!!deleteResultMap} onOpenChange={() => setDeleteResultMap(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteResultMap?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this map and all its associated routes/challenges. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteResultConfirm} disabled={deleting} className="bg-destructive text-destructive-foreground">
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
