@@ -206,7 +206,7 @@ const UserMaps: React.FC = () => {
 
   const playMap = (table: 'route_maps' | 'route_finder_maps', mapName: string) => {
     if (table === 'route_maps') {
-      navigate(`/game?map=${encodeURIComponent(mapName)}`);
+      navigate(`/route-game?map=${encodeURIComponent(mapName)}`);
     } else {
       navigate(`/route-finder?map=${encodeURIComponent(mapName)}`);
     }
