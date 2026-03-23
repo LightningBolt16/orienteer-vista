@@ -156,8 +156,9 @@ const RouteFinderUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onComp
       for (const [filename, file] of validation.imageFiles) {
         const storagePath = `${rfMap.id}/1_1/${filename}`;
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const { error: upErr } = await supabase.storage.from('route-images')
-          .upload(storagePath, bytes, { contentType: 'image/webp', upsert: true });
+        const contentType = filename.endsWith('.png') ? 'image/png' : 'image/webp';
+        const { error: upErr } = await supabase.storage.from('user-route-images')
+          .upload(storagePath, bytes, { contentType, upsert: true });
         if (upErr) console.error('Upload error for', filename, upErr);
         uploaded++;
         setProgress(p => ({ ...p, current: 1 + uploaded, message: `Uploading images... (${uploaded}/${totalImages})` }));
