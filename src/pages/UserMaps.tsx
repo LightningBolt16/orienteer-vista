@@ -204,12 +204,14 @@ const UserMaps: React.FC = () => {
     toast({ title: 'Logo updated' });
   };
 
-  const playMap = (table: 'route_maps' | 'route_finder_maps', mapName: string) => {
+  const playMap = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
     if (table === 'route_maps') {
-      navigate(`/route-game?map=${encodeURIComponent(mapName)}`);
-    } else {
-      navigate(`/route-finder?map=${encodeURIComponent(mapName)}`);
+      const routeGameMapId = map.source_map_id || map.id;
+      navigate(`/route-game?map=${encodeURIComponent(routeGameMapId)}`);
+      return;
     }
+
+    navigate(`/route-finder?map=${encodeURIComponent(map.id)}`);
   };
 
   if (userLoading) {

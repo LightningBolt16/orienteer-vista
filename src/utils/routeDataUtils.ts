@@ -520,17 +520,76 @@ export async function loadUserMapRoutes(
   isMobile: boolean = false
 ): Promise<{ routes: RouteData[], map: MapSource | null, userMapName: string }> {
   const aspect = isMobile ? '9_16' : '16_9';
-  
-  // Get the user map info - no user_id filter since mapId is unique
-  const { data: userMap, error: userMapError } = await supabase
-    .from('user_maps')
-    .select('id, name, user_id, status')
-    .eq('id', mapId)
-    .single();
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  if (userMapError || !userMap) {
-    console.error('User map not found:', userMapError);
+  if (!uuidPattern.test(mapId)) {
+    console.error('Invalid map identifier for user map route loading:', mapId);
     return { routes: [], map: null, userMapName: '' };
+  }
+
+  type MinimalUserMap = {
+    id: string;
+    name: string;
+    status: string;
+  };
+
+  type MinimalRouteMap = {
+    id: string;
+    name: string;
+    source_map_id: string | null;
+  };
+
+  let userMap: MinimalUserMap | null = null;
+  let routeMap: MinimalRouteMap | null = null;
+
+  const { data: userMapData, error: userMapError } = await supabase
+    .from('user_maps')
+    .select('id, name, status')
+    .eq('id', mapId)
+    .maybeSingle();
+
+  if (userMapError) {
+    console.error('Error looking up user map:', userMapError);
+  }
+
+  userMap = userMapData;
+
+  if (!userMap) {
+    const { data: routeMapData, error: routeMapLookupError } = await supabase
+      .from('route_maps')
+      .select('id, name, source_map_id')
+      .eq('id', mapId)
+      .maybeSingle();
+
+    if (routeMapLookupError) {
+      console.error('Error looking up route map:', routeMapLookupError);
+      return { routes: [], map: null, userMapName: '' };
+    }
+
+    if (!routeMapData) {
+      console.error('User or route map not found for play link:', mapId);
+      return { routes: [], map: null, userMapName: '' };
+    }
+
+    routeMap = routeMapData;
+
+    if (!routeMap.source_map_id) {
+      console.error('Route map missing source map id:', routeMap.id);
+      return { routes: [], map: null, userMapName: routeMap.name };
+    }
+
+    const { data: sourceUserMap, error: sourceUserMapError } = await supabase
+      .from('user_maps')
+      .select('id, name, status')
+      .eq('id', routeMap.source_map_id)
+      .maybeSingle();
+
+    if (sourceUserMapError || !sourceUserMap) {
+      console.error('Source user map not found:', sourceUserMapError);
+      return { routes: [], map: null, userMapName: routeMap.name };
+    }
+
+    userMap = sourceUserMap;
   }
 
   if (userMap.status !== 'completed') {
@@ -538,16 +597,19 @@ export async function loadUserMapRoutes(
     return { routes: [], map: null, userMapName: userMap.name };
   }
 
-  // Get the route_maps entry for this user map
-  const { data: routeMap, error: routeMapError } = await supabase
-    .from('route_maps')
-    .select('id, name')
-    .eq('source_map_id', mapId)
-    .single();
+  if (!routeMap) {
+    const { data: resolvedRouteMap, error: routeMapError } = await supabase
+      .from('route_maps')
+      .select('id, name, source_map_id')
+      .eq('source_map_id', userMap.id)
+      .maybeSingle();
 
-  if (routeMapError || !routeMap) {
-    console.error('Route map not found:', routeMapError);
-    return { routes: [], map: null, userMapName: userMap.name };
+    if (routeMapError || !resolvedRouteMap) {
+      console.error('Route map not found:', routeMapError);
+      return { routes: [], map: null, userMapName: userMap.name };
+    }
+
+    routeMap = resolvedRouteMap;
   }
 
   // Check if 1:1 images exist (preferred for adaptive cropping), fallback to requested aspect
@@ -571,7 +633,7 @@ export async function loadUserMapRoutes(
 
   if (routeImagesError || !routeImages || routeImages.length === 0) {
     console.error('No route images found:', routeImagesError);
-    return { routes: [], map: null, userMapName: userMap.name };
+    return { routes: [], map: null, userMapName: routeMap.name };
   }
 
   // User maps always use user-route-images bucket
@@ -581,22 +643,19 @@ export async function loadUserMapRoutes(
   const routes: RouteData[] = routeImages.map(route => {
     const imagePath = route.image_path;
     const imageUrl = `${USER_STORAGE_URL}/public/${bucketName}/${imagePath}`;
-    
-    // Parse alt_route_lengths
+
     let altRouteLengths: number[] | undefined;
     if (route.alt_route_lengths && Array.isArray(route.alt_route_lengths)) {
       altRouteLengths = route.alt_route_lengths as number[];
     }
-    
-    // Calculate mainRouteIndex from shortest_side
+
     const numAlternates = route.num_alternates || 1;
     const mainRouteIndex = getMainRouteIndexFromSide(route.shortest_side, numAlternates);
-    
-    // Determine source aspect from the actual stored aspect ratio
-    const sourceAspect: SourceAspect = queryAspect === '1:1' ? '1:1' : 
-      (aspect === '9_16' ? '9_16' : '16_9');
 
-    // Parse safe zone
+    const sourceAspect: SourceAspect = queryAspect === '1:1'
+      ? '1:1'
+      : (aspect === '9_16' ? '9_16' : '16_9');
+
     let safeZone: SafeZone | undefined;
     if (route.safe_zone && typeof route.safe_zone === 'object' && !Array.isArray(route.safe_zone)) {
       const sz = route.safe_zone as Record<string, number>;
@@ -618,7 +677,7 @@ export async function loadUserMapRoutes(
       altRouteLengths,
       numAlternates,
       mainRouteIndex,
-      mapName: userMap.name,
+      mapName: routeMap.name,
       imagePath: imageUrl,
       sourceAspect,
       safeZone,
@@ -627,13 +686,13 @@ export async function loadUserMapRoutes(
 
   const mapSource: MapSource = {
     id: routeMap.id,
-    name: userMap.name,
+    name: routeMap.name,
     aspect,
     isDbMap: true,
     isUserMap: true,
   };
 
-  return { routes, map: mapSource, userMapName: userMap.name };
+  return { routes, map: mapSource, userMapName: routeMap.name };
 }
 
 // Clear caches (useful for testing or when data changes)

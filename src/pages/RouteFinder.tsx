@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import RouteFinderGame from '@/components/route-finder/RouteFinderGame';
 import RouteFinderMapSelector from '@/components/route-finder/RouteFinderMapSelector';
 import PublishRouteFinderMapDialog from '@/components/route-finder/PublishRouteFinderMapDialog';
@@ -30,8 +30,11 @@ const RouteFinder: React.FC = () => {
   const { t } = useLanguage();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { plan, isActive, clubId: subClubId } = useSubscription();
+  const requestedMapParam = searchParams.get('map');
+  const initialMapSelectionApplied = useRef(false);
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapOption[]>([]);
   const [privateMaps, setPrivateMaps] = useState<MapOption[]>([]);
@@ -77,7 +80,9 @@ const RouteFinder: React.FC = () => {
   }, [subClubId]);
 
   // Determine if a PWT map is selected (for showing footer)
-  const selectedMap = selectedMapId ? maps.find(m => m.id === selectedMapId) : null;
+  const selectedMap = selectedMapId
+    ? [...maps, ...privateMaps, ...clubMaps, ...communityMaps].find(m => m.id === selectedMapId) ?? null
+    : null;
   const showPwtFooter = selectedMap ? isPwtMap(selectedMap.name) : maps.some(m => isPwtMap(m.name));
 
   // Load available maps (official, private, community)
@@ -139,7 +144,6 @@ const RouteFinder: React.FC = () => {
           setPrivateMaps(userPrivateMaps);
         }
 
-        // Load club maps if user is in a club with active subscription
         if (subClubId) {
           const { data: clubData, error: clubError } = await supabase
             .from('route_finder_maps')
@@ -157,7 +161,6 @@ const RouteFinder: React.FC = () => {
           }
         }
 
-        // Load community maps (public, community category)
         const { data: communityData, error: communityError } = await supabase
           .from('route_finder_maps')
           .select(`id, name, description, country_code, location_name, route_finder_challenges(id)`)
@@ -184,6 +187,27 @@ const RouteFinder: React.FC = () => {
   useEffect(() => {
     loadMaps();
   }, [loadMaps]);
+
+  useEffect(() => {
+    if (!requestedMapParam || initialMapSelectionApplied.current) return;
+
+    const allAvailableMaps = [...maps, ...privateMaps, ...clubMaps, ...communityMaps];
+    if (allAvailableMaps.length === 0) return;
+
+    const normalizedRequested = requestedMapParam.toLowerCase();
+    const matchedMap = allAvailableMaps.find(
+      (map) => map.id === requestedMapParam || map.name.toLowerCase() === normalizedRequested
+    );
+
+    if (!matchedMap) return;
+
+    setSelectedMapId(matchedMap.id);
+    setIsWarmUp(true);
+    setPrivateMapsOpen(privateMaps.some((map) => map.id === matchedMap.id));
+    setClubMapsOpen(clubMaps.some((map) => map.id === matchedMap.id));
+    setCommunityMapsOpen(communityMaps.some((map) => map.id === matchedMap.id));
+    initialMapSelectionApplied.current = true;
+  }, [requestedMapParam, maps, privateMaps, clubMaps, communityMaps]);
 
   // Pure CSS-based fullscreen toggle - simpler and more reliable
   const toggleFullscreen = useCallback(() => {
