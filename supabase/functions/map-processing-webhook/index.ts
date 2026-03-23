@@ -371,7 +371,7 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      // Insert challenges with impassability mask and bbox dimensions
+      // Insert challenges with impassability mask, bbox dimensions, and safe_zone
       const challengeRecords = challenges.map((c: any, index: number) => ({
         map_id: rfMap.id,
         challenge_index: index,
@@ -387,6 +387,7 @@ Deno.serve(async (req) => {
         impassability_mask_path: c.impassability_mask_path || null,
         bbox_width: c.bbox_width || null,
         bbox_height: c.bbox_height || null,
+        safe_zone: c.safe_zone || null,
       }))
 
       const { error: insertError } = await supabase.from('route_finder_challenges').insert(challengeRecords)

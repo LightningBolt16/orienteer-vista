@@ -1,0 +1,1 @@
+ALTER TABLE route_finder_challenges ADD COLUMN IF NOT EXISTS safe_zone jsonb;

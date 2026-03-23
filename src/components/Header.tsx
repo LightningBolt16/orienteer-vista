@@ -227,20 +227,12 @@ const Header: React.FC = () => {
                       <span>{t('proRequests')}</span>
                     </Link>
                     <Link 
-                      to="/admin/upload-maps"
+                      to="/admin/maps"
                       className="p-3 rounded-md flex items-center space-x-2 text-yellow-600"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Upload className="h-5 w-5" />
                       <span>{t('uploadMaps')}</span>
-                    </Link>
-                    <Link 
-                      to="/admin/map-visibility"
-                      className="p-3 rounded-md flex items-center space-x-2 text-yellow-600"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Eye className="h-5 w-5" />
-                      <span>{t('manageMapVisibility')}</span>
                     </Link>
                   </>
                 )}
@@ -344,15 +336,9 @@ const Header: React.FC = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link to="/admin/upload-maps" className="text-yellow-600">
+                        <Link to="/admin/maps" className="text-yellow-600">
                           <Upload className="h-4 w-4 mr-2" />
-                          {t('uploadMaps')}
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/map-visibility" className="text-yellow-600">
-                          <Eye className="h-4 w-4 mr-2" />
-                          {t('manageMapVisibility')}
+                          Manage Maps
                         </Link>
                       </DropdownMenuItem>
                     </>

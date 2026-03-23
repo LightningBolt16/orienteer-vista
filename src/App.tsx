@@ -23,8 +23,7 @@ import UserProfile from "./pages/UserProfile";
 import ClubsPage from "./pages/ClubsPage";
 import AdminClubRequests from "./pages/AdminClubRequests";
 import AdminProRequests from "./pages/AdminProRequests";
-import UploadMaps from "./pages/admin/UploadMaps";
-import ManageMapVisibility from "./pages/admin/ManageMapVisibility";
+import AdminMapManager from "./pages/admin/AdminMapManager";
 import UserMaps from "./pages/UserMaps";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
@@ -70,8 +69,9 @@ const App: React.FC = () => {
                     <Route path="/clubs" element={<Layout><ClubsPage /></Layout>} />
                     <Route path="/admin/club-requests" element={<Layout><AdminClubRequests /></Layout>} />
                     <Route path="/admin/pro-requests" element={<Layout><AdminProRequests /></Layout>} />
-                    <Route path="/admin/upload-maps" element={<UploadMaps />} />
-                    <Route path="/admin/map-visibility" element={<ManageMapVisibility />} />
+                    <Route path="/admin/maps" element={<AdminMapManager />} />
+                    <Route path="/admin/upload-maps" element={<AdminMapManager />} />
+                    <Route path="/admin/map-visibility" element={<AdminMapManager />} />
                     <Route path="/my-maps" element={<Layout><UserMaps /></Layout>} />
                     <Route path="*" element={<Layout><NotFound /></Layout>} />
                   </Routes>

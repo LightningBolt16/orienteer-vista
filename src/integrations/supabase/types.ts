@@ -453,6 +453,7 @@ export type Database = {
           map_id: string
           optimal_length: number
           optimal_path: Json
+          safe_zone: Json | null
           start_node_id: string
         }
         Insert: {
@@ -471,6 +472,7 @@ export type Database = {
           map_id: string
           optimal_length: number
           optimal_path: Json
+          safe_zone?: Json | null
           start_node_id: string
         }
         Update: {
@@ -489,6 +491,7 @@ export type Database = {
           map_id?: string
           optimal_length?: number
           optimal_path?: Json
+          safe_zone?: Json | null
           start_node_id?: string
         }
         Relationships: [
