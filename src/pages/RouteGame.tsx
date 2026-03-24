@@ -406,6 +406,13 @@ const RouteGame: React.FC = () => {
     navigate('/my-maps');
   };
 
+  // Filter routes: shortest 50% when not fullscreen, all when fullscreen
+  const filteredRouteData = useMemo(() => {
+    if (isFullscreen || routeData.length <= 2) return routeData;
+    const sorted = [...routeData].sort((a, b) => a.mainRouteLength - b.mainRouteLength);
+    return sorted.slice(0, Math.ceil(sorted.length / 2));
+  }, [routeData, isFullscreen]);
+
   // Show loading spinner while checking auth
   if (userLoading) {
     return (
@@ -415,13 +422,6 @@ const RouteGame: React.FC = () => {
     );
   }
   const showLoadingSpinner = isPreloading || isLoading;
-
-  // Filter routes: shortest 50% when not fullscreen, all when fullscreen
-  const filteredRouteData = useMemo(() => {
-    if (isFullscreen || routeData.length <= 2) return routeData;
-    const sorted = [...routeData].sort((a, b) => a.mainRouteLength - b.mainRouteLength);
-    return sorted.slice(0, Math.ceil(sorted.length / 2));
-  }, [routeData, isFullscreen]);
   
   return (
     <div className="pb-20 space-y-8">
