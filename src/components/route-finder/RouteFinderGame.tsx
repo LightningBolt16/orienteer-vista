@@ -148,18 +148,19 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
         } : null;
 
         return {
-        ...c,
-        map_name: c.route_finder_maps?.name,
-        safe_zone: normalizedSafeZone,
-        graph_data: {
-          nodes: c.graph_data?.nodes || [],
-          edges: c.graph_data?.edges || [],
-          start: c.start_node_id,
-          finish: c.finish_node_id,
-          optimalPath: c.optimal_path || [],
-          optimalLength: c.optimal_length || 0,
-        } as RouteFinderGraph,
-      }));
+          ...c,
+          map_name: c.route_finder_maps?.name,
+          safe_zone: normalizedSafeZone,
+          graph_data: {
+            nodes: c.graph_data?.nodes || [],
+            edges: c.graph_data?.edges || [],
+            start: c.start_node_id,
+            finish: c.finish_node_id,
+            optimalPath: c.optimal_path || [],
+            optimalLength: c.optimal_length || 0,
+          } as RouteFinderGraph,
+        };
+      });
 
       const shuffled = [...transformedChallenges].sort(() => Math.random() - 0.5);
       setAllChallenges(shuffled);
