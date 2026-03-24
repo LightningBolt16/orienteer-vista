@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import RouteSelector from '../components/RouteSelector';
 import MobileRouteSelector from '../components/MobileRouteSelector';
@@ -405,6 +405,13 @@ const RouteGame: React.FC = () => {
   const handleBackToPublicMaps = () => {
     navigate('/my-maps');
   };
+
+  // Filter routes: shortest 50% when not fullscreen, all when fullscreen
+  const filteredRouteData = useMemo(() => {
+    if (isFullscreen || routeData.length <= 2) return routeData;
+    const sorted = [...routeData].sort((a, b) => a.mainRouteLength - b.mainRouteLength);
+    return sorted.slice(0, Math.ceil(sorted.length / 2));
+  }, [routeData, isFullscreen]);
 
   // Show loading spinner while checking auth
   if (userLoading) {
@@ -842,7 +849,7 @@ const RouteGame: React.FC = () => {
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
-      ) : routeData.length > 0 && (
+      ) : filteredRouteData.length > 0 && (
         <section className={isFullscreen && !isMobile ? 'fixed inset-0 z-[60] bg-black' : isFullscreen ? '' : 'max-w-4xl mx-auto'}>
           <div 
             ref={gameContainerRef}
@@ -864,7 +871,7 @@ const RouteGame: React.FC = () => {
             <div className={isFullscreen && !isMobile ? 'h-full w-full' : ''}>
               {isMobile ? (
                 <MobileRouteSelector 
-                  routeData={routeData} 
+                  routeData={filteredRouteData} 
                   mapSource={selectedMap}
                   allMaps={allMapsForRoutes}
                   isFullscreen={isFullscreen}
@@ -872,7 +879,7 @@ const RouteGame: React.FC = () => {
                 />
               ) : (
                 <RouteSelector 
-                  routeData={routeData} 
+                  routeData={filteredRouteData} 
                   mapSource={selectedMap}
                   allMaps={allMapsForRoutes}
                   isFullscreen={isFullscreen}

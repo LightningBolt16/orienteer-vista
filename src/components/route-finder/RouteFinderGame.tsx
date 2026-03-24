@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import RouteDrawingCanvas, { type RouteDrawingCanvasHandle } from './RouteDrawingCanvas';
@@ -16,6 +16,7 @@ import {
   loadImpassabilityMask 
 } from '@/utils/routeFinderUtils';
 import { Loader2 } from 'lucide-react';
+import type { SafeZone } from '@/utils/routeDataUtils';
 
 interface Challenge {
   id: string;
@@ -33,6 +34,13 @@ interface Challenge {
   bbox_height: number | null;
   aspect_ratio: string;
   map_name?: string;
+  safe_zone?: SafeZone | null;
+}
+
+function filterShortestHalf<T>(items: T[], getLength: (item: T) => number): T[] {
+  if (items.length <= 2) return items;
+  const sorted = [...items].sort((a, b) => getLength(a) - getLength(b));
+  return sorted.slice(0, Math.ceil(sorted.length / 2));
 }
 
 interface RouteFinderGameProps {
@@ -61,7 +69,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   const { user } = useUser();
   const { t } = useLanguage();
   const canvasRef = useRef<RouteDrawingCanvasHandle>(null);
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [allChallenges, setAllChallenges] = useState<Challenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
@@ -78,6 +86,12 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [showImpassableWarning, setShowImpassableWarning] = useState(false);
   const [canvasState, setCanvasState] = useState({ hasDrawing: false, canUndo: false });
+
+  // Filter challenges: shortest 50% when not fullscreen, all when fullscreen
+  const challenges = useMemo(() => {
+    if (isFullscreen) return allChallenges;
+    return filterShortestHalf(allChallenges, c => c.optimal_length);
+  }, [allChallenges, isFullscreen]);
 
   // Poll canvas state for button enable/disable
   useEffect(() => {
@@ -108,7 +122,6 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       if (mapId) {
         query = query.eq('map_id', mapId);
       } else {
-        // When loading all maps, exclude hidden maps
         query = query.eq('route_finder_maps.is_hidden', false);
       }
 
@@ -125,6 +138,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       const transformedChallenges = data.map((c: any) => ({
         ...c,
         map_name: c.route_finder_maps?.name,
+        safe_zone: c.safe_zone as SafeZone | null,
         graph_data: {
           nodes: c.graph_data?.nodes || [],
           edges: c.graph_data?.edges || [],
@@ -136,7 +150,8 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       }));
 
       const shuffled = [...transformedChallenges].sort(() => Math.random() - 0.5);
-      setChallenges(shuffled);
+      setAllChallenges(shuffled);
+      setCurrentIndex(0);
       setStartTime(Date.now());
     } catch (err: any) {
       console.error('Error loading challenges:', err);
@@ -267,6 +282,8 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
     n => n.id === currentChallenge.finish_node_id
   );
 
+  const is1x1 = currentChallenge?.aspect_ratio === '1_1' || currentChallenge?.aspect_ratio === '1:1';
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -370,7 +387,7 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
       </div>
 
       {/* Map area - takes remaining space */}
-      <div className="flex-1 relative min-h-0">
+      <div className={`flex-1 relative min-h-0 ${!isFullscreen && is1x1 ? 'aspect-square max-h-[80vh] mx-auto w-full' : ''}`}>
         <RouteDrawingCanvas
           ref={canvasRef}
           imageUrl={getImageUrl(currentChallenge.base_image_path)}
@@ -385,6 +402,9 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
           graphNodes={debugMode ? currentChallenge.graph_data.nodes : undefined}
           onImpassableWarning={setShowImpassableWarning}
           showImpassableVignette={showImpassableWarning}
+          safeZone={currentChallenge.safe_zone}
+          isFullscreen={isFullscreen}
+          aspectRatio={currentChallenge.aspect_ratio}
         />
       </div>
 
