@@ -1,5 +1,6 @@
-import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { isPointPassable, type Point, type ImpassabilityMask } from '@/utils/routeFinderUtils';
+import type { SafeZone } from '@/utils/routeDataUtils';
 
 interface GraphNode {
   id: string;
@@ -28,6 +29,9 @@ interface RouteDrawingCanvasProps {
   graphNodes?: GraphNode[];
   onImpassableWarning?: (show: boolean) => void;
   showImpassableVignette?: boolean;
+  safeZone?: SafeZone | null;
+  isFullscreen?: boolean;
+  aspectRatio?: string;
 }
 
 const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanvasProps>(({
@@ -43,6 +47,9 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
   graphNodes,
   onImpassableWarning,
   showImpassableVignette = false,
+  safeZone,
+  isFullscreen = false,
+  aspectRatio,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,9 +61,13 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [imageBounds, setImageBounds] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   const hasDrawing = paths.length > 0 || currentPath.length > 0;
   const canUndo = paths.length > 0;
+
+  const is1x1 = aspectRatio === '1_1' || aspectRatio === '1:1';
+  const shouldZoom = isFullscreen && is1x1 && !!safeZone;
 
   // Expose actions to parent
   useImperativeHandle(ref, () => ({
@@ -82,8 +93,79 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
     img.src = imageUrl;
   }, [imageUrl]);
 
+  // Track viewport size for zoom calculations
+  useEffect(() => {
+    const update = () => {
+      if (isFullscreen) {
+        setViewport({ width: window.innerWidth, height: window.innerHeight });
+      } else {
+        const el = containerRef.current;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          setViewport({ width: rect.width, height: rect.height });
+        }
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, [isFullscreen]);
+
   const effectiveBboxWidth = bboxWidth || imageDimensions.width;
   const effectiveBboxHeight = bboxHeight || imageDimensions.height;
+
+  // Compute safe zone transform (same logic as SafeZoneImage)
+  const zoomTransform = useMemo(() => {
+    if (!shouldZoom || !safeZone || viewport.width === 0 || viewport.height === 0) return null;
+
+    const sz = { x: safeZone.x, y: safeZone.y, w: safeZone.w, h: safeZone.h };
+    const szCenterX = safeZone.center_x ?? (sz.x + sz.w / 2);
+    const szCenterY = safeZone.center_y ?? (sz.y + sz.h / 2);
+
+    const AR_vp = viewport.width / viewport.height;
+    const AR_sz = sz.w / sz.h;
+
+    const imgSize = Math.min(viewport.width, viewport.height);
+
+    const szPxW = sz.w * imgSize;
+    const szPxH = sz.h * imgSize;
+
+    let scale: number;
+    if (AR_vp > AR_sz) {
+      scale = viewport.height / szPxH;
+    } else {
+      scale = viewport.width / szPxW;
+    }
+
+    const imgLeft = (viewport.width - imgSize) / 2;
+    const imgTop = (viewport.height - imgSize) / 2;
+
+    const szCenterPxX = imgLeft + szCenterX * imgSize;
+    const szCenterPxY = imgTop + szCenterY * imgSize;
+
+    const vpCenterX = viewport.width / 2;
+    const vpCenterY = viewport.height / 2;
+
+    let tx = vpCenterX - szCenterPxX;
+    let ty = vpCenterY - szCenterPxY;
+
+    // Clamp so scaled image covers viewport
+    const screenLeft = szCenterPxX + (imgLeft - szCenterPxX) * scale + tx;
+    const screenRight = szCenterPxX + (imgLeft + imgSize - szCenterPxX) * scale + tx;
+    const screenTop = szCenterPxY + (imgTop - szCenterPxY) * scale + ty;
+    const screenBottom = szCenterPxY + (imgTop + imgSize - szCenterPxY) * scale + ty;
+
+    if (screenLeft > 0) tx -= screenLeft;
+    if (screenRight < viewport.width) tx += (viewport.width - screenRight);
+    if (screenTop > 0) ty -= screenTop;
+    if (screenBottom < viewport.height) ty += (viewport.height - screenBottom);
+
+    return { scale, tx, ty, originX: szCenterPxX, originY: szCenterPxY };
+  }, [shouldZoom, safeZone, viewport.width, viewport.height]);
 
   // Calculate actual image bounds within container (accounting for object-contain)
   const calculateImageBounds = useCallback(() => {
@@ -250,8 +332,23 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
       clientY = e.clientY;
     }
 
-    const containerX = clientX - rect.left;
-    const containerY = clientY - rect.top;
+    // When zoomed, we need to reverse the CSS transform to get container-local coords
+    let containerX: number, containerY: number;
+
+    if (zoomTransform) {
+      // The container has transform: translate(tx, ty) scale(s) with origin at (originX, originY)
+      // Screen point → pre-transform point:
+      // screenPt = origin + (localPt - origin) * scale + translate
+      // localPt = origin + (screenPt - translate - origin) / scale
+      const sx = clientX - rect.left;
+      const sy = clientY - rect.top;
+      
+      containerX = zoomTransform.originX + (sx - zoomTransform.tx - zoomTransform.originX) / zoomTransform.scale;
+      containerY = zoomTransform.originY + (sy - zoomTransform.ty - zoomTransform.originY) / zoomTransform.scale;
+    } else {
+      containerX = clientX - rect.left;
+      containerY = clientY - rect.top;
+    }
 
     if (
       containerX < imageBounds.x ||
@@ -322,37 +419,18 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
     setCurrentPath([]);
   };
 
+  const transformStyle = zoomTransform ? {
+    transform: `translate(${zoomTransform.tx}px, ${zoomTransform.ty}px) scale(${zoomTransform.scale})`,
+    transformOrigin: `${zoomTransform.originX}px ${zoomTransform.originY}px`,
+  } : undefined;
+
   return (
-    <div className="relative w-full h-full">
-      {/* Background image */}
-      <img
-        src={imageUrl}
-        alt="Map"
-        className="absolute inset-0 w-full h-full object-contain"
-        draggable={false}
-      />
-
-      {/* Debug mask overlay */}
-      {debugMode && (
-        <canvas
-          ref={debugCanvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ opacity: 0.5 }}
-        />
-      )}
-
-      {/* Debug graph nodes overlay */}
-      {debugMode && graphNodes && (
-        <canvas
-          ref={graphNodesCanvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-        />
-      )}
-
-      {/* Drawing canvas overlay */}
+    <div className={`relative w-full h-full ${shouldZoom ? 'overflow-hidden' : ''}`}>
+      {/* Transformed wrapper - contains both image and drawing canvas */}
       <div
         ref={containerRef}
         className="absolute inset-0 touch-none"
+        style={transformStyle}
         onMouseDown={handlePointerDown}
         onMouseMove={handlePointerMove}
         onMouseUp={handlePointerUp}
@@ -361,13 +439,39 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
         onTouchMove={handlePointerMove}
         onTouchEnd={handlePointerUp}
       >
+        {/* Background image */}
+        <img
+          src={imageUrl}
+          alt="Map"
+          className="absolute inset-0 w-full h-full object-contain"
+          draggable={false}
+        />
+
+        {/* Debug mask overlay */}
+        {debugMode && (
+          <canvas
+            ref={debugCanvasRef}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            style={{ opacity: 0.5 }}
+          />
+        )}
+
+        {/* Debug graph nodes overlay */}
+        {debugMode && graphNodes && (
+          <canvas
+            ref={graphNodesCanvasRef}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+          />
+        )}
+
+        {/* Drawing canvas */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
         />
       </div>
 
-      {/* Red vignette overlay for impassable terrain warning */}
+      {/* Red vignette overlay for impassable terrain warning (outside transform) */}
       {showImpassableVignette && (
         <div
           className="absolute inset-0 pointer-events-none z-10 transition-opacity duration-200"
@@ -377,7 +481,7 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
         />
       )}
 
-      {/* Debug mode indicator */}
+      {/* Debug mode indicator (outside transform) */}
       {debugMode && (
         <div className="absolute top-2 left-2 z-10 bg-destructive/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-destructive-foreground font-medium">
           DEBUG MODE
