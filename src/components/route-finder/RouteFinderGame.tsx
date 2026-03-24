@@ -135,10 +135,22 @@ const RouteFinderGame: React.FC<RouteFinderGameProps> = ({
         return;
       }
 
-      const transformedChallenges = data.map((c: any) => ({
+      const transformedChallenges = data.map((c: any) => {
+        // DB stores safe_zone with "width"/"height" keys but SafeZone type uses "w"/"h"
+        const rawSz = c.safe_zone as Record<string, number> | null;
+        const normalizedSafeZone: SafeZone | null = rawSz ? {
+          x: rawSz.x,
+          y: rawSz.y,
+          w: rawSz.w ?? rawSz.width,
+          h: rawSz.h ?? rawSz.height,
+          center_x: rawSz.center_x,
+          center_y: rawSz.center_y,
+        } : null;
+
+        return {
         ...c,
         map_name: c.route_finder_maps?.name,
-        safe_zone: c.safe_zone as SafeZone | null,
+        safe_zone: normalizedSafeZone,
         graph_data: {
           nodes: c.graph_data?.nodes || [],
           edges: c.graph_data?.edges || [],
