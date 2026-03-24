@@ -40,6 +40,8 @@ interface Challenge {
 function filterShortestHalf<T>(items: T[], getLength: (item: T) => number): T[] {
   if (items.length <= 2) return items;
   const sorted = [...items].sort((a, b) => getLength(a) - getLength(b));
+  const half = sorted.slice(0, Math.ceil(sorted.length / 2));
+  return half.sort(() => Math.random() - 0.5);
   return sorted.slice(0, Math.ceil(sorted.length / 2));
 }
 
