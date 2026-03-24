@@ -66,8 +66,7 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
   const hasDrawing = paths.length > 0 || currentPath.length > 0;
   const canUndo = paths.length > 0;
 
-  const is1x1 = aspectRatio === '1_1' || aspectRatio === '1:1';
-  const shouldZoom = isFullscreen && is1x1 && !!safeZone;
+  const shouldZoom = false;
 
   // Expose actions to parent
   useImperativeHandle(ref, () => ({
@@ -335,20 +334,8 @@ const RouteDrawingCanvas = forwardRef<RouteDrawingCanvasHandle, RouteDrawingCanv
     // When zoomed, we need to reverse the CSS transform to get container-local coords
     let containerX: number, containerY: number;
 
-    if (zoomTransform) {
-      // The container has transform: translate(tx, ty) scale(s) with origin at (originX, originY)
-      // Screen point → pre-transform point:
-      // screenPt = origin + (localPt - origin) * scale + translate
-      // localPt = origin + (screenPt - translate - origin) / scale
-      const sx = clientX - rect.left;
-      const sy = clientY - rect.top;
-      
-      containerX = zoomTransform.originX + (sx - zoomTransform.tx - zoomTransform.originX) / zoomTransform.scale;
-      containerY = zoomTransform.originY + (sy - zoomTransform.ty - zoomTransform.originY) / zoomTransform.scale;
-    } else {
-      containerX = clientX - rect.left;
-      containerY = clientY - rect.top;
-    }
+    containerX = clientX - rect.left;
+    containerY = clientY - rect.top;
 
     if (
       containerX < imageBounds.x ||
