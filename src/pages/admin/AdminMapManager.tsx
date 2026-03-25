@@ -178,6 +178,43 @@ const AdminMapManager: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Route Navigator Tab */}
+          <TabsContent value="route-navigator" className="mt-4 space-y-4">
+            <div>
+              <Button
+                variant={showRNUpload ? 'secondary' : 'outline'}
+                onClick={() => setShowRNUpload(!showRNUpload)}
+                className="gap-2"
+              >
+                {showRNUpload ? <ChevronUp className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {showRNUpload ? 'Hide Upload' : 'Upload New Map'}
+              </Button>
+              {showRNUpload && (
+                <div className="mt-4">
+                  <RouteNavigatorUploadWizard onComplete={() => { setShowRNUpload(false); loadMaps(); }} />
+                </div>
+              )}
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Official Route Navigator Maps</CardTitle>
+                <CardDescription>Toggle visibility, rename, set country</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {navigatorMaps.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No official navigator maps found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {navigatorMaps.map(map => (
+                      <AdminMapCard key={map.id} map={map} table="route_navigator_maps" onUpdate={loadMaps} />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
