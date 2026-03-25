@@ -86,7 +86,7 @@ const AdminMapManager: React.FC = () => {
         </div>
 
         <Tabs defaultValue="route-choice">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="route-choice" className="gap-2">
               <Map className="h-4 w-4" />
               Route Choice ({routeMaps.length})
@@ -94,6 +94,10 @@ const AdminMapManager: React.FC = () => {
             <TabsTrigger value="route-finder" className="gap-2">
               <Route className="h-4 w-4" />
               Route Finder ({routeFinderMaps.length})
+            </TabsTrigger>
+            <TabsTrigger value="route-navigator" className="gap-2">
+              <Navigation className="h-4 w-4" />
+              Navigator ({navigatorMaps.length})
             </TabsTrigger>
           </TabsList>
 
