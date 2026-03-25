@@ -29,7 +29,7 @@ const NavigatorResult: React.FC<NavigatorResultProps> = ({
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-3">
             {isOptimal ? (
-              <CheckCircle2 className="h-16 w-16 text-green-500" />
+              <CheckCircle2 className="h-16 w-16 text-primary" />
             ) : (
               <Target className="h-16 w-16 text-primary" />
             )}
