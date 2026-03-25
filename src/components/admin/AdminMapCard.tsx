@@ -63,7 +63,7 @@ export interface AdminMapItem {
 
 interface AdminMapCardProps {
   map: AdminMapItem;
-  table: 'route_maps' | 'route_finder_maps';
+  table: 'route_maps' | 'route_finder_maps' | 'route_navigator_maps';
   onUpdate: () => void;
   showDelete?: boolean;
 }
