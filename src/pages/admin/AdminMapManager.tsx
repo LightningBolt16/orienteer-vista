@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Map, Route, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Loader2, Map, Route, Plus, ChevronDown, ChevronUp, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import AdminMapCard, { type AdminMapItem } from '@/components/admin/AdminMapCard';
 import MapUploadWizard from '@/components/admin/MapUploadWizard';
 import RouteFinderUploadWizard from '@/components/admin/RouteFinderUploadWizard';
+import RouteNavigatorUploadWizard from '@/components/admin/RouteNavigatorUploadWizard';
 import Layout from '@/components/Layout';
 
 const AdminMapManager: React.FC = () => {
@@ -16,9 +17,11 @@ const AdminMapManager: React.FC = () => {
   const navigate = useNavigate();
   const [routeMaps, setRouteMaps] = useState<AdminMapItem[]>([]);
   const [routeFinderMaps, setRouteFinderMaps] = useState<AdminMapItem[]>([]);
+  const [navigatorMaps, setNavigatorMaps] = useState<AdminMapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRCUpload, setShowRCUpload] = useState(false);
   const [showRFUpload, setShowRFUpload] = useState(false);
+  const [showRNUpload, setShowRNUpload] = useState(false);
 
   useEffect(() => {
     if (!adminLoading && !isAdmin) navigate('/');
@@ -27,7 +30,7 @@ const AdminMapManager: React.FC = () => {
   const loadMaps = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: rm }, { data: rfm }] = await Promise.all([
+      const [{ data: rm }, { data: rfm }, { data: rnm }] = await Promise.all([
         supabase.from('route_maps')
           .select('id, name, is_hidden, is_public, map_category, country_code, map_type, logo_path, location_name, description, created_at')
           .or('map_category.eq.official,map_category.is.null')
@@ -36,9 +39,14 @@ const AdminMapManager: React.FC = () => {
           .select('id, name, is_hidden, is_public, map_category, country_code, location_name, description, created_at')
           .or('map_category.eq.official,map_category.is.null')
           .order('name'),
+        supabase.from('route_navigator_maps')
+          .select('id, name, is_hidden, is_public, map_category, country_code, created_at')
+          .or('map_category.eq.official,map_category.is.null')
+          .order('name'),
       ]);
       setRouteMaps((rm || []) as AdminMapItem[]);
       setRouteFinderMaps((rfm || []) as AdminMapItem[]);
+      setNavigatorMaps((rnm || []) as AdminMapItem[]);
     } catch (err) {
       console.error('Error loading maps:', err);
     } finally {
