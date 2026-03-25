@@ -58,6 +58,7 @@ export interface AdminMapItem {
   logo_path?: string | null;
   location_name?: string | null;
   description?: string | null;
+  created_at?: string | null;
 }
 
 interface AdminMapCardProps {
@@ -199,6 +200,11 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
             {map.location_name && (
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                 <MapPin className="h-3 w-3" />{map.location_name}
+              </span>
+            )}
+            {map.created_at && (
+              <span className="text-xs text-muted-foreground">
+                {new Date(map.created_at).toLocaleDateString()}
               </span>
             )}
           </div>

@@ -29,11 +29,11 @@ const AdminMapManager: React.FC = () => {
     try {
       const [{ data: rm }, { data: rfm }] = await Promise.all([
         supabase.from('route_maps')
-          .select('id, name, is_hidden, is_public, map_category, country_code, map_type, logo_path, location_name, description')
+          .select('id, name, is_hidden, is_public, map_category, country_code, map_type, logo_path, location_name, description, created_at')
           .or('map_category.eq.official,map_category.is.null')
           .order('name'),
         supabase.from('route_finder_maps')
-          .select('id, name, is_hidden, is_public, map_category, country_code, location_name, description')
+          .select('id, name, is_hidden, is_public, map_category, country_code, location_name, description, created_at')
           .or('map_category.eq.official,map_category.is.null')
           .order('name'),
       ]);
