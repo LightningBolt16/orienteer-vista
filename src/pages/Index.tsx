@@ -104,6 +104,11 @@ const Index: React.FC = () => {
               Route Finder
             </Button>
           </Link>
+          <Link to="/route-navigator">
+            <Button size="lg" variant="outline">
+              Route Navigator
+            </Button>
+          </Link>
         </div>
         
         <div className="w-full">

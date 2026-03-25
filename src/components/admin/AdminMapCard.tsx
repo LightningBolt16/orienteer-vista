@@ -63,7 +63,7 @@ export interface AdminMapItem {
 
 interface AdminMapCardProps {
   map: AdminMapItem;
-  table: 'route_maps' | 'route_finder_maps';
+  table: 'route_maps' | 'route_finder_maps' | 'route_navigator_maps';
   onUpdate: () => void;
   showDelete?: boolean;
 }
@@ -137,8 +137,10 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
       // Delete associated data first
       if (table === 'route_maps') {
         await supabase.from('route_images').delete().eq('map_id', map.id);
-      } else {
+      } else if (table === 'route_finder_maps') {
         await supabase.from('route_finder_challenges').delete().eq('map_id', map.id);
+      } else if (table === 'route_navigator_maps') {
+        await supabase.from('route_navigator_challenges').delete().eq('map_id', map.id);
       }
       const { error } = await supabase.from(table).delete().eq('id', map.id);
       if (error) throw error;

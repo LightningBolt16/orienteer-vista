@@ -695,6 +695,169 @@ export type Database = {
           },
         ]
       }
+      route_navigator_attempts: {
+        Row: {
+          challenge_id: string | null
+          created_at: string | null
+          id: string
+          is_optimal: boolean | null
+          map_name: string
+          player_path: Json | null
+          response_time: number
+          user_id: string
+          wrong_turns: number | null
+        }
+        Insert: {
+          challenge_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_optimal?: boolean | null
+          map_name: string
+          player_path?: Json | null
+          response_time: number
+          user_id: string
+          wrong_turns?: number | null
+        }
+        Update: {
+          challenge_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_optimal?: boolean | null
+          map_name?: string
+          player_path?: Json | null
+          response_time?: number
+          user_id?: string
+          wrong_turns?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_navigator_attempts_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "route_navigator_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_navigator_challenges: {
+        Row: {
+          bbox: Json | null
+          challenge_index: number
+          created_at: string | null
+          decision_points: Json
+          difficulty_score: number | null
+          finish_x: number
+          finish_y: number
+          id: string
+          map_id: string
+          optimal_length: number | null
+          start_x: number
+          start_y: number
+        }
+        Insert: {
+          bbox?: Json | null
+          challenge_index: number
+          created_at?: string | null
+          decision_points: Json
+          difficulty_score?: number | null
+          finish_x: number
+          finish_y: number
+          id?: string
+          map_id: string
+          optimal_length?: number | null
+          start_x: number
+          start_y: number
+        }
+        Update: {
+          bbox?: Json | null
+          challenge_index?: number
+          created_at?: string | null
+          decision_points?: Json
+          difficulty_score?: number | null
+          finish_x?: number
+          finish_y?: number
+          id?: string
+          map_id?: string
+          optimal_length?: number | null
+          start_x?: number
+          start_y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_navigator_challenges_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "route_navigator_maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_navigator_maps: {
+        Row: {
+          club_id: string | null
+          country_code: string | null
+          created_at: string
+          id: string
+          image_height: number | null
+          image_width: number | null
+          is_hidden: boolean
+          is_public: boolean | null
+          map_category: string | null
+          name: string
+          source_image_url: string | null
+          source_map_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          club_id?: string | null
+          country_code?: string | null
+          created_at?: string
+          id?: string
+          image_height?: number | null
+          image_width?: number | null
+          is_hidden?: boolean
+          is_public?: boolean | null
+          map_category?: string | null
+          name: string
+          source_image_url?: string | null
+          source_map_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          club_id?: string | null
+          country_code?: string | null
+          created_at?: string
+          id?: string
+          image_height?: number | null
+          image_width?: number | null
+          is_hidden?: boolean
+          is_public?: boolean | null
+          map_category?: string | null
+          name?: string
+          source_image_url?: string | null
+          source_map_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_navigator_maps_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_navigator_maps_source_map_id_fkey"
+            columns: ["source_map_id"]
+            isOneToOne: false
+            referencedRelation: "user_maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           club_id: string | null

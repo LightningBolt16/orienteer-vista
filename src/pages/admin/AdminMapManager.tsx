@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Map, Route, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Loader2, Map, Route, Plus, ChevronDown, ChevronUp, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import AdminMapCard, { type AdminMapItem } from '@/components/admin/AdminMapCard';
 import MapUploadWizard from '@/components/admin/MapUploadWizard';
 import RouteFinderUploadWizard from '@/components/admin/RouteFinderUploadWizard';
+import RouteNavigatorUploadWizard from '@/components/admin/RouteNavigatorUploadWizard';
 import Layout from '@/components/Layout';
 
 const AdminMapManager: React.FC = () => {
@@ -16,9 +17,11 @@ const AdminMapManager: React.FC = () => {
   const navigate = useNavigate();
   const [routeMaps, setRouteMaps] = useState<AdminMapItem[]>([]);
   const [routeFinderMaps, setRouteFinderMaps] = useState<AdminMapItem[]>([]);
+  const [navigatorMaps, setNavigatorMaps] = useState<AdminMapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRCUpload, setShowRCUpload] = useState(false);
   const [showRFUpload, setShowRFUpload] = useState(false);
+  const [showRNUpload, setShowRNUpload] = useState(false);
 
   useEffect(() => {
     if (!adminLoading && !isAdmin) navigate('/');
@@ -27,7 +30,7 @@ const AdminMapManager: React.FC = () => {
   const loadMaps = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: rm }, { data: rfm }] = await Promise.all([
+      const [{ data: rm }, { data: rfm }, { data: rnm }] = await Promise.all([
         supabase.from('route_maps')
           .select('id, name, is_hidden, is_public, map_category, country_code, map_type, logo_path, location_name, description, created_at')
           .or('map_category.eq.official,map_category.is.null')
@@ -36,9 +39,14 @@ const AdminMapManager: React.FC = () => {
           .select('id, name, is_hidden, is_public, map_category, country_code, location_name, description, created_at')
           .or('map_category.eq.official,map_category.is.null')
           .order('name'),
+        supabase.from('route_navigator_maps')
+          .select('id, name, is_hidden, is_public, map_category, country_code, created_at')
+          .or('map_category.eq.official,map_category.is.null')
+          .order('name'),
       ]);
       setRouteMaps((rm || []) as AdminMapItem[]);
       setRouteFinderMaps((rfm || []) as AdminMapItem[]);
+      setNavigatorMaps((rnm || []) as AdminMapItem[]);
     } catch (err) {
       console.error('Error loading maps:', err);
     } finally {
@@ -78,7 +86,7 @@ const AdminMapManager: React.FC = () => {
         </div>
 
         <Tabs defaultValue="route-choice">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="route-choice" className="gap-2">
               <Map className="h-4 w-4" />
               Route Choice ({routeMaps.length})
@@ -86,6 +94,10 @@ const AdminMapManager: React.FC = () => {
             <TabsTrigger value="route-finder" className="gap-2">
               <Route className="h-4 w-4" />
               Route Finder ({routeFinderMaps.length})
+            </TabsTrigger>
+            <TabsTrigger value="route-navigator" className="gap-2">
+              <Navigation className="h-4 w-4" />
+              Navigator ({navigatorMaps.length})
             </TabsTrigger>
           </TabsList>
 
@@ -160,6 +172,43 @@ const AdminMapManager: React.FC = () => {
                   <div className="space-y-2">
                     {routeFinderMaps.map(map => (
                       <AdminMapCard key={map.id} map={map} table="route_finder_maps" onUpdate={loadMaps} />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Route Navigator Tab */}
+          <TabsContent value="route-navigator" className="mt-4 space-y-4">
+            <div>
+              <Button
+                variant={showRNUpload ? 'secondary' : 'outline'}
+                onClick={() => setShowRNUpload(!showRNUpload)}
+                className="gap-2"
+              >
+                {showRNUpload ? <ChevronUp className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {showRNUpload ? 'Hide Upload' : 'Upload New Map'}
+              </Button>
+              {showRNUpload && (
+                <div className="mt-4">
+                  <RouteNavigatorUploadWizard onComplete={() => { setShowRNUpload(false); loadMaps(); }} />
+                </div>
+              )}
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Official Route Navigator Maps</CardTitle>
+                <CardDescription>Toggle visibility, rename, set country</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {navigatorMaps.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No official navigator maps found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {navigatorMaps.map(map => (
+                      <AdminMapCard key={map.id} map={map} table="route_navigator_maps" onUpdate={loadMaps} />
                     ))}
                   </div>
                 )}

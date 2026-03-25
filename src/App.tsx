@@ -25,6 +25,7 @@ import AdminClubRequests from "./pages/AdminClubRequests";
 import AdminProRequests from "./pages/AdminProRequests";
 import AdminMapManager from "./pages/admin/AdminMapManager";
 import UserMaps from "./pages/UserMaps";
+import RouteNavigator from "./pages/RouteNavigator";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 import { NetworkProvider } from "./context/NetworkContext";
@@ -73,6 +74,7 @@ const App: React.FC = () => {
                     <Route path="/admin/upload-maps" element={<AdminMapManager />} />
                     <Route path="/admin/map-visibility" element={<AdminMapManager />} />
                     <Route path="/my-maps" element={<Layout><UserMaps /></Layout>} />
+                    <Route path="/route-navigator" element={<RouteNavigator />} />
                     <Route path="*" element={<Layout><NotFound /></Layout>} />
                   </Routes>
                 </BrowserRouter>
