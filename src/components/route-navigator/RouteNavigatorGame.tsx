@@ -9,11 +9,13 @@ import {
   buildAdjacency,
   findStartNode,
   findNextNode,
+  validateChallenge,
+  isFinishReached,
 } from '@/utils/routeNavigatorUtils';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type GamePhase = 'loading' | 'overview' | 'navigating' | 'result';
+type GamePhase = 'loading' | 'waiting-image' | 'overview' | 'navigating' | 'result';
 
 interface RouteNavigatorGameProps {
   mapId: string;
@@ -43,8 +45,9 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   const [wrongBranch, setWrongBranch] = useState<number | null>(null);
   const [startTime, setStartTime] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [imageReady, setImageReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const challenge = challenges[currentIndex] || null;
   const finish = challenge ? { x: challenge.finish_x, y: challenge.finish_y } : { x: 0, y: 0 };
@@ -84,27 +87,43 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         difficulty_score: c.difficulty_score ? Number(c.difficulty_score) : null,
       }));
 
-      setChallenges(mapped);
+      // Filter to only valid/playable challenges
+      const valid = mapped.filter((ch) => validateChallenge(ch));
+      if (valid.length < mapped.length) {
+        console.warn(`Skipped ${mapped.length - valid.length} invalid challenges out of ${mapped.length}`);
+      }
+
+      setChallenges(valid);
       setCurrentIndex(0);
-      setPhase('overview');
+      setPhase('waiting-image');
     };
     load();
   }, [mapId]);
 
-  // Container size
+  // Container size observer
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
     const updateSize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setContainerSize({ width: rect.width, height: rect.height });
-      }
+      const rect = el.getBoundingClientRect();
+      setContainerSize({ width: rect.width, height: rect.height });
     };
     updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  // Overview → navigating after delay
+  // Gate: wait for image + container before entering overview
+  useEffect(() => {
+    if (phase === 'waiting-image' && imageReady && containerSize.width > 0 && containerSize.height > 0 && challenges.length > 0) {
+      setPhase('overview');
+    }
+  }, [phase, imageReady, containerSize, challenges.length]);
+
+  // Overview → navigating after 3s
   useEffect(() => {
     if (phase === 'overview' && challenge) {
       const timer = setTimeout(() => {
@@ -123,6 +142,10 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     }
   }, [phase, challenge]);
 
+  const handleImageLoaded = useCallback(() => {
+    setImageReady(true);
+  }, []);
+
   const handleBranchSelect = useCallback(
     (branch: Branch) => {
       if (phase !== 'navigating' || selectedBranch !== null || wrongBranch !== null) return;
@@ -131,10 +154,9 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         setSelectedBranch(branch.to_macro);
         setTimeout(() => {
           const nextNode = findNextNode(dpMap, branch);
-          if (nextNode && nextNode.branches.length > 0) {
-            setCurrentNode(nextNode);
-            setSelectedBranch(null);
-          } else {
+
+          if (isFinishReached(nextNode, branch, finish, imageWidth, imageHeight)) {
+            // Challenge complete
             const elapsed = Date.now() - startTime;
             setElapsedMs(elapsed);
             setPhase('result');
@@ -152,6 +174,14 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
                 if (error) console.error('Failed to record attempt:', error);
               });
             }
+          } else if (nextNode) {
+            setCurrentNode(nextNode);
+            setSelectedBranch(null);
+          } else {
+            // Shouldn't happen after validation, but handle gracefully
+            const elapsed = Date.now() - startTime;
+            setElapsedMs(elapsed);
+            setPhase('result');
           }
         }, 600);
       } else {
@@ -162,20 +192,23 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         }, 1200);
       }
     },
-    [phase, selectedBranch, wrongBranch, dpMap, startTime, wrongTurns, userId, challenge, mapName]
+    [phase, selectedBranch, wrongBranch, dpMap, startTime, wrongTurns, userId, challenge, mapName, finish, imageWidth, imageHeight]
   );
 
   const handleNextChallenge = useCallback(() => {
     const nextIdx = (currentIndex + 1) % challenges.length;
     setCurrentIndex(nextIdx);
+    setSelectedBranch(null);
+    setWrongBranch(null);
+    setCurrentNode(null);
     setPhase('overview');
   }, [currentIndex, challenges.length]);
 
   const totalDecisionPoints = challenge?.decision_points.length || 0;
 
-  if (phase === 'loading') {
+  if (phase === 'loading' || (phase === 'waiting-image' && challenges.length === 0)) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
+      <div className="flex items-center justify-center h-screen bg-black">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -194,24 +227,27 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-screen">
-      <NavigatorMapView
-        imageUrl={sourceImageUrl}
-        imageWidth={imageWidth}
-        imageHeight={imageHeight}
-        currentNode={phase === 'overview' ? null : currentNode}
-        finish={finish}
-        start={start}
-        containerWidth={containerSize.width}
-        containerHeight={containerSize.height}
-        isOverview={phase === 'overview'}
-        onBranchSelect={handleBranchSelect}
-        selectedBranchId={selectedBranch}
-        wrongBranchId={wrongBranch}
-      />
+    <div ref={containerRef} className="relative w-full h-screen bg-black">
+      {containerSize.width > 0 && containerSize.height > 0 && (
+        <NavigatorMapView
+          imageUrl={sourceImageUrl}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          currentNode={phase === 'overview' ? null : currentNode}
+          finish={finish}
+          start={start}
+          containerWidth={containerSize.width}
+          containerHeight={containerSize.height}
+          isOverview={phase === 'overview'}
+          onBranchSelect={handleBranchSelect}
+          selectedBranchId={selectedBranch}
+          wrongBranchId={wrongBranch}
+          onImageLoaded={handleImageLoaded}
+        />
+      )}
 
       {/* Back button */}
-      <div className="absolute top-3 left-3 z-10">
+      <div className="absolute top-3 left-3 z-20">
         <Button
           variant="secondary"
           size="icon"
@@ -224,7 +260,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
       {/* HUD overlay */}
       {phase === 'navigating' && (
-        <div className="absolute top-3 left-14 right-3 flex justify-between pointer-events-none">
+        <div className="absolute top-3 left-14 right-3 flex justify-between pointer-events-none z-20">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium">
             Wrong turns: {wrongTurns}
           </div>
@@ -234,9 +270,16 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         </div>
       )}
 
+      {/* Waiting for image */}
+      {phase === 'waiting-image' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-30">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
+
       {/* Overview info */}
       {phase === 'overview' && challenge && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="bg-background/80 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
             <div className="text-lg font-bold mb-1">Navigate to the finish!</div>
             <div className="text-sm text-muted-foreground">
