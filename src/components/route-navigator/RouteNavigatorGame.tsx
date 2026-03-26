@@ -100,7 +100,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     load();
   }, [mapId]);
 
-  // Container size observer
+  // Container size observer — re-run when phase changes so we catch the containerRef mounting
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -114,7 +114,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     const ro = new ResizeObserver(updateSize);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [phase]);
 
   // Gate: wait for image + container before entering overview
   useEffect(() => {
