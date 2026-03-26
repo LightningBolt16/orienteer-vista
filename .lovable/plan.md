@@ -1,174 +1,142 @@
 
+## Route Navigator: robust fix plan for Matera
 
-## Route Navigator — Updated Plan with Data Structures
+### What I verified
+- The Matera navigator map is public and loads 114 challenges plus a valid source image URL.
+- In the sandbox, clicking Matera reproduces the failure: brief loading/overview, then a mostly black game area with HUD but unusable map.
+- The source image itself does load successfully; the failure is in view/state logic, not missing storage data.
+- The current implementation has 4 concrete weak points:
+  1. `RouteNavigatorGame` starts the 3-second overview immediately after challenge data loads, before the source image is confirmed loaded.
+  2. `NavigatorMapView` uses fragile transform math (`transformOrigin=currentNode` + translate/scale/rotate in one string), which is easy to push fully off-screen.
+  3. The map image and SVG overlay are not built as a proper shared “world stage”, so alignment is brittle.
+  4. `findStartNode` picks the nearest node only. I checked the Matera data and about 8/114 challenges would start on a node with no correct outgoing branch, so some rounds are inherently wrong/unwinnable with current logic.
 
-### Data Format (from Matera pipeline)
+### Root causes to fix
+1. **Bad phase timing**
+   - Overview begins before `imageReady` and before the viewport is stable.
+   - On a large source image, the overview can expire while the map is still black/loading.
 
-Each challenge in `Matera_challenges_routing.json` contains:
+2. **Bad camera model**
+   - The navigation view should be a camera centered on a junction.
+   - Right now it is a single CSS transform with implicit ordering, which is why the image can vanish while overlays remain.
 
-```text
-{
-  "challenge_id": 1,
-  "start": { "x": 1723, "y": 2970 },           // pixel coords on source map
-  "finish": { "x": 3024, "y": 3119 },
-  "bbox": { "min_x": 1523, "max_x": 3353, "min_y": 2385, "max_y": 3320 },
-  "optimal_path": [ {x, y}, {x, y}, ... ],      // pixel-by-pixel (STRIP THIS)
-  "decision_points": [                           // nodes relevant to THIS challenge
-    {
-      "id": 149,
-      "x": 2833.67, "y": 2001.67,               // pixel coords on source map
-      "branches": [
-        {
-          "to_macro": 680,                        // destination node id
-          "path": [ {x,y}, ... ],                 // trail pixels between junctions
-          "is_correct": true                      // on the optimal path?
-        },
-        { "to_macro": 315, "path": [...], "is_correct": false }
-      ]
-    },
-    ...
-  ]
-}
-```
+3. **Bad graph resolution**
+   - “Closest node to start” is not robust enough for this dataset.
+   - Completion logic also relies too much on “no next node” instead of “we have reached finish proximity / terminal correct-path node”.
 
-The full `decision_points.json` (807 nodes, whole map graph) is NOT needed for gameplay — each challenge already embeds only the relevant subset of nodes with `is_correct` flags.
+4. **Weak interaction affordance**
+   - Branch previews only use `slice(0, 30)`, which is often too short visually.
+   - Even if technically clickable, the routes are too subtle for real gameplay.
 
-### Storage Strategy
+### Implementation plan
 
-**Strip `optimal_path`** (pixel-by-pixel path, thousands of points per challenge — unnecessary for turn-by-turn gameplay). Keep only `decision_points`, `start`, `finish`, `bbox`, `challenge_id`.
+#### 1) Stabilize loading before gameplay
+- Add explicit `imageLoaded` state to `NavigatorMapView` / `RouteNavigatorGame`.
+- Do not enter the overview timer until all 3 are true:
+  - challenge loaded
+  - container size measured (`width > 0 && height > 0`)
+  - source image loaded
+- Until then, show a full-screen loading state on black background, not the game HUD.
+- This alone should stop the “squished then disappears” first impression.
 
-Store **one row per challenge** in a new `route_navigator_challenges` table, matching the existing `route_finder_challenges` pattern.
-
-### Database
-
-**New table: `route_navigator_maps`**
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| name | text | Map name |
-| user_id | uuid | Owner |
-| source_image_url | text | Full-res source map in storage |
-| image_width | integer | Source image pixel width |
-| image_height | integer | Source image pixel height |
-| map_category | text | official / private / community |
-| is_public | boolean | |
-| is_hidden | boolean | |
-| country_code | text | |
-| created_at | timestamptz | |
-
-RLS: same pattern as `route_finder_maps`.
-
-**New table: `route_navigator_challenges`**
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| map_id | uuid | FK to route_navigator_maps |
-| challenge_index | integer | From pipeline challenge_id |
-| start_x | numeric | Pixel coord on source map |
-| start_y | numeric | |
-| finish_x | numeric | |
-| finish_y | numeric | |
-| bbox | jsonb | `{min_x, max_x, min_y, max_y}` |
-| decision_points | jsonb | Array of nodes with branches + is_correct |
-| optimal_length | numeric | Computed from path or provided by pipeline |
-| difficulty_score | numeric | Optional |
-| created_at | timestamptz | |
-
-RLS: same pattern as `route_finder_challenges` (anyone can view if map is public, owners can delete).
-
-**New table: `route_navigator_attempts`**
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| user_id | uuid | |
-| challenge_id | uuid | |
-| map_name | text | Denormalized for leaderboard |
-| player_path | jsonb | Sequence of node ids chosen |
-| is_optimal | boolean | Did they follow the correct path? |
-| wrong_turns | integer | Count of wrong branches taken |
-| response_time | integer | Total ms |
-| created_at | timestamptz | |
-
-### Upload Flow (Admin)
-
-An admin upload wizard (or a parser script) that:
-1. Accepts the `{MapName}_challenges_routing.json` file
-2. Strips `optimal_path` from each challenge
-3. Computes `optimal_length` by summing Euclidean distances between consecutive `decision_points` on the correct branch path (or accepts it from pipeline)
-4. Inserts one row per challenge into `route_navigator_challenges`
-5. The source map image is uploaded to `user-route-images` bucket
-
-### Game Flow
+#### 2) Rebuild the map as a proper stage + camera
+Refactor `NavigatorMapView` into a shared-coordinate world stage:
 
 ```text
-1. Map selector → pick a Route Navigator map
-2. OVERVIEW (2-3s): Full map shown, start ● and finish ★ marked
-3. ZOOM IN: Animate to first decision point (start node)
-   - Map rotated so finish direction is UP
-   - Zoom to ~400px radius around junction
-4. DECIDE: Player sees branch trails highlighted, taps one or uses arrows
-   - If correct: animate along branch path to next node, recalculate rotation
-   - If wrong: immediate feedback (flash red), count wrong turn, show correct
-5. REPEAT until reaching finish node
-6. RESULT: Score based on wrong turns + time
+viewport (absolute, overflow hidden)
+└─ camera layer (absolute, transform from world -> screen)
+   └─ world layer (position: relative; width=imageWidth; height=imageHeight)
+      ├─ image layer
+      └─ svg overlay layer
 ```
 
-### Core Components
+Use a deterministic transform like:
 
-| New File | Purpose |
-|----------|---------|
-| `src/pages/RouteNavigator.tsx` | Page with map selector, fullscreen toggle |
-| `src/components/route-navigator/RouteNavigatorGame.tsx` | State machine: overview → navigating → result |
-| `src/components/route-navigator/NavigatorMapView.tsx` | Map image with CSS transform (scale, translate, rotate) |
-| `src/components/route-navigator/JunctionOverlay.tsx` | Branch arrows + trail highlights overlay |
-| `src/components/route-navigator/NavigatorResult.tsx` | Results screen |
-| `src/utils/routeNavigatorUtils.ts` | Bearing calc, scoring |
-
-### Transform Logic
-
-At each junction node, compute bearing to finish and zoom level:
-
-```typescript
-// Bearing from current node to finish (in degrees, 0 = up)
-const bearing = Math.atan2(finish.x - current.x, -(finish.y - current.y)) * (180 / Math.PI);
-
-// CSS transform on the map image container
-transform: `translate(${tx}px, ${ty}px) scale(${scale}) rotate(${-bearing}deg)`;
-transformOrigin: `${current.x}px ${current.y}px`;
+```text
+translate(viewportCenterX, viewportCenterY)
+rotate(-bearing)
+scale(zoom)
+translate(-currentNode.x, -currentNode.y)
 ```
 
-The overlay layer (arrows/buttons) is OUTSIDE the transform, positioned in screen coordinates.
+Key rules:
+- `transformOrigin: 0 0`
+- image and overlay must live inside the same world layer
+- the world layer must have explicit width/height matching source pixels
+- no mixed implicit layout positioning
 
-### Branch Visualization
+This is the most important structural fix.
 
-Each branch's `path` array provides ~5-20 pixel-coord points from the junction outward. Render the first ~100px of each branch as a colored SVG polyline on the transformed map. Make them tappable (fat stroke + invisible hit area). Alternatively, show directional arrow buttons outside the transform for mobile.
+#### 3) Fix overview rendering separately from navigation
+- Overview should use simple contain-fit of the full source map with visible start/finish markers.
+- Navigation should use the camera model above.
+- Do not reuse the navigation transform for overview.
+- Keep a persistent “goal compass” during navigation, and keep a faint finish indicator when it is within view.
 
-### Scoring
+#### 4) Make challenge start/end resolution robust for Matera data
+Replace the current naive helpers with data-aware ones:
 
-- **Perfect run**: 0 wrong turns = 100 points
-- **Penalty per wrong turn**: -10 points (minimum 0)
-- **Time bonus**: Multiplier based on speed (fast decisions = higher score)
-- `score = max(0, 100 - wrongTurns * 10) * timeMultiplier`
+- **Start node selection**
+  - Prefer the nearest node that has at least one `is_correct=true` outgoing branch.
+  - If multiple candidates are close, pick the one whose correct-path chain can progress toward finish.
+  - Only fall back to plain nearest node if no such candidate exists.
 
-### Routing
+- **Completion detection**
+  - Consider challenge complete when:
+    - the next node is within a finish tolerance, or
+    - the correct branch leads to the terminal node nearest finish, or
+    - the branch endpoint itself is within finish tolerance.
+  - Do not rely only on `nextNode.branches.length === 0`.
 
-Add `/route-navigator` to `App.tsx`. Add navigation button from landing/index page.
+- **Validation on load**
+  - Precompute challenge validity once per loaded map:
+    - resolvable start node
+    - at least one correct path chain
+    - resolvable finish
+  - Skip invalid challenges and log them clearly instead of starting broken rounds.
 
-### Implementation Phases
+#### 5) Improve route visibility and selection
+- Replace `branch.path.slice(0, 30)` with a preview based on cumulative distance, so each option shows enough visible trail.
+- Increase visible stroke and hit area.
+- Add an optional mobile-friendly fallback choice UI:
+  - branch buttons/arrows outside the map
+  - still keep direct map tapping as the main interaction
+- Keep the current node marker larger and clearer.
 
-1. **Database**: Create 3 tables + RLS policies via migration
-2. **Upload**: Admin upload wizard that parses the JSON, strips optimal_path, inserts challenges
-3. **Game core**: Map view with zoom/pan/rotate, junction detection, branch selection
-4. **Results + scoring**: Score calculation, attempt recording, results screen
-5. **Polish**: Animations, mobile optimization, landing page integration
+#### 6) Prevent black-screen camera states
+- Add camera safeguards:
+  - clamp zoom to sane min/max
+  - if the computed transform would place nearly the entire world outside the viewport, fall back to a safer zoom-out
+  - if rotation + zoom near map edge creates too much empty space, reduce zoom slightly rather than showing an almost all-black screen
+- This should make the game resilient even when a junction is near map boundaries.
 
-### Technical Details
+#### 7) Harden the upload/import flow
+- Keep import logic compatible with both `decision_points` and `decision_nodes`.
+- Add import-time validation summary:
+  - total challenges
+  - skipped invalid challenges
+  - challenges whose nearest node had no correct branch
+- Require a valid source image URL/dimensions before the map is considered playable.
+- Remove reliance on one-off map-specific cleanup behavior; challenge replacement should happen inside the uploader/admin action, not via hardcoded migration deletes.
 
-- **Decision point ordering**: The `decision_points` array per challenge contains only nodes on or near the optimal path. The game starts at the node closest to `start` coords and navigates toward `finish`. At each node, find which branch has `is_correct: true` — that's the optimal choice.
-- **Path between junctions**: Each branch has a `path` array of pixel coords. Use these for the pan animation between nodes (interpolate along the path over ~600ms).
-- **Rotation animation**: CSS `transition: transform 0.6s ease-in-out` handles smooth rotation + pan between junctions.
-- **Mobile tap targets**: Arrow buttons should be 48px+ for touch. Position them around the screen edges, outside the rotating map container.
+### Files that will likely change
+- `src/components/route-navigator/NavigatorMapView.tsx`
+- `src/components/route-navigator/RouteNavigatorGame.tsx`
+- `src/utils/routeNavigatorUtils.ts`
+- `src/pages/RouteNavigator.tsx`
+- `src/components/admin/RouteNavigatorUploadWizard.tsx`
 
+### Technical details
+- The cleanest fix is not more tweaking of the current transform formula; it is replacing it with a proper camera stage.
+- The Matera dataset is usable, but the game logic must respect that many nodes are distractors and only some are on the correct chain.
+- No major database redesign is required for this fix; this is mainly view logic + challenge validation + importer hardening.
+
+### Acceptance criteria
+The fix is done when all of these are true in a logged-out sandbox:
+1. Clicking Matera shows a stable loading state, then a readable full-map overview.
+2. Start and finish markers are clearly visible during overview.
+3. After overview, the map remains visible and centered on the first playable junction.
+4. At least the first several Matera challenges are actually playable and progress correctly.
+5. Route choices are clearly visible and easy to tap/click.
+6. No “marker and routes over black background” state appears.
+7. No challenge starts on a dead node with zero correct outgoing branches.
