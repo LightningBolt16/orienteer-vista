@@ -57,7 +57,7 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
 
       const parsed: ParsedChallenge[] = arr.map((c: any) => {
         // Strip optimal_path, keep only decision_points
-        const dp: DecisionPoint[] = (c.decision_points || []).map((d: any) => ({
+        const dp: DecisionPoint[] = (c.decision_points || c.decision_nodes || []).map((d: any) => ({
           id: d.id,
           x: d.x,
           y: d.y,

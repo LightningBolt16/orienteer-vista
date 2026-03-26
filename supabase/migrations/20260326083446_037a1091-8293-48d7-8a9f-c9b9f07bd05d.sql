@@ -1,0 +1,1 @@
+DELETE FROM route_navigator_challenges WHERE map_id = '4081719b-d172-4a5d-a64e-6cbe36aafdd8';
