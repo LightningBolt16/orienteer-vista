@@ -10,7 +10,8 @@ import {
   findStartNode,
   findNextNode,
 } from '@/utils/routeNavigatorUtils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type GamePhase = 'loading' | 'overview' | 'navigating' | 'result';
 
@@ -47,6 +48,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
   const challenge = challenges[currentIndex] || null;
   const finish = challenge ? { x: challenge.finish_x, y: challenge.finish_y } : { x: 0, y: 0 };
+  const start = challenge ? { x: challenge.start_x, y: challenge.start_y } : { x: 0, y: 0 };
 
   const dpMap = useMemo(() => {
     if (!challenge) return new Map<number, DecisionPoint>();
@@ -67,7 +69,6 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         return;
       }
 
-      // Shuffle
       const shuffled = [...data].sort(() => Math.random() - 0.5);
       const mapped: NavigatorChallenge[] = shuffled.map((c: any) => ({
         id: c.id,
@@ -117,7 +118,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         setWrongBranch(null);
         setStartTime(Date.now());
         setPhase('navigating');
-      }, 2500);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [phase, challenge]);
@@ -128,19 +129,16 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
       if (branch.is_correct) {
         setSelectedBranch(branch.to_macro);
-        // Move to next node after brief delay
         setTimeout(() => {
           const nextNode = findNextNode(dpMap, branch);
           if (nextNode && nextNode.branches.length > 0) {
             setCurrentNode(nextNode);
             setSelectedBranch(null);
           } else {
-            // Reached finish or a dead-end on correct path
             const elapsed = Date.now() - startTime;
             setElapsedMs(elapsed);
             setPhase('result');
 
-            // Record attempt
             if (userId) {
               supabase.from('route_navigator_attempts').insert({
                 user_id: userId,
@@ -159,7 +157,6 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       } else {
         setWrongBranch(branch.to_macro);
         setWrongTurns((prev) => prev + 1);
-        // Clear wrong indicator after animation
         setTimeout(() => {
           setWrongBranch(null);
         }, 1200);
@@ -178,7 +175,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
   if (phase === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center h-screen bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -197,13 +194,14 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-[60vh]">
+    <div ref={containerRef} className="relative w-full h-screen">
       <NavigatorMapView
         imageUrl={sourceImageUrl}
         imageWidth={imageWidth}
         imageHeight={imageHeight}
         currentNode={phase === 'overview' ? null : currentNode}
         finish={finish}
+        start={start}
         containerWidth={containerSize.width}
         containerHeight={containerSize.height}
         isOverview={phase === 'overview'}
@@ -212,9 +210,21 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         wrongBranchId={wrongBranch}
       />
 
+      {/* Back button */}
+      <div className="absolute top-3 left-3 z-10">
+        <Button
+          variant="secondary"
+          size="icon"
+          className="bg-background/80 backdrop-blur-sm"
+          onClick={onBack}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+      </div>
+
       {/* HUD overlay */}
       {phase === 'navigating' && (
-        <div className="absolute top-3 left-3 right-3 flex justify-between pointer-events-none">
+        <div className="absolute top-3 left-14 right-3 flex justify-between pointer-events-none">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium">
             Wrong turns: {wrongTurns}
           </div>
@@ -224,13 +234,13 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         </div>
       )}
 
-      {/* Overview markers */}
+      {/* Overview info */}
       {phase === 'overview' && challenge && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-background/80 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
             <div className="text-lg font-bold mb-1">Navigate to the finish!</div>
             <div className="text-sm text-muted-foreground">
-              {totalDecisionPoints} decision points
+              Choose the correct path at each junction
             </div>
           </div>
         </div>
