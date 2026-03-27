@@ -6,8 +6,10 @@ import {
   NavigatorChallenge,
   DecisionPoint,
   Branch,
+  applyCorrectEdgesToGraph,
   buildAdjacency,
   findStartNode,
+  mergeDecisionPointGraphs,
   resolveBranchDestination,
   validateChallenge,
 } from '@/utils/routeNavigatorUtils';
@@ -48,18 +50,24 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   const [traversedPath, setTraversedPath] = useState<{ x: number; y: number }[]>([]);
   // Track which correct-sequence nodes were visited in order
   const [correctNodesHit, setCorrectNodesHit] = useState<number[]>([]);
+  const [fullGraph, setFullGraph] = useState<DecisionPoint[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const challenge = challenges[currentIndex] || null;
+  const challengeDecisionPoints = useMemo(() => {
+    if (!challenge) return [] as DecisionPoint[];
+    if (fullGraph.length === 0) return challenge.decision_points;
+    return applyCorrectEdgesToGraph(fullGraph, challenge.decision_points);
+  }, [challenge, fullGraph]);
   const finish = challenge ? { x: challenge.finish_x, y: challenge.finish_y } : { x: 0, y: 0 };
   const start = challenge ? { x: challenge.start_x, y: challenge.start_y } : { x: 0, y: 0 };
 
   // Build the correct node sequence from decision_points
   const correctSequence = useMemo(() => {
     if (!challenge) return [] as number[];
-    const dpMap = buildAdjacency(challenge.decision_points);
-    const startNode = findStartNode(challenge.decision_points, { x: challenge.start_x, y: challenge.start_y });
+    const dpMap = buildAdjacency(challengeDecisionPoints);
+    const startNode = findStartNode(challengeDecisionPoints, { x: challenge.start_x, y: challenge.start_y });
     if (!startNode) return [] as number[];
 
     const seq: number[] = [];
@@ -73,35 +81,35 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       cur = resolveBranchDestination(dpMap, correctBranch, cur);
     }
     return seq;
-  }, [challenge]);
+  }, [challenge, challengeDecisionPoints]);
 
   const dpMap = useMemo(() => {
     if (!challenge) return new Map<number, DecisionPoint>();
-    return buildAdjacency(challenge.decision_points);
-  }, [challenge]);
+    return buildAdjacency(challengeDecisionPoints);
+  }, [challenge, challengeDecisionPoints]);
 
   const finishTargetNode = useMemo(() => {
-    if (!challenge || challenge.decision_points.length === 0) return null;
+    if (!challenge || challengeDecisionPoints.length === 0) return null;
 
     if (correctSequence.length > 0) {
       return dpMap.get(correctSequence[correctSequence.length - 1]) ?? null;
     }
 
-    return challenge.decision_points.reduce<DecisionPoint | null>((closest, node) => {
+    return challengeDecisionPoints.reduce<DecisionPoint | null>((closest, node) => {
       const nodeDist = Math.hypot(node.x - challenge.finish_x, node.y - challenge.finish_y);
       if (!closest) return node;
 
       const closestDist = Math.hypot(closest.x - challenge.finish_x, closest.y - challenge.finish_y);
       return nodeDist < closestDist ? node : closest;
     }, null);
-  }, [challenge, correctSequence, dpMap]);
+  }, [challenge, challengeDecisionPoints, correctSequence, dpMap]);
 
   // Compute the correct path polyline from decision points
   // Correct path: straight lines between decision point centers only
   const correctPath = useMemo(() => {
     if (!challenge) return [] as { x: number; y: number }[];
     const points: { x: number; y: number }[] = [{ x: challenge.start_x, y: challenge.start_y }];
-    const startNode = findStartNode(challenge.decision_points, { x: challenge.start_x, y: challenge.start_y });
+    const startNode = findStartNode(challengeDecisionPoints, { x: challenge.start_x, y: challenge.start_y });
     if (!startNode) return points;
 
     const visited = new Set<number>();
@@ -115,7 +123,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     }
     points.push({ x: challenge.finish_x, y: challenge.finish_y });
     return points;
-  }, [challenge, dpMap]);
+  }, [challenge, challengeDecisionPoints, dpMap]);
 
   // Load challenges
   useEffect(() => {
@@ -151,6 +159,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         console.warn(`Skipped ${mapped.length - valid.length} invalid challenges out of ${mapped.length}`);
       }
 
+      setFullGraph(mergeDecisionPointGraphs(valid.map((ch) => ch.decision_points)));
       setChallenges(valid);
       setCurrentIndex(0);
       setPhase('waiting-image');
@@ -186,7 +195,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     console.log(`Preview duration: ${previewDuration}ms`);
 
     const startNode = findStartNode(
-      challenge.decision_points,
+      challengeDecisionPoints,
       { x: challenge.start_x, y: challenge.start_y }
     );
     setCurrentNode(startNode);
@@ -205,7 +214,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     }
     setTraversedPath(pathInit);
     setPhase('navigating');
-  }, [phase, challenge, overviewStartTime, correctSequence]);
+  }, [phase, challenge, challengeDecisionPoints, overviewStartTime, correctSequence]);
 
   const handleImageLoaded = useCallback(() => {
     setImageReady(true);
