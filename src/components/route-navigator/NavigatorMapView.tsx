@@ -118,90 +118,81 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     };
   }, [currentNode, finish, start, containerWidth, containerHeight, imageWidth, imageHeight, isOverview, isZoomedOut, showResult]);
 
-  // Branch SVG paths
+  // Branch SVG paths — clean arrows with large hit areas
   const branchPaths = useMemo(() => {
     if (isOverview || !currentNode) return null;
     return currentNode.branches.map((branch, idx) => {
-      const points = getBranchPreviewPath(branch, 250);
+      const points = getBranchPreviewPath(branch, 300);
       if (points.length < 2) return null;
-      const pathStr = points.map((p) => `${p.x},${p.y}`).join(' ');
+
       const isSelected = selectedBranchId === branch.to_macro;
       const color = isSelected ? '#22c55e' : BRANCH_COLORS[idx % BRANCH_COLORS.length];
 
-      // Arrow head calculations
+      // Build a smooth SVG path instead of polyline
+      const first = points[0];
+      let d = `M ${first.x} ${first.y}`;
+      for (let i = 1; i < points.length; i++) {
+        d += ` L ${points[i].x} ${points[i].y}`;
+      }
+
+      // Arrowhead at the end
       const last = points[points.length - 1];
       const prev = points[points.length - 2];
       const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-      const arrowLen = 30;
-      const arrowWidth = 0.45;
-      const tipX = last.x + arrowLen * 0.3 * Math.cos(angle);
-      const tipY = last.y + arrowLen * 0.3 * Math.sin(angle);
-      const x1 = last.x - arrowLen * Math.cos(angle - arrowWidth);
-      const y1 = last.y - arrowLen * Math.sin(angle - arrowWidth);
-      const x2 = last.x - arrowLen * Math.cos(angle + arrowWidth);
-      const y2 = last.y - arrowLen * Math.sin(angle + arrowWidth);
+      const headLen = 24;
+      const headW = Math.PI / 5;
+      const lx = last.x - headLen * Math.cos(angle - headW);
+      const ly = last.y - headLen * Math.sin(angle - headW);
+      const rx = last.x - headLen * Math.cos(angle + headW);
+      const ry = last.y - headLen * Math.sin(angle + headW);
 
       return (
         <g key={branch.to_macro}>
-          {/* Fat invisible hit area */}
-          <polyline
-            points={pathStr}
+          {/* Wide invisible hit area for the entire branch */}
+          <path
+            d={d}
             fill="none"
             stroke="transparent"
-            strokeWidth={80}
+            strokeWidth={100}
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
           />
-          {/* Outer glow */}
-          <polyline
-            points={pathStr}
+          {/* Soft shadow */}
+          <path
+            d={d}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected ? 20 : 16}
+            strokeWidth={isSelected ? 18 : 14}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity={0.25}
+            strokeOpacity={0.2}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Main line */}
-          <polyline
-            points={pathStr}
+          {/* Main stroke */}
+          <path
+            d={d}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected ? 12 : 9}
+            strokeWidth={isSelected ? 10 : 7}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity={0.95}
+            strokeOpacity={0.9}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Inner bright core */}
-          <polyline
-            points={pathStr}
-            fill="none"
-            stroke="white"
-            strokeWidth={isSelected ? 4 : 3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeOpacity={0.4}
-            style={{ pointerEvents: 'none' }}
-          />
-          {/* Chevron arrowhead */}
+          {/* Clean arrowhead triangle */}
           <polygon
-            points={`${tipX},${tipY} ${x1},${y1} ${last.x},${last.y} ${x2},${y2}`}
+            points={`${last.x},${last.y} ${lx},${ly} ${rx},${ry}`}
             fill={color}
-            fillOpacity={0.95}
-            stroke={color}
-            strokeWidth={2}
-            strokeLinejoin="round"
+            fillOpacity={0.9}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Arrow hit area */}
+          {/* Extra hit area at arrow tip */}
           <circle
             cx={last.x}
             cy={last.y}
-            r={40}
+            r={50}
             fill="transparent"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}

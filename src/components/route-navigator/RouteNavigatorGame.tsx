@@ -97,6 +97,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   }, [challenge, correctSequence, dpMap]);
 
   // Compute the correct path polyline from decision points
+  // Correct path: straight lines between decision point centers only
   const correctPath = useMemo(() => {
     if (!challenge) return [] as { x: number; y: number }[];
     const points: { x: number; y: number }[] = [{ x: challenge.start_x, y: challenge.start_y }];
@@ -110,9 +111,6 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       visited.add(cur.id);
       const correctBranch = cur.branches.find(b => b.is_correct);
       if (!correctBranch) break;
-      if (correctBranch.path.length > 0) {
-        points.push(...correctBranch.path);
-      }
       cur = findNextNode(dpMap, correctBranch);
     }
     points.push({ x: challenge.finish_x, y: challenge.finish_y });
@@ -263,10 +261,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         );
         const reachedFinish = nextNodeAtFinish || nodeNearFinish || branchEndsNearFinish;
 
-        // Add path points to traversed path
-        if (branch.path.length > 0) {
-          setTraversedPath(prev => [...prev, ...branch.path]);
-        }
+        // Record only node positions for a clean traversed path
         if (nextNode) {
           setTraversedPath(prev => [...prev, { x: nextNode.x, y: nextNode.y }]);
         }
