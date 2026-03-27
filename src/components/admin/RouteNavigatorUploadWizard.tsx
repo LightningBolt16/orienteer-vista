@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, CheckCircle, XCircle, Loader2, FileText } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { computeOptimalLength, DecisionPoint } from '@/utils/routeNavigatorUtils';
+import { computeOptimalLength, DecisionPoint, Branch } from '@/utils/routeNavigatorUtils';
 
 const COUNTRIES = [
   { code: 'IT', name: 'Italy', flag: '🇮🇹' },
@@ -22,83 +22,191 @@ const COUNTRIES = [
   { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
 ];
 
-interface ParsedChallenge {
+interface RawNode {
+  id: number;
+  x?: number;
+  y?: number;
+  r?: number;
+  c?: number;
+  branches: {
+    to_macro: number;
+    path: Array<{ r?: number; c?: number; x?: number; y?: number }>;
+  }[];
+}
+
+interface RawChallenge {
+  challenge_id: number;
+  start: { x: number; y: number };
+  finish: { x: number; y: number };
+  bbox: { min_x: number; max_x: number; min_y: number; max_y: number };
+  correct_node_sequence: number[];
+}
+
+interface MergedChallenge {
   challenge_id: number;
   start: { x: number; y: number };
   finish: { x: number; y: number };
   bbox: { min_x: number; max_x: number; min_y: number; max_y: number };
   decision_points: DecisionPoint[];
-  optimal_length?: number;
+  optimal_length: number;
+}
+
+/** Convert r/c path points to x/y */
+function convertPath(path: Array<{ r?: number; c?: number; x?: number; y?: number }>): { x: number; y: number }[] {
+  return path.map(p => ({
+    x: p.x ?? p.c ?? 0,
+    y: p.y ?? p.r ?? 0,
+  }));
+}
+
+/** Merge decision_points graph + challenges_routing into per-challenge decision_points with is_correct */
+function mergeData(nodes: RawNode[], challenges: RawChallenge[]): MergedChallenge[] {
+  // Build node lookup
+  const nodeMap = new Map<number, RawNode>();
+  for (const n of nodes) {
+    nodeMap.set(n.id, n);
+  }
+
+  const results: MergedChallenge[] = [];
+  const warnings: string[] = [];
+
+  for (const ch of challenges) {
+    const seq = ch.correct_node_sequence;
+    if (!seq || seq.length < 2) {
+      warnings.push(`Challenge ${ch.challenge_id}: sequence too short`);
+      continue;
+    }
+
+    // Build set of correct edges: nodeA -> nodeB
+    const correctEdges = new Set<string>();
+    for (let i = 0; i < seq.length - 1; i++) {
+      correctEdges.add(`${seq[i]}->${seq[i + 1]}`);
+    }
+
+    // Collect all nodes that are in the correct sequence
+    const seqNodeIds = new Set(seq);
+
+    // Also collect all nodes reachable from sequence nodes (for wrong turns)
+    const relevantNodeIds = new Set<number>(seqNodeIds);
+    for (const nodeId of seqNodeIds) {
+      const node = nodeMap.get(nodeId);
+      if (node) {
+        for (const b of node.branches) {
+          relevantNodeIds.add(b.to_macro);
+        }
+      }
+    }
+
+    // Build decision points for this challenge
+    const dp: DecisionPoint[] = [];
+    for (const nodeId of relevantNodeIds) {
+      const node = nodeMap.get(nodeId);
+      if (!node) continue;
+
+      const branches: Branch[] = node.branches.map(b => ({
+        to_macro: b.to_macro,
+        path: convertPath(b.path),
+        is_correct: correctEdges.has(`${nodeId}->${b.to_macro}`),
+      }));
+
+      dp.push({
+        id: nodeId,
+        x: node.x ?? node.c ?? 0,
+        y: node.y ?? node.r ?? 0,
+        branches,
+      });
+    }
+
+    const start = ch.start;
+    const finish = ch.finish;
+
+    results.push({
+      challenge_id: ch.challenge_id,
+      start,
+      finish,
+      bbox: ch.bbox,
+      decision_points: dp,
+      optimal_length: computeOptimalLength(dp, start, finish),
+    });
+  }
+
+  if (warnings.length > 0) {
+    console.warn('Merge warnings:', warnings);
+  }
+
+  return results;
 }
 
 type Step = 'select' | 'configure' | 'uploading' | 'complete';
 
 const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
   const [step, setStep] = useState<Step>('select');
-  const [jsonFile, setJsonFile] = useState<File | null>(null);
+  const [dpFile, setDpFile] = useState<File | null>(null);
+  const [routingFile, setRoutingFile] = useState<File | null>(null);
+  const [dpNodeCount, setDpNodeCount] = useState(0);
   const [sourceImageFile, setSourceImageFile] = useState<File | null>(null);
-  const [challenges, setChallenges] = useState<ParsedChallenge[]>([]);
+  const [challenges, setChallenges] = useState<MergedChallenge[]>([]);
   const [mapName, setMapName] = useState('');
   const [countryCode, setCountryCode] = useState('');
   const [imageWidth, setImageWidth] = useState<number>(0);
   const [imageHeight, setImageHeight] = useState<number>(0);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [rawNodes, setRawNodes] = useState<RawNode[]>([]);
+  const [rawChallenges, setRawChallenges] = useState<RawChallenge[]>([]);
 
-  const handleJsonSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDpFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null);
-
     try {
       const text = await file.text();
-      const raw = JSON.parse(text);
-      const arr = Array.isArray(raw) ? raw : [raw];
+      const nodes: RawNode[] = JSON.parse(text);
+      if (!Array.isArray(nodes)) throw new Error('Expected an array of nodes');
+      setRawNodes(nodes);
+      setDpNodeCount(nodes.length);
+      setDpFile(file);
+    } catch (err) {
+      setError(`Decision points parse error: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+  }, []);
 
-      const parsed: ParsedChallenge[] = arr.map((c: any) => {
-        // Strip optimal_path, keep only decision_points
-        const dp: DecisionPoint[] = (c.decision_points || c.decision_nodes || []).map((d: any) => ({
-          id: d.id,
-          x: d.x,
-          y: d.y,
-          branches: (d.branches || []).map((b: any) => ({
-            to_macro: b.to_macro,
-            path: b.path || [],
-            is_correct: b.is_correct || false,
-          })),
-        }));
-
-        const start = { x: c.start?.x || 0, y: c.start?.y || 0 };
-        const finish = { x: c.finish?.x || 0, y: c.finish?.y || 0 };
-
-        return {
-          challenge_id: c.challenge_id || c.challenge_index || 0,
-          start,
-          finish,
-          bbox: c.bbox || { min_x: 0, max_x: 0, min_y: 0, max_y: 0 },
-          decision_points: dp,
-          optimal_length: c.optimal_length || computeOptimalLength(dp, start, finish),
-        };
-      });
-
-      setChallenges(parsed);
-      setJsonFile(file);
+  const handleRoutingFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      const text = await file.text();
+      const chs: RawChallenge[] = JSON.parse(text);
+      if (!Array.isArray(chs)) throw new Error('Expected an array of challenges');
+      setRawChallenges(chs);
+      setRoutingFile(file);
 
       // Derive map name from filename
       const name = file.name.replace(/_challenges_routing\.json$/i, '').replace(/\.json$/i, '');
       setMapName(name);
-      setStep('configure');
     } catch (err) {
-      setError(`Failed to parse JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`Routing parse error: ${err instanceof Error ? err.message : 'Unknown'}`);
     }
   }, []);
+
+  const handleMergeAndContinue = useCallback(() => {
+    if (rawNodes.length === 0 || rawChallenges.length === 0) return;
+    setError(null);
+    try {
+      const merged = mergeData(rawNodes, rawChallenges);
+      if (merged.length === 0) throw new Error('No valid challenges after merge');
+      setChallenges(merged);
+      setStep('configure');
+    } catch (err) {
+      setError(`Merge error: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+  }, [rawNodes, rawChallenges]);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setSourceImageFile(file);
-
-    // Read image dimensions
     const img = new Image();
     img.onload = () => {
       setImageWidth(img.naturalWidth);
@@ -114,7 +222,6 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
     setUploadProgress(0);
 
     try {
-      // 1. Upload source image if provided
       let sourceImageUrl: string | null = null;
       if (sourceImageFile) {
         const ext = sourceImageFile.name.split('.').pop() || 'webp';
@@ -123,13 +230,11 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
           .from('user-route-images')
           .upload(imagePath, sourceImageFile, { upsert: true, contentType: sourceImageFile.type });
         if (uploadErr) throw new Error(`Image upload failed: ${uploadErr.message}`);
-
         const { data: urlData } = supabase.storage.from('user-route-images').getPublicUrl(imagePath);
         sourceImageUrl = urlData.publicUrl;
       }
       setUploadProgress(10);
 
-      // 2. Create map entry
       const { data: mapData, error: mapErr } = await supabase
         .from('route_navigator_maps')
         .insert({
@@ -148,7 +253,6 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
       if (mapErr) throw new Error(`Map creation failed: ${mapErr.message}`);
       setUploadProgress(20);
 
-      // 3. Insert challenges in batches
       const mapId = mapData.id;
       const batchSize = 20;
       for (let i = 0; i < challenges.length; i += batchSize) {
@@ -168,7 +272,6 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
           .from('route_navigator_challenges')
           .insert(batch);
         if (insertErr) throw new Error(`Challenge insert failed: ${insertErr.message}`);
-
         setUploadProgress(20 + Math.round(((i + batchSize) / challenges.length) * 80));
       }
 
@@ -198,19 +301,48 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
         {step === 'select' && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Select the challenges routing JSON file (e.g. Matera_challenges_routing.json).
-              The optimal_path arrays will be stripped automatically.
+              Upload two JSON files: the decision points graph and the challenges routing file.
             </p>
+
             <div>
-              <Label htmlFor="nav-json">Challenges JSON</Label>
+              <Label htmlFor="nav-dp-json">Decision Points JSON (full graph)</Label>
               <Input
-                id="nav-json"
+                id="nav-dp-json"
                 type="file"
                 accept=".json"
-                onChange={handleJsonSelect}
+                onChange={handleDpFileSelect}
                 className="mt-1"
               />
+              {dpFile && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ✓ {dpNodeCount} nodes loaded
+                </p>
+              )}
             </div>
+
+            <div>
+              <Label htmlFor="nav-routing-json">Challenges Routing JSON</Label>
+              <Input
+                id="nav-routing-json"
+                type="file"
+                accept=".json"
+                onChange={handleRoutingFileSelect}
+                className="mt-1"
+              />
+              {routingFile && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ✓ {rawChallenges.length} challenges loaded
+                </p>
+              )}
+            </div>
+
+            <Button
+              onClick={handleMergeAndContinue}
+              disabled={rawNodes.length === 0 || rawChallenges.length === 0}
+              className="w-full gap-2"
+            >
+              Merge & Continue
+            </Button>
           </div>
         )}
 
@@ -218,7 +350,7 @@ const RouteNavigatorUploadWizard: React.FC<{ onComplete?: () => void }> = ({ onC
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-primary">
               <CheckCircle className="h-4 w-4" />
-              Parsed {challenges.length} challenges
+              Merged {challenges.length} challenges from {dpNodeCount} nodes
             </div>
 
             <div>

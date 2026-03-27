@@ -11,6 +11,7 @@ interface NavigatorMapViewProps {
   containerWidth: number;
   containerHeight: number;
   isOverview: boolean;
+  isZoomedOut?: boolean;
   onBranchSelect: (branch: Branch) => void;
   selectedBranchId?: number | null;
   wrongBranchId?: number | null;
@@ -18,6 +19,7 @@ interface NavigatorMapViewProps {
 }
 
 const BRANCH_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#be185d'];
+const IOF_PURPLE = '#f20dff';
 
 const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
   imageUrl,
@@ -29,6 +31,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
   containerWidth,
   containerHeight,
   isOverview,
+  isZoomedOut = false,
   onBranchSelect,
   selectedBranchId,
   wrongBranchId,
@@ -41,15 +44,35 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     onImageLoaded?.();
   }, [onImageLoaded]);
 
-  // Camera transform — proper world-stage model
-  // Structure: viewport → camera (transform) → world (imageWidth×imageHeight) → img + svg
+  // Camera transform
   const cameraTransform = useMemo(() => {
-    if (isOverview || !currentNode) {
-      // Contain-fit the full image
+    if (isOverview || isZoomedOut || !currentNode) {
+      // Overview: zoom into the start/finish region rather than full map
+      if (isOverview && start.x > 0 && finish.x > 0) {
+        const cx = (start.x + finish.x) / 2;
+        const cy = (start.y + finish.y) / 2;
+        const dx = Math.abs(finish.x - start.x);
+        const dy = Math.abs(finish.y - start.y);
+        const padding = Math.max(dx, dy) * 0.4;
+        const regionW = dx + padding * 2;
+        const regionH = dy + padding * 2;
+        const scaleX = containerWidth / regionW;
+        const scaleY = containerHeight / regionH;
+        const scale = Math.min(scaleX, scaleY);
+        // Clamp so we don't zoom in too much on very close start/finish
+        const maxScale = Math.min(containerWidth, containerHeight) / 400;
+        const fitScale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+        const finalScale = Math.max(fitScale, Math.min(scale, maxScale));
+        return {
+          transform: `translate(${containerWidth / 2}px, ${containerHeight / 2}px) scale(${finalScale}) translate(${-cx}px, ${-cy}px)`,
+          transformOrigin: '0 0',
+          transition: 'transform 0.8s ease-in-out',
+        };
+      }
+      // Zoomed-out or fallback: contain-fit the full image
       const scaleX = containerWidth / imageWidth;
       const scaleY = containerHeight / imageHeight;
       const scale = Math.min(scaleX, scaleY);
-      // Center the image
       const cx = imageWidth / 2;
       const cy = imageHeight / 2;
       return {
@@ -61,10 +84,8 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
 
     // Navigation: center on current node, rotate so finish is "up"
     const bearing = bearingToFinish(currentNode, finish);
-    const zoomRadius = 350;
+    const zoomRadius = 250;
     let scale = Math.min(containerWidth, containerHeight) / (zoomRadius * 2);
-
-    // Clamp scale to sane range
     const minScale = Math.min(containerWidth, containerHeight) / Math.max(imageWidth, imageHeight);
     scale = Math.max(scale, minScale * 0.5);
     scale = Math.min(scale, 8);
@@ -79,7 +100,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
       transformOrigin: '0 0',
       transition: 'transform 0.6s ease-in-out',
     };
-  }, [currentNode, finish, containerWidth, containerHeight, imageWidth, imageHeight, isOverview]);
+  }, [currentNode, finish, start, containerWidth, containerHeight, imageWidth, imageHeight, isOverview, isZoomedOut]);
 
   // Branch SVG paths
   const branchPaths = useMemo(() => {
@@ -94,7 +115,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
 
       return (
         <g key={branch.to_macro}>
-          {/* Wide invisible hit area for easy tapping */}
           <polyline
             points={pathStr}
             fill="none"
@@ -105,7 +125,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
           />
-          {/* Visible path — outer glow */}
           <polyline
             points={pathStr}
             fill="none"
@@ -116,7 +135,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             strokeOpacity={0.35}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Visible path — core */}
           <polyline
             points={pathStr}
             fill="none"
@@ -127,7 +145,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             strokeOpacity={0.95}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Arrowhead at the end of each branch preview */}
           {points.length >= 2 && (() => {
             const last = points[points.length - 1];
             const prev = points[points.length - 2];
@@ -166,20 +183,57 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     });
   }, [currentNode, isOverview, onBranchSelect, selectedBranchId, wrongBranchId]);
 
-  // Overview scale for markers
-  const overviewScale = useMemo(() => {
-    if (!isOverview) return 1;
-    const scaleX = containerWidth / imageWidth;
-    const scaleY = containerHeight / imageHeight;
-    return Math.min(scaleX, scaleY);
-  }, [isOverview, containerWidth, containerHeight, imageWidth, imageHeight]);
+  // IOF markers — start triangle pointing toward finish, finish double circle
+  const iofMarkers = useMemo(() => {
+    if (start.x === 0 && start.y === 0) return null;
+
+    const angle = Math.atan2(finish.x - start.x, -(finish.y - start.y)) * (180 / Math.PI);
+    const triSize = 22;
+    // Equilateral triangle pointing up by default, rotated to point toward finish
+    const triPoints = `0,${-triSize} ${-triSize * 0.866},${triSize * 0.5} ${triSize * 0.866},${triSize * 0.5}`;
+
+    const dist = Math.sqrt((finish.x - start.x) ** 2 + (finish.y - start.y) ** 2);
+    // Gap near markers for the connecting line
+    const gap = 30;
+    const dx = (finish.x - start.x) / dist;
+    const dy = (finish.y - start.y) / dist;
+    const lineStart = { x: start.x + dx * gap, y: start.y + dy * gap };
+    const lineEnd = { x: finish.x - dx * gap, y: finish.y - dy * gap };
+
+    return (
+      <>
+        {/* Connecting dashed line */}
+        <line
+          x1={lineStart.x} y1={lineStart.y}
+          x2={lineEnd.x} y2={lineEnd.y}
+          stroke={IOF_PURPLE}
+          strokeWidth={3}
+          strokeDasharray="12,8"
+          strokeOpacity={0.7}
+          style={{ pointerEvents: 'none' }}
+        />
+        {/* Start triangle */}
+        <g transform={`translate(${start.x},${start.y}) rotate(${angle})`}>
+          <polygon
+            points={triPoints}
+            fill="none"
+            stroke={IOF_PURPLE}
+            strokeWidth={3.5}
+            style={{ pointerEvents: 'none' }}
+          />
+        </g>
+        {/* Finish double circle */}
+        <circle cx={finish.x} cy={finish.y} r={20} fill="none" stroke={IOF_PURPLE} strokeWidth={3.5} style={{ pointerEvents: 'none' }} />
+        <circle cx={finish.x} cy={finish.y} r={12} fill="none" stroke={IOF_PURPLE} strokeWidth={3} style={{ pointerEvents: 'none' }} />
+      </>
+    );
+  }, [start, finish]);
 
   return (
     <div
       className="relative overflow-hidden bg-black"
       style={{ width: containerWidth, height: containerHeight }}
     >
-      {/* Camera layer — applies the world→screen transform */}
       <div
         style={{
           position: 'absolute',
@@ -188,9 +242,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
           ...cameraTransform,
         }}
       >
-        {/* World layer — fixed pixel dimensions matching source image */}
         <div style={{ position: 'relative', width: imageWidth, height: imageHeight }}>
-          {/* Image layer */}
           <img
             src={imageUrl}
             alt="Orienteering map"
@@ -200,7 +252,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             draggable={false}
             onLoad={handleImageLoad}
           />
-          {/* SVG overlay — exact same coordinate space */}
           <svg
             width={imageWidth}
             height={imageHeight}
@@ -211,21 +262,8 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
               left: 0,
             }}
           >
-            {/* Overview markers */}
-            {isOverview && (
-              <>
-                {/* Start marker - triangle */}
-                <polygon
-                  points={`${start.x},${start.y - 22 / overviewScale} ${start.x - 20 / overviewScale},${start.y + 12 / overviewScale} ${start.x + 20 / overviewScale},${start.y + 12 / overviewScale}`}
-                  fill="none"
-                  stroke="#e11d48"
-                  strokeWidth={5 / overviewScale}
-                />
-                {/* Finish marker - double circle */}
-                <circle cx={finish.x} cy={finish.y} r={20 / overviewScale} fill="none" stroke="#e11d48" strokeWidth={5 / overviewScale} />
-                <circle cx={finish.x} cy={finish.y} r={12 / overviewScale} fill="none" stroke="#e11d48" strokeWidth={4 / overviewScale} />
-              </>
-            )}
+            {/* IOF start/finish markers — always visible */}
+            {iofMarkers}
 
             {/* Branch paths during navigation */}
             {branchPaths}
@@ -241,7 +279,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         </div>
       </div>
 
-      {/* Loading overlay if image not yet loaded */}
       {!imgLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
           <div className="text-white/60 text-sm">Loading map...</div>

@@ -12,7 +12,7 @@ import {
   validateChallenge,
   isFinishReached,
 } from '@/utils/routeNavigatorUtils';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, ZoomOut, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type GamePhase = 'loading' | 'waiting-image' | 'overview' | 'navigating' | 'result';
@@ -46,6 +46,8 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   const [startTime, setStartTime] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [imageReady, setImageReady] = useState(false);
+  const [isZoomedOut, setIsZoomedOut] = useState(false);
+  const [overviewStartTime, setOverviewStartTime] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -87,7 +89,6 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         difficulty_score: c.difficulty_score ? Number(c.difficulty_score) : null,
       }));
 
-      // Filter to only valid/playable challenges
       const valid = mapped.filter((ch) => validateChallenge(ch));
       if (valid.length < mapped.length) {
         console.warn(`Skipped ${mapped.length - valid.length} invalid challenges out of ${mapped.length}`);
@@ -100,17 +101,15 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     load();
   }, [mapId]);
 
-  // Container size observer — re-run when phase changes so we catch the containerRef mounting
+  // Container size observer
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
     const updateSize = () => {
       const rect = el.getBoundingClientRect();
       setContainerSize({ width: rect.width, height: rect.height });
     };
     updateSize();
-
     const ro = new ResizeObserver(updateSize);
     ro.observe(el);
     return () => ro.disconnect();
@@ -120,27 +119,27 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   useEffect(() => {
     if (phase === 'waiting-image' && imageReady && containerSize.width > 0 && containerSize.height > 0 && challenges.length > 0) {
       setPhase('overview');
+      setOverviewStartTime(Date.now());
     }
   }, [phase, imageReady, containerSize, challenges.length]);
 
-  // Overview → navigating after 3s
-  useEffect(() => {
-    if (phase === 'overview' && challenge) {
-      const timer = setTimeout(() => {
-        const startNode = findStartNode(
-          challenge.decision_points,
-          { x: challenge.start_x, y: challenge.start_y }
-        );
-        setCurrentNode(startNode);
-        setWrongTurns(0);
-        setSelectedBranch(null);
-        setWrongBranch(null);
-        setStartTime(Date.now());
-        setPhase('navigating');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [phase, challenge]);
+  const handleStartNavigation = useCallback(() => {
+    if (phase !== 'overview' || !challenge) return;
+    const previewDuration = Date.now() - overviewStartTime;
+    console.log(`Preview duration: ${previewDuration}ms`);
+    
+    const startNode = findStartNode(
+      challenge.decision_points,
+      { x: challenge.start_x, y: challenge.start_y }
+    );
+    setCurrentNode(startNode);
+    setWrongTurns(0);
+    setSelectedBranch(null);
+    setWrongBranch(null);
+    setStartTime(Date.now());
+    setIsZoomedOut(false);
+    setPhase('navigating');
+  }, [phase, challenge, overviewStartTime]);
 
   const handleImageLoaded = useCallback(() => {
     setImageReady(true);
@@ -150,13 +149,18 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     (branch: Branch) => {
       if (phase !== 'navigating' || selectedBranch !== null || wrongBranch !== null) return;
 
+      // If zoomed out, zoom back in first
+      if (isZoomedOut) {
+        setIsZoomedOut(false);
+        return;
+      }
+
       if (branch.is_correct) {
         setSelectedBranch(branch.to_macro);
         setTimeout(() => {
           const nextNode = findNextNode(dpMap, branch);
 
           if (isFinishReached(nextNode, branch, finish, imageWidth, imageHeight)) {
-            // Challenge complete
             const elapsed = Date.now() - startTime;
             setElapsedMs(elapsed);
             setPhase('result');
@@ -178,7 +182,6 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
             setCurrentNode(nextNode);
             setSelectedBranch(null);
           } else {
-            // Shouldn't happen after validation, but handle gracefully
             const elapsed = Date.now() - startTime;
             setElapsedMs(elapsed);
             setPhase('result');
@@ -192,7 +195,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         }, 1200);
       }
     },
-    [phase, selectedBranch, wrongBranch, dpMap, startTime, wrongTurns, userId, challenge, mapName, finish, imageWidth, imageHeight]
+    [phase, selectedBranch, wrongBranch, isZoomedOut, dpMap, startTime, wrongTurns, userId, challenge, mapName, finish, imageWidth, imageHeight]
   );
 
   const handleNextChallenge = useCallback(() => {
@@ -201,6 +204,8 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setSelectedBranch(null);
     setWrongBranch(null);
     setCurrentNode(null);
+    setIsZoomedOut(false);
+    setOverviewStartTime(Date.now());
     setPhase('overview');
   }, [currentIndex, challenges.length]);
 
@@ -239,6 +244,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           containerWidth={containerSize.width}
           containerHeight={containerSize.height}
           isOverview={phase === 'overview'}
+          isZoomedOut={isZoomedOut}
           onBranchSelect={handleBranchSelect}
           selectedBranchId={selectedBranch}
           wrongBranchId={wrongBranch}
@@ -260,12 +266,22 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
       {/* HUD overlay */}
       {phase === 'navigating' && (
-        <div className="absolute top-3 left-14 right-3 flex justify-between pointer-events-none z-20">
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium">
+        <div className="absolute top-3 left-14 right-3 flex justify-between items-start z-20">
+          <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium pointer-events-none">
             Wrong turns: {wrongTurns}
           </div>
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium">
-            ↑ Goal
+          <div className="flex items-center gap-2">
+            <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium pointer-events-none">
+              ↑ Goal
+            </div>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="bg-background/80 backdrop-blur-sm h-8 w-8"
+              onClick={() => setIsZoomedOut(prev => !prev)}
+            >
+              {isZoomedOut ? <ZoomIn className="h-4 w-4" /> : <ZoomOut className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
       )}
@@ -277,14 +293,23 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         </div>
       )}
 
-      {/* Overview info */}
+      {/* Overview with Start button */}
       {phase === 'overview' && challenge && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="bg-background/80 backdrop-blur-sm rounded-xl px-6 py-4 text-center">
-            <div className="text-lg font-bold mb-1">Navigate to the finish!</div>
-            <div className="text-sm text-muted-foreground">
-              Choose the correct path at each junction
+        <div className="absolute inset-0 flex items-end justify-center pb-16 z-20">
+          <div className="flex flex-col items-center gap-4">
+            <div className="bg-background/80 backdrop-blur-sm rounded-xl px-6 py-4 text-center pointer-events-none">
+              <div className="text-lg font-bold mb-1">Navigate to the finish!</div>
+              <div className="text-sm text-muted-foreground">
+                Choose the correct path at each junction
+              </div>
             </div>
+            <Button
+              size="lg"
+              className="px-10 py-3 text-lg font-bold shadow-lg"
+              onClick={handleStartNavigation}
+            >
+              Start
+            </Button>
           </div>
         </div>
       )}
