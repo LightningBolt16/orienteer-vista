@@ -8,7 +8,7 @@ import {
   Branch,
   buildAdjacency,
   findStartNode,
-  findNextNode,
+  resolveBranchDestination,
   validateChallenge,
 } from '@/utils/routeNavigatorUtils';
 import { Loader2, ArrowLeft, ZoomOut, ZoomIn } from 'lucide-react';
@@ -70,7 +70,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       visited.add(cur.id);
       const correctBranch = cur.branches.find(b => b.is_correct);
       if (!correctBranch) break;
-      cur = findNextNode(dpMap, correctBranch);
+      cur = resolveBranchDestination(dpMap, correctBranch, cur);
     }
     return seq;
   }, [challenge]);
@@ -111,7 +111,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       visited.add(cur.id);
       const correctBranch = cur.branches.find(b => b.is_correct);
       if (!correctBranch) break;
-      cur = findNextNode(dpMap, correctBranch);
+      cur = resolveBranchDestination(dpMap, correctBranch, cur);
     }
     points.push({ x: challenge.finish_x, y: challenge.finish_y });
     return points;
@@ -247,7 +247,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       // Free movement — always move to the selected branch's destination
       setSelectedBranch(branch.to_macro);
       setTimeout(() => {
-        const nextNode = findNextNode(dpMap, branch);
+        const nextNode = resolveBranchDestination(dpMap, branch, currentNode);
         const branchEnd = branch.path[branch.path.length - 1] ?? null;
         const finishThreshold = 64;
         const nextNodeAtFinish = Boolean(
