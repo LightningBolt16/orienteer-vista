@@ -222,7 +222,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         x: innerBaseCenter.x - normalX * innerHalfWidth,
         y: innerBaseCenter.y - normalY * innerHalfWidth,
       };
-      const hitWidth = Math.max(18, Math.min(30, totalLength * 0.12));
+      const hitWidth = Math.max(12, Math.min(18, totalLength * 0.08));
 
       return (
         <g key={branch.to_macro}>
@@ -270,6 +270,12 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             points={`${last.x},${last.y} ${leftBase.x},${leftBase.y} ${rightBase.x},${rightBase.y}`}
             fill={color}
             fillOpacity={0.98}
+            style={{ cursor: 'pointer' }}
+            onClick={() => onBranchSelect(branch)}
+          />
+          <polygon
+            points={`${last.x},${last.y} ${leftBase.x},${leftBase.y} ${rightBase.x},${rightBase.y}`}
+            fill="transparent"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
           />
