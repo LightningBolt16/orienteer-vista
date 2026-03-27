@@ -99,33 +99,80 @@ export function findNextNode(
 export function resolveBranchDestination(
   dpMap: Map<number, DecisionPoint>,
   branch: Branch,
-  currentNode?: DecisionPoint | null,
-  maxSnapDistance: number = 160
+  _currentNode?: DecisionPoint | null,
+  _maxSnapDistance: number = 160
 ): DecisionPoint | null {
-  const directNode = findNextNode(dpMap, branch);
-  if (directNode) return directNode;
+  return findNextNode(dpMap, branch);
+}
 
-  const branchEnd = branch.path[branch.path.length - 1];
-  if (!branchEnd) return null;
+export function mergeDecisionPointGraphs(graphs: DecisionPoint[][]): DecisionPoint[] {
+  const nodeMap = new Map<number, DecisionPoint>();
 
-  let closestNode: DecisionPoint | null = null;
-  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const graph of graphs) {
+    for (const node of graph) {
+      const existing = nodeMap.get(node.id);
 
-  for (const node of dpMap.values()) {
-    if (currentNode && node.id === currentNode.id) continue;
+      if (!existing) {
+        nodeMap.set(node.id, {
+          id: node.id,
+          x: node.x,
+          y: node.y,
+          branches: node.branches.map((branch) => ({
+            to_macro: branch.to_macro,
+            path: branch.path.map((point) => ({ ...point })),
+            is_correct: false,
+          })),
+        });
+        continue;
+      }
 
-    const distance = euclidean(branchEnd, node);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestNode = node;
+      existing.x = existing.x || node.x;
+      existing.y = existing.y || node.y;
+
+      const existingKeys = new Set(
+        existing.branches.map(
+          (branch) => `${branch.to_macro}:${branch.path.map((point) => `${point.x},${point.y}`).join('|')}`
+        )
+      );
+
+      for (const branch of node.branches) {
+        const branchKey = `${branch.to_macro}:${branch.path.map((point) => `${point.x},${point.y}`).join('|')}`;
+        if (existingKeys.has(branchKey)) continue;
+
+        existing.branches.push({
+          to_macro: branch.to_macro,
+          path: branch.path.map((point) => ({ ...point })),
+          is_correct: false,
+        });
+        existingKeys.add(branchKey);
+      }
     }
   }
 
-  if (closestDistance <= maxSnapDistance) {
-    return closestNode;
+  return Array.from(nodeMap.values());
+}
+
+export function applyCorrectEdgesToGraph(
+  fullGraph: DecisionPoint[],
+  challengeGraph: DecisionPoint[]
+): DecisionPoint[] {
+  const correctEdges = new Set<string>();
+
+  for (const node of challengeGraph) {
+    for (const branch of node.branches) {
+      if (branch.is_correct) {
+        correctEdges.add(`${node.id}->${branch.to_macro}`);
+      }
+    }
   }
 
-  return null;
+  return fullGraph.map((node) => ({
+    ...node,
+    branches: node.branches.map((branch) => ({
+      ...branch,
+      is_correct: correctEdges.has(`${node.id}->${branch.to_macro}`),
+    })),
+  }));
 }
 
 // Check if a challenge is "reachable" — it must have a start node with a correct branch
