@@ -1,6 +1,8 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { bearingToFinish, DecisionPoint, Branch, getBranchPreviewPath } from '@/utils/routeNavigatorUtils';
 
+type MapPoint = { x: number; y: number };
+
 interface NavigatorMapViewProps {
   imageUrl: string;
   imageWidth: number;
@@ -20,8 +22,57 @@ interface NavigatorMapViewProps {
   showResult?: boolean;
 }
 
-const BRANCH_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#be185d'];
-const IOF_PURPLE = '#f20dff';
+const BRANCH_COLORS = [
+  'hsl(221 83% 53%)',
+  'hsl(0 72% 51%)',
+  'hsl(142 71% 45%)',
+  'hsl(32 95% 44%)',
+  'hsl(262 83% 58%)',
+  'hsl(188 89% 38%)',
+  'hsl(330 81% 43%)',
+];
+const IOF_PURPLE = 'hsl(300 95% 50%)';
+const ARROW_CORE = 'hsl(0 0% 100%)';
+
+const getSegmentLength = (from: MapPoint, to: MapPoint) => Math.hypot(to.x - from.x, to.y - from.y);
+
+const trimPolylineStart = (points: MapPoint[], trimDistance: number): MapPoint[] => {
+  if (points.length < 2 || trimDistance <= 0) return points;
+
+  let remaining = trimDistance;
+
+  for (let i = 1; i < points.length; i += 1) {
+    const from = points[i - 1];
+    const to = points[i];
+    const segmentLength = getSegmentLength(from, to);
+
+    if (segmentLength === 0) continue;
+
+    if (remaining <= segmentLength) {
+      const t = remaining / segmentLength;
+      return [
+        {
+          x: from.x + (to.x - from.x) * t,
+          y: from.y + (to.y - from.y) * t,
+        },
+        ...points.slice(i),
+      ];
+    }
+
+    remaining -= segmentLength;
+  }
+
+  return [points[points.length - 1]];
+};
+
+const trimPolyline = (points: MapPoint[], trimStart: number, trimEnd: number): MapPoint[] => {
+  const trimmedStart = trimPolylineStart(points, trimStart);
+  if (trimmedStart.length < 2) return trimmedStart;
+
+  const reversed = [...trimmedStart].reverse();
+  const trimmedEnd = trimPolylineStart(reversed, trimEnd).reverse();
+  return trimmedEnd.length >= 2 ? trimmedEnd : trimmedStart;
+};
 
 const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
   imageUrl,
@@ -126,76 +177,113 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
       if (points.length < 2) return null;
 
       const isSelected = selectedBranchId === branch.to_macro;
-      const color = isSelected ? '#22c55e' : BRANCH_COLORS[idx % BRANCH_COLORS.length];
+      const color = isSelected ? 'hsl(142 71% 45%)' : BRANCH_COLORS[idx % BRANCH_COLORS.length];
+      const totalLength = points.slice(1).reduce((sum, point, pointIndex) => {
+        return sum + getSegmentLength(points[pointIndex], point);
+      }, 0);
 
-      // Build a smooth SVG path instead of polyline
-      const first = points[0];
+      const headLength = Math.min(34, Math.max(22, totalLength * 0.22));
+      const trimStart = Math.min(28, totalLength * 0.18);
+      const shaftPoints = trimPolyline(points, trimStart, headLength);
+      if (shaftPoints.length < 2) return null;
+
+      const first = shaftPoints[0];
       let d = `M ${first.x} ${first.y}`;
-      for (let i = 1; i < points.length; i++) {
-        d += ` L ${points[i].x} ${points[i].y}`;
+      for (let i = 1; i < shaftPoints.length; i++) {
+        d += ` L ${shaftPoints[i].x} ${shaftPoints[i].y}`;
       }
 
-      // Arrowhead at the end
       const last = points[points.length - 1];
       const prev = points[points.length - 2];
       const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-      const headLen = 24;
-      const headW = Math.PI / 5;
-      const lx = last.x - headLen * Math.cos(angle - headW);
-      const ly = last.y - headLen * Math.sin(angle - headW);
-      const rx = last.x - headLen * Math.cos(angle + headW);
-      const ry = last.y - headLen * Math.sin(angle + headW);
+      const baseCenter = shaftPoints[shaftPoints.length - 1];
+      const headWidth = headLength * 0.95;
+      const normalX = Math.sin(angle);
+      const normalY = -Math.cos(angle);
+      const leftBase = {
+        x: baseCenter.x + normalX * (headWidth / 2),
+        y: baseCenter.y + normalY * (headWidth / 2),
+      };
+      const rightBase = {
+        x: baseCenter.x - normalX * (headWidth / 2),
+        y: baseCenter.y - normalY * (headWidth / 2),
+      };
+      const innerHeadScale = 0.52;
+      const innerBaseCenter = {
+        x: last.x + (baseCenter.x - last.x) * innerHeadScale,
+        y: last.y + (baseCenter.y - last.y) * innerHeadScale,
+      };
+      const innerHalfWidth = (headWidth * innerHeadScale) / 2;
+      const innerLeftBase = {
+        x: innerBaseCenter.x + normalX * innerHalfWidth,
+        y: innerBaseCenter.y + normalY * innerHalfWidth,
+      };
+      const innerRightBase = {
+        x: innerBaseCenter.x - normalX * innerHalfWidth,
+        y: innerBaseCenter.y - normalY * innerHalfWidth,
+      };
+      const hitWidth = Math.max(12, Math.min(18, totalLength * 0.08));
 
       return (
         <g key={branch.to_macro}>
-          {/* Wide invisible hit area for the entire branch */}
           <path
             d={d}
             fill="none"
             stroke="transparent"
-            strokeWidth={100}
+            strokeWidth={hitWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
           />
-          {/* Soft shadow */}
           <path
             d={d}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected ? 18 : 14}
+            strokeWidth={isSelected ? 14 : 11}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity={0.2}
+            strokeOpacity={0.22}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Main stroke */}
           <path
             d={d}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected ? 10 : 7}
+            strokeWidth={isSelected ? 8.5 : 6.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity={0.9}
+            strokeOpacity={0.96}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Clean arrowhead triangle */}
+          <path
+            d={d}
+            fill="none"
+            stroke={ARROW_CORE}
+            strokeWidth={isSelected ? 3.6 : 2.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity={0.96}
+            style={{ pointerEvents: 'none' }}
+          />
           <polygon
-            points={`${last.x},${last.y} ${lx},${ly} ${rx},${ry}`}
+            points={`${last.x},${last.y} ${leftBase.x},${leftBase.y} ${rightBase.x},${rightBase.y}`}
             fill={color}
-            fillOpacity={0.9}
-            style={{ pointerEvents: 'none' }}
+            fillOpacity={0.98}
+            style={{ cursor: 'pointer' }}
+            onClick={() => onBranchSelect(branch)}
           />
-          {/* Extra hit area at arrow tip */}
-          <circle
-            cx={last.x}
-            cy={last.y}
-            r={50}
+          <polygon
+            points={`${last.x},${last.y} ${leftBase.x},${leftBase.y} ${rightBase.x},${rightBase.y}`}
             fill="transparent"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
+          />
+          <polygon
+            points={`${last.x},${last.y} ${innerLeftBase.x},${innerLeftBase.y} ${innerRightBase.x},${innerRightBase.y}`}
+            fill={ARROW_CORE}
+            fillOpacity={0.96}
+            style={{ pointerEvents: 'none' }}
           />
         </g>
       );
