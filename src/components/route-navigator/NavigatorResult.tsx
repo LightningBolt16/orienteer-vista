@@ -1,30 +1,41 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, Target, ArrowRight } from 'lucide-react';
-import { calculateScore } from '@/utils/routeNavigatorUtils';
+import { CheckCircle2, Clock, Target, ArrowRight } from 'lucide-react';
 
 interface NavigatorResultProps {
-  wrongTurns: number;
-  totalDecisionPoints: number;
+  correctHits: number;
+  totalCorrectNodes: number;
   timeMs: number;
   onNextChallenge: () => void;
   onBackToSelector: () => void;
 }
 
 const NavigatorResult: React.FC<NavigatorResultProps> = ({
-  wrongTurns,
-  totalDecisionPoints,
+  correctHits,
+  totalCorrectNodes,
   timeMs,
   onNextChallenge,
   onBackToSelector,
 }) => {
-  const score = calculateScore(wrongTurns, timeMs);
-  const isOptimal = wrongTurns === 0;
+  const accuracy = totalCorrectNodes > 0 ? Math.round((correctHits / totalCorrectNodes) * 100) : 0;
+  const isOptimal = correctHits === totalCorrectNodes;
   const timeSeconds = (timeMs / 1000).toFixed(1);
 
   return (
     <div className="w-full max-w-sm mx-auto">
       <div className="bg-background/90 backdrop-blur-md rounded-xl p-5 shadow-2xl border border-border/50">
+        {/* Legend */}
+        <div className="flex justify-center gap-4 mb-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-1 rounded bg-[#22c55e]" />
+            <span className="text-muted-foreground">Correct route</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-1 rounded bg-[#f97316]" style={{ borderBottom: '2px dashed #f97316' }} />
+            <span className="text-muted-foreground">Your route</span>
+          </div>
+        </div>
+
         <div className="text-center mb-3">
           <div className="flex justify-center mb-2">
             {isOptimal ? (
@@ -40,8 +51,8 @@ const NavigatorResult: React.FC<NavigatorResultProps> = ({
 
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="bg-muted/60 rounded-lg p-2 text-center">
-            <div className="text-xl font-bold text-primary">{score}</div>
-            <div className="text-xs text-muted-foreground">Score</div>
+            <div className="text-xl font-bold text-primary">{accuracy}%</div>
+            <div className="text-xs text-muted-foreground">Accuracy</div>
           </div>
           <div className="bg-muted/60 rounded-lg p-2 text-center">
             <div className="flex items-center justify-center gap-0.5">
@@ -51,15 +62,10 @@ const NavigatorResult: React.FC<NavigatorResultProps> = ({
             <div className="text-xs text-muted-foreground">Time</div>
           </div>
           <div className="bg-muted/60 rounded-lg p-2 text-center">
-            <div className="flex items-center justify-center gap-0.5">
-              {wrongTurns === 0 ? (
-                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-              ) : (
-                <XCircle className="h-3.5 w-3.5 text-destructive" />
-              )}
-              <span className="text-xl font-bold">{wrongTurns}</span>
+            <div className="text-xl font-bold">
+              {correctHits}/{totalCorrectNodes}
             </div>
-            <div className="text-xs text-muted-foreground">Wrong</div>
+            <div className="text-xs text-muted-foreground">Correct</div>
           </div>
         </div>
 

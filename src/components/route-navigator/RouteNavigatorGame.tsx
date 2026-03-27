@@ -9,7 +9,6 @@ import {
   buildAdjacency,
   findStartNode,
   findNextNode,
-  isFinishReached,
   validateChallenge,
 } from '@/utils/routeNavigatorUtils';
 import { Loader2, ArrowLeft, ZoomOut, ZoomIn } from 'lucide-react';
@@ -40,15 +39,15 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   const [challenges, setChallenges] = useState<NavigatorChallenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentNode, setCurrentNode] = useState<DecisionPoint | null>(null);
-  const [wrongTurns, setWrongTurns] = useState(0);
   const [selectedBranch, setSelectedBranch] = useState<number | null>(null);
-  const [wrongBranch, setWrongBranch] = useState<number | null>(null);
   const [startTime, setStartTime] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [imageReady, setImageReady] = useState(false);
   const [isZoomedOut, setIsZoomedOut] = useState(false);
   const [overviewStartTime, setOverviewStartTime] = useState(0);
   const [traversedPath, setTraversedPath] = useState<{ x: number; y: number }[]>([]);
+  // Track which correct-sequence nodes were visited in order
+  const [correctNodesHit, setCorrectNodesHit] = useState<number[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -56,10 +55,53 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   const finish = challenge ? { x: challenge.finish_x, y: challenge.finish_y } : { x: 0, y: 0 };
   const start = challenge ? { x: challenge.start_x, y: challenge.start_y } : { x: 0, y: 0 };
 
+  // Build the correct node sequence from decision_points
+  const correctSequence = useMemo(() => {
+    if (!challenge) return [] as number[];
+    const dpMap = buildAdjacency(challenge.decision_points);
+    const startNode = findStartNode(challenge.decision_points, { x: challenge.start_x, y: challenge.start_y });
+    if (!startNode) return [] as number[];
+
+    const seq: number[] = [];
+    const visited = new Set<number>();
+    let cur: DecisionPoint | null = startNode;
+    while (cur && !visited.has(cur.id)) {
+      seq.push(cur.id);
+      visited.add(cur.id);
+      const correctBranch = cur.branches.find(b => b.is_correct);
+      if (!correctBranch) break;
+      cur = findNextNode(dpMap, correctBranch);
+    }
+    return seq;
+  }, [challenge]);
+
   const dpMap = useMemo(() => {
     if (!challenge) return new Map<number, DecisionPoint>();
     return buildAdjacency(challenge.decision_points);
   }, [challenge]);
+
+  // Compute the correct path polyline from decision points
+  const correctPath = useMemo(() => {
+    if (!challenge) return [] as { x: number; y: number }[];
+    const points: { x: number; y: number }[] = [{ x: challenge.start_x, y: challenge.start_y }];
+    const startNode = findStartNode(challenge.decision_points, { x: challenge.start_x, y: challenge.start_y });
+    if (!startNode) return points;
+
+    const visited = new Set<number>();
+    let cur: DecisionPoint | null = startNode;
+    while (cur && !visited.has(cur.id)) {
+      points.push({ x: cur.x, y: cur.y });
+      visited.add(cur.id);
+      const correctBranch = cur.branches.find(b => b.is_correct);
+      if (!correctBranch) break;
+      if (correctBranch.path.length > 0) {
+        points.push(...correctBranch.path);
+      }
+      cur = findNextNode(dpMap, correctBranch);
+    }
+    points.push({ x: challenge.finish_x, y: challenge.finish_y });
+    return points;
+  }, [challenge, dpMap]);
 
   // Load challenges
   useEffect(() => {
@@ -134,28 +176,35 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       { x: challenge.start_x, y: challenge.start_y }
     );
     setCurrentNode(startNode);
-    setWrongTurns(0);
     setSelectedBranch(null);
-    setWrongBranch(null);
     setStartTime(Date.now());
     setIsZoomedOut(false);
+    setCorrectNodesHit([]);
     // Initialize traversed path with start position and first node
     const pathInit: { x: number; y: number }[] = [{ x: challenge.start_x, y: challenge.start_y }];
-    if (startNode) pathInit.push({ x: startNode.x, y: startNode.y });
+    if (startNode) {
+      pathInit.push({ x: startNode.x, y: startNode.y });
+      // Check if start node is first in correct sequence
+      if (correctSequence.length > 0 && startNode.id === correctSequence[0]) {
+        setCorrectNodesHit([startNode.id]);
+      }
+    }
     setTraversedPath(pathInit);
     setPhase('navigating');
-  }, [phase, challenge, overviewStartTime]);
+  }, [phase, challenge, overviewStartTime, correctSequence]);
 
   const handleImageLoaded = useCallback(() => {
     setImageReady(true);
   }, []);
 
-  const finishGame = useCallback((wt: number) => {
+  const finishGame = useCallback((hits: number[]) => {
     const elapsed = Date.now() - startTime;
     setElapsedMs(elapsed);
     // Add finish point to traversed path
     setTraversedPath(prev => [...prev, finish]);
     setPhase('result');
+
+    const wrongTurns = correctSequence.length - hits.length;
 
     if (userId) {
       supabase.from('route_navigator_attempts').insert({
@@ -163,97 +212,72 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         challenge_id: challenge?.id,
         map_name: mapName,
         player_path: null,
-        is_optimal: wt === 0,
-        wrong_turns: wt,
+        is_optimal: hits.length === correctSequence.length,
+        wrong_turns: Math.max(0, wrongTurns),
         response_time: elapsed,
       }).then(({ error }) => {
         if (error) console.error('Failed to record attempt:', error);
       });
     }
-  }, [startTime, userId, challenge, mapName, finish]);
+  }, [startTime, userId, challenge, mapName, finish, correctSequence]);
 
   const handleBranchSelect = useCallback(
     (branch: Branch) => {
-      if (phase !== 'navigating' || selectedBranch !== null || wrongBranch !== null) return;
+      if (phase !== 'navigating' || selectedBranch !== null) return;
 
       if (isZoomedOut) {
         setIsZoomedOut(false);
         return;
       }
 
-      if (branch.is_correct) {
-        // Correct branch
-        setSelectedBranch(branch.to_macro);
-        setTimeout(() => {
-          const nextNode = findNextNode(dpMap, branch);
+      // Free movement — always move to the selected branch's destination
+      setSelectedBranch(branch.to_macro);
+      setTimeout(() => {
+        const nextNode = findNextNode(dpMap, branch);
 
-          // Add path points from branch to traversed path
-          if (branch.path.length > 0) {
-            setTraversedPath(prev => [...prev, ...branch.path]);
-          }
-          if (nextNode) {
-            setTraversedPath(prev => [...prev, { x: nextNode.x, y: nextNode.y }]);
-          }
-
-          if (isFinishReached(nextNode, branch, finish, imageWidth, imageHeight)) {
-            finishGame(wrongTurns);
-          } else if (nextNode) {
-            setCurrentNode(nextNode);
-            setSelectedBranch(null);
-          } else {
-            finishGame(wrongTurns);
-          }
-        }, 600);
-      } else {
-        // Wrong branch — still allow movement, then bounce back
-        setWrongBranch(branch.to_macro);
-        const newWrongTurns = wrongTurns + 1;
-        setWrongTurns(newWrongTurns);
-
-        // Move to the wrong node briefly, then come back
-        const wrongNode = findNextNode(dpMap, branch);
-        if (wrongNode) {
-          // Add wrong path to traversed path (shown in red later)
-          if (branch.path.length > 0) {
-            setTraversedPath(prev => [...prev, ...branch.path, { x: wrongNode.x, y: wrongNode.y }]);
-          }
-
-          // Briefly show the wrong node position
-          const previousNode = currentNode;
-          setCurrentNode(wrongNode);
-
-          setTimeout(() => {
-            // Bounce back to previous node
-            setCurrentNode(previousNode);
-            setWrongBranch(null);
-            // Add return path
-            if (previousNode) {
-              setTraversedPath(prev => [...prev, { x: previousNode.x, y: previousNode.y }]);
-            }
-          }, 1200);
-        } else {
-          setTimeout(() => {
-            setWrongBranch(null);
-          }, 1200);
+        // Add path points to traversed path
+        if (branch.path.length > 0) {
+          setTraversedPath(prev => [...prev, ...branch.path]);
         }
-      }
+        if (nextNode) {
+          setTraversedPath(prev => [...prev, { x: nextNode.x, y: nextNode.y }]);
+        }
+
+        // Track correct nodes visited in order
+        let updatedHits = correctNodesHit;
+        if (nextNode) {
+          const nextExpectedIdx = correctNodesHit.length;
+          if (nextExpectedIdx < correctSequence.length && nextNode.id === correctSequence[nextExpectedIdx]) {
+            updatedHits = [...correctNodesHit, nextNode.id];
+            setCorrectNodesHit(updatedHits);
+          }
+        }
+
+        // Check if we've reached a terminal node (no outgoing branches) or no next node
+        if (!nextNode || nextNode.branches.length === 0) {
+          finishGame(updatedHits);
+        } else {
+          setCurrentNode(nextNode);
+          setSelectedBranch(null);
+        }
+      }, 600);
     },
-    [phase, selectedBranch, wrongBranch, isZoomedOut, dpMap, startTime, wrongTurns, userId, challenge, mapName, finish, imageWidth, imageHeight, currentNode, finishGame]
+    [phase, selectedBranch, isZoomedOut, dpMap, correctNodesHit, correctSequence, finishGame]
   );
 
   const handleNextChallenge = useCallback(() => {
     const nextIdx = (currentIndex + 1) % challenges.length;
     setCurrentIndex(nextIdx);
     setSelectedBranch(null);
-    setWrongBranch(null);
     setCurrentNode(null);
     setIsZoomedOut(false);
     setTraversedPath([]);
+    setCorrectNodesHit([]);
     setOverviewStartTime(Date.now());
     setPhase('overview');
   }, [currentIndex, challenges.length]);
 
-  const totalDecisionPoints = challenge?.decision_points.length || 0;
+  const totalDecisionPoints = correctSequence.length;
 
   if (phase === 'loading' || (phase === 'waiting-image' && challenges.length === 0)) {
     return (
@@ -281,14 +305,15 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
               onBranchSelect={() => {}}
               onImageLoaded={handleImageLoaded}
               traversedPath={traversedPath}
+              correctPath={correctPath}
               showResult={true}
             />
           )}
         </div>
         <div className="absolute inset-0 z-20 flex items-end justify-center pb-8">
           <NavigatorResult
-            wrongTurns={wrongTurns}
-            totalDecisionPoints={totalDecisionPoints}
+            correctHits={correctNodesHit.length}
+            totalCorrectNodes={correctSequence.length}
             timeMs={elapsedMs}
             onNextChallenge={handleNextChallenge}
             onBackToSelector={onBack}
@@ -314,7 +339,6 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           isZoomedOut={isZoomedOut}
           onBranchSelect={handleBranchSelect}
           selectedBranchId={selectedBranch}
-          wrongBranchId={wrongBranch}
           onImageLoaded={handleImageLoaded}
         />
       )}
@@ -335,7 +359,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       {phase === 'navigating' && (
         <div className="absolute top-3 left-14 right-3 flex justify-between items-start z-20">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium pointer-events-none">
-            Wrong turns: {wrongTurns}
+            {correctNodesHit.length}/{correctSequence.length} correct
           </div>
           <div className="flex items-center gap-2">
             <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium pointer-events-none">
