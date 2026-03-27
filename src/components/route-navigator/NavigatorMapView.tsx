@@ -14,9 +14,9 @@ interface NavigatorMapViewProps {
   isZoomedOut?: boolean;
   onBranchSelect: (branch: Branch) => void;
   selectedBranchId?: number | null;
-  wrongBranchId?: number | null;
   onImageLoaded?: () => void;
   traversedPath?: { x: number; y: number }[];
+  correctPath?: { x: number; y: number }[];
   showResult?: boolean;
 }
 
@@ -36,9 +36,9 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
   isZoomedOut = false,
   onBranchSelect,
   selectedBranchId,
-  wrongBranchId,
   onImageLoaded,
   traversedPath,
+  correctPath,
   showResult = false,
 }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -114,16 +114,15 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     };
   }, [currentNode, finish, start, containerWidth, containerHeight, imageWidth, imageHeight, isOverview, isZoomedOut, showResult]);
 
-  // Branch SVG paths with improved arrow visuals
+  // Branch SVG paths
   const branchPaths = useMemo(() => {
     if (isOverview || !currentNode) return null;
     return currentNode.branches.map((branch, idx) => {
       const points = getBranchPreviewPath(branch, 250);
       if (points.length < 2) return null;
       const pathStr = points.map((p) => `${p.x},${p.y}`).join(' ');
-      const isWrong = wrongBranchId === branch.to_macro;
       const isSelected = selectedBranchId === branch.to_macro;
-      const color = isWrong ? '#ef4444' : isSelected ? '#22c55e' : BRANCH_COLORS[idx % BRANCH_COLORS.length];
+      const color = isSelected ? '#22c55e' : BRANCH_COLORS[idx % BRANCH_COLORS.length];
 
       // Arrow head calculations
       const last = points[points.length - 1];
@@ -131,7 +130,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
       const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
       const arrowLen = 30;
       const arrowWidth = 0.45;
-      // Chevron-style arrow
       const tipX = last.x + arrowLen * 0.3 * Math.cos(angle);
       const tipY = last.y + arrowLen * 0.3 * Math.sin(angle);
       const x1 = last.x - arrowLen * Math.cos(angle - arrowWidth);
@@ -157,7 +155,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             points={pathStr}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected || isWrong ? 20 : 16}
+            strokeWidth={isSelected ? 20 : 16}
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeOpacity={0.25}
@@ -168,7 +166,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             points={pathStr}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected || isWrong ? 12 : 9}
+            strokeWidth={isSelected ? 12 : 9}
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeOpacity={0.95}
@@ -179,7 +177,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             points={pathStr}
             fill="none"
             stroke="white"
-            strokeWidth={isSelected || isWrong ? 4 : 3}
+            strokeWidth={isSelected ? 4 : 3}
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeOpacity={0.4}
@@ -204,24 +202,10 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
           />
-          {isWrong && (
-            <polyline
-              points={pathStr}
-              fill="none"
-              stroke="#ef4444"
-              strokeWidth={22}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeOpacity={0.4}
-              style={{ pointerEvents: 'none' }}
-            >
-              <animate attributeName="stroke-opacity" values="0.4;0;0.4" dur="0.6s" repeatCount="3" />
-            </polyline>
-          )}
         </g>
       );
     });
-  }, [currentNode, isOverview, onBranchSelect, selectedBranchId, wrongBranchId]);
+  }, [currentNode, isOverview, onBranchSelect, selectedBranchId]);
 
   // IOF markers
   const iofMarkers = useMemo(() => {
@@ -262,10 +246,10 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     );
   }, [start, finish, triSize, finishOuterR, finishInnerR, strokeW, markerGap, markerScale]);
 
-  // Traversed path rendering (for result screen)
-  const traversedPathSvg = useMemo(() => {
-    if (!traversedPath || traversedPath.length < 2) return null;
-    const pathStr = traversedPath.map((p) => `${p.x},${p.y}`).join(' ');
+  // Correct path rendering (green, for result screen)
+  const correctPathSvg = useMemo(() => {
+    if (!showResult || !correctPath || correctPath.length < 2) return null;
+    const pathStr = correctPath.map((p) => `${p.x},${p.y}`).join(' ');
     return (
       <>
         <polyline
@@ -275,36 +259,69 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
           strokeWidth={14}
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeOpacity={0.3}
+          strokeOpacity={0.25}
           style={{ pointerEvents: 'none' }}
         />
         <polyline
           points={pathStr}
           fill="none"
           stroke="#22c55e"
-          strokeWidth={8}
+          strokeWidth={6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={0.8}
+          style={{ pointerEvents: 'none' }}
+        />
+      </>
+    );
+  }, [showResult, correctPath]);
+
+  // Traversed path rendering (red/orange, for result screen — player's actual path)
+  const traversedPathSvg = useMemo(() => {
+    if (!showResult || !traversedPath || traversedPath.length < 2) return null;
+    const pathStr = traversedPath.map((p) => `${p.x},${p.y}`).join(' ');
+    return (
+      <>
+        <polyline
+          points={pathStr}
+          fill="none"
+          stroke="#f97316"
+          strokeWidth={14}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={0.25}
+          style={{ pointerEvents: 'none' }}
+        />
+        <polyline
+          points={pathStr}
+          fill="none"
+          stroke="#f97316"
+          strokeWidth={6}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeOpacity={0.85}
+          strokeDasharray="12,8"
           style={{ pointerEvents: 'none' }}
         />
-        {/* Markers at each decision point */}
+        {/* Decision point dots on player path */}
         {traversedPath.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r={i === 0 || i === traversedPath.length - 1 ? 0 : 6}
-            fill="#22c55e"
-            fillOpacity={0.8}
-            stroke="white"
-            strokeWidth={2}
-            style={{ pointerEvents: 'none' }}
-          />
+          i > 0 && i < traversedPath.length - 1 ? (
+            <circle
+              key={i}
+              cx={p.x}
+              cy={p.y}
+              r={5}
+              fill="#f97316"
+              fillOpacity={0.8}
+              stroke="white"
+              strokeWidth={1.5}
+              style={{ pointerEvents: 'none' }}
+            />
+          ) : null
         ))}
       </>
     );
-  }, [traversedPath]);
+  }, [showResult, traversedPath]);
 
   return (
     <div
@@ -340,6 +357,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             }}
           >
             {iofMarkers}
+            {correctPathSvg}
             {traversedPathSvg}
             {branchPaths}
 
