@@ -253,8 +253,11 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           }
         }
 
-        // Check if we've reached a terminal node (no outgoing branches) or no next node
-        if (!nextNode || nextNode.branches.length === 0) {
+        // Only finish when there's truly nowhere to go (no next node or zero branches)
+        if (!nextNode) {
+          finishGame(updatedHits);
+        } else if (nextNode.branches.length === 0) {
+          // Terminal node — add it to path then finish
           finishGame(updatedHits);
         } else {
           setCurrentNode(nextNode);
@@ -310,7 +313,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
             />
           )}
         </div>
-        <div className="absolute inset-0 z-20 flex items-end justify-center pb-8">
+        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
           <NavigatorResult
             correctHits={correctNodesHit.length}
             totalCorrectNodes={correctSequence.length}
