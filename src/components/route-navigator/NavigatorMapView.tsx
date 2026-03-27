@@ -16,6 +16,8 @@ interface NavigatorMapViewProps {
   selectedBranchId?: number | null;
   wrongBranchId?: number | null;
   onImageLoaded?: () => void;
+  traversedPath?: { x: number; y: number }[];
+  showResult?: boolean;
 }
 
 const BRANCH_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#be185d'];
@@ -36,6 +38,8 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
   selectedBranchId,
   wrongBranchId,
   onImageLoaded,
+  traversedPath,
+  showResult = false,
 }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -44,11 +48,22 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     onImageLoaded?.();
   }, [onImageLoaded]);
 
+  // Marker sizes scaled to map
+  const markerScale = useMemo(() => {
+    const mapDiag = Math.sqrt(imageWidth ** 2 + imageHeight ** 2);
+    return Math.max(0.6, Math.min(2.5, mapDiag / 3000));
+  }, [imageWidth, imageHeight]);
+
+  const triSize = 32 * markerScale;
+  const finishOuterR = 28 * markerScale;
+  const finishInnerR = 18 * markerScale;
+  const strokeW = 4.5 * markerScale;
+  const markerGap = 40 * markerScale;
+
   // Camera transform
   const cameraTransform = useMemo(() => {
     if (isOverview || isZoomedOut || !currentNode) {
-      // Overview: zoom into the start/finish region rather than full map
-      if (isOverview && start.x > 0 && finish.x > 0) {
+      if ((isOverview || showResult) && start.x > 0 && finish.x > 0) {
         const cx = (start.x + finish.x) / 2;
         const cy = (start.y + finish.y) / 2;
         const dx = Math.abs(finish.x - start.x);
@@ -59,7 +74,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         const scaleX = containerWidth / regionW;
         const scaleY = containerHeight / regionH;
         const scale = Math.min(scaleX, scaleY);
-        // Clamp so we don't zoom in too much on very close start/finish
         const maxScale = Math.min(containerWidth, containerHeight) / 400;
         const fitScale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
         const finalScale = Math.max(fitScale, Math.min(scale, maxScale));
@@ -69,7 +83,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
           transition: 'transform 0.8s ease-in-out',
         };
       }
-      // Zoomed-out or fallback: contain-fit the full image
       const scaleX = containerWidth / imageWidth;
       const scaleY = containerHeight / imageHeight;
       const scale = Math.min(scaleX, scaleY);
@@ -82,7 +95,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
       };
     }
 
-    // Navigation: center on current node, rotate so finish is "up"
     const bearing = bearingToFinish(currentNode, finish);
     const zoomRadius = 250;
     let scale = Math.min(containerWidth, containerHeight) / (zoomRadius * 2);
@@ -100,9 +112,9 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
       transformOrigin: '0 0',
       transition: 'transform 0.6s ease-in-out',
     };
-  }, [currentNode, finish, start, containerWidth, containerHeight, imageWidth, imageHeight, isOverview, isZoomedOut]);
+  }, [currentNode, finish, start, containerWidth, containerHeight, imageWidth, imageHeight, isOverview, isZoomedOut, showResult]);
 
-  // Branch SVG paths
+  // Branch SVG paths with improved arrow visuals
   const branchPaths = useMemo(() => {
     if (isOverview || !currentNode) return null;
     return currentNode.branches.map((branch, idx) => {
@@ -113,63 +125,91 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
       const isSelected = selectedBranchId === branch.to_macro;
       const color = isWrong ? '#ef4444' : isSelected ? '#22c55e' : BRANCH_COLORS[idx % BRANCH_COLORS.length];
 
+      // Arrow head calculations
+      const last = points[points.length - 1];
+      const prev = points[points.length - 2];
+      const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+      const arrowLen = 30;
+      const arrowWidth = 0.45;
+      // Chevron-style arrow
+      const tipX = last.x + arrowLen * 0.3 * Math.cos(angle);
+      const tipY = last.y + arrowLen * 0.3 * Math.sin(angle);
+      const x1 = last.x - arrowLen * Math.cos(angle - arrowWidth);
+      const y1 = last.y - arrowLen * Math.sin(angle - arrowWidth);
+      const x2 = last.x - arrowLen * Math.cos(angle + arrowWidth);
+      const y2 = last.y - arrowLen * Math.sin(angle + arrowWidth);
+
       return (
         <g key={branch.to_macro}>
+          {/* Fat invisible hit area */}
           <polyline
             points={pathStr}
             fill="none"
             stroke="transparent"
-            strokeWidth={60}
+            strokeWidth={80}
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
           />
+          {/* Outer glow */}
           <polyline
             points={pathStr}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected || isWrong ? 16 : 12}
+            strokeWidth={isSelected || isWrong ? 20 : 16}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity={0.35}
+            strokeOpacity={0.25}
             style={{ pointerEvents: 'none' }}
           />
+          {/* Main line */}
           <polyline
             points={pathStr}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected || isWrong ? 10 : 7}
+            strokeWidth={isSelected || isWrong ? 12 : 9}
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeOpacity={0.95}
             style={{ pointerEvents: 'none' }}
           />
-          {points.length >= 2 && (() => {
-            const last = points[points.length - 1];
-            const prev = points[points.length - 2];
-            const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-            const arrowLen = 18;
-            const arrowAngle = 0.5;
-            const x1 = last.x - arrowLen * Math.cos(angle - arrowAngle);
-            const y1 = last.y - arrowLen * Math.sin(angle - arrowAngle);
-            const x2 = last.x - arrowLen * Math.cos(angle + arrowAngle);
-            const y2 = last.y - arrowLen * Math.sin(angle + arrowAngle);
-            return (
-              <polygon
-                points={`${last.x},${last.y} ${x1},${y1} ${x2},${y2}`}
-                fill={color}
-                fillOpacity={0.9}
-                style={{ pointerEvents: 'none' }}
-              />
-            );
-          })()}
+          {/* Inner bright core */}
+          <polyline
+            points={pathStr}
+            fill="none"
+            stroke="white"
+            strokeWidth={isSelected || isWrong ? 4 : 3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity={0.4}
+            style={{ pointerEvents: 'none' }}
+          />
+          {/* Chevron arrowhead */}
+          <polygon
+            points={`${tipX},${tipY} ${x1},${y1} ${last.x},${last.y} ${x2},${y2}`}
+            fill={color}
+            fillOpacity={0.95}
+            stroke={color}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            style={{ pointerEvents: 'none' }}
+          />
+          {/* Arrow hit area */}
+          <circle
+            cx={last.x}
+            cy={last.y}
+            r={40}
+            fill="transparent"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onBranchSelect(branch)}
+          />
           {isWrong && (
             <polyline
               points={pathStr}
               fill="none"
               stroke="#ef4444"
-              strokeWidth={18}
+              strokeWidth={22}
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeOpacity={0.4}
@@ -183,51 +223,88 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
     });
   }, [currentNode, isOverview, onBranchSelect, selectedBranchId, wrongBranchId]);
 
-  // IOF markers — start triangle pointing toward finish, finish double circle
+  // IOF markers
   const iofMarkers = useMemo(() => {
     if (start.x === 0 && start.y === 0) return null;
 
     const angle = Math.atan2(finish.x - start.x, -(finish.y - start.y)) * (180 / Math.PI);
-    const triSize = 22;
-    // Equilateral triangle pointing up by default, rotated to point toward finish
     const triPoints = `0,${-triSize} ${-triSize * 0.866},${triSize * 0.5} ${triSize * 0.866},${triSize * 0.5}`;
 
     const dist = Math.sqrt((finish.x - start.x) ** 2 + (finish.y - start.y) ** 2);
-    // Gap near markers for the connecting line
-    const gap = 30;
     const dx = (finish.x - start.x) / dist;
     const dy = (finish.y - start.y) / dist;
-    const lineStart = { x: start.x + dx * gap, y: start.y + dy * gap };
-    const lineEnd = { x: finish.x - dx * gap, y: finish.y - dy * gap };
+    const lineStart = { x: start.x + dx * markerGap, y: start.y + dy * markerGap };
+    const lineEnd = { x: finish.x - dx * markerGap, y: finish.y - dy * markerGap };
 
     return (
       <>
-        {/* Connecting dashed line */}
         <line
           x1={lineStart.x} y1={lineStart.y}
           x2={lineEnd.x} y2={lineEnd.y}
           stroke={IOF_PURPLE}
-          strokeWidth={3}
-          strokeDasharray="12,8"
+          strokeWidth={strokeW * 0.8}
+          strokeDasharray={`${16 * markerScale},${10 * markerScale}`}
           strokeOpacity={0.7}
           style={{ pointerEvents: 'none' }}
         />
-        {/* Start triangle */}
         <g transform={`translate(${start.x},${start.y}) rotate(${angle})`}>
           <polygon
             points={triPoints}
             fill="none"
             stroke={IOF_PURPLE}
-            strokeWidth={3.5}
+            strokeWidth={strokeW}
             style={{ pointerEvents: 'none' }}
           />
         </g>
-        {/* Finish double circle */}
-        <circle cx={finish.x} cy={finish.y} r={20} fill="none" stroke={IOF_PURPLE} strokeWidth={3.5} style={{ pointerEvents: 'none' }} />
-        <circle cx={finish.x} cy={finish.y} r={12} fill="none" stroke={IOF_PURPLE} strokeWidth={3} style={{ pointerEvents: 'none' }} />
+        <circle cx={finish.x} cy={finish.y} r={finishOuterR} fill="none" stroke={IOF_PURPLE} strokeWidth={strokeW} style={{ pointerEvents: 'none' }} />
+        <circle cx={finish.x} cy={finish.y} r={finishInnerR} fill="none" stroke={IOF_PURPLE} strokeWidth={strokeW * 0.85} style={{ pointerEvents: 'none' }} />
       </>
     );
-  }, [start, finish]);
+  }, [start, finish, triSize, finishOuterR, finishInnerR, strokeW, markerGap, markerScale]);
+
+  // Traversed path rendering (for result screen)
+  const traversedPathSvg = useMemo(() => {
+    if (!traversedPath || traversedPath.length < 2) return null;
+    const pathStr = traversedPath.map((p) => `${p.x},${p.y}`).join(' ');
+    return (
+      <>
+        <polyline
+          points={pathStr}
+          fill="none"
+          stroke="#22c55e"
+          strokeWidth={14}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={0.3}
+          style={{ pointerEvents: 'none' }}
+        />
+        <polyline
+          points={pathStr}
+          fill="none"
+          stroke="#22c55e"
+          strokeWidth={8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={0.85}
+          style={{ pointerEvents: 'none' }}
+        />
+        {/* Markers at each decision point */}
+        {traversedPath.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={i === 0 || i === traversedPath.length - 1 ? 0 : 6}
+            fill="#22c55e"
+            fillOpacity={0.8}
+            stroke="white"
+            strokeWidth={2}
+            style={{ pointerEvents: 'none' }}
+          />
+        ))}
+      </>
+    );
+  }, [traversedPath]);
 
   return (
     <div
@@ -262,17 +339,15 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
               left: 0,
             }}
           >
-            {/* IOF start/finish markers — always visible */}
             {iofMarkers}
-
-            {/* Branch paths during navigation */}
+            {traversedPathSvg}
             {branchPaths}
 
             {/* Current node marker */}
-            {currentNode && !isOverview && (
+            {currentNode && !isOverview && !showResult && (
               <>
-                <circle cx={currentNode.x} cy={currentNode.y} r={18} fill="hsl(24, 100%, 50%)" stroke="white" strokeWidth={4} fillOpacity={0.9} />
-                <circle cx={currentNode.x} cy={currentNode.y} r={7} fill="white" />
+                <circle cx={currentNode.x} cy={currentNode.y} r={22} fill="hsl(24, 100%, 50%)" stroke="white" strokeWidth={5} fillOpacity={0.9} />
+                <circle cx={currentNode.x} cy={currentNode.y} r={8} fill="white" />
               </>
             )}
           </svg>

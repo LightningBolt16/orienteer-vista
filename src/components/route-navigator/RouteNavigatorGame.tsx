@@ -9,8 +9,8 @@ import {
   buildAdjacency,
   findStartNode,
   findNextNode,
-  validateChallenge,
   isFinishReached,
+  validateChallenge,
 } from '@/utils/routeNavigatorUtils';
 import { Loader2, ArrowLeft, ZoomOut, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   const [imageReady, setImageReady] = useState(false);
   const [isZoomedOut, setIsZoomedOut] = useState(false);
   const [overviewStartTime, setOverviewStartTime] = useState(0);
+  const [traversedPath, setTraversedPath] = useState<{ x: number; y: number }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -127,7 +128,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     if (phase !== 'overview' || !challenge) return;
     const previewDuration = Date.now() - overviewStartTime;
     console.log(`Preview duration: ${previewDuration}ms`);
-    
+
     const startNode = findStartNode(
       challenge.decision_points,
       { x: challenge.start_x, y: challenge.start_y }
@@ -138,6 +139,10 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setWrongBranch(null);
     setStartTime(Date.now());
     setIsZoomedOut(false);
+    // Initialize traversed path with start position and first node
+    const pathInit: { x: number; y: number }[] = [{ x: challenge.start_x, y: challenge.start_y }];
+    if (startNode) pathInit.push({ x: startNode.x, y: startNode.y });
+    setTraversedPath(pathInit);
     setPhase('navigating');
   }, [phase, challenge, overviewStartTime]);
 
@@ -145,57 +150,95 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setImageReady(true);
   }, []);
 
+  const finishGame = useCallback((wt: number) => {
+    const elapsed = Date.now() - startTime;
+    setElapsedMs(elapsed);
+    // Add finish point to traversed path
+    setTraversedPath(prev => [...prev, finish]);
+    setPhase('result');
+
+    if (userId) {
+      supabase.from('route_navigator_attempts').insert({
+        user_id: userId,
+        challenge_id: challenge?.id,
+        map_name: mapName,
+        player_path: null,
+        is_optimal: wt === 0,
+        wrong_turns: wt,
+        response_time: elapsed,
+      }).then(({ error }) => {
+        if (error) console.error('Failed to record attempt:', error);
+      });
+    }
+  }, [startTime, userId, challenge, mapName, finish]);
+
   const handleBranchSelect = useCallback(
     (branch: Branch) => {
       if (phase !== 'navigating' || selectedBranch !== null || wrongBranch !== null) return;
 
-      // If zoomed out, zoom back in first
       if (isZoomedOut) {
         setIsZoomedOut(false);
         return;
       }
 
       if (branch.is_correct) {
+        // Correct branch
         setSelectedBranch(branch.to_macro);
         setTimeout(() => {
           const nextNode = findNextNode(dpMap, branch);
 
-          if (isFinishReached(nextNode, branch, finish, imageWidth, imageHeight)) {
-            const elapsed = Date.now() - startTime;
-            setElapsedMs(elapsed);
-            setPhase('result');
+          // Add path points from branch to traversed path
+          if (branch.path.length > 0) {
+            setTraversedPath(prev => [...prev, ...branch.path]);
+          }
+          if (nextNode) {
+            setTraversedPath(prev => [...prev, { x: nextNode.x, y: nextNode.y }]);
+          }
 
-            if (userId) {
-              supabase.from('route_navigator_attempts').insert({
-                user_id: userId,
-                challenge_id: challenge?.id,
-                map_name: mapName,
-                player_path: null,
-                is_optimal: wrongTurns === 0,
-                wrong_turns: wrongTurns,
-                response_time: elapsed,
-              }).then(({ error }) => {
-                if (error) console.error('Failed to record attempt:', error);
-              });
-            }
+          if (isFinishReached(nextNode, branch, finish, imageWidth, imageHeight)) {
+            finishGame(wrongTurns);
           } else if (nextNode) {
             setCurrentNode(nextNode);
             setSelectedBranch(null);
           } else {
-            const elapsed = Date.now() - startTime;
-            setElapsedMs(elapsed);
-            setPhase('result');
+            finishGame(wrongTurns);
           }
         }, 600);
       } else {
+        // Wrong branch — still allow movement, then bounce back
         setWrongBranch(branch.to_macro);
-        setWrongTurns((prev) => prev + 1);
-        setTimeout(() => {
-          setWrongBranch(null);
-        }, 1200);
+        const newWrongTurns = wrongTurns + 1;
+        setWrongTurns(newWrongTurns);
+
+        // Move to the wrong node briefly, then come back
+        const wrongNode = findNextNode(dpMap, branch);
+        if (wrongNode) {
+          // Add wrong path to traversed path (shown in red later)
+          if (branch.path.length > 0) {
+            setTraversedPath(prev => [...prev, ...branch.path, { x: wrongNode.x, y: wrongNode.y }]);
+          }
+
+          // Briefly show the wrong node position
+          const previousNode = currentNode;
+          setCurrentNode(wrongNode);
+
+          setTimeout(() => {
+            // Bounce back to previous node
+            setCurrentNode(previousNode);
+            setWrongBranch(null);
+            // Add return path
+            if (previousNode) {
+              setTraversedPath(prev => [...prev, { x: previousNode.x, y: previousNode.y }]);
+            }
+          }, 1200);
+        } else {
+          setTimeout(() => {
+            setWrongBranch(null);
+          }, 1200);
+        }
       }
     },
-    [phase, selectedBranch, wrongBranch, isZoomedOut, dpMap, startTime, wrongTurns, userId, challenge, mapName, finish, imageWidth, imageHeight]
+    [phase, selectedBranch, wrongBranch, isZoomedOut, dpMap, startTime, wrongTurns, userId, challenge, mapName, finish, imageWidth, imageHeight, currentNode, finishGame]
   );
 
   const handleNextChallenge = useCallback(() => {
@@ -205,6 +248,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setWrongBranch(null);
     setCurrentNode(null);
     setIsZoomedOut(false);
+    setTraversedPath([]);
     setOverviewStartTime(Date.now());
     setPhase('overview');
   }, [currentIndex, challenges.length]);
@@ -221,13 +265,36 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
   if (phase === 'result') {
     return (
-      <NavigatorResult
-        wrongTurns={wrongTurns}
-        totalDecisionPoints={totalDecisionPoints}
-        timeMs={elapsedMs}
-        onNextChallenge={handleNextChallenge}
-        onBackToSelector={onBack}
-      />
+      <div className="relative w-full h-screen bg-black">
+        <div ref={containerRef} className="absolute inset-0">
+          {containerSize.width > 0 && containerSize.height > 0 && (
+            <NavigatorMapView
+              imageUrl={sourceImageUrl}
+              imageWidth={imageWidth}
+              imageHeight={imageHeight}
+              currentNode={null}
+              finish={finish}
+              start={start}
+              containerWidth={containerSize.width}
+              containerHeight={containerSize.height}
+              isOverview={true}
+              onBranchSelect={() => {}}
+              onImageLoaded={handleImageLoaded}
+              traversedPath={traversedPath}
+              showResult={true}
+            />
+          )}
+        </div>
+        <div className="absolute inset-0 z-20 flex items-end justify-center pb-8">
+          <NavigatorResult
+            wrongTurns={wrongTurns}
+            totalDecisionPoints={totalDecisionPoints}
+            timeMs={elapsedMs}
+            onNextChallenge={handleNextChallenge}
+            onBackToSelector={onBack}
+          />
+        </div>
+      </div>
     );
   }
 
