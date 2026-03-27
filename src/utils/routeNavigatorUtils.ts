@@ -96,6 +96,38 @@ export function findNextNode(
   return dpMap.get(branch.to_macro) || null;
 }
 
+export function resolveBranchDestination(
+  dpMap: Map<number, DecisionPoint>,
+  branch: Branch,
+  currentNode?: DecisionPoint | null,
+  maxSnapDistance: number = 160
+): DecisionPoint | null {
+  const directNode = findNextNode(dpMap, branch);
+  if (directNode) return directNode;
+
+  const branchEnd = branch.path[branch.path.length - 1];
+  if (!branchEnd) return null;
+
+  let closestNode: DecisionPoint | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const node of dpMap.values()) {
+    if (currentNode && node.id === currentNode.id) continue;
+
+    const distance = euclidean(branchEnd, node);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestNode = node;
+    }
+  }
+
+  if (closestDistance <= maxSnapDistance) {
+    return closestNode;
+  }
+
+  return null;
+}
+
 // Check if a challenge is "reachable" — it must have a start node with a correct branch
 // and the correct-path chain must eventually lead to a terminal node or near finish
 export function validateChallenge(
@@ -122,7 +154,7 @@ export function validateChallenge(
     visited.add(current.id);
     const correctBranch = current.branches.find((b) => b.is_correct);
     if (!correctBranch) break; // terminal — valid end
-    const next = findNextNode(dpMap, correctBranch);
+    const next = resolveBranchDestination(dpMap, correctBranch, current);
     if (!next) break; // leads to unknown node — treat as terminal
     current = next;
     steps++;
