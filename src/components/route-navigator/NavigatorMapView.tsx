@@ -68,7 +68,9 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         const cy = (start.y + finish.y) / 2;
         const dx = Math.abs(finish.x - start.x);
         const dy = Math.abs(finish.y - start.y);
-        const padding = Math.max(dx, dy) * 0.4;
+        // For result view, use more padding so routes aren't hidden behind the card
+        const paddingMul = showResult ? 0.7 : 0.4;
+        const padding = Math.max(dx, dy) * paddingMul;
         const regionW = dx + padding * 2;
         const regionH = dy + padding * 2;
         const scaleX = containerWidth / regionW;
@@ -77,8 +79,10 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         const maxScale = Math.min(containerWidth, containerHeight) / 400;
         const fitScale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
         const finalScale = Math.max(fitScale, Math.min(scale, maxScale));
+        // For result, shift the map upward so the bottom card doesn't cover routes
+        const yOffset = showResult ? -containerHeight * 0.12 : 0;
         return {
-          transform: `translate(${containerWidth / 2}px, ${containerHeight / 2}px) scale(${finalScale}) translate(${-cx}px, ${-cy}px)`,
+          transform: `translate(${containerWidth / 2}px, ${containerHeight / 2 + yOffset}px) scale(${finalScale}) translate(${-cx}px, ${-cy}px)`,
           transformOrigin: '0 0',
           transition: 'transform 0.8s ease-in-out',
         };
