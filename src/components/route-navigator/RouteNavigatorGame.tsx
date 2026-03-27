@@ -80,6 +80,22 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     return buildAdjacency(challenge.decision_points);
   }, [challenge]);
 
+  const finishTargetNode = useMemo(() => {
+    if (!challenge || challenge.decision_points.length === 0) return null;
+
+    if (correctSequence.length > 0) {
+      return dpMap.get(correctSequence[correctSequence.length - 1]) ?? null;
+    }
+
+    return challenge.decision_points.reduce<DecisionPoint | null>((closest, node) => {
+      const nodeDist = Math.hypot(node.x - challenge.finish_x, node.y - challenge.finish_y);
+      if (!closest) return node;
+
+      const closestDist = Math.hypot(closest.x - challenge.finish_x, closest.y - challenge.finish_y);
+      return nodeDist < closestDist ? node : closest;
+    }, null);
+  }, [challenge, correctSequence, dpMap]);
+
   // Compute the correct path polyline from decision points
   const correctPath = useMemo(() => {
     if (!challenge) return [] as { x: number; y: number }[];
@@ -234,6 +250,18 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
       setSelectedBranch(branch.to_macro);
       setTimeout(() => {
         const nextNode = findNextNode(dpMap, branch);
+        const branchEnd = branch.path[branch.path.length - 1] ?? null;
+        const finishThreshold = 64;
+        const nextNodeAtFinish = Boolean(
+          nextNode && finishTargetNode && nextNode.id === finishTargetNode.id
+        );
+        const nodeNearFinish = Boolean(
+          nextNode && Math.hypot(nextNode.x - finish.x, nextNode.y - finish.y) <= finishThreshold
+        );
+        const branchEndsNearFinish = Boolean(
+          branchEnd && Math.hypot(branchEnd.x - finish.x, branchEnd.y - finish.y) <= finishThreshold
+        );
+        const reachedFinish = nextNodeAtFinish || nodeNearFinish || branchEndsNearFinish;
 
         // Add path points to traversed path
         if (branch.path.length > 0) {
@@ -253,19 +281,18 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           }
         }
 
-        // Only finish when there's truly nowhere to go (no next node or zero branches)
-        if (!nextNode) {
+        // Finish only when the player actually reaches the challenge finish area
+        if (reachedFinish) {
           finishGame(updatedHits);
-        } else if (nextNode.branches.length === 0) {
-          // Terminal node — add it to path then finish
-          finishGame(updatedHits);
-        } else {
+        } else if (nextNode) {
           setCurrentNode(nextNode);
+          setSelectedBranch(null);
+        } else {
           setSelectedBranch(null);
         }
       }, 600);
     },
-    [phase, selectedBranch, isZoomedOut, dpMap, correctNodesHit, correctSequence, finishGame]
+    [phase, selectedBranch, isZoomedOut, dpMap, correctNodesHit, correctSequence, finish, finishGame, finishTargetNode]
   );
 
   const handleNextChallenge = useCallback(() => {
