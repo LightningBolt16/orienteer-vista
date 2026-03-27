@@ -139,7 +139,7 @@ export function isFinishReached(
   imageWidth: number,
   imageHeight: number
 ): boolean {
-  const finishTolerance = Math.max(imageWidth, imageHeight) * 0.05;
+  const finishTolerance = Math.max(imageWidth, imageHeight) * 0.03;
 
   // No next node in the graph — terminal
   if (!nextNode) return true;
@@ -147,16 +147,21 @@ export function isFinishReached(
   // Next node has no branches — terminal
   if (nextNode.branches.length === 0) return true;
 
-  // Next node has no correct branches — effectively terminal for the player
-  if (!nextNode.branches.some((b) => b.is_correct)) return true;
+  // Next node has no correct branches AND is near finish — terminal
+  // (Don't end prematurely if there are still branches to explore even if none marked correct)
+  if (!nextNode.branches.some((b) => b.is_correct)) {
+    if (euclidean(nextNode, finish) < finishTolerance * 3) return true;
+    // Node far from finish with no correct branches — still terminal but unusual
+    return true;
+  }
 
-  // Branch endpoint is near finish
+  // Branch endpoint is very near finish
   if (branch.path.length > 0) {
     const endPt = branch.path[branch.path.length - 1];
     if (euclidean(endPt, finish) < finishTolerance) return true;
   }
 
-  // Next node itself is near finish
+  // Next node itself is very near finish
   if (euclidean(nextNode, finish) < finishTolerance) return true;
 
   return false;
