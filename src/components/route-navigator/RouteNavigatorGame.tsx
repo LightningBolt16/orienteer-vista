@@ -460,8 +460,8 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
 
       {/* Overview with Start button and instructions */}
       {phase === 'overview' && challenge && (
-        <div className="absolute inset-0 flex items-end justify-center pb-16 z-20">
-          <div className="flex flex-col items-center gap-4">
+        <div className="absolute inset-0 flex items-end justify-center pb-16 z-20 pointer-events-none">
+          <div className="flex flex-col items-center gap-4 pointer-events-auto">
             <div className="bg-background/80 backdrop-blur-sm rounded-xl px-6 py-4 text-center pointer-events-none">
               <div className="text-lg font-bold mb-1">Navigate to the finish!</div>
               <div className="text-sm text-muted-foreground">
