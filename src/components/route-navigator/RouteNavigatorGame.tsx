@@ -17,7 +17,7 @@ import {
 import { Loader2, ArrowLeft, ZoomOut, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type GamePhase = 'loading' | 'waiting-image' | 'overview' | 'navigating' | 'result';
+type GamePhase = 'loading' | 'waiting-image' | 'overview' | 'navigating' | 'result' | 'transitioning';
 
 interface RouteNavigatorGameProps {
   mapId: string;
@@ -345,12 +345,13 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setIsZoomedOut(false);
     setTraversedPath([]);
     setCorrectNodesHit([]);
-    setOverviewStartTime(Date.now());
-    // Briefly stay in result phase so the camera animates to the new overview position
-    // The NavigatorMapView transition handles the smooth zoom/rotate
+    // Enter transitioning: map animates to new challenge, no overlays shown
+    setPhase('transitioning');
+    // After camera animation completes, show overview with instructions
     setTimeout(() => {
+      setOverviewStartTime(Date.now());
       setPhase('overview');
-    }, 100);
+    }, 900);
   }, [currentIndex, challenges.length]);
 
   const totalDecisionPoints = correctSequence.length;
