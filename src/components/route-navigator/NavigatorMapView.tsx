@@ -32,7 +32,7 @@ const BRANCH_COLORS = [
   'hsl(330 81% 43%)',
 ];
 const IOF_PURPLE = 'hsl(300 95% 50%)';
-const ARROW_CORE = 'hsl(0 0% 100%)';
+
 
 const getSegmentLength = (from: MapPoint, to: MapPoint) => Math.hypot(to.x - from.x, to.y - from.y);
 
@@ -208,20 +208,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         x: baseCenter.x - normalX * (headWidth / 2),
         y: baseCenter.y - normalY * (headWidth / 2),
       };
-      const innerHeadScale = 0.52;
-      const innerBaseCenter = {
-        x: last.x + (baseCenter.x - last.x) * innerHeadScale,
-        y: last.y + (baseCenter.y - last.y) * innerHeadScale,
-      };
-      const innerHalfWidth = (headWidth * innerHeadScale) / 2;
-      const innerLeftBase = {
-        x: innerBaseCenter.x + normalX * innerHalfWidth,
-        y: innerBaseCenter.y + normalY * innerHalfWidth,
-      };
-      const innerRightBase = {
-        x: innerBaseCenter.x - normalX * innerHalfWidth,
-        y: innerBaseCenter.y - normalY * innerHalfWidth,
-      };
       const hitWidth = Math.max(12, Math.min(18, totalLength * 0.08));
 
       return (
@@ -250,17 +236,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             d={d}
             fill="none"
             stroke={color}
-            strokeWidth={isSelected ? 8.5 : 6.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeOpacity={0.96}
-            style={{ pointerEvents: 'none' }}
-          />
-          <path
-            d={d}
-            fill="none"
-            stroke={ARROW_CORE}
-            strokeWidth={isSelected ? 3.6 : 2.8}
+            strokeWidth={isSelected ? 10 : 8}
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeOpacity={0.96}
@@ -278,12 +254,6 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
             fill="transparent"
             style={{ cursor: 'pointer' }}
             onClick={() => onBranchSelect(branch)}
-          />
-          <polygon
-            points={`${last.x},${last.y} ${innerLeftBase.x},${innerLeftBase.y} ${innerRightBase.x},${innerRightBase.y}`}
-            fill={ARROW_CORE}
-            fillOpacity={0.96}
-            style={{ pointerEvents: 'none' }}
           />
         </g>
       );

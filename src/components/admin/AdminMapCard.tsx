@@ -134,13 +134,27 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      // Delete associated data first
       if (table === 'route_maps') {
-        await supabase.from('route_images').delete().eq('map_id', map.id);
+        const { error: riErr } = await supabase.from('route_images').delete().eq('map_id', map.id);
+        if (riErr) throw new Error(`Failed to delete route images: ${riErr.message}`);
       } else if (table === 'route_finder_maps') {
-        await supabase.from('route_finder_challenges').delete().eq('map_id', map.id);
+        // Delete attempts referencing these challenges first
+        const { data: cIds } = await supabase.from('route_finder_challenges').select('id').eq('map_id', map.id);
+        if (cIds && cIds.length > 0) {
+          const { error: aErr } = await supabase.from('route_finder_attempts').delete().in('challenge_id', cIds.map(c => c.id));
+          if (aErr) console.warn('Failed to delete finder attempts:', aErr.message);
+        }
+        const { error: cErr } = await supabase.from('route_finder_challenges').delete().eq('map_id', map.id);
+        if (cErr) throw new Error(`Failed to delete finder challenges: ${cErr.message}`);
       } else if (table === 'route_navigator_maps') {
-        await supabase.from('route_navigator_challenges').delete().eq('map_id', map.id);
+        // Delete attempts referencing these challenges first
+        const { data: cIds } = await supabase.from('route_navigator_challenges').select('id').eq('map_id', map.id);
+        if (cIds && cIds.length > 0) {
+          const { error: aErr } = await supabase.from('route_navigator_attempts').delete().in('challenge_id', cIds.map(c => c.id));
+          if (aErr) console.warn('Failed to delete navigator attempts:', aErr.message);
+        }
+        const { error: cErr } = await supabase.from('route_navigator_challenges').delete().eq('map_id', map.id);
+        if (cErr) throw new Error(`Failed to delete navigator challenges: ${cErr.message}`);
       }
       const { error } = await supabase.from(table).delete().eq('id', map.id);
       if (error) throw error;

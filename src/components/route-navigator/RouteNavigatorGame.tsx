@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/integrations/supabase/client';
 import NavigatorMapView from './NavigatorMapView';
 import NavigatorResult from './NavigatorResult';
+import NavigatorTutorial, { useNavigatorTutorial } from './NavigatorTutorial';
 import {
   NavigatorChallenge,
   DecisionPoint,
@@ -37,6 +38,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   userId,
   onBack,
 }) => {
+  const { showTutorial, dismissTutorial } = useNavigatorTutorial();
   const [phase, setPhase] = useState<GamePhase>('loading');
   const [challenges, setChallenges] = useState<NavigatorChallenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -104,8 +106,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     }, null);
   }, [challenge, challengeDecisionPoints, correctSequence, dpMap]);
 
-  // Compute the correct path polyline from decision points
-  // Correct path: straight lines between decision point centers only
+  // Compute the correct path polyline using branch paths for geographic accuracy
   const correctPath = useMemo(() => {
     if (!challenge) return [] as { x: number; y: number }[];
     const points: { x: number; y: number }[] = [{ x: challenge.start_x, y: challenge.start_y }];
@@ -115,10 +116,20 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     const visited = new Set<number>();
     let cur: DecisionPoint | null = startNode;
     while (cur && !visited.has(cur.id)) {
-      points.push({ x: cur.x, y: cur.y });
       visited.add(cur.id);
       const correctBranch = cur.branches.find(b => b.is_correct);
-      if (!correctBranch) break;
+      if (!correctBranch) {
+        points.push({ x: cur.x, y: cur.y });
+        break;
+      }
+      // Use branch path coordinates for geographic accuracy
+      if (correctBranch.path && correctBranch.path.length > 0) {
+        for (const p of correctBranch.path) {
+          points.push({ x: p.x, y: p.y });
+        }
+      } else {
+        points.push({ x: cur.x, y: cur.y });
+      }
       cur = resolveBranchDestination(dpMap, correctBranch, cur);
     }
     points.push({ x: challenge.finish_x, y: challenge.finish_y });
@@ -270,9 +281,19 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         );
         const reachedFinish = nextNodeAtFinish || nodeNearFinish || branchEndsNearFinish;
 
-        // Record only node positions for a clean traversed path
+        // Record branch path coordinates for geographic accuracy
         if (nextNode) {
-          setTraversedPath(prev => [...prev, { x: nextNode.x, y: nextNode.y }]);
+          setTraversedPath(prev => {
+            const newPoints = [...prev];
+            if (branch.path && branch.path.length > 0) {
+              for (const p of branch.path) {
+                newPoints.push({ x: p.x, y: p.y });
+              }
+            } else {
+              newPoints.push({ x: nextNode.x, y: nextNode.y });
+            }
+            return newPoints;
+          });
         }
 
         // Track correct nodes visited in order
@@ -418,14 +439,14 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         </div>
       )}
 
-      {/* Overview with Start button */}
+      {/* Overview with Start button and instructions */}
       {phase === 'overview' && challenge && (
         <div className="absolute inset-0 flex items-end justify-center pb-16 z-20">
           <div className="flex flex-col items-center gap-4">
             <div className="bg-background/80 backdrop-blur-sm rounded-xl px-6 py-4 text-center pointer-events-none">
               <div className="text-lg font-bold mb-1">Navigate to the finish!</div>
               <div className="text-sm text-muted-foreground">
-                Choose the correct path at each junction
+                Study the map, then tap Start. Choose directions at each junction to find the shortest route.
               </div>
             </div>
             <Button
@@ -437,6 +458,11 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* First-use tutorial */}
+      {showTutorial && (
+        <NavigatorTutorial onClose={dismissTutorial} />
       )}
     </div>
   );
