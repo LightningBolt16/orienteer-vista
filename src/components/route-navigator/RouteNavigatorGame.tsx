@@ -346,7 +346,11 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setTraversedPath([]);
     setCorrectNodesHit([]);
     setOverviewStartTime(Date.now());
-    setPhase('overview');
+    // Briefly stay in result phase so the camera animates to the new overview position
+    // The NavigatorMapView transition handles the smooth zoom/rotate
+    setTimeout(() => {
+      setPhase('overview');
+    }, 100);
   }, [currentIndex, challenges.length]);
 
   const totalDecisionPoints = correctSequence.length;
