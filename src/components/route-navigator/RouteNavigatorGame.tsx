@@ -387,6 +387,8 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
             correctHits={correctNodesHit.length}
             totalCorrectNodes={correctSequence.length}
             timeMs={elapsedMs}
+            correctRouteLength={correctRouteLength}
+            playerRouteLength={playerRouteLength}
             onNextChallenge={handleNextChallenge}
             onBackToSelector={onBack}
           />
