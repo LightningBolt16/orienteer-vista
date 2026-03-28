@@ -364,43 +364,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     );
   }
 
-  if (phase === 'result') {
-    return (
-      <div className="relative w-full h-screen bg-black">
-        <div ref={containerRef} className="absolute inset-0">
-          {containerSize.width > 0 && containerSize.height > 0 && (
-            <NavigatorMapView
-              imageUrl={sourceImageUrl}
-              imageWidth={imageWidth}
-              imageHeight={imageHeight}
-              currentNode={null}
-              finish={finish}
-              start={start}
-              containerWidth={containerSize.width}
-              containerHeight={containerSize.height}
-              isOverview={true}
-              onBranchSelect={() => {}}
-              onImageLoaded={handleImageLoaded}
-              traversedPath={traversedPath}
-              correctPath={correctPath}
-              showResult={true}
-            />
-          )}
-        </div>
-        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
-          <NavigatorResult
-            correctHits={correctNodesHit.length}
-            totalCorrectNodes={correctSequence.length}
-            timeMs={elapsedMs}
-            correctRouteLength={correctRouteLength}
-            playerRouteLength={playerRouteLength}
-            onNextChallenge={handleNextChallenge}
-            onBackToSelector={onBack}
-          />
-        </div>
-      </div>
-    );
-  }
+  const isResultOrTransition = phase === 'result' || phase === 'transitioning';
 
   return (
     <div ref={containerRef} className="relative w-full h-screen bg-black">
