@@ -131,7 +131,7 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         const fitScale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
         const finalScale = Math.max(fitScale, Math.min(scale, maxScale));
         // Shift map up: result (bottom card), overview (bottom instructions)
-        const yOffset = showResult ? -containerHeight * 0.12 : isOverview ? -containerHeight * 0.08 : 0;
+        const yOffset = showResult ? -containerHeight * 0.18 : isOverview ? -containerHeight * 0.08 : 0;
         // Rotate so start→finish points straight up
         const bearing = Math.atan2(finish.x - start.x, -(finish.y - start.y)) * (180 / Math.PI);
         return {
