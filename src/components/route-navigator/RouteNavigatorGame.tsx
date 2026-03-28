@@ -38,6 +38,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
   userId,
   onBack,
 }) => {
+  const { showTutorial, dismissTutorial } = useNavigatorTutorial();
   const [phase, setPhase] = useState<GamePhase>('loading');
   const [challenges, setChallenges] = useState<NavigatorChallenge[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
