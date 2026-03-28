@@ -1035,6 +1035,7 @@ export type Database = {
           created_at: string
           id: string
           name: string | null
+          navigator_tutorial_seen: boolean
           onboarding_completed: boolean
           previous_rank: number | null
           profile_image: string | null
@@ -1054,6 +1055,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string | null
+          navigator_tutorial_seen?: boolean
           onboarding_completed?: boolean
           previous_rank?: number | null
           profile_image?: string | null
@@ -1073,6 +1075,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string | null
+          navigator_tutorial_seen?: boolean
           onboarding_completed?: boolean
           previous_rank?: number | null
           profile_image?: string | null
