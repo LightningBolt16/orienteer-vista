@@ -17,7 +17,7 @@ import {
 import { Loader2, ArrowLeft, ZoomOut, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type GamePhase = 'loading' | 'waiting-image' | 'overview' | 'navigating' | 'result';
+type GamePhase = 'loading' | 'waiting-image' | 'overview' | 'navigating' | 'result' | 'transitioning';
 
 interface RouteNavigatorGameProps {
   mapId: string;
@@ -345,12 +345,13 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setIsZoomedOut(false);
     setTraversedPath([]);
     setCorrectNodesHit([]);
-    setOverviewStartTime(Date.now());
-    // Briefly stay in result phase so the camera animates to the new overview position
-    // The NavigatorMapView transition handles the smooth zoom/rotate
+    // Enter transitioning: map animates to new challenge, no overlays shown
+    setPhase('transitioning');
+    // After camera animation completes, show overview with instructions
     setTimeout(() => {
+      setOverviewStartTime(Date.now());
       setPhase('overview');
-    }, 100);
+    }, 900);
   }, [currentIndex, challenges.length]);
 
   const totalDecisionPoints = correctSequence.length;
@@ -363,43 +364,7 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     );
   }
 
-  if (phase === 'result') {
-    return (
-      <div className="relative w-full h-screen bg-black">
-        <div ref={containerRef} className="absolute inset-0">
-          {containerSize.width > 0 && containerSize.height > 0 && (
-            <NavigatorMapView
-              imageUrl={sourceImageUrl}
-              imageWidth={imageWidth}
-              imageHeight={imageHeight}
-              currentNode={null}
-              finish={finish}
-              start={start}
-              containerWidth={containerSize.width}
-              containerHeight={containerSize.height}
-              isOverview={true}
-              onBranchSelect={() => {}}
-              onImageLoaded={handleImageLoaded}
-              traversedPath={traversedPath}
-              correctPath={correctPath}
-              showResult={true}
-            />
-          )}
-        </div>
-        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
-          <NavigatorResult
-            correctHits={correctNodesHit.length}
-            totalCorrectNodes={correctSequence.length}
-            timeMs={elapsedMs}
-            correctRouteLength={correctRouteLength}
-            playerRouteLength={playerRouteLength}
-            onNextChallenge={handleNextChallenge}
-            onBackToSelector={onBack}
-          />
-        </div>
-      </div>
-    );
-  }
+  const isResultOrTransition = phase === 'result' || phase === 'transitioning';
 
   return (
     <div ref={containerRef} className="relative w-full h-screen bg-black">
@@ -408,16 +373,19 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           imageUrl={sourceImageUrl}
           imageWidth={imageWidth}
           imageHeight={imageHeight}
-          currentNode={phase === 'overview' ? null : currentNode}
+          currentNode={phase === 'overview' || isResultOrTransition ? null : currentNode}
           finish={finish}
           start={start}
           containerWidth={containerSize.width}
           containerHeight={containerSize.height}
-          isOverview={phase === 'overview'}
+          isOverview={phase === 'overview' || isResultOrTransition}
           isZoomedOut={isZoomedOut}
-          onBranchSelect={handleBranchSelect}
+          onBranchSelect={isResultOrTransition ? () => {} : handleBranchSelect}
           selectedBranchId={selectedBranch}
           onImageLoaded={handleImageLoaded}
+          traversedPath={phase === 'result' ? traversedPath : undefined}
+          correctPath={phase === 'result' ? correctPath : undefined}
+          showResult={phase === 'result'}
         />
       )}
 
@@ -432,6 +400,21 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
+
+      {/* Result card */}
+      {phase === 'result' && (
+        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
+          <NavigatorResult
+            correctHits={correctNodesHit.length}
+            totalCorrectNodes={correctSequence.length}
+            timeMs={elapsedMs}
+            correctRouteLength={correctRouteLength}
+            playerRouteLength={playerRouteLength}
+            onNextChallenge={handleNextChallenge}
+            onBackToSelector={onBack}
+          />
+        </div>
+      )}
 
       {/* HUD overlay */}
       {phase === 'navigating' && (
