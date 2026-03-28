@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords, Route, Eye } from 'lucide-react';
+import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn, CreditCard, Building2, Shield, Upload, Swords, Route, Eye, Navigation } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAdmin } from '../hooks/useAdmin';
@@ -164,6 +164,17 @@ const Header: React.FC = () => {
                   <span>{t('routeFinder') || 'Route Finder'}</span>
                 </Link>
                 
+                <Link 
+                  to="/route-navigator" 
+                  className={`p-3 rounded-md flex items-center space-x-2 ${
+                    isCurrentPath('/route-navigator') ? 'bg-muted text-orienteering' : ''
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Navigation className="h-5 w-5" />
+                  <span>Route Navigator</span>
+                </Link>
+                
                 {isAuthenticated && (
                   <Link 
                     to="/my-maps"
@@ -279,6 +290,16 @@ const Header: React.FC = () => {
             >
               <Route className="h-4 w-4" />
               <span>{t('routeFinder') || 'Route Finder'}</span>
+            </Link>
+            
+            <Link 
+              to="/route-navigator" 
+              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                isCurrentPath('/route-navigator') ? 'text-orienteering' : 'text-foreground'
+              }`}
+            >
+              <Navigation className="h-4 w-4" />
+              <span>Navigator</span>
             </Link>
             
             <div className="flex items-center space-x-2 ml-4">

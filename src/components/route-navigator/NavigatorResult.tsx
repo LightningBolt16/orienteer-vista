@@ -1,11 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Clock, Target, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Clock, Target, ArrowRight, Ruler } from 'lucide-react';
 
 interface NavigatorResultProps {
   correctHits: number;
   totalCorrectNodes: number;
   timeMs: number;
+  correctRouteLength: number;
+  playerRouteLength: number;
   onNextChallenge: () => void;
   onBackToSelector: () => void;
 }
@@ -14,12 +16,20 @@ const NavigatorResult: React.FC<NavigatorResultProps> = ({
   correctHits,
   totalCorrectNodes,
   timeMs,
+  correctRouteLength,
+  playerRouteLength,
   onNextChallenge,
   onBackToSelector,
 }) => {
-  const accuracy = totalCorrectNodes > 0 ? Math.round((correctHits / totalCorrectNodes) * 100) : 0;
-  const isOptimal = correctHits === totalCorrectNodes;
+  const ratio = playerRouteLength > 0 ? Math.min(100, Math.round((correctRouteLength / playerRouteLength) * 100)) : 0;
+  const isOptimal = ratio >= 98;
   const timeSeconds = (timeMs / 1000).toFixed(1);
+
+  // Format lengths as relative units (pixels → arbitrary "m")
+  const formatLen = (px: number) => {
+    if (px >= 1000) return `${(px / 1000).toFixed(1)}k`;
+    return Math.round(px).toString();
+  };
 
   return (
     <div className="w-full max-w-sm mx-auto">
@@ -51,8 +61,8 @@ const NavigatorResult: React.FC<NavigatorResultProps> = ({
 
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="bg-muted/60 rounded-lg p-2 text-center">
-            <div className="text-xl font-bold text-primary">{accuracy}%</div>
-            <div className="text-xs text-muted-foreground">Accuracy</div>
+            <div className="text-xl font-bold text-primary">{ratio}%</div>
+            <div className="text-xs text-muted-foreground">Score</div>
           </div>
           <div className="bg-muted/60 rounded-lg p-2 text-center">
             <div className="flex items-center justify-center gap-0.5">
@@ -66,6 +76,18 @@ const NavigatorResult: React.FC<NavigatorResultProps> = ({
               {correctHits}/{totalCorrectNodes}
             </div>
             <div className="text-xs text-muted-foreground">Correct</div>
+          </div>
+        </div>
+
+        {/* Route length comparison */}
+        <div className="flex justify-between text-xs text-muted-foreground mb-3 px-1">
+          <div className="flex items-center gap-1">
+            <Ruler className="h-3 w-3" />
+            <span>Optimal: {formatLen(correctRouteLength)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Ruler className="h-3 w-3" />
+            <span>Yours: {formatLen(playerRouteLength)}</span>
           </div>
         </div>
 

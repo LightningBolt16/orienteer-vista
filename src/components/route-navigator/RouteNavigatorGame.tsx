@@ -231,11 +231,28 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
     setImageReady(true);
   }, []);
 
+  // Compute polyline length utility
+  const polylineLength = useCallback((pts: { x: number; y: number }[]) => {
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) {
+      len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    return len;
+  }, []);
+
+  const [correctRouteLength, setCorrectRouteLength] = useState(0);
+  const [playerRouteLength, setPlayerRouteLength] = useState(0);
+
   const finishGame = useCallback((hits: number[]) => {
     const elapsed = Date.now() - startTime;
     setElapsedMs(elapsed);
     // Add finish point to traversed path
-    setTraversedPath(prev => [...prev, finish]);
+    setTraversedPath(prev => {
+      const final = [...prev, finish];
+      setPlayerRouteLength(polylineLength(final));
+      return final;
+    });
+    setCorrectRouteLength(polylineLength(correctPath));
     setPhase('result');
 
     const wrongTurns = correctSequence.length - hits.length;
@@ -370,6 +387,8 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
             correctHits={correctNodesHit.length}
             totalCorrectNodes={correctSequence.length}
             timeMs={elapsedMs}
+            correctRouteLength={correctRouteLength}
+            playerRouteLength={playerRouteLength}
             onNextChallenge={handleNextChallenge}
             onBackToSelector={onBack}
           />
