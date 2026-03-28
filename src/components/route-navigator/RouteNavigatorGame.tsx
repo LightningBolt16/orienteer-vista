@@ -417,8 +417,8 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
         />
       )}
 
-      {/* Back button */}
-      <div className="absolute top-3 left-3 z-20">
+      {/* Back button — z-30 to stay above overview overlay */}
+      <div className="absolute top-3 left-3 z-30">
         <Button
           variant="secondary"
           size="icon"
