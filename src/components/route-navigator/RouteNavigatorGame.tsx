@@ -373,16 +373,19 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           imageUrl={sourceImageUrl}
           imageWidth={imageWidth}
           imageHeight={imageHeight}
-          currentNode={phase === 'overview' ? null : currentNode}
+          currentNode={phase === 'overview' || isResultOrTransition ? null : currentNode}
           finish={finish}
           start={start}
           containerWidth={containerSize.width}
           containerHeight={containerSize.height}
-          isOverview={phase === 'overview'}
+          isOverview={phase === 'overview' || isResultOrTransition}
           isZoomedOut={isZoomedOut}
-          onBranchSelect={handleBranchSelect}
+          onBranchSelect={isResultOrTransition ? () => {} : handleBranchSelect}
           selectedBranchId={selectedBranch}
           onImageLoaded={handleImageLoaded}
+          traversedPath={phase === 'result' ? traversedPath : undefined}
+          correctPath={phase === 'result' ? correctPath : undefined}
+          showResult={phase === 'result'}
         />
       )}
 
@@ -397,6 +400,21 @@ const RouteNavigatorGame: React.FC<RouteNavigatorGameProps> = ({
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
+
+      {/* Result card */}
+      {phase === 'result' && (
+        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
+          <NavigatorResult
+            correctHits={correctNodesHit.length}
+            totalCorrectNodes={correctSequence.length}
+            timeMs={elapsedMs}
+            correctRouteLength={correctRouteLength}
+            playerRouteLength={playerRouteLength}
+            onNextChallenge={handleNextChallenge}
+            onBackToSelector={onBack}
+          />
+        </div>
+      )}
 
       {/* HUD overlay */}
       {phase === 'navigating' && (
