@@ -114,12 +114,12 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
   // Camera transform
   const cameraTransform = useMemo(() => {
     if (isOverview || isZoomedOut || !currentNode) {
-      if ((isOverview || showResult) && start.x > 0 && finish.x > 0) {
+      if ((isOverview || showResult || isZoomedOut) && start.x > 0 && finish.x > 0) {
         const cx = (start.x + finish.x) / 2;
         const cy = (start.y + finish.y) / 2;
         const dx = Math.abs(finish.x - start.x);
         const dy = Math.abs(finish.y - start.y);
-        // For result view, use more padding so routes aren't hidden behind the card
+        // More padding for result so routes aren't hidden behind the card
         const paddingMul = showResult ? 0.7 : 0.4;
         const padding = Math.max(dx, dy) * paddingMul;
         const regionW = dx + padding * 2;
@@ -130,8 +130,8 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         const maxScale = Math.min(containerWidth, containerHeight) / 400;
         const fitScale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
         const finalScale = Math.max(fitScale, Math.min(scale, maxScale));
-        // For result, shift the map upward so the bottom card doesn't cover routes
-        const yOffset = showResult ? -containerHeight * 0.12 : 0;
+        // Shift map up: result (bottom card), overview (bottom instructions)
+        const yOffset = showResult ? -containerHeight * 0.12 : isOverview ? -containerHeight * 0.08 : 0;
         // Rotate so start→finish points straight up
         const bearing = Math.atan2(finish.x - start.x, -(finish.y - start.y)) * (180 / Math.PI);
         return {
