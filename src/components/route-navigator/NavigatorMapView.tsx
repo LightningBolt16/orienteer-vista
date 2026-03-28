@@ -132,8 +132,10 @@ const NavigatorMapView: React.FC<NavigatorMapViewProps> = ({
         const finalScale = Math.max(fitScale, Math.min(scale, maxScale));
         // For result, shift the map upward so the bottom card doesn't cover routes
         const yOffset = showResult ? -containerHeight * 0.12 : 0;
+        // Rotate so start→finish points straight up
+        const bearing = Math.atan2(finish.x - start.x, -(finish.y - start.y)) * (180 / Math.PI);
         return {
-          transform: `translate(${containerWidth / 2}px, ${containerHeight / 2 + yOffset}px) scale(${finalScale}) translate(${-cx}px, ${-cy}px)`,
+          transform: `translate(${containerWidth / 2}px, ${containerHeight / 2 + yOffset}px) rotate(${-bearing}deg) scale(${finalScale}) translate(${-cx}px, ${-cy}px)`,
           transformOrigin: '0 0',
           transition: 'transform 0.8s ease-in-out',
         };
