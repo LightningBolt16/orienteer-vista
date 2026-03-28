@@ -7,7 +7,7 @@ import RouteFinderMapSelector from '@/components/route-finder/RouteFinderMapSele
 import PublishRouteFinderMapDialog from '@/components/route-finder/PublishRouteFinderMapDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, LogIn, Globe } from 'lucide-react';
+import { Loader2, LogIn, Globe, Navigation } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -15,6 +15,10 @@ import { useSubscription } from '@/hooks/useSubscription';
 import Layout from '@/components/Layout';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import { toast as sonnerToast } from 'sonner';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MapOption {
   id: string;
@@ -63,6 +67,13 @@ const RouteFinder: React.FC = () => {
   // Club info
   const [clubName, setClubName] = useState<string | null>(null);
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+
+  // Mobile warning
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
+
+  useEffect(() => {
+    if (isMobile) setShowMobileWarning(true);
+  }, [isMobile]);
 
   // Publishing dialog
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
@@ -411,6 +422,27 @@ const RouteFinder: React.FC = () => {
             <PwtAttribution variant="footer" />
           </section>
         )}
+
+        {/* Mobile Warning Dialog */}
+        <AlertDialog open={showMobileWarning} onOpenChange={setShowMobileWarning}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Best on a larger screen</AlertDialogTitle>
+              <AlertDialogDescription>
+                Route Finder involves drawing paths on the map, which works best on a tablet or desktop. For a great mobile experience, try Route Navigator instead!
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => setShowMobileWarning(false)}>
+                Play Anyway
+              </Button>
+              <Button onClick={() => navigate('/route-navigator')} className="flex items-center gap-2">
+                <Navigation className="h-4 w-4" />
+                Go to Route Navigator
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Publish Dialog */}
         <PublishRouteFinderMapDialog
