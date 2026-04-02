@@ -15,6 +15,7 @@ import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
 import { useAdmin } from '@/hooks/useAdmin';
 import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
+import PublicMapEditWizard from '@/components/user-maps/PublicMapEditWizard';
 import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
 import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
 import { supabase } from '@/integrations/supabase/client';
