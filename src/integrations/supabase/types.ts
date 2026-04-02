@@ -627,6 +627,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          impassability_image_url: string | null
           is_hidden: boolean
           is_public: boolean | null
           latitude: number | null
@@ -646,6 +647,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          impassability_image_url?: string | null
           is_hidden?: boolean
           is_public?: boolean | null
           latitude?: number | null
@@ -665,6 +667,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          impassability_image_url?: string | null
           is_hidden?: boolean
           is_public?: boolean | null
           latitude?: number | null
@@ -965,6 +968,7 @@ export type Database = {
           r2_bw_key: string | null
           r2_color_key: string | null
           roi_coordinates: Json
+          source_public_map_id: string | null
           status: string
           storage_provider: string | null
           tile_grid: Json | null
@@ -986,6 +990,7 @@ export type Database = {
           r2_bw_key?: string | null
           r2_color_key?: string | null
           roi_coordinates: Json
+          source_public_map_id?: string | null
           status?: string
           storage_provider?: string | null
           tile_grid?: Json | null
@@ -1007,6 +1012,7 @@ export type Database = {
           r2_bw_key?: string | null
           r2_color_key?: string | null
           roi_coordinates?: Json
+          source_public_map_id?: string | null
           status?: string
           storage_provider?: string | null
           tile_grid?: Json | null
