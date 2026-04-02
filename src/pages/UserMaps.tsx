@@ -246,6 +246,17 @@ const UserMaps: React.FC = () => {
     );
   }
 
+  if (showEditPublicMap) {
+    return (
+      <div className="container max-w-4xl mx-auto py-8 px-4">
+        <PublicMapEditWizard
+          onComplete={() => { setShowEditPublicMap(false); fetchUserMaps(); loadResultMaps(); }}
+          onCancel={() => setShowEditPublicMap(false)}
+        />
+      </div>
+    );
+  }
+
   const renderMapCard = (map: ResultMap, table: 'route_maps' | 'route_finder_maps') => {
     const isCommunity = map.map_category === 'community';
     const isEditing = editingName === map.id;
