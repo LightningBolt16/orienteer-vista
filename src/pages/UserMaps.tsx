@@ -51,6 +51,7 @@ const UserMaps: React.FC = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { hasPro, loading: proLoading } = useProAccess();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
+  const [showEditPublicMap, setShowEditPublicMap] = useState(false);
   const [showAdminRequest, setShowAdminRequest] = useState(false);
   const [deleteSourceMapId, setDeleteSourceMapId] = useState<string | null>(null);
   const [deleteResultMap, setDeleteResultMap] = useState<{ id: string; name: string; table: 'route_maps' | 'route_finder_maps' } | null>(null);
