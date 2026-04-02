@@ -15,6 +15,7 @@ import { useUser } from '@/context/UserContext';
 import { useUserMaps, UserMap } from '@/hooks/useUserMaps';
 import { useAdmin } from '@/hooks/useAdmin';
 import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
+import PublicMapEditWizard from '@/components/user-maps/PublicMapEditWizard';
 import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
 import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +51,7 @@ const UserMaps: React.FC = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { hasPro, loading: proLoading } = useProAccess();
   const [showUploadWizard, setShowUploadWizard] = useState(false);
+  const [showEditPublicMap, setShowEditPublicMap] = useState(false);
   const [showAdminRequest, setShowAdminRequest] = useState(false);
   const [deleteSourceMapId, setDeleteSourceMapId] = useState<string | null>(null);
   const [deleteResultMap, setDeleteResultMap] = useState<{ id: string; name: string; table: 'route_maps' | 'route_finder_maps' } | null>(null);
@@ -244,6 +246,17 @@ const UserMaps: React.FC = () => {
     );
   }
 
+  if (showEditPublicMap) {
+    return (
+      <div className="container max-w-4xl mx-auto py-8 px-4">
+        <PublicMapEditWizard
+          onComplete={() => { setShowEditPublicMap(false); fetchUserMaps(); loadResultMaps(); }}
+          onCancel={() => setShowEditPublicMap(false)}
+        />
+      </div>
+    );
+  }
+
   const renderMapCard = (map: ResultMap, table: 'route_maps' | 'route_finder_maps') => {
     const isCommunity = map.map_category === 'community';
     const isEditing = editingName === map.id;
@@ -413,6 +426,10 @@ const UserMaps: React.FC = () => {
               Request Admin
             </Button>
           )}
+          <Button variant="outline" onClick={() => setShowEditPublicMap(true)}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Edit Public Map
+          </Button>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
