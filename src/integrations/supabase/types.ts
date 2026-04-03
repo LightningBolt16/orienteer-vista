@@ -623,6 +623,7 @@ export type Database = {
       route_maps: {
         Row: {
           club_id: string | null
+          color_image_url: string | null
           country_code: string | null
           created_at: string
           description: string | null
@@ -643,6 +644,7 @@ export type Database = {
         }
         Insert: {
           club_id?: string | null
+          color_image_url?: string | null
           country_code?: string | null
           created_at?: string
           description?: string | null
@@ -663,6 +665,7 @@ export type Database = {
         }
         Update: {
           club_id?: string | null
+          color_image_url?: string | null
           country_code?: string | null
           created_at?: string
           description?: string | null

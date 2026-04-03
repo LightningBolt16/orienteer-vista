@@ -76,7 +76,9 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
   const [deleting, setDeleting] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bwInputRef = useRef<HTMLInputElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
   const [uploadingBw, setUploadingBw] = useState(false);
+  const [uploadingColor, setUploadingColor] = useState(false);
 
   const toggleVisibility = async () => {
     const { error } = await supabase
@@ -150,6 +152,26 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
     } finally {
       setUploadingBw(false);
       if (bwInputRef.current) bwInputRef.current.value = '';
+    }
+  };
+
+  const handleColorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || table !== 'route_maps') return;
+    setUploadingColor(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `color/${map.id}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('route-images').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+      await updateField('color_image_url', urlData.publicUrl);
+      toast({ title: 'Color map image uploaded' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploadingColor(false);
+      if (colorInputRef.current) colorInputRef.current.value = '';
     }
   };
 
@@ -297,6 +319,17 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
               {uploadingBw ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).impassability_image_url ? '✓ B&W' : 'B&W'}
             </Button>
             <input ref={bwInputRef} type="file" accept="image/png,image/tiff" className="hidden" onChange={handleBwUpload} />
+            <Button
+              size="sm"
+              variant={(map as any).color_image_url ? 'outline' : 'ghost'}
+              className="h-8 text-xs"
+              onClick={() => colorInputRef.current?.click()}
+              disabled={uploadingColor}
+              title="Upload full color map image"
+            >
+              {uploadingColor ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).color_image_url ? '✓ Color' : 'Color'}
+            </Button>
+            <input ref={colorInputRef} type="file" accept="image/*" className="hidden" onChange={handleColorUpload} />
           </>
         )}
 

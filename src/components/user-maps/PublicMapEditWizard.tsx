@@ -110,7 +110,19 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   useEffect(() => {
     if (!selectedMap) return;
     const loadPreview = async () => {
-      // If map has a source_map_id, try to get the source user_maps R2 color key
+      // Priority 1: color_image_url uploaded by admin
+      const { data: mapWithColor } = await supabase
+        .from('route_maps')
+        .select('color_image_url')
+        .eq('id', selectedMap.id)
+        .maybeSingle();
+
+      if ((mapWithColor as any)?.color_image_url) {
+        setColorPreviewUrl((mapWithColor as any).color_image_url);
+        return;
+      }
+
+      // Priority 2: R2 color key from source user_maps
       if (selectedMap.source_map_id) {
         const { data: userMap } = await supabase
           .from('user_maps')
@@ -119,7 +131,6 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
           .maybeSingle();
         
         if (userMap?.r2_color_key) {
-          // Construct public R2 URL
           const r2PublicBase = 'https://pub-d72218e4aec146adb567299c2968aed4.r2.dev';
           setColorPreviewUrl(`${r2PublicBase}/${userMap.r2_color_key}`);
           return;
@@ -298,10 +309,29 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     if (nextIdx < steps.length) setStep(steps[nextIdx].key);
   };
 
+  const cleanupClone = async () => {
+    if (clonedMapId && !isSubmitted) {
+      try {
+        await supabase.from('user_maps').delete().eq('id', clonedMapId);
+      } catch (e) {
+        console.warn('Failed to cleanup cloned map:', e);
+      }
+      setClonedMapId(null);
+    }
+  };
+
   const handleBack = () => {
     const prevIdx = currentStepIndex - 1;
-    if (prevIdx >= 0) setStep(steps[prevIdx].key);
-    else onCancel?.();
+    if (prevIdx >= 0) {
+      setStep(steps[prevIdx].key);
+    } else {
+      // Going back from first step = cancel
+      cleanupClone().then(() => onCancel?.());
+    }
+  };
+
+  const handleCancel = () => {
+    cleanupClone().then(() => onCancel?.());
   };
 
   const canProceed = () => {
@@ -528,7 +558,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
         {/* Navigation */}
         {!isSubmitted && (
           <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={handleBack}>
+            <Button variant="outline" onClick={step === 'select' ? handleCancel : handleBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               {step === 'select' ? 'Cancel' : 'Back'}
             </Button>
