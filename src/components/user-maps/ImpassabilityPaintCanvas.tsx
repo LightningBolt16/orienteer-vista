@@ -284,7 +284,11 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
         className="relative border rounded-lg overflow-hidden bg-muted"
         style={{ height: '500px' }}
       >
-        {!imageLoaded ? (
+        {imageError ? (
+          <div className="flex items-center justify-center h-full px-4">
+            <p className="text-destructive text-sm text-center">{imageError}</p>
+          </div>
+        ) : !imageLoaded ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>

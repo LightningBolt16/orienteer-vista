@@ -319,6 +319,17 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
               {uploadingBw ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).impassability_image_url ? '✓ B&W' : 'B&W'}
             </Button>
             <input ref={bwInputRef} type="file" accept="image/png,image/tiff" className="hidden" onChange={handleBwUpload} />
+            <Button
+              size="sm"
+              variant={(map as any).color_image_url ? 'outline' : 'ghost'}
+              className="h-8 text-xs"
+              onClick={() => colorInputRef.current?.click()}
+              disabled={uploadingColor}
+              title="Upload full color map image"
+            >
+              {uploadingColor ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).color_image_url ? '✓ Color' : 'Color'}
+            </Button>
+            <input ref={colorInputRef} type="file" accept="image/*" className="hidden" onChange={handleColorUpload} />
           </>
         )}
 

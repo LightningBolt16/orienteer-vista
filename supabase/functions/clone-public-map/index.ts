@@ -181,29 +181,6 @@ Deno.serve(async (req) => {
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
-    if (insertError) {
-      console.error('Failed to create cloned map:', insertError);
-      return new Response(
-        JSON.stringify({ error: `Failed to clone map: ${insertError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({
-        user_map_id: newUserMap.id,
-        name: cloneName,
-        already_exists: false,
-        has_impassability: !!routeMap.impassability_image_url,
-        source_map: {
-          name: routeMap.name,
-          r2_color_key: sourceUserMap.r2_color_key,
-          r2_bw_key: sourceUserMap.r2_bw_key,
-        },
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Clone error:', error);
     return new Response(
