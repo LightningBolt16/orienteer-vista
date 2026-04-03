@@ -1,76 +1,58 @@
 
 
-## Public Map Impassability Editor — Plan
+## Three Fixes: Public Map Editing Access + Admin B&W Upload + Canvas Loading
 
 ### Problem
-Users want to improve public maps by editing their B&W impassability raster (paint/erase black pixels) and adding boundary annotations. This requires a new editing mode on the My Maps page that clones a public map into a private version, lets the user paint on the B&W image, then triggers reprocessing.
+1. Only maps with `source_map_id` appear in the public map editor — official maps without a linked `user_maps` record are excluded
+2. Admins have no way to upload B&W impassability images for official maps
+3. The "Add Boundaries" and "Draw ROI" canvases load forever because `crossOrigin` is missing on image elements
 
-### Architecture
+### Fix 1: Allow all public maps to be cloned
 
-**Two capabilities, different prerequisites:**
-1. **B&W paint/erase** — only available when the public map has a linked `user_maps` record with a `bw_tif_path` (you'd upload these for official maps). The user paints on a rasterized preview of the B&W TIF.
-2. **Boundary annotations** — available for any public map. Uses the existing `ImpassableDrawingCanvas` polygon/line tools on the color map image. Creates a cloned `user_maps` record with the annotations.
+**File**: `src/components/user-maps/PublicMapEditWizard.tsx`
 
-Both produce a cloned private `user_maps` entry owned by the current user, which then gets reprocessed through Modal.
+- Remove the `.not('source_map_id', 'is', null)` filter when loading public maps — show ALL public `route_maps`
+- Update `clone-public-map` edge function to handle maps without a `source_map_id` — instead of requiring a linked `user_maps` record, create a minimal `user_maps` record using the map's first route image as the color reference
+- For maps without source files, skip the clone step entirely and just create a fresh `user_maps` record with annotations/ROI only (no B&W paint step)
 
-### Data flow
+**File**: `supabase/functions/clone-public-map/index.ts`
 
-```text
-User picks public route_map → 
-  Clone user_maps record (new ID, user's user_id) →
-  Copy R2 files to user's namespace (via edge function) →
-  User edits B&W raster / adds annotations →
-  Upload modified B&W back to R2 →
-  Trigger reprocessing →
-  New private route_maps/route_finder_maps created
-```
+- If `source_map_id` is null, create a `user_maps` record with placeholder paths and store the `source_public_map_id`
+- The user can still add annotations and ROI, which get sent to processing
 
-### Database changes
+### Fix 2: Admin B&W image upload
 
-1. **Add `impassability_image_url` column to `route_maps`** — stores a public URL to a pre-rendered PNG of the B&W TIF for maps where you've uploaded one. This avoids needing to download/convert the TIF client-side.
+**File**: `src/components/admin/AdminMapCard.tsx`
 
-2. **Add `source_public_map_id` to `user_maps`** — tracks which public map was cloned, preventing duplicate clones and enabling future syncing.
+- Add a new upload button (visible only for `route_maps` table) that lets admins upload a B&W PNG
+- Upload to the public `maps` storage bucket (or `route-images`) and update `impassability_image_url` on the `route_maps` record
+- Show a small indicator when a map already has an impassability image
 
-### New components
+### Fix 3: Canvas `crossOrigin` fix
 
-1. **`PublicMapEditor`** — new page/modal accessible from My Maps. Shows a list of public maps with an "Edit" button. For maps with impassability data, shows the B&W raster painting canvas. For all maps, shows the annotation overlay tools.
+**Files**: `src/components/user-maps/ImpassableDrawingCanvas.tsx`, `src/components/user-maps/ROIDrawingCanvas.tsx`
 
-2. **`ImpassabilityPaintCanvas`** — new canvas component for painting/erasing on a B&W raster image. Tools: brush (add black), eraser (remove black), brush size slider, pan, zoom. Outputs a modified PNG/bitmap that gets uploaded back as the new B&W image.
+- Add `img.crossOrigin = 'anonymous'` before setting `img.src` in the image loading `useEffect` — matching the pattern already used in `ImpassabilityPaintCanvas.tsx`
+- This allows the canvases to draw cross-origin images from Supabase storage
 
-3. **Edge function `clone-public-map`** — copies R2 files from the source map's namespace to the user's namespace, creates a new `user_maps` record, and returns the new map ID.
+### Fix 4: Better color preview URL
 
-### UI on My Maps page
+**File**: `src/components/user-maps/PublicMapEditWizard.tsx`
 
-- Add a new tab or button: "Edit Public Map" alongside "Upload Map"
-- Shows a grid/list of public `route_maps` that have `source_map_id` pointing to a `user_maps` with B&W data (for paint mode), plus all public maps (for annotation-only mode)
-- Clicking "Edit" opens a wizard:
-  1. **Step 1**: Preview the color map + B&W overlay
-  2. **Step 2**: Paint/erase on B&W (if available) OR add boundary annotations
-  3. **Step 3**: Draw/adjust ROI
-  4. **Step 4**: Configure processing parameters
-  5. **Step 5**: Submit → clones files, creates user_maps record, triggers processing
+- Instead of using a cropped route image as the color preview (which is a small crop, not the full map), use the map's source image directly if available
+- For maps stored in R2, construct the public URL from the R2 color key
+- Fallback to the route image approach if no direct source is available
 
-### ImpassabilityPaintCanvas details
+### Technical details
 
-- Renders the B&W PNG on a canvas with zoom/pan (reuse patterns from `ImpassableDrawingCanvas`)
-- Brush tool: draws black circles on canvas at click/drag positions
-- Eraser tool: draws white circles (removes impassability)
-- Brush size slider (5px–50px in image space)
-- On submit: export canvas to PNG blob, upload to R2 replacing the cloned B&W file
-- The canvas works in image-coordinate space so the output matches the original TIF dimensions
+- The `impassability_image_url` column already exists on `route_maps` (added in previous migration)
+- Storage bucket `maps` is public, suitable for B&W PNG uploads
+- The `crossOrigin` fix is a one-line change per file
+- The clone edge function needs a conditional path for maps without `source_map_id`
 
 ### Implementation order
-
-1. DB migration: add `impassability_image_url` to `route_maps`, add `source_public_map_id` to `user_maps`
-2. Edge function `clone-public-map`: copies R2 files, creates `user_maps` record
-3. `ImpassabilityPaintCanvas` component (new)
-4. `PublicMapEditWizard` component combining paint canvas + existing annotation/ROI tools
-5. Integration into `UserMaps.tsx` page with "Edit Public Map" flow
-6. Upload the pre-rendered B&W PNGs for existing public maps (manual/admin step)
-
-### Key considerations
-
-- The B&W TIF files are large; we render a pre-converted PNG for the editor and only upload the modified version back as a PNG (Modal can handle PNG input alongside TIF)
-- Modal processor may need a small update to accept PNG for B&W input instead of TIF — or we convert PNG→TIF client/server-side before processing
-- ROI from the original map can be pre-filled as a starting point
+1. Canvas `crossOrigin` fix (2 files, 1 line each)
+2. Admin B&W upload button in AdminMapCard
+3. Remove `source_map_id` filter + update clone function
+4. Improve color preview URL logic
 
