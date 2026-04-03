@@ -1,58 +1,46 @@
 
 
-## Three Fixes: Public Map Editing Access + Admin B&W Upload + Canvas Loading
+## Three Fixes: Cancel Cleanup + B&W Paint Loading + Admin Color Map Upload
 
-### Problem
-1. Only maps with `source_map_id` appear in the public map editor — official maps without a linked `user_maps` record are excluded
-2. Admins have no way to upload B&W impassability images for official maps
-3. The "Add Boundaries" and "Draw ROI" canvases load forever because `crossOrigin` is missing on image elements
+### Problem 1: Cancel leaves orphaned "processing" clone
+When the user clicks "Start Editing" on a public map, the wizard immediately calls `clone-public-map` which creates a `user_maps` record with `status: 'pending'`. If the user then cancels, that record remains — showing as a "processing" map in their list.
 
-### Fix 1: Allow all public maps to be cloned
+**Fix**: In `PublicMapEditWizard.tsx`, update `onCancel` to delete the cloned `user_maps` record if one was created but never submitted. Add a cleanup function that runs when the user cancels or navigates back to step 'select' from a later step.
 
-**File**: `src/components/user-maps/PublicMapEditWizard.tsx`
+```
+onCancel → if clonedMapId exists && !isSubmitted → DELETE from user_maps where id = clonedMapId → then call parent onCancel
+```
 
-- Remove the `.not('source_map_id', 'is', null)` filter when loading public maps — show ALL public `route_maps`
-- Update `clone-public-map` edge function to handle maps without a `source_map_id` — instead of requiring a linked `user_maps` record, create a minimal `user_maps` record using the map's first route image as the color reference
-- For maps without source files, skip the clone step entirely and just create a fresh `user_maps` record with annotations/ROI only (no B&W paint step)
+Also update `handleBack` so going back from step 1 (to cancel) triggers the same cleanup.
 
-**File**: `supabase/functions/clone-public-map/index.ts`
+### Problem 2: B&W impassability paint canvas loads forever
+The `ImpassabilityPaintCanvas` already has `img.crossOrigin = 'anonymous'` (line 44), so the CORS fix is in place. The likely issue is that the `impassability_image_url` stored in `route_maps` may be pointing to a URL that requires different CORS headers, or the image simply fails to load silently.
 
-- If `source_map_id` is null, create a `user_maps` record with placeholder paths and store the `source_public_map_id`
-- The user can still add annotations and ROI, which get sent to processing
+**Fix**: Add an `img.onerror` handler in `ImpassabilityPaintCanvas.tsx` that sets a loading error state and shows a message instead of spinning forever. Also ensure the URL is valid before attempting to load.
 
-### Fix 2: Admin B&W image upload
+### Problem 3: Admin needs to upload color map for official maps
+Currently there's no way to upload a full color map image for official `route_maps`. The color preview in the edit wizard falls back to a small route image crop, which is inadequate.
 
-**File**: `src/components/admin/AdminMapCard.tsx`
-
-- Add a new upload button (visible only for `route_maps` table) that lets admins upload a B&W PNG
-- Upload to the public `maps` storage bucket (or `route-images`) and update `impassability_image_url` on the `route_maps` record
-- Show a small indicator when a map already has an impassability image
-
-### Fix 3: Canvas `crossOrigin` fix
-
-**Files**: `src/components/user-maps/ImpassableDrawingCanvas.tsx`, `src/components/user-maps/ROIDrawingCanvas.tsx`
-
-- Add `img.crossOrigin = 'anonymous'` before setting `img.src` in the image loading `useEffect` — matching the pattern already used in `ImpassabilityPaintCanvas.tsx`
-- This allows the canvases to draw cross-origin images from Supabase storage
-
-### Fix 4: Better color preview URL
-
-**File**: `src/components/user-maps/PublicMapEditWizard.tsx`
-
-- Instead of using a cropped route image as the color preview (which is a small crop, not the full map), use the map's source image directly if available
-- For maps stored in R2, construct the public URL from the R2 color key
-- Fallback to the route image approach if no direct source is available
+**Fix**: Add a `color_image_url` column to `route_maps` via migration. Add a "Color" upload button in `AdminMapCard.tsx` (next to the existing B&W button) that uploads a full color PNG/JPG to the `route-images` bucket and stores the public URL. Update `PublicMapEditWizard.tsx` to prefer `color_image_url` over the R2/route-image fallback chain.
 
 ### Technical details
 
-- The `impassability_image_url` column already exists on `route_maps` (added in previous migration)
-- Storage bucket `maps` is public, suitable for B&W PNG uploads
-- The `crossOrigin` fix is a one-line change per file
-- The clone edge function needs a conditional path for maps without `source_map_id`
+**Migration**:
+```sql
+ALTER TABLE public.route_maps ADD COLUMN IF NOT EXISTS color_image_url text;
+```
+
+**Files to modify**:
+- `src/components/user-maps/PublicMapEditWizard.tsx` — cleanup on cancel, use `color_image_url` for preview
+- `src/components/user-maps/ImpassabilityPaintCanvas.tsx` — add onerror handler
+- `src/components/admin/AdminMapCard.tsx` — add color map upload button
+- `supabase/functions/clone-public-map/index.ts` — remove dead code after line 184
+- New migration for `color_image_url`
 
 ### Implementation order
-1. Canvas `crossOrigin` fix (2 files, 1 line each)
-2. Admin B&W upload button in AdminMapCard
-3. Remove `source_map_id` filter + update clone function
-4. Improve color preview URL logic
+1. Migration: add `color_image_url` to `route_maps`
+2. Cancel cleanup in PublicMapEditWizard
+3. ImpassabilityPaintCanvas error handling
+4. Admin color map upload button
+5. Use `color_image_url` in preview fallback chain
 
