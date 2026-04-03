@@ -547,7 +547,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
         {/* Navigation */}
         {!isSubmitted && (
           <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={handleBack}>
+            <Button variant="outline" onClick={step === 'select' ? handleCancel : handleBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               {step === 'select' ? 'Cancel' : 'Back'}
             </Button>
