@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin, Trash2, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,8 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const bwInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingBw, setUploadingBw] = useState(false);
 
   const toggleVisibility = async () => {
     const { error } = await supabase
@@ -129,6 +131,26 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
     }
     await updateField('logo_path', path);
     toast({ title: 'Logo updated' });
+  };
+
+  const handleBwUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || table !== 'route_maps') return;
+    setUploadingBw(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `bw/${map.id}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('route-images').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+      await updateField('impassability_image_url', urlData.publicUrl);
+      toast({ title: 'B&W impassability image uploaded' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploadingBw(false);
+      if (bwInputRef.current) bwInputRef.current.value = '';
+    }
   };
 
   const handleDelete = async () => {
@@ -260,10 +282,21 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
 
         {table === 'route_maps' && (
           <>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRef.current?.click()}>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRef.current?.click()} title="Upload logo">
               {map.logo_path ? <Image className="h-4 w-4 text-primary" /> : <Flag className="h-4 w-4 text-muted-foreground" />}
             </Button>
             <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            <Button
+              size="sm"
+              variant={(map as any).impassability_image_url ? 'outline' : 'ghost'}
+              className="h-8 text-xs"
+              onClick={() => bwInputRef.current?.click()}
+              disabled={uploadingBw}
+              title="Upload B&W impassability image"
+            >
+              {uploadingBw ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).impassability_image_url ? '✓ B&W' : 'B&W'}
+            </Button>
+            <input ref={bwInputRef} type="file" accept="image/png,image/tiff" className="hidden" onChange={handleBwUpload} />
           </>
         )}
 

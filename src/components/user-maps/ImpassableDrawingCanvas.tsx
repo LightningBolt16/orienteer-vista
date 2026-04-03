@@ -65,6 +65,7 @@ const ImpassableDrawingCanvas: React.FC<ImpassableDrawingCanvasProps> = ({
   // Load image
   useEffect(() => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       imageRef.current = img;
       setImageDimensions({ width: img.width, height: img.height });
