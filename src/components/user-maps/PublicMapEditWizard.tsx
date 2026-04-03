@@ -93,7 +93,6 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
           .from('route_maps')
           .select('id, name, source_map_id, impassability_image_url, country_code, description')
           .eq('is_public', true)
-          .not('source_map_id', 'is', null)
           .order('name');
 
         if (error) throw error;
