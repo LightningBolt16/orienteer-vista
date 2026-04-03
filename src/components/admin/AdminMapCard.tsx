@@ -155,6 +155,26 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
     }
   };
 
+  const handleColorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || table !== 'route_maps') return;
+    setUploadingColor(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `color/${map.id}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('route-images').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+      await updateField('color_image_url', urlData.publicUrl);
+      toast({ title: 'Color map image uploaded' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploadingColor(false);
+      if (colorInputRef.current) colorInputRef.current.value = '';
+    }
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
