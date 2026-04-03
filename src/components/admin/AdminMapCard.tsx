@@ -165,6 +165,11 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
   const handleColorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || table !== 'route_maps') return;
+    if (file.size > MAX_UPLOAD_SIZE) {
+      toast({ title: 'File too large', description: `Max size is 500MB. Your file is ${(file.size / 1024 / 1024).toFixed(0)}MB.`, variant: 'destructive' });
+      if (colorInputRef.current) colorInputRef.current.value = '';
+      return;
+    }
     setUploadingColor(true);
     try {
       const ext = file.name.split('.').pop();
