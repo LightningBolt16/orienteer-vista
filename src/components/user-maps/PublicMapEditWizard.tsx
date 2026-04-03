@@ -357,7 +357,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
               </div>
             ) : filteredMaps.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No public maps with source files available.
+                No public maps available.
               </p>
             ) : (
               <div className="grid gap-2 max-h-[400px] overflow-y-auto">

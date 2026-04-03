@@ -282,10 +282,21 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
 
         {table === 'route_maps' && (
           <>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRef.current?.click()}>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => logoInputRef.current?.click()} title="Upload logo">
               {map.logo_path ? <Image className="h-4 w-4 text-primary" /> : <Flag className="h-4 w-4 text-muted-foreground" />}
             </Button>
             <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            <Button
+              size="sm"
+              variant={(map as any).impassability_image_url ? 'outline' : 'ghost'}
+              className="h-8 text-xs"
+              onClick={() => bwInputRef.current?.click()}
+              disabled={uploadingBw}
+              title="Upload B&W impassability image"
+            >
+              {uploadingBw ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).impassability_image_url ? '✓ B&W' : 'B&W'}
+            </Button>
+            <input ref={bwInputRef} type="file" accept="image/png,image/tiff" className="hidden" onChange={handleBwUpload} />
           </>
         )}
 
