@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin, Trash2, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
