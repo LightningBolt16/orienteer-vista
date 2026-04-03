@@ -107,11 +107,26 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   }, []);
 
   // Get a preview image for the selected map's color version
-  // We can use the route_images table to find an image for this map
   useEffect(() => {
     if (!selectedMap) return;
     const loadPreview = async () => {
-      // Try to get the first route image for this map as a reference
+      // If map has a source_map_id, try to get the source user_maps R2 color key
+      if (selectedMap.source_map_id) {
+        const { data: userMap } = await supabase
+          .from('user_maps')
+          .select('r2_color_key')
+          .eq('id', selectedMap.source_map_id)
+          .maybeSingle();
+        
+        if (userMap?.r2_color_key) {
+          // Construct public R2 URL
+          const r2PublicBase = 'https://pub-d72218e4aec146adb567299c2968aed4.r2.dev';
+          setColorPreviewUrl(`${r2PublicBase}/${userMap.r2_color_key}`);
+          return;
+        }
+      }
+      
+      // Fallback: use the first route image
       const { data: images } = await supabase
         .from('route_images')
         .select('image_path')
