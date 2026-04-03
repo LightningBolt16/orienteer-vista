@@ -1,0 +1,1 @@
+ALTER TABLE public.route_maps ADD COLUMN IF NOT EXISTS color_image_url text;
