@@ -133,6 +133,26 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
     toast({ title: 'Logo updated' });
   };
 
+  const handleBwUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || table !== 'route_maps') return;
+    setUploadingBw(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `bw/${map.id}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('route-images').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+      await updateField('impassability_image_url', urlData.publicUrl);
+      toast({ title: 'B&W impassability image uploaded' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setUploadingBw(false);
+      if (bwInputRef.current) bwInputRef.current.value = '';
+    }
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
