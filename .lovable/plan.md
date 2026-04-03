@@ -1,46 +1,47 @@
 
 
-## Three Fixes: Cancel Cleanup + B&W Paint Loading + Admin Color Map Upload
+## Fix File Upload Size Limits, B&W Image Loading, and Storage Accessibility
 
-### Problem 1: Cancel leaves orphaned "processing" clone
-When the user clicks "Start Editing" on a public map, the wizard immediately calls `clone-public-map` which creates a `user_maps` record with `status: 'pending'`. If the user then cancels, that record remains — showing as a "processing" map in their list.
+### Problems identified
 
-**Fix**: In `PublicMapEditWizard.tsx`, update `onCancel` to delete the cloned `user_maps` record if one was created but never submitted. Add a cleanup function that runs when the user cancels or navigates back to step 'select' from a later step.
+1. **Color map upload fails ("file too large")**: The admin uploads color/B&W images to the `route-images` bucket, which has no `file_size_limit` set (Supabase defaults to ~50MB). Large orienteering map images easily exceed this.
 
-```
-onCancel → if clonedMapId exists && !isSubmitted → DELETE from user_maps where id = clonedMapId → then call parent onCancel
-```
+2. **B&W impassability image fails to load in paint canvas**: The `ImpassabilityPaintCanvas` already has `crossOrigin = 'anonymous'` and `onerror` handling. The console shows `Failed to load image`. The likely cause: the `impassability_image_url` stored in `route_maps` points to the `route-images` bucket, but the URL may have CORS issues or the image genuinely failed to upload properly (related to problem 1). Once the upload size issue is fixed and a valid image is uploaded, this should resolve.
 
-Also update `handleBack` so going back from step 1 (to cancel) triggers the same cleanup.
+3. **Private `user-map-sources` bucket blocks cloning**: When user maps are uploaded via the private upload wizard, their TIF files go to the private `user-map-sources` bucket. If these maps are later made public, the source files are inaccessible for cloning. The R2 storage path works (R2 keys are public), but Supabase-stored maps would fail.
 
-### Problem 2: B&W impassability paint canvas loads forever
-The `ImpassabilityPaintCanvas` already has `img.crossOrigin = 'anonymous'` (line 44), so the CORS fix is in place. The likely issue is that the `impassability_image_url` stored in `route_maps` may be pointing to a URL that requires different CORS headers, or the image simply fails to load silently.
+### Fix 1: Increase `route-images` bucket file size limit
 
-**Fix**: Add an `img.onerror` handler in `ImpassabilityPaintCanvas.tsx` that sets a loading error state and shows a message instead of spinning forever. Also ensure the URL is valid before attempting to load.
+**Migration**: Set `file_size_limit` on the `route-images` bucket to 500MB (matching `user-map-sources`), since admin-uploaded color maps and B&W images can be very large TIFs/PNGs.
 
-### Problem 3: Admin needs to upload color map for official maps
-Currently there's no way to upload a full color map image for official `route_maps`. The color preview in the edit wizard falls back to a small route image crop, which is inadequate.
-
-**Fix**: Add a `color_image_url` column to `route_maps` via migration. Add a "Color" upload button in `AdminMapCard.tsx` (next to the existing B&W button) that uploads a full color PNG/JPG to the `route-images` bucket and stores the public URL. Update `PublicMapEditWizard.tsx` to prefer `color_image_url` over the R2/route-image fallback chain.
-
-### Technical details
-
-**Migration**:
 ```sql
-ALTER TABLE public.route_maps ADD COLUMN IF NOT EXISTS color_image_url text;
+UPDATE storage.buckets 
+SET file_size_limit = 524288000
+WHERE id = 'route-images';
 ```
 
-**Files to modify**:
-- `src/components/user-maps/PublicMapEditWizard.tsx` — cleanup on cancel, use `color_image_url` for preview
-- `src/components/user-maps/ImpassabilityPaintCanvas.tsx` — add onerror handler
-- `src/components/admin/AdminMapCard.tsx` — add color map upload button
-- `supabase/functions/clone-public-map/index.ts` — remove dead code after line 184
-- New migration for `color_image_url`
+### Fix 2: Add RLS policy for admin uploads to `route-images`
+
+Currently admins upload to `route-images` via `supabase.storage.from('route-images').upload()`. Need to verify storage RLS allows this. Add admin insert/update policies on `storage.objects` for the `route-images` bucket if missing.
+
+### Fix 3: Ensure public map source files are accessible
+
+For the `user-map-sources` bucket (private), when a map's associated `route_maps` entry is public, the clone edge function uses the **service role key** (it already does — line 23 of `clone-public-map/index.ts`), so it can read from private buckets. The clone function doesn't actually copy files from storage — it copies the R2 keys/paths. So this works for R2-stored maps.
+
+For Supabase-stored maps being made public, the `clone-public-map` function just copies the path references (not actual files). The processing pipeline will use the service role to access them. No change needed here.
+
+### Fix 4: Validate the B&W image URL is reachable
+
+In `PublicMapEditWizard.tsx`, add a pre-check that tries to fetch the `impassability_image_url` with a HEAD request before passing it to the paint canvas. If it fails, show an error message instead of loading the canvas.
+
+### Files to modify
+
+1. **New migration** — increase `route-images` bucket limit + ensure storage RLS policies for admin uploads
+2. **`src/components/user-maps/PublicMapEditWizard.tsx`** — add URL validation before loading paint canvas
+3. **`src/components/admin/AdminMapCard.tsx`** — add file size validation with clear error message before upload attempt (warn if >500MB)
 
 ### Implementation order
-1. Migration: add `color_image_url` to `route_maps`
-2. Cancel cleanup in PublicMapEditWizard
-3. ImpassabilityPaintCanvas error handling
-4. Admin color map upload button
-5. Use `color_image_url` in preview fallback chain
+1. Migration: bucket size limit + storage RLS
+2. Admin upload: client-side size validation with helpful error
+3. Wizard: B&W URL pre-validation
 
