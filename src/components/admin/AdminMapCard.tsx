@@ -75,6 +75,8 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const bwInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingBw, setUploadingBw] = useState(false);
 
   const toggleVisibility = async () => {
     const { error } = await supabase
