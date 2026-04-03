@@ -43,6 +43,51 @@ interface Point {
   y: number;
 }
 
+// Sub-component with URL pre-validation for B&W paint step
+const PaintStep: React.FC<{ imageUrl: string; onExport: (blob: Blob) => void; editedBwBlob: Blob | null }> = ({ imageUrl, onExport, editedBwBlob }) => {
+  const [urlValid, setUrlValid] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setUrlValid(null);
+    fetch(imageUrl, { method: 'HEAD', mode: 'cors' })
+      .then(res => setUrlValid(res.ok))
+      .catch(() => setUrlValid(false));
+  }, [imageUrl]);
+
+  if (urlValid === null) {
+    return (
+      <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">Checking image availability...</span>
+      </div>
+    );
+  }
+
+  if (urlValid === false) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+          <p className="text-sm text-destructive">
+            Failed to load the B&W impassability image. The image may not have been uploaded yet or is inaccessible. You can skip this step.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Paint or erase black pixels on the impassability map. Black areas will be treated as impassable terrain.
+      </p>
+      <ImpassabilityPaintCanvas imageUrl={imageUrl} onExport={onExport} />
+      {editedBwBlob && (
+        <p className="text-sm text-green-600">✓ B&W edits captured ({(editedBwBlob.size / 1024).toFixed(0)} KB)</p>
+      )}
+    </div>
+  );
+};
+
 interface PublicMapEditWizardProps {
   onComplete?: () => void;
   onCancel?: () => void;
@@ -431,18 +476,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
         {/* Step: Paint B&W */}
         {step === 'paint' && selectedMap?.impassability_image_url && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Paint or erase black pixels on the impassability map. Black areas will be treated as impassable terrain.
-            </p>
-            <ImpassabilityPaintCanvas
-              imageUrl={selectedMap.impassability_image_url}
-              onExport={handlePaintExport}
-            />
-            {editedBwBlob && (
-              <p className="text-sm text-green-600">✓ B&W edits captured ({(editedBwBlob.size / 1024).toFixed(0)} KB)</p>
-            )}
-          </div>
+          <PaintStep
+            imageUrl={selectedMap.impassability_image_url}
+            onExport={handlePaintExport}
+            editedBwBlob={editedBwBlob}
+          />
         )}
 
         {/* Step: Annotations */}
