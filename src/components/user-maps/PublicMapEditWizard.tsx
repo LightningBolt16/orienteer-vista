@@ -298,10 +298,29 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     if (nextIdx < steps.length) setStep(steps[nextIdx].key);
   };
 
+  const cleanupClone = async () => {
+    if (clonedMapId && !isSubmitted) {
+      try {
+        await supabase.from('user_maps').delete().eq('id', clonedMapId);
+      } catch (e) {
+        console.warn('Failed to cleanup cloned map:', e);
+      }
+      setClonedMapId(null);
+    }
+  };
+
   const handleBack = () => {
     const prevIdx = currentStepIndex - 1;
-    if (prevIdx >= 0) setStep(steps[prevIdx].key);
-    else onCancel?.();
+    if (prevIdx >= 0) {
+      setStep(steps[prevIdx].key);
+    } else {
+      // Going back from first step = cancel
+      cleanupClone().then(() => onCancel?.());
+    }
+  };
+
+  const handleCancel = () => {
+    cleanupClone().then(() => onCancel?.());
   };
 
   const canProceed = () => {
