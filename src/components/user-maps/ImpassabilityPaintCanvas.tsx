@@ -41,6 +41,8 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
 
   // Load image
   useEffect(() => {
+    setImageError(null);
+    setImageLoaded(false);
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -58,6 +60,9 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
 
       // Save initial state
       undoStack.current = [ctx.getImageData(0, 0, img.width, img.height)];
+    };
+    img.onerror = () => {
+      setImageError('Failed to load the impassability image. The URL may be invalid or inaccessible.');
     };
     img.src = imageUrl;
   }, [imageUrl]);
