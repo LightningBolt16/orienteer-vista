@@ -47,32 +47,39 @@ interface Point {
   y: number;
 }
 
-// Sub-component with URL pre-validation for B&W paint step
+// Sub-component that resolves B&W image URL (handling TIFF conversion)
 const PaintStep: React.FC<{ imageUrl: string; onExport: (blob: Blob) => void; editedBwBlob: Blob | null }> = ({ imageUrl, onExport, editedBwBlob }) => {
-  const [urlValid, setUrlValid] = useState<boolean | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setUrlValid(null);
-    fetch(imageUrl, { method: 'HEAD', mode: 'cors' })
-      .then(res => setUrlValid(res.ok))
-      .catch(() => setUrlValid(false));
+    setLoading(true);
+    setError(null);
+    
+    // Use the resolver which handles TIFF conversion
+    import('@/utils/r2Preview').then(({ resolveImageUrl }) => {
+      resolveImageUrl(imageUrl)
+        .then(url => { setResolvedUrl(url); setLoading(false); })
+        .catch(err => { setError(err.message); setLoading(false); });
+    });
   }, [imageUrl]);
 
-  if (urlValid === null) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-2 text-sm text-muted-foreground">Checking image availability...</span>
+        <span className="ml-2 text-sm text-muted-foreground">Loading impassability image...</span>
       </div>
     );
   }
 
-  if (urlValid === false) {
+  if (error || !resolvedUrl) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
           <p className="text-sm text-destructive">
-            Failed to load the B&W impassability image. The image may not have been uploaded yet or is inaccessible. You can skip this step.
+            Failed to load the B&W impassability image: {error || 'Unknown error'}. You can skip this step.
           </p>
         </div>
       </div>
@@ -84,7 +91,7 @@ const PaintStep: React.FC<{ imageUrl: string; onExport: (blob: Blob) => void; ed
       <p className="text-sm text-muted-foreground">
         Paint or erase black pixels on the impassability map. Black areas will be treated as impassable terrain.
       </p>
-      <ImpassabilityPaintCanvas imageUrl={imageUrl} onExport={onExport} />
+      <ImpassabilityPaintCanvas imageUrl={resolvedUrl} onExport={onExport} />
       {editedBwBlob && (
         <p className="text-sm text-green-600">✓ B&W edits captured ({(editedBwBlob.size / 1024).toFixed(0)} KB)</p>
       )}
