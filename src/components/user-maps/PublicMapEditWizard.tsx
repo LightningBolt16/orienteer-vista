@@ -162,52 +162,42 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     loadPublicMaps();
   }, []);
 
-  // Get a preview image for the selected map's color version
+  // Resolve color preview using the full fallback chain
   useEffect(() => {
     if (!selectedMap) return;
-    const loadPreview = async () => {
-      // Priority 1: color_image_url uploaded by admin
-      const { data: mapWithColor } = await supabase
-        .from('route_maps')
-        .select('color_image_url')
-        .eq('id', selectedMap.id)
-        .maybeSingle();
-
-      if ((mapWithColor as any)?.color_image_url) {
-        setColorPreviewUrl((mapWithColor as any).color_image_url);
-        return;
-      }
-
-      // Priority 2: R2 color key from source user_maps
+    const resolve = async () => {
+      // Get source user_maps R2 key if linked
+      let sourceR2ColorKey: string | null = null;
       if (selectedMap.source_map_id) {
         const { data: userMap } = await supabase
           .from('user_maps')
           .select('r2_color_key')
           .eq('id', selectedMap.source_map_id)
           .maybeSingle();
-        
-        if (userMap?.r2_color_key) {
-          const r2PublicBase = 'https://pub-d72218e4aec146adb567299c2968aed4.r2.dev';
-          setColorPreviewUrl(`${r2PublicBase}/${userMap.r2_color_key}`);
-          return;
-        }
+        sourceR2ColorKey = userMap?.r2_color_key || null;
       }
-      
-      // Fallback: use the first route image
+
+      // Get fallback route image URL
+      let fallbackUrl: string | null = null;
       const { data: images } = await supabase
         .from('route_images')
         .select('image_path')
         .eq('map_id', selectedMap.id)
         .limit(1);
-
       if (images && images.length > 0) {
-        const { data: urlData } = supabase.storage
-          .from('route-images')
-          .getPublicUrl(images[0].image_path);
-        setColorPreviewUrl(urlData.publicUrl);
+        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(images[0].image_path);
+        fallbackUrl = urlData.publicUrl;
       }
+
+      const resolved = await resolveColorPreview(
+        selectedMap.color_image_url,
+        selectedMap.color_r2_key,
+        sourceR2ColorKey,
+        fallbackUrl,
+      );
+      setColorPreviewUrl(resolved);
     };
-    loadPreview();
+    resolve();
   }, [selectedMap]);
 
   const filteredMaps = publicMaps.filter(m =>
