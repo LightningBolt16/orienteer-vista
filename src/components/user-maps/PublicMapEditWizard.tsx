@@ -139,6 +139,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   // Color map preview URL (for annotation/ROI steps)
   const [colorPreviewUrl, setColorPreviewUrl] = useState<string | null>(null);
+  // Resolved B&W URL for paint step
+  const [resolvedBwUrl, setResolvedBwUrl] = useState<string | null>(null);
 
   // Load public maps
   useEffect(() => {
