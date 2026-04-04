@@ -516,6 +516,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <span className="ml-2 text-sm text-muted-foreground">Resolving B&W image...</span>
           </div>
+        )}
 
         {/* Step: Annotations */}
         {step === 'annotations' && (
