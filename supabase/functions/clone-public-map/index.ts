@@ -7,7 +7,8 @@ const corsHeaders = {
 
 /**
  * Clone a public map's user_maps record for the current user.
- * Prefers route_maps-level R2 keys, then falls back to source user_maps.
+ * Returns resolved source asset references so the client never needs
+ * to query private user_maps rows directly.
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get the public route_map (including new R2 key fields)
+    // Get the public route_map
     const { data: routeMap, error: rmError } = await supabase
       .from('route_maps')
       .select('*')
@@ -70,11 +71,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingClone) {
+      // Still resolve assets for the existing clone
+      const resolved = await resolveAssets(supabase, routeMap);
       return new Response(
         JSON.stringify({ 
           user_map_id: existingClone.id, 
           already_exists: true,
-          message: 'You already have a clone of this map' 
+          message: 'You already have a clone of this map',
+          ...resolved,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -82,39 +86,25 @@ Deno.serve(async (req) => {
 
     const cloneName = `${routeMap.name} (edited)`;
 
-    // Determine R2 keys: prefer route_maps-level keys, then source user_maps keys
-    let colorR2Key = routeMap.color_r2_key || null;
-    let bwR2Key = routeMap.bw_r2_key || null;
-    let sourceUserMap: any = null;
-
-    if (routeMap.source_map_id) {
-      const { data: sum } = await supabase
-        .from('user_maps')
-        .select('*')
-        .eq('id', routeMap.source_map_id)
-        .single();
-      sourceUserMap = sum;
-
-      if (!colorR2Key && sum?.r2_color_key) colorR2Key = sum.r2_color_key;
-      if (!bwR2Key && sum?.r2_bw_key) bwR2Key = sum.r2_bw_key;
-    }
+    // Resolve R2 keys: prefer route_maps-level keys, then source user_maps keys
+    const resolved = await resolveAssets(supabase, routeMap);
 
     // Build the insert record
     const insertData: Record<string, any> = {
       user_id: user.id,
       name: cloneName,
-      roi_coordinates: sourceUserMap?.roi_coordinates || [],
-      processing_parameters: sourceUserMap?.processing_parameters || {},
+      roi_coordinates: resolved.sourceUserMap?.roi_coordinates || [],
+      processing_parameters: resolved.sourceUserMap?.processing_parameters || {},
       status: 'pending',
       storage_provider: 'r2',
       source_public_map_id: source_map_id,
-      r2_color_key: colorR2Key,
-      r2_bw_key: bwR2Key,
-      color_tif_path: colorR2Key || `placeholder/${source_map_id}/color`,
-      bw_tif_path: bwR2Key || `placeholder/${source_map_id}/bw`,
-      is_tiled: sourceUserMap?.is_tiled || false,
-      tile_grid: sourceUserMap?.tile_grid || null,
-      impassable_annotations: sourceUserMap?.impassable_annotations || null,
+      r2_color_key: resolved.colorR2Key,
+      r2_bw_key: resolved.bwR2Key,
+      color_tif_path: resolved.colorR2Key || `placeholder/${source_map_id}/color`,
+      bw_tif_path: resolved.bwR2Key || `placeholder/${source_map_id}/bw`,
+      is_tiled: resolved.sourceUserMap?.is_tiled || false,
+      tile_grid: resolved.sourceUserMap?.tile_grid || null,
+      impassable_annotations: resolved.sourceUserMap?.impassable_annotations || null,
     };
 
     const { data: newUserMap, error: insertError } = await supabase
@@ -136,11 +126,15 @@ Deno.serve(async (req) => {
         user_map_id: newUserMap.id,
         name: cloneName,
         already_exists: false,
-        has_impassability: !!routeMap.impassability_image_url || !!bwR2Key,
+        has_impassability: resolved.hasBw,
+        color_r2_key: resolved.colorR2Key,
+        bw_r2_key: resolved.bwR2Key,
+        color_image_url: routeMap.color_image_url || null,
+        impassability_image_url: routeMap.impassability_image_url || null,
         source_map: {
           name: routeMap.name,
-          r2_color_key: colorR2Key,
-          r2_bw_key: bwR2Key,
+          r2_color_key: resolved.colorR2Key,
+          r2_bw_key: resolved.bwR2Key,
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -153,3 +147,30 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+/**
+ * Resolve source assets server-side, bypassing RLS.
+ * Returns the best available R2 keys and whether B&W editing is available.
+ */
+async function resolveAssets(supabase: any, routeMap: any) {
+  let colorR2Key = routeMap.color_r2_key || null;
+  let bwR2Key = routeMap.bw_r2_key || null;
+  let sourceUserMap: any = null;
+
+  // If route_map links to a source user_maps, fetch it server-side (no RLS issue)
+  if (routeMap.source_map_id) {
+    const { data: sum } = await supabase
+      .from('user_maps')
+      .select('*')
+      .eq('id', routeMap.source_map_id)
+      .single();
+    sourceUserMap = sum;
+
+    if (!colorR2Key && sum?.r2_color_key) colorR2Key = sum.r2_color_key;
+    if (!bwR2Key && sum?.r2_bw_key) bwR2Key = sum.r2_bw_key;
+  }
+
+  const hasBw = !!(routeMap.impassability_image_url || bwR2Key);
+
+  return { colorR2Key, bwR2Key, hasBw, sourceUserMap };
+}
