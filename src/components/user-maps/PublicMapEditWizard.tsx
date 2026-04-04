@@ -140,14 +140,14 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   // Color map preview URL (for annotation/ROI steps)
   const [colorPreviewUrl, setColorPreviewUrl] = useState<string | null>(null);
 
-  // Load public maps that have source_map_id (so we can clone their files)
+  // Load public maps
   useEffect(() => {
     const loadPublicMaps = async () => {
       setLoadingMaps(true);
       try {
         const { data, error } = await supabase
           .from('route_maps')
-          .select('id, name, source_map_id, impassability_image_url, country_code, description')
+          .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description')
           .eq('is_public', true)
           .order('name');
 
