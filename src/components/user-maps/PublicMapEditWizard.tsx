@@ -360,8 +360,10 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     const base: { key: WizardStep; label: string }[] = [
       { key: 'select', label: 'Select Map' },
     ];
-    if (selectedMap?.impassability_image_url) {
+    const hasBw = selectedMap?.impassability_image_url || selectedMap?.bw_r2_key;
+    if (hasBw) {
       base.push({ key: 'paint', label: 'Edit Impassability' });
+    }
     }
     base.push(
       { key: 'annotations', label: 'Add Boundaries' },
