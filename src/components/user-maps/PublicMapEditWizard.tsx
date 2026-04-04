@@ -16,6 +16,7 @@ import RouteFinderParametersForm, { RouteFinderParameters, DEFAULT_ROUTE_FINDER_
 import { ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { uploadMapFilesToR2 } from '@/utils/r2Upload';
+import { resolveColorPreview, resolveBwPreview } from '@/utils/r2Preview';
 
 interface PublicMap {
   id: string;
