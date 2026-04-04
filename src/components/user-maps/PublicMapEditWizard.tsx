@@ -202,6 +202,29 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     resolve();
   }, [selectedMap]);
 
+  // Resolve B&W URL for paint step
+  useEffect(() => {
+    if (!selectedMap) return;
+    const resolve = async () => {
+      let sourceBwKey: string | null = null;
+      if (selectedMap.source_map_id) {
+        const { data: userMap } = await supabase
+          .from('user_maps')
+          .select('r2_bw_key')
+          .eq('id', selectedMap.source_map_id)
+          .maybeSingle();
+        sourceBwKey = userMap?.r2_bw_key || null;
+      }
+      const resolved = await resolveBwPreview(
+        selectedMap.impassability_image_url,
+        selectedMap.bw_r2_key,
+        sourceBwKey,
+      );
+      setResolvedBwUrl(resolved);
+    };
+    resolve();
+  }, [selectedMap]);
+
   const filteredMaps = publicMaps.filter(m =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
