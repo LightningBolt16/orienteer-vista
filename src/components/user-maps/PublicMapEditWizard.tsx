@@ -364,7 +364,6 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     if (hasBw) {
       base.push({ key: 'paint', label: 'Edit Impassability' });
     }
-    }
     base.push(
       { key: 'annotations', label: 'Add Boundaries' },
       { key: 'roi', label: 'Draw ROI' },
