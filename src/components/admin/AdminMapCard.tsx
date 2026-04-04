@@ -71,6 +71,7 @@ interface AdminMapCardProps {
 }
 
 const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showDelete = true }) => {
+  const { user } = useUser();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(map.name);
   const [saving, setSaving] = useState(false);
