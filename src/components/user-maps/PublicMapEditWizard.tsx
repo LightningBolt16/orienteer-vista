@@ -504,13 +504,18 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
         )}
 
         {/* Step: Paint B&W */}
-        {step === 'paint' && selectedMap?.impassability_image_url && (
+        {step === 'paint' && resolvedBwUrl && (
           <PaintStep
-            imageUrl={selectedMap.impassability_image_url}
+            imageUrl={resolvedBwUrl}
             onExport={handlePaintExport}
             editedBwBlob={editedBwBlob}
           />
         )}
+        {step === 'paint' && !resolvedBwUrl && (
+          <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="ml-2 text-sm text-muted-foreground">Resolving B&W image...</span>
+          </div>
 
         {/* Step: Annotations */}
         {step === 'annotations' && (
