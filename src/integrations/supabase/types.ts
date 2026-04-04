@@ -622,8 +622,10 @@ export type Database = {
       }
       route_maps: {
         Row: {
+          bw_r2_key: string | null
           club_id: string | null
           color_image_url: string | null
+          color_r2_key: string | null
           country_code: string | null
           created_at: string
           description: string | null
@@ -643,8 +645,10 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          bw_r2_key?: string | null
           club_id?: string | null
           color_image_url?: string | null
+          color_r2_key?: string | null
           country_code?: string | null
           created_at?: string
           description?: string | null
@@ -664,8 +668,10 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          bw_r2_key?: string | null
           club_id?: string | null
           color_image_url?: string | null
+          color_r2_key?: string | null
           country_code?: string | null
           created_at?: string
           description?: string | null
