@@ -220,8 +220,9 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
       setClonedMapId(data.user_map_id);
 
-      // If map has impassability image, go to paint step
-      if (selectedMap.impassability_image_url) {
+      // If map has any B&W source (impassability_image_url, bw_r2_key, or source user_maps), go to paint step
+      const hasBw = selectedMap.impassability_image_url || selectedMap.bw_r2_key;
+      if (hasBw) {
         setStep('paint');
       } else {
         // Skip paint, go to annotations
