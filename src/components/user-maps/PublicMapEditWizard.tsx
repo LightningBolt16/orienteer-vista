@@ -16,12 +16,16 @@ import RouteFinderParametersForm, { RouteFinderParameters, DEFAULT_ROUTE_FINDER_
 import { ProcessingParameters, DEFAULT_PROCESSING_PARAMETERS } from '@/hooks/useUserMaps';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { uploadMapFilesToR2 } from '@/utils/r2Upload';
+import { resolveColorPreview, resolveBwPreview } from '@/utils/r2Preview';
 
 interface PublicMap {
   id: string;
   name: string;
   source_map_id: string | null;
   impassability_image_url: string | null;
+  color_image_url: string | null;
+  color_r2_key: string | null;
+  bw_r2_key: string | null;
   country_code: string | null;
   description: string | null;
 }
@@ -43,32 +47,39 @@ interface Point {
   y: number;
 }
 
-// Sub-component with URL pre-validation for B&W paint step
+// Sub-component that resolves B&W image URL (handling TIFF conversion)
 const PaintStep: React.FC<{ imageUrl: string; onExport: (blob: Blob) => void; editedBwBlob: Blob | null }> = ({ imageUrl, onExport, editedBwBlob }) => {
-  const [urlValid, setUrlValid] = useState<boolean | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setUrlValid(null);
-    fetch(imageUrl, { method: 'HEAD', mode: 'cors' })
-      .then(res => setUrlValid(res.ok))
-      .catch(() => setUrlValid(false));
+    setLoading(true);
+    setError(null);
+    
+    // Use the resolver which handles TIFF conversion
+    import('@/utils/r2Preview').then(({ resolveImageUrl }) => {
+      resolveImageUrl(imageUrl)
+        .then(url => { setResolvedUrl(url); setLoading(false); })
+        .catch(err => { setError(err.message); setLoading(false); });
+    });
   }, [imageUrl]);
 
-  if (urlValid === null) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-2 text-sm text-muted-foreground">Checking image availability...</span>
+        <span className="ml-2 text-sm text-muted-foreground">Loading impassability image...</span>
       </div>
     );
   }
 
-  if (urlValid === false) {
+  if (error || !resolvedUrl) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
           <p className="text-sm text-destructive">
-            Failed to load the B&W impassability image. The image may not have been uploaded yet or is inaccessible. You can skip this step.
+            Failed to load the B&W impassability image: {error || 'Unknown error'}. You can skip this step.
           </p>
         </div>
       </div>
@@ -80,7 +91,7 @@ const PaintStep: React.FC<{ imageUrl: string; onExport: (blob: Blob) => void; ed
       <p className="text-sm text-muted-foreground">
         Paint or erase black pixels on the impassability map. Black areas will be treated as impassable terrain.
       </p>
-      <ImpassabilityPaintCanvas imageUrl={imageUrl} onExport={onExport} />
+      <ImpassabilityPaintCanvas imageUrl={resolvedUrl} onExport={onExport} />
       {editedBwBlob && (
         <p className="text-sm text-green-600">✓ B&W edits captured ({(editedBwBlob.size / 1024).toFixed(0)} KB)</p>
       )}
@@ -128,15 +139,17 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   // Color map preview URL (for annotation/ROI steps)
   const [colorPreviewUrl, setColorPreviewUrl] = useState<string | null>(null);
+  // Resolved B&W URL for paint step
+  const [resolvedBwUrl, setResolvedBwUrl] = useState<string | null>(null);
 
-  // Load public maps that have source_map_id (so we can clone their files)
+  // Load public maps
   useEffect(() => {
     const loadPublicMaps = async () => {
       setLoadingMaps(true);
       try {
         const { data, error } = await supabase
           .from('route_maps')
-          .select('id, name, source_map_id, impassability_image_url, country_code, description')
+          .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description')
           .eq('is_public', true)
           .order('name');
 
@@ -151,52 +164,65 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     loadPublicMaps();
   }, []);
 
-  // Get a preview image for the selected map's color version
+  // Resolve color preview using the full fallback chain
   useEffect(() => {
     if (!selectedMap) return;
-    const loadPreview = async () => {
-      // Priority 1: color_image_url uploaded by admin
-      const { data: mapWithColor } = await supabase
-        .from('route_maps')
-        .select('color_image_url')
-        .eq('id', selectedMap.id)
-        .maybeSingle();
-
-      if ((mapWithColor as any)?.color_image_url) {
-        setColorPreviewUrl((mapWithColor as any).color_image_url);
-        return;
-      }
-
-      // Priority 2: R2 color key from source user_maps
+    const resolve = async () => {
+      // Get source user_maps R2 key if linked
+      let sourceR2ColorKey: string | null = null;
       if (selectedMap.source_map_id) {
         const { data: userMap } = await supabase
           .from('user_maps')
           .select('r2_color_key')
           .eq('id', selectedMap.source_map_id)
           .maybeSingle();
-        
-        if (userMap?.r2_color_key) {
-          const r2PublicBase = 'https://pub-d72218e4aec146adb567299c2968aed4.r2.dev';
-          setColorPreviewUrl(`${r2PublicBase}/${userMap.r2_color_key}`);
-          return;
-        }
+        sourceR2ColorKey = userMap?.r2_color_key || null;
       }
-      
-      // Fallback: use the first route image
+
+      // Get fallback route image URL
+      let fallbackUrl: string | null = null;
       const { data: images } = await supabase
         .from('route_images')
         .select('image_path')
         .eq('map_id', selectedMap.id)
         .limit(1);
-
       if (images && images.length > 0) {
-        const { data: urlData } = supabase.storage
-          .from('route-images')
-          .getPublicUrl(images[0].image_path);
-        setColorPreviewUrl(urlData.publicUrl);
+        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(images[0].image_path);
+        fallbackUrl = urlData.publicUrl;
       }
+
+      const resolved = await resolveColorPreview(
+        selectedMap.color_image_url,
+        selectedMap.color_r2_key,
+        sourceR2ColorKey,
+        fallbackUrl,
+      );
+      setColorPreviewUrl(resolved);
     };
-    loadPreview();
+    resolve();
+  }, [selectedMap]);
+
+  // Resolve B&W URL for paint step
+  useEffect(() => {
+    if (!selectedMap) return;
+    const resolve = async () => {
+      let sourceBwKey: string | null = null;
+      if (selectedMap.source_map_id) {
+        const { data: userMap } = await supabase
+          .from('user_maps')
+          .select('r2_bw_key')
+          .eq('id', selectedMap.source_map_id)
+          .maybeSingle();
+        sourceBwKey = userMap?.r2_bw_key || null;
+      }
+      const resolved = await resolveBwPreview(
+        selectedMap.impassability_image_url,
+        selectedMap.bw_r2_key,
+        sourceBwKey,
+      );
+      setResolvedBwUrl(resolved);
+    };
+    resolve();
   }, [selectedMap]);
 
   const filteredMaps = publicMaps.filter(m =>
@@ -219,8 +245,9 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
       setClonedMapId(data.user_map_id);
 
-      // If map has impassability image, go to paint step
-      if (selectedMap.impassability_image_url) {
+      // If map has any B&W source (impassability_image_url, bw_r2_key, or source user_maps), go to paint step
+      const hasBw = selectedMap.impassability_image_url || selectedMap.bw_r2_key;
+      if (hasBw) {
         setStep('paint');
       } else {
         // Skip paint, go to annotations
@@ -333,8 +360,10 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     const base: { key: WizardStep; label: string }[] = [
       { key: 'select', label: 'Select Map' },
     ];
-    if (selectedMap?.impassability_image_url) {
+    const hasBw = selectedMap?.impassability_image_url || selectedMap?.bw_r2_key;
+    if (hasBw) {
       base.push({ key: 'paint', label: 'Edit Impassability' });
+    }
     }
     base.push(
       { key: 'annotations', label: 'Add Boundaries' },
@@ -454,7 +483,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        {map.impassability_image_url && (
+                        {(map.impassability_image_url || map.bw_r2_key) && (
                           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
                             B&W Editable
                           </span>
@@ -475,12 +504,18 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
         )}
 
         {/* Step: Paint B&W */}
-        {step === 'paint' && selectedMap?.impassability_image_url && (
+        {step === 'paint' && resolvedBwUrl && (
           <PaintStep
-            imageUrl={selectedMap.impassability_image_url}
+            imageUrl={resolvedBwUrl}
             onExport={handlePaintExport}
             editedBwBlob={editedBwBlob}
           />
+        )}
+        {step === 'paint' && !resolvedBwUrl && (
+          <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="ml-2 text-sm text-muted-foreground">Resolving B&W image...</span>
+          </div>
         )}
 
         {/* Step: Annotations */}

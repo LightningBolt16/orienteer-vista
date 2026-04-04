@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getPresignedUrls, uploadToR2 } from '@/utils/r2Upload';
+import { useUser } from '@/context/UserContext';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -69,6 +71,7 @@ interface AdminMapCardProps {
 }
 
 const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showDelete = true }) => {
+  const { user } = useUser();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(map.name);
   const [saving, setSaving] = useState(false);
@@ -139,21 +142,30 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
 
   const handleBwUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || table !== 'route_maps') return;
-    if (file.size > MAX_UPLOAD_SIZE) {
-      toast({ title: 'File too large', description: `Max size is 500MB. Your file is ${(file.size / 1024 / 1024).toFixed(0)}MB.`, variant: 'destructive' });
-      if (bwInputRef.current) bwInputRef.current.value = '';
-      return;
-    }
+    if (!file || table !== 'route_maps' || !user) return;
     setUploadingBw(true);
     try {
-      const ext = file.name.split('.').pop();
-      const path = `bw/${map.id}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('route-images').upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
-      await updateField('impassability_image_url', urlData.publicUrl);
+      const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
+      
+      // Upload source file to R2
+      const urls = await getPresignedUrls(user.id, `admin-bw-${map.id}`);
+      await uploadToR2(urls.bw_presigned_url, file);
+      
+      // Update route_maps with R2 key
+      const updateData: Record<string, any> = { bw_r2_key: urls.bw_key };
+      
+      // For non-TIFF files, also store as browser-friendly preview URL
+      if (!isTiff) {
+        const ext = file.name.split('.').pop();
+        const path = `bw/${map.id}.${ext}`;
+        await supabase.storage.from('route-images').upload(path, file, { upsert: true });
+        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+        updateData.impassability_image_url = urlData.publicUrl;
+      }
+      
+      await supabase.from(table).update(updateData).eq('id', map.id);
       toast({ title: 'B&W impassability image uploaded' });
+      onUpdate();
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -164,21 +176,30 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
 
   const handleColorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || table !== 'route_maps') return;
-    if (file.size > MAX_UPLOAD_SIZE) {
-      toast({ title: 'File too large', description: `Max size is 500MB. Your file is ${(file.size / 1024 / 1024).toFixed(0)}MB.`, variant: 'destructive' });
-      if (colorInputRef.current) colorInputRef.current.value = '';
-      return;
-    }
+    if (!file || table !== 'route_maps' || !user) return;
     setUploadingColor(true);
     try {
-      const ext = file.name.split('.').pop();
-      const path = `color/${map.id}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('route-images').upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
-      await updateField('color_image_url', urlData.publicUrl);
+      const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
+      
+      // Upload source file to R2
+      const urls = await getPresignedUrls(user.id, `admin-color-${map.id}`);
+      await uploadToR2(urls.color_presigned_url, file);
+      
+      // Update route_maps with R2 key
+      const updateData: Record<string, any> = { color_r2_key: urls.color_key };
+      
+      // For non-TIFF files, also store as browser-friendly preview URL
+      if (!isTiff) {
+        const ext = file.name.split('.').pop();
+        const path = `color/${map.id}.${ext}`;
+        await supabase.storage.from('route-images').upload(path, file, { upsert: true });
+        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+        updateData.color_image_url = urlData.publicUrl;
+      }
+      
+      await supabase.from(table).update(updateData).eq('id', map.id);
       toast({ title: 'Color map image uploaded' });
+      onUpdate();
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
     } finally {

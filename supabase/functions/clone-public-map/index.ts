@@ -7,10 +7,7 @@ const corsHeaders = {
 
 /**
  * Clone a public map's user_maps record for the current user.
- * Copies R2 keys to user's namespace and creates a new user_maps entry.
- * 
- * Body: { source_map_id: string (route_maps.id) }
- * Returns: { user_map_id: string, ... }
+ * Prefers route_maps-level R2 keys, then falls back to source user_maps.
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -50,7 +47,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get the public route_map
+    // Get the public route_map (including new R2 key fields)
     const { data: routeMap, error: rmError } = await supabase
       .from('route_maps')
       .select('*')
@@ -83,88 +80,51 @@ Deno.serve(async (req) => {
       );
     }
 
-    const timestamp = Date.now();
     const cloneName = `${routeMap.name} (edited)`;
 
-    // If map has a source user_maps record, clone from it
+    // Determine R2 keys: prefer route_maps-level keys, then source user_maps keys
+    let colorR2Key = routeMap.color_r2_key || null;
+    let bwR2Key = routeMap.bw_r2_key || null;
+    let sourceUserMap: any = null;
+
     if (routeMap.source_map_id) {
-      const { data: sourceUserMap, error: sumError } = await supabase
+      const { data: sum } = await supabase
         .from('user_maps')
         .select('*')
         .eq('id', routeMap.source_map_id)
         .single();
+      sourceUserMap = sum;
 
-      if (sumError || !sourceUserMap) {
-        return new Response(
-          JSON.stringify({ error: 'Source map files not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const { data: newUserMap, error: insertError } = await supabase
-        .from('user_maps')
-        .insert({
-          user_id: user.id,
-          name: cloneName,
-          color_tif_path: sourceUserMap.color_tif_path,
-          bw_tif_path: sourceUserMap.bw_tif_path,
-          roi_coordinates: sourceUserMap.roi_coordinates,
-          processing_parameters: sourceUserMap.processing_parameters || {},
-          status: 'pending',
-          storage_provider: sourceUserMap.storage_provider || 'r2',
-          r2_color_key: sourceUserMap.r2_color_key,
-          r2_bw_key: sourceUserMap.r2_bw_key,
-          is_tiled: sourceUserMap.is_tiled || false,
-          tile_grid: sourceUserMap.tile_grid,
-          impassable_annotations: sourceUserMap.impassable_annotations,
-          source_public_map_id: source_map_id,
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Failed to create cloned map:', insertError);
-        return new Response(
-          JSON.stringify({ error: `Failed to clone map: ${insertError.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          user_map_id: newUserMap.id,
-          name: cloneName,
-          already_exists: false,
-          has_impassability: !!routeMap.impassability_image_url,
-          source_map: {
-            name: routeMap.name,
-            r2_color_key: sourceUserMap.r2_color_key,
-            r2_bw_key: sourceUserMap.r2_bw_key,
-          },
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (!colorR2Key && sum?.r2_color_key) colorR2Key = sum.r2_color_key;
+      if (!bwR2Key && sum?.r2_bw_key) bwR2Key = sum.r2_bw_key;
     }
 
-    // No source user_maps record — create a minimal one for annotation/ROI-only editing
+    // Build the insert record
+    const insertData: Record<string, any> = {
+      user_id: user.id,
+      name: cloneName,
+      roi_coordinates: sourceUserMap?.roi_coordinates || [],
+      processing_parameters: sourceUserMap?.processing_parameters || {},
+      status: 'pending',
+      storage_provider: 'r2',
+      source_public_map_id: source_map_id,
+      r2_color_key: colorR2Key,
+      r2_bw_key: bwR2Key,
+      color_tif_path: colorR2Key || `placeholder/${source_map_id}/color`,
+      bw_tif_path: bwR2Key || `placeholder/${source_map_id}/bw`,
+      is_tiled: sourceUserMap?.is_tiled || false,
+      tile_grid: sourceUserMap?.tile_grid || null,
+      impassable_annotations: sourceUserMap?.impassable_annotations || null,
+    };
+
     const { data: newUserMap, error: insertError } = await supabase
       .from('user_maps')
-      .insert({
-        user_id: user.id,
-        name: cloneName,
-        color_tif_path: `placeholder/${source_map_id}/color`,
-        bw_tif_path: `placeholder/${source_map_id}/bw`,
-        roi_coordinates: [],
-        processing_parameters: {},
-        status: 'pending',
-        storage_provider: 'r2',
-        source_public_map_id: source_map_id,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (insertError) {
-      console.error('Failed to create minimal cloned map:', insertError);
+      console.error('Failed to create cloned map:', insertError);
       return new Response(
         JSON.stringify({ error: `Failed to clone map: ${insertError.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -176,8 +136,12 @@ Deno.serve(async (req) => {
         user_map_id: newUserMap.id,
         name: cloneName,
         already_exists: false,
-        has_impassability: !!routeMap.impassability_image_url,
-        source_map: { name: routeMap.name },
+        has_impassability: !!routeMap.impassability_image_url || !!bwR2Key,
+        source_map: {
+          name: routeMap.name,
+          r2_color_key: colorR2Key,
+          r2_bw_key: bwR2Key,
+        },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

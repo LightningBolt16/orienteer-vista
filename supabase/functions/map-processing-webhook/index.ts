@@ -72,6 +72,8 @@ Deno.serve(async (req) => {
         map_category: 'private',
         description: `Custom map with ${route_count || 0} routes`,
         map_type: 'forest',
+        color_r2_key: userMap.r2_color_key || null,
+        bw_r2_key: userMap.r2_bw_key || null,
       }).select().single()
 
       if (routeMapError) {
