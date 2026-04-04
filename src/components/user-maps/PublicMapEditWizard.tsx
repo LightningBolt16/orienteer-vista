@@ -23,6 +23,9 @@ interface PublicMap {
   name: string;
   source_map_id: string | null;
   impassability_image_url: string | null;
+  color_image_url: string | null;
+  color_r2_key: string | null;
+  bw_r2_key: string | null;
   country_code: string | null;
   description: string | null;
 }
