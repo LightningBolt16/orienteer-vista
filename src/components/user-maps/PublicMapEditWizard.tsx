@@ -483,7 +483,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        {map.impassability_image_url && (
+                        {(map.impassability_image_url || map.bw_r2_key) && (
                           <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
                             B&W Editable
                           </span>
