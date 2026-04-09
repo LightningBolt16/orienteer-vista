@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Eye, EyeOff, Pencil, Check, X, Image, Flag, MapPin, Trash2, Loader2 } from 'lucide-react';
+import { convertTifToDataUrl } from '@/utils/tifUtils';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -154,14 +155,21 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
       // Update route_maps with R2 key
       const updateData: Record<string, any> = { bw_r2_key: urls.bw_key };
       
-      // For non-TIFF files, also store as browser-friendly preview URL
-      if (!isTiff) {
-        const ext = file.name.split('.').pop();
-        const path = `bw/${map.id}.${ext}`;
-        await supabase.storage.from('route-images').upload(path, file, { upsert: true });
-        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
-        updateData.impassability_image_url = urlData.publicUrl;
+      // Generate browser-friendly preview and upload to route-images bucket
+      let previewBlob: Blob;
+      if (isTiff) {
+        // Convert TIFF to PNG via canvas
+        const dataUrl = await convertTifToDataUrl(file);
+        const resp = await fetch(dataUrl);
+        previewBlob = await resp.blob();
+      } else {
+        previewBlob = file;
       }
+      const ext = isTiff ? 'png' : file.name.split('.').pop();
+      const path = `bw/${map.id}.${ext}`;
+      await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
+      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+      updateData.impassability_image_url = urlData.publicUrl;
       
       await supabase.from(table).update(updateData).eq('id', map.id);
       toast({ title: 'B&W impassability image uploaded' });
@@ -188,14 +196,20 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
       // Update route_maps with R2 key
       const updateData: Record<string, any> = { color_r2_key: urls.color_key };
       
-      // For non-TIFF files, also store as browser-friendly preview URL
-      if (!isTiff) {
-        const ext = file.name.split('.').pop();
-        const path = `color/${map.id}.${ext}`;
-        await supabase.storage.from('route-images').upload(path, file, { upsert: true });
-        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
-        updateData.color_image_url = urlData.publicUrl;
+      // Generate browser-friendly preview and upload to route-images bucket
+      let previewBlob: Blob;
+      if (isTiff) {
+        const dataUrl = await convertTifToDataUrl(file);
+        const resp = await fetch(dataUrl);
+        previewBlob = await resp.blob();
+      } else {
+        previewBlob = file;
       }
+      const ext = isTiff ? 'png' : file.name.split('.').pop();
+      const path = `color/${map.id}.${ext}`;
+      await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
+      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+      updateData.color_image_url = urlData.publicUrl;
       
       await supabase.from(table).update(updateData).eq('id', map.id);
       toast({ title: 'Color map image uploaded' });

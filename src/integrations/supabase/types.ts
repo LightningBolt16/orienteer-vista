@@ -963,8 +963,10 @@ export type Database = {
       }
       user_maps: {
         Row: {
+          bw_preview_url: string | null
           bw_tif_path: string
           club_id: string | null
+          color_preview_url: string | null
           color_tif_path: string
           created_at: string
           error_message: string | null
@@ -985,8 +987,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bw_preview_url?: string | null
           bw_tif_path: string
           club_id?: string | null
+          color_preview_url?: string | null
           color_tif_path: string
           created_at?: string
           error_message?: string | null
@@ -1007,8 +1011,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bw_preview_url?: string | null
           bw_tif_path?: string
           club_id?: string | null
+          color_preview_url?: string | null
           color_tif_path?: string
           created_at?: string
           error_message?: string | null
