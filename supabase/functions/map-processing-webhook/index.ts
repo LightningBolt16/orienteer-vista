@@ -74,6 +74,8 @@ Deno.serve(async (req) => {
         map_type: 'forest',
         color_r2_key: userMap.r2_color_key || null,
         bw_r2_key: userMap.r2_bw_key || null,
+        color_image_url: userMap.color_preview_url || null,
+        impassability_image_url: userMap.bw_preview_url || null,
       }).select().single()
 
       if (routeMapError) {
