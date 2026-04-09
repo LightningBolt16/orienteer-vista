@@ -1,92 +1,87 @@
 
-Goal
 
-Make the public editor use the original uploaded source map assets again for:
-- Edit Impassability
-- Add Boundaries
-- Draw ROI
+## Complete Overhaul: Public Map Edit Mode
 
-and only fall back to route crops for truly legacy maps with no source assets at all.
+### Root cause
 
-What is actually broken
+The `r2Preview.ts` resolver tries to fetch TIFF files directly from the R2 public CDN URL (`pub-d72218e4aec146adb567299c2968aed4.r2.dev`) in the browser. This fails with "Failed to fetch" because the R2 bucket does not serve CORS headers. The browser blocks the cross-origin request entirely.
 
-1. The public editor is trying to read `user_maps.r2_color_key` / `user_maps.r2_bw_key` directly from the client using `source_map_id`.
-   - That fails for public maps uploaded by other users because `user_maps` is private by RLS.
-   - Result: the editor cannot reach the original source assets even though they exist.
+This means every map that relies on R2 TIFF resolution — which is every map with source assets — shows "no editable B&W source" or loads forever, because the catch clause returns `null` and the wizard marks it `unavailable`.
 
-2. The paint step has no terminal “failed/no source” state.
-   - If B&W resolution returns `null`, the wizard keeps showing “Resolving B&W image...” forever.
+In the private upload flow this never happens because the user selects TIFFs locally and `convertTifToDataUrl` works on a local `File` object. The TIFFs are uploaded TO R2 but never fetched FROM R2 in the browser.
 
-3. The color fallback chain is too permissive.
-   - If source lookup fails, it falls back to `route_images.image_path`, which is just a route crop.
-   - That is why Add Boundaries sometimes shows a route image instead of the original map.
+### Solution: store browser-friendly PNG previews at upload time
 
-4. Official maps are a separate case.
-   - They need route-level source assets on `route_maps` because there is often no linked private `user_maps` record to fall back to.
+Instead of trying to fetch and convert remote TIFFs in the browser, store a PNG preview alongside each TIFF at the point where the user/admin already has the file locally. The editor then uses these preview URLs directly — no cross-origin TIFF fetching needed.
 
-Plan
+### Changes
 
-1. Stop client-side reads from `user_maps` in `PublicMapEditWizard`
-- Remove the direct client queries using `selectedMap.source_map_id`.
-- Replace them with a backend-resolved asset payload fetched through a backend function or by extending `clone-public-map` to return:
-  - resolved source references for color and B&W
-  - whether B&W editing is actually available
-  - any initial ROI/annotation data if needed
-- This avoids the current RLS problem entirely.
+#### 1. Private upload flow — generate and store PNG previews
 
-2. Make the editor use original uploaded assets first
-- For color steps, use this order:
-  1. `route_maps.color_image_url`
-  2. `route_maps.color_r2_key`
-  3. source private map R2 key resolved server-side
-  4. only then legacy route crop, and only if no real source exists
-- For B&W steps, use this order:
-  1. `route_maps.impassability_image_url`
-  2. `route_maps.bw_r2_key`
-  3. source private map B&W R2 key resolved server-side
-  4. otherwise mark B&W editing unavailable
-- Keep using the TIFF conversion path from `tifUtils`/`r2Preview` so uploaded TIFFs render the same way as in the original upload flow.
+In `UserMapUploadWizard.tsx`, after the user's TIF is converted for preview (line 145, `convertTifToDataUrl`), take that data URL, convert it to a PNG blob, and upload it to the public `route-images` Supabase bucket alongside the TIFF upload to R2.
 
-3. Remove the misleading route-image fallback for editable maps
-- If a map is supposed to have a real source asset but it cannot be resolved, show an error state instead of silently using a route crop.
-- Only use `route_images.image_path` for old legacy maps that truly have no source color asset anywhere.
-- This prevents the “pointless route image” behavior in Add Boundaries and ROI.
+Store the preview URL on `user_maps` in two new columns: `color_preview_url` and `bw_preview_url`.
 
-4. Fix the infinite loading states
-- Track explicit asset states in the wizard, e.g. `loading | ready | unavailable | error`.
-- For Edit Impassability:
-  - if no B&W source exists, skip the step or show “This map has no editable B&W source”
-  - if load fails, show a real error card instead of spinning forever
-- Do the same for Add Boundaries and ROI so they never sit in an endless loader.
+Do the same for the B&W TIF — convert it client-side and upload a PNG preview.
 
-5. Ensure newly public user maps always carry their source assets on `route_maps`
-- Keep `map-processing-webhook` copying `r2_color_key` and `r2_bw_key` from `user_maps` into `route_maps`.
-- Verify published maps rely on those route-level fields first, so public editing does not depend on private-table reads.
-- Backfill any existing `route_maps` from linked `user_maps` so older public maps start working again.
+#### 2. Admin upload flow — generate and store PNG previews
 
-6. Keep official maps editable through route-level assets
-- Official maps should continue storing their full source assets directly on `route_maps` (`color_r2_key`, `bw_r2_key`, optional preview URLs).
-- Admin upload should remain the path for official maps without original private-source linkage.
+In `AdminMapCard.tsx`, when the admin uploads a color or B&W file, convert it client-side to a PNG preview (using canvas for images, `convertTifToDataUrl` for TIFFs), upload the preview to `route-images`, and store the URL on `route_maps.color_image_url` / `route_maps.impassability_image_url`.
 
-Technical details
+Currently the admin upload goes to R2 only — add the preview upload to `route-images` as a second step.
 
-- Main root cause is not Modal; it is that the frontend is trying to read private source-map rows directly.
-- The safest fix is: resolve source assets server-side, then let the frontend only consume public/edit-safe asset references.
-- The editor should never treat `null` as “still loading”.
-- Route crops should be legacy fallback only, not the normal editor source.
+#### 3. Webhook — propagate preview URLs to route_maps
 
-Files likely involved
+In `map-processing-webhook/index.ts`, when creating a `route_maps` entry from a `user_maps` record, also copy over `color_preview_url` and `bw_preview_url` into `route_maps.color_image_url` and `route_maps.impassability_image_url`.
 
-- `src/components/user-maps/PublicMapEditWizard.tsx`
-- `src/utils/r2Preview.ts`
-- `supabase/functions/clone-public-map/index.ts` or a new backend function for editor asset lookup
-- `supabase/functions/map-processing-webhook/index.ts`
-- one migration/backfill for older `route_maps` that are missing `color_r2_key` / `bw_r2_key`
+#### 4. Rewrite `r2Preview.ts` — remove remote TIFF fetching
 
-Recommended order
+Replace the current `resolveImageUrl` that tries to fetch remote TIFFs with a simple function that only uses stored preview URLs:
+- `resolveColorPreview`: check `color_image_url` first, then fall back to route-image crop. No R2 fetch.
+- `resolveBwPreview`: check `impassability_image_url` first. If null, return null (no B&W available). No R2 fetch.
 
-1. Fix wizard state handling so it cannot spin forever
-2. Move source asset lookup off the client and behind backend resolution
-3. Remove route-crop fallback except for true legacy cases
-4. Backfill older public maps from linked private source maps
-5. Verify official maps still use route-level uploads correctly
+Remove `r2KeyToUrl`, `isTiffUrl`, and the TIFF fetch+convert path entirely from this file.
+
+#### 5. Simplify `PublicMapEditWizard.tsx`
+
+- Remove the complex multi-fallback asset resolution useEffect
+- Use preview URLs directly from `resolvedAssets` (which come from `clone-public-map`)
+- If `impassability_image_url` is null and `color_image_url` is null, show clear "no source available" messages
+- Keep the explicit `loading | ready | unavailable | error` states but simplify the resolution logic
+
+#### 6. Update `clone-public-map` edge function
+
+Return the preview URLs directly. Remove any logic that returns R2 keys for client-side resolution — the client no longer needs them. The response should include:
+- `color_image_url` (browser-friendly preview)
+- `impassability_image_url` (browser-friendly preview)
+- `has_impassability` (boolean)
+- R2 keys are still stored on the cloned `user_maps` for server-side processing, but not returned for browser display.
+
+#### 7. Migration
+
+Add `color_preview_url` and `bw_preview_url` columns to `user_maps` table.
+
+### For existing maps without previews
+
+Maps that already have R2 keys but no preview URLs will need admin re-upload of the preview images via the admin panel. This is a one-time manual step. The admin upload flow (change 2) will make this straightforward.
+
+### Files to modify
+
+- `src/utils/r2Preview.ts` — simplify to use preview URLs only
+- `src/components/user-maps/PublicMapEditWizard.tsx` — simplify asset resolution
+- `src/components/user-maps/UserMapUploadWizard.tsx` — add preview PNG upload
+- `src/components/admin/AdminMapCard.tsx` — store preview alongside R2 upload
+- `supabase/functions/clone-public-map/index.ts` — return preview URLs
+- `supabase/functions/map-processing-webhook/index.ts` — propagate preview URLs
+- New migration for `user_maps.color_preview_url`, `user_maps.bw_preview_url`
+
+### Implementation order
+
+1. Migration: add preview URL columns to `user_maps`
+2. Rewrite `r2Preview.ts` to remove TIFF fetching
+3. Simplify `PublicMapEditWizard.tsx` to use preview URLs
+4. Update `clone-public-map` to return preview URLs
+5. Update `AdminMapCard.tsx` to generate and store previews
+6. Update `UserMapUploadWizard.tsx` to generate and store previews
+7. Update `map-processing-webhook` to propagate preview URLs
+
