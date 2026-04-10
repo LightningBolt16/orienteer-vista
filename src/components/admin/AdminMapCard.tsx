@@ -156,20 +156,27 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
       const updateData: Record<string, any> = { bw_r2_key: urls.bw_key };
       
       // Generate browser-friendly preview and upload to route-images bucket
-      let previewBlob: Blob;
+      let previewBlob: Blob | null = null;
       if (isTiff) {
-        // Convert TIFF to PNG via canvas
-        const dataUrl = await convertTifToDataUrl(file);
-        const resp = await fetch(dataUrl);
-        previewBlob = await resp.blob();
+        try {
+          const dataUrl = await convertTifToDataUrl(file);
+          const resp = await fetch(dataUrl);
+          previewBlob = await resp.blob();
+        } catch (convErr) {
+          console.warn('TIFF preview conversion failed:', convErr);
+          toast({ title: 'Preview generation failed', description: 'Source file uploaded to R2 but browser preview could not be generated from this TIFF format. Try uploading a PNG version for preview.', variant: 'default' });
+        }
       } else {
         previewBlob = file;
       }
-      const ext = isTiff ? 'png' : file.name.split('.').pop();
-      const path = `bw/${map.id}.${ext}`;
-      await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
-      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
-      updateData.impassability_image_url = urlData.publicUrl;
+      
+      if (previewBlob) {
+        const ext = isTiff ? 'png' : file.name.split('.').pop();
+        const path = `bw/${map.id}.${ext}`;
+        await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
+        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+        updateData.impassability_image_url = urlData.publicUrl;
+      }
       
       await supabase.from(table).update(updateData).eq('id', map.id);
       toast({ title: 'B&W impassability image uploaded' });
@@ -197,19 +204,27 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
       const updateData: Record<string, any> = { color_r2_key: urls.color_key };
       
       // Generate browser-friendly preview and upload to route-images bucket
-      let previewBlob: Blob;
+      let previewBlob: Blob | null = null;
       if (isTiff) {
-        const dataUrl = await convertTifToDataUrl(file);
-        const resp = await fetch(dataUrl);
-        previewBlob = await resp.blob();
+        try {
+          const dataUrl = await convertTifToDataUrl(file);
+          const resp = await fetch(dataUrl);
+          previewBlob = await resp.blob();
+        } catch (convErr) {
+          console.warn('TIFF preview conversion failed:', convErr);
+          toast({ title: 'Preview generation failed', description: 'Source file uploaded to R2 but browser preview could not be generated from this TIFF format. Try uploading a PNG version for preview.', variant: 'default' });
+        }
       } else {
         previewBlob = file;
       }
-      const ext = isTiff ? 'png' : file.name.split('.').pop();
-      const path = `color/${map.id}.${ext}`;
-      await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
-      const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
-      updateData.color_image_url = urlData.publicUrl;
+      
+      if (previewBlob) {
+        const ext = isTiff ? 'png' : file.name.split('.').pop();
+        const path = `color/${map.id}.${ext}`;
+        await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
+        const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
+        updateData.color_image_url = urlData.publicUrl;
+      }
       
       await supabase.from(table).update(updateData).eq('id', map.id);
       toast({ title: 'Color map image uploaded' });
@@ -365,7 +380,7 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
             >
               {uploadingBw ? <Loader2 className="h-3 w-3 animate-spin" /> : (map as any).impassability_image_url ? '✓ B&W' : 'B&W'}
             </Button>
-            <input ref={bwInputRef} type="file" accept="image/png,image/tiff" className="hidden" onChange={handleBwUpload} />
+            <input ref={bwInputRef} type="file" accept="image/png,image/jpeg,image/tiff,.tif,.tiff" className="hidden" onChange={handleBwUpload} />
             <Button
               size="sm"
               variant={(map as any).color_image_url ? 'outline' : 'ghost'}
