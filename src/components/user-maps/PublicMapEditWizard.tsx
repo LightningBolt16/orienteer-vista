@@ -138,17 +138,21 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       const bwUrl = data.impassability_image_url || null;
       const hasBw = data.has_impassability ?? !!bwUrl;
 
-      // If no color preview from server, try route image fallback
+      // Always try route_images fallback for color — most maps have these even without source previews
       let finalColorUrl = colorUrl;
       if (!finalColorUrl) {
-        const { data: images } = await supabase
-          .from('route_images')
-          .select('image_path')
-          .eq('map_id', selectedMap.id)
-          .limit(1);
-        if (images && images.length > 0) {
-          const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(images[0].image_path);
-          finalColorUrl = urlData.publicUrl;
+        try {
+          const { data: images } = await supabase
+            .from('route_images')
+            .select('image_path')
+            .eq('map_id', selectedMap.id)
+            .limit(1);
+          if (images && images.length > 0) {
+            const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(images[0].image_path);
+            finalColorUrl = urlData.publicUrl;
+          }
+        } catch (fallbackErr) {
+          console.warn('Route images fallback failed:', fallbackErr);
         }
       }
 

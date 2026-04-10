@@ -167,7 +167,7 @@ async function resolveAssets(supabase: any, routeMap: any) {
     if (!bwPreviewUrl && sum?.bw_preview_url) bwPreviewUrl = sum.bw_preview_url;
   }
 
-  const hasBw = !!(bwPreviewUrl || routeMap.impassability_image_url);
+  const hasBw = !!(bwR2Key || bwPreviewUrl || routeMap.impassability_image_url);
 
   return { colorR2Key, bwR2Key, colorPreviewUrl, bwPreviewUrl, hasBw, sourceUserMap };
 }

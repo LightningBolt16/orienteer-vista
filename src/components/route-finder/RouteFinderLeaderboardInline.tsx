@@ -83,7 +83,7 @@ const RouteFinderLeaderboardInline: React.FC<RouteFinderLeaderboardInlineProps> 
         query = query.eq('map_name', mapFilter);
       }
       
-      const { data: attempts, error: attemptsError } = await query;
+      const { data: attempts, error: attemptsError } = await query.limit(10000);
       
       if (attemptsError) throw attemptsError;
       
