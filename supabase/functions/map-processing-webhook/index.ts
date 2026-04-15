@@ -267,6 +267,10 @@ Deno.serve(async (req) => {
           const { data: routeMap } = await supabase.from('route_maps').insert({
             name: map.name, user_id: map.user_id, source_map_id: map.id,
             is_public: false, description: `${count} routes (auto-completed)`, map_type: 'forest',
+            color_r2_key: map.r2_color_key || null,
+            bw_r2_key: map.r2_bw_key || null,
+            color_image_url: map.color_preview_url || null,
+            impassability_image_url: map.bw_preview_url || null,
           }).select().single()
 
           if (routeMap) {
