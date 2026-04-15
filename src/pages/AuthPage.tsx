@@ -240,7 +240,7 @@ const AuthPage: React.FC = () => {
           <CardHeader className="space-y-1 flex flex-col items-center">
             <div className="flex items-center space-x-2 mb-4">
               <Compass className="h-10 w-10 text-orienteering" />
-              <span className="text-2xl font-bold">Routa.se</span>
+              <span className="text-2xl font-bold">Routster</span>
             </div>
             <CardTitle className="text-2xl">{t('forgotPassword')}</CardTitle>
             <CardDescription>
@@ -338,9 +338,9 @@ const AuthPage: React.FC = () => {
         <CardHeader className="space-y-1 flex flex-col items-center">
           <div className="flex items-center space-x-2 mb-4">
             <Compass className="h-10 w-10 text-orienteering" />
-            <span className="text-2xl font-bold">Routa.se</span>
+            <span className="text-2xl font-bold">Routster</span>
           </div>
-          <CardTitle className="text-2xl">{t('welcomeTo')} Routa.se</CardTitle>
+          <CardTitle className="text-2xl">{t('welcomeTo')} Routster</CardTitle>
           <CardDescription>
             {t('authDescription')}
           </CardDescription>
