@@ -293,7 +293,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     const base: { key: WizardStep; label: string }[] = [
       { key: 'select', label: 'Select Map' },
     ];
-    if (hasImpassability && bwPreviewUrl) {
+    if (hasImpassability) {
       base.push({ key: 'paint', label: 'Edit Impassability' });
     }
     base.push(
