@@ -91,7 +91,10 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  // Load public maps
+  // Precomputed editability: maps that have at least one route_image (color fallback)
+  const [editableMaps, setEditableMaps] = useState<Set<string>>(new Set());
+
+  // Load public maps and check which ones actually have browser-loadable assets
   useEffect(() => {
     const loadPublicMaps = async () => {
       setLoadingMaps(true);
@@ -103,7 +106,28 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
           .order('name');
 
         if (error) throw error;
-        setPublicMaps((data || []) as PublicMap[]);
+        const maps = (data || []) as PublicMap[];
+        setPublicMaps(maps);
+
+        // Check which maps have browser-loadable assets (color_image_url OR route_images fallback)
+        const mapIds = maps.map(m => m.id);
+        if (mapIds.length > 0) {
+          const { data: routeImagesCheck } = await supabase
+            .from('route_images')
+            .select('map_id')
+            .in('map_id', mapIds)
+            .limit(1000);
+          
+          const mapsWithRouteImages = new Set((routeImagesCheck || []).map(r => r.map_id));
+          const editable = new Set<string>();
+          for (const m of maps) {
+            // A map is editable if it has a color_image_url OR at least one route_image as fallback
+            if (m.color_image_url || mapsWithRouteImages.has(m.id)) {
+              editable.add(m.id);
+            }
+          }
+          setEditableMaps(editable);
+        }
       } catch (err) {
         console.error('Failed to load public maps:', err);
       } finally {
@@ -269,7 +293,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     const base: { key: WizardStep; label: string }[] = [
       { key: 'select', label: 'Select Map' },
     ];
-    if (hasImpassability && bwPreviewUrl) {
+    if (hasImpassability) {
       base.push({ key: 'paint', label: 'Edit Impassability' });
     }
     base.push(
@@ -316,7 +340,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   const canProceed = () => {
     switch (step) {
-      case 'select': return !!selectedMap;
+      case 'select': return !!selectedMap && editableMaps.has(selectedMap.id);
       case 'paint': return true;
       case 'annotations': return true;
       case 'roi': return roiCoordinates.length >= 3;
@@ -417,7 +441,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
                     }`}
                     onClick={() => handleSelectMap(map)}
                   >
-                    <div className="flex items-center justify-between">
+                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-sm">{map.name}</p>
                         {map.description && (
@@ -427,11 +451,15 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
                           {map.country_code && (
                             <span className="text-xs text-muted-foreground">{map.country_code}</span>
                           )}
-                          {(map.impassability_image_url || map.bw_r2_key) && (
-                            <span className="text-xs text-green-600">B&W available</span>
-                          )}
-                          {(map.color_image_url || map.color_r2_key) && (
-                            <span className="text-xs text-blue-600">Color source</span>
+                          {map.impassability_image_url ? (
+                            <span className="text-xs text-green-600">B&W editing available</span>
+                          ) : map.bw_r2_key ? (
+                            <span className="text-xs text-amber-600">B&W source only (no preview)</span>
+                          ) : null}
+                          {editableMaps.has(map.id) ? (
+                            <span className="text-xs text-blue-600">Color editing available</span>
+                          ) : (
+                            <span className="text-xs text-red-500">Not editable</span>
                           )}
                         </div>
                       </div>

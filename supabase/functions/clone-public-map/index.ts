@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
 /**
  * Resolve source assets server-side, bypassing RLS.
  * Returns R2 keys for cloning AND browser-friendly preview URLs for the editor.
+ * Also falls back to route_images for color preview if no dedicated preview URL exists.
  */
 async function resolveAssets(supabase: any, routeMap: any) {
   let colorR2Key = routeMap.color_r2_key || null;
@@ -165,6 +166,24 @@ async function resolveAssets(supabase: any, routeMap: any) {
     if (!bwR2Key && sum?.r2_bw_key) bwR2Key = sum.r2_bw_key;
     if (!colorPreviewUrl && sum?.color_preview_url) colorPreviewUrl = sum.color_preview_url;
     if (!bwPreviewUrl && sum?.bw_preview_url) bwPreviewUrl = sum.bw_preview_url;
+  }
+
+  // Fallback: use a route_image as color preview (cropped but browser-displayable)
+  if (!colorPreviewUrl) {
+    const { data: routeImages } = await supabase
+      .from('route_images')
+      .select('image_path')
+      .eq('map_id', routeMap.id)
+      .limit(1);
+    
+    if (routeImages && routeImages.length > 0) {
+      // Determine which bucket: user maps use 'user-route-images', official use 'route-images'
+      const bucket = routeMap.user_id ? 'user-route-images' : 'route-images';
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(routeImages[0].image_path);
+      if (urlData?.publicUrl) {
+        colorPreviewUrl = urlData.publicUrl;
+      }
+    }
   }
 
   const hasBw = !!(bwR2Key || bwPreviewUrl || routeMap.impassability_image_url);
