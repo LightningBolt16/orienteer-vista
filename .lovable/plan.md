@@ -1,66 +1,173 @@
 
+Goal
 
-## Diagnosis and Fix Plan
+Make Public Map Editing reliable by:
+- showing the real source images when they exist
+- restoring the B&W paint step
+- marking maps as unavailable when the editor cannot actually load what it needs
+- fixing the data pipeline so newly uploaded/published maps keep usable editor assets
 
-### Issue 1: "Offset is outside the bounds of the data view" on admin upload
+What I found
 
-**Root cause**: `AdminMapCard.tsx` calls `convertTifToDataUrl(file)` to generate a PNG preview when uploading a BW or color TIFF. The geotiff.js library cannot decode certain TIFF compression formats (e.g. LZW with certain configurations), throwing a DataView bounds error. The upload fails entirely because the error is not caught separately from the R2 upload.
+1. The problem is real data loss / missing asset propagation, not just a UI bug.
+- Database check: public `route_maps` = 9
+- With `color_image_url` = 0
+- With `impassability_image_url` = 1
+- With `color_r2_key` = 4
+- With `bw_r2_key` = 4
+- Database check: `user_maps` = 22
+- With `color_preview_url` = 0
+- With `bw_preview_url` = 0
 
-**Fix**: Wrap the preview generation in a try/catch so that R2 upload succeeds even if the browser-side TIFF-to-PNG conversion fails. Show a warning that no preview could be generated but the source file was uploaded. Also accept PNG/JPEG uploads directly (not just TIF) since these don't need conversion.
+So the editor is usually given raw source keys, but not browser-loadable preview URLs.
 
-### Issue 2: Public map editor loads forever / shows "no source"
+2. Your B&W editor has not actually been removed, but the wizard hides it.
+- In `PublicMapEditWizard.tsx`, the B&W step is only included when:
+  `hasImpassability && bwPreviewUrl`
+- That means a map with a real B&W source in storage but no preview URL never shows the step at all.
 
-**Root cause**: Looking at the database, **zero** route_maps have `color_image_url` populated, and only Rinkeby has `impassability_image_url` (pointing to a raw `.tif`). The `clone-public-map` function tries to resolve preview URLs from `route_maps` and linked `user_maps`, but finds nothing because preview URLs were never generated for existing maps.
+3. The select page is incorrectly optimistic.
+- It labels maps as available from:
+  - `map.bw_r2_key`
+  - `map.color_r2_key`
+- But those only mean “a raw source file exists”, not “the browser can render/edit it”.
+- So maps are shown as usable even when the editor cannot actually display the source.
 
-The wizard's route_images fallback (lines 142-153) should provide a color source from the cropped route images, but this only works after `clone-public-map` returns successfully. If the clone function itself errors or the map has no route_images, the wizard shows "unavailable."
+4. Your own newly uploaded public map fails for the same reason.
+- `PublishMapDialog` just publishes the existing processed `route_map`.
+- That `route_map` only has usable editor assets if preview URLs were copied through.
+- For your recent maps, both `user_maps.color_preview_url` and `user_maps.bw_preview_url` are null, so the published map has no editable preview sources.
 
-**Fix**:
-1. Make the route_images fallback more robust — query it regardless of clone result
-2. For the BW step: if no preview URL exists, skip the step gracefully (which the code already does via `hasImpassability`) 
-3. For color steps (annotations/ROI): always fall back to route_images crop as the drawing background — this is adequate for boundary drawing and ROI selection
+5. There is also a backend consistency gap.
+- `map-processing-webhook` normal completion copies preview URLs into `route_maps`.
+- But the stale/auto-complete path creates `route_maps` without copying preview URLs.
+- So even if preview generation starts working, some maps can still be created in a broken editor state.
 
-### Issue 3: BW impassability editor "dropped"
+6. The “color fallback” is only half solved.
+- The wizard can fall back to `route_images` for the color background after clone.
+- But that fallback is not used on the map selection page to decide whether a map is truly editable.
+- And there is no equivalent fallback for B&W, so B&W editing still disappears.
 
-**Root cause**: The component (`ImpassabilityPaintCanvas`) still exists and is imported. But the wizard step is only shown when `hasImpassability && bwPreviewUrl` are both truthy (line 268). Since no maps have `bw_preview_url` or `impassability_image_url` populated, the step is always skipped.
+Why this is occurring
 
-**Fix**: 
-- When admin uploads a BW file successfully (even if preview generation fails), mark the map as having impassability
-- On the clone-public-map side, if a `bw_r2_key` exists on the route_map, generate a flag `has_impassability = true` even without a preview URL
-- Actually the real issue is the BW paint canvas needs a displayable URL. The fix in admin upload (Issue 1) must ensure previews are stored. Additionally, for maps that already have BW R2 keys but no preview, provide an admin action to regenerate previews.
+The core issue is that the public editor was redesigned to depend on browser-safe preview URLs, but the data pipeline never got completed end-to-end.
 
-### Issue 4: Leaderboard not updating
+Current state:
+```text
+user uploads TIFFs
+  -> raw source stored in R2
+  -> processing creates route images
+  -> public route_map created
+  -> editor expects preview URLs
+  -> preview URLs are mostly never stored/copied
+  -> UI still treats raw R2 keys as “available”
+  -> editor gets stuck / has no color source / hides B&W step
+```
 
-**Root cause**: The data exists (74 attempts, 3 users with 3+ attempts). The leaderboard query looks correct. The likely issue is the **1000-row default Supabase limit** isn't a problem here. Let me check if the `map_name` filter is causing empty results — the leaderboard filters by `map_name` (a text field) but the tabs use `map.name` from `route_finder_maps`. If the `map_name` stored in attempts doesn't match the map name exactly, the filter returns empty. Also, the leaderboard may simply need a page refresh or the user may be looking at a filtered view.
+So there are really 3 separate failures:
+1. preview generation/storage is not succeeding for new user maps
+2. preview propagation into `route_maps` is incomplete
+3. frontend availability logic is checking the wrong thing
 
-**Fix**: Add explicit `.limit(10000)` to the attempts query to be safe, and verify that `map_name` values in attempts match the map names from `route_finder_maps`. Also add a refresh button to the inline leaderboard.
+Plan
 
----
+1. Fix the source-of-truth for editor readiness
+- Add a clear editor asset model for each public map:
+  - `hasColorEditorSource`
+  - `hasBwEditorSource`
+  - `canEditPublicMap`
+- Compute this from real browser-loadable assets:
+  - color preview URL, or route-image fallback
+  - B&W preview URL only
+- Stop using raw `r2_*_key` presence as the UI signal for “available”.
 
-### Implementation Plan
+2. Fix `PublicMapEditWizard.tsx`
+- Always resolve assets into explicit states before entering edit steps:
+  - `ready`
+  - `partial`
+  - `unavailable`
+  - `error`
+- Use route-image fallback for color preview when no color preview URL exists.
+- Restore the B&W step when a B&W preview exists.
+- If only color exists, skip B&W cleanly and explain why.
+- Ensure the wizard always exits loading state.
 
-#### Step 1: Fix admin upload TIFF error
-- In `AdminMapCard.tsx`, wrap `convertTifToDataUrl` in try/catch for both `handleBwUpload` and `handleColorUpload`
-- If conversion fails, still upload to R2 successfully but show a warning toast that preview couldn't be generated
-- Accept PNG/JPEG directly without TIFF conversion (they're already browser-friendly)
+3. Fix the map selection page
+- Precompute editability per map before showing badges/buttons.
+- Replace current labels with truthful statuses, for example:
+  - “Color editing available”
+  - “B&W editing available”
+  - “Partially editable”
+  - “Not available for editing”
+- Prevent starting edit mode for maps with no usable editor assets.
 
-#### Step 2: Fix public map editor asset resolution  
-- In `PublicMapEditWizard.tsx`, make the route_images fallback always run (not just when clone returns no color URL)
-- In `clone-public-map`, set `has_impassability = true` when `bw_r2_key` exists (even without preview URL)
-- Ensure the wizard never shows infinite loading — always resolve to `ready` or `unavailable`
+4. Fix upload/publish pipeline for new maps
+- Review and harden `UserMapUploadWizard.tsx` preview generation path.
+- Make preview creation observable instead of silent:
+  - if preview generation fails, store an explicit warning/state
+  - do not silently leave the map with no editor previews
+- Ensure preview URLs are written to `user_maps` for new uploads.
 
-#### Step 3: Restore BW paint editor visibility
-- When a map has `bw_r2_key` but no `impassability_image_url`, still show the paint step but with a message explaining they need to upload a preview via admin first (for official maps) or that the B&W source is available for processing but not for browser editing
-- For user maps with `bw_preview_url` populated (from the upload wizard), the paint step will work normally
+5. Fix route-map propagation
+- In `map-processing-webhook/index.ts`, make both completion paths copy:
+  - `color_preview_url -> route_maps.color_image_url`
+  - `bw_preview_url -> route_maps.impassability_image_url`
+  - plus existing R2 keys
+- Ensure stale/auto-complete path does the same.
 
-#### Step 4: Fix leaderboard data loading
-- Add `.limit(10000)` to the attempts query in both `RouteFinderLeaderboard.tsx` and `RouteFinderLeaderboardInline.tsx`
-- Verify `map_name` matching between attempts and maps
-- The inline leaderboard already has a refresh mechanism via `useEffect` on `selectedMap`
+6. Backfill existing broken maps
+- Add one migration/backfill step that copies preview URLs from linked `user_maps` into `route_maps` where available.
+- Also backfill R2 keys where missing.
+- Then identify maps still lacking previews so they can be marked unavailable rather than pretending to work.
 
-#### Files to modify
-- `src/components/admin/AdminMapCard.tsx` — graceful TIFF conversion failure
-- `src/components/user-maps/PublicMapEditWizard.tsx` — robust asset resolution, restore paint step
-- `supabase/functions/clone-public-map/index.ts` — better has_impassability logic  
-- `src/pages/RouteFinderLeaderboard.tsx` — add query limit
-- `src/components/route-finder/RouteFinderLeaderboardInline.tsx` — add query limit
+7. Handle legacy/offical maps explicitly
+- Official maps may only have admin-uploaded assets.
+- Community/private-derived maps should prefer original uploaded source previews.
+- If an official map has only route crops and no B&W preview, allow color-only boundary/ROI editing but do not claim B&W editing is available.
 
+Files to update
+
+Frontend:
+- `src/components/user-maps/PublicMapEditWizard.tsx`
+- `src/components/user-maps/UserMapUploadWizard.tsx`
+- `src/components/user-maps/PublishMapDialog.tsx` if publish-time validation is needed
+- possibly `src/pages/UserMaps.tsx` if entry gating/message belongs there
+
+Backend:
+- `supabase/functions/clone-public-map/index.ts`
+- `supabase/functions/map-processing-webhook/index.ts`
+
+Database:
+- new migration to backfill `route_maps` from linked `user_maps`
+- optionally add a derived/editability flag if we want simpler frontend queries
+
+Technical details
+
+Current confirmed broken examples:
+```text
+Public route map "Erikslund"
+- has color_r2_key
+- has bw_r2_key
+- has NO color_image_url
+- has NO impassability_image_url
+
+Source user_map "Erikslund4"
+- has r2_color_key
+- has r2_bw_key
+- has NO color_preview_url
+- has NO bw_preview_url
+```
+
+That exactly explains:
+- no color preview from source previews
+- no B&W step
+- map still looking “available” because raw keys exist
+
+Recommended implementation order
+
+1. Fix selection-page availability logic
+2. Fix wizard state machine so it never hangs
+3. Fix clone/backend asset resolution
+4. Fix upload + processing propagation for new maps
+5. Backfill existing maps
+6. Verify official maps, community maps, and newly uploaded maps separately
