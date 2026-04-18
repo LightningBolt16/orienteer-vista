@@ -1,173 +1,178 @@
 
 Goal
 
-Make Public Map Editing reliable by:
-- showing the real source images when they exist
-- restoring the B&W paint step
-- marking maps as unavailable when the editor cannot actually load what it needs
-- fixing the data pipeline so newly uploaded/published maps keep usable editor assets
+Make public/official map editing use the real full source assets again for:
+- Edit Impassability
+- Add Boundaries
+- Draw ROI
 
-What I found
+and never rely on route export images as an editor source.
 
-1. The problem is real data loss / missing asset propagation, not just a UI bug.
-- Database check: public `route_maps` = 9
-- With `color_image_url` = 0
-- With `impassability_image_url` = 1
-- With `color_r2_key` = 4
-- With `bw_r2_key` = 4
-- Database check: `user_maps` = 22
-- With `color_preview_url` = 0
-- With `bw_preview_url` = 0
+What is actually going wrong
 
-So the editor is usually given raw source keys, but not browser-loadable preview URLs.
+1. The editor currently depends on browser-safe preview URLs, not the original source files.
+- `PublicMapEditWizard` can only render `color_image_url` / `impassability_image_url`.
+- It cannot render raw `r2_*_key` values.
+- `clone-public-map` often returns `has_impassability: true` but `impassability_image_url: null`.
 
-2. Your B&W editor has not actually been removed, but the wizard hides it.
-- In `PublicMapEditWizard.tsx`, the B&W step is only included when:
-  `hasImpassability && bwPreviewUrl`
-- That means a map with a real B&W source in storage but no preview URL never shows the step at all.
+2. Source files exist, but the browser usually cannot use them directly.
+- User/public maps keep raw source keys in R2.
+- Official maps may also keep raw source keys.
+- Direct browser TIFF loading is unreliable, and private/R2 source access is not browser-safe for this flow.
 
-3. The select page is incorrectly optimistic.
-- It labels maps as available from:
-  - `map.bw_r2_key`
-  - `map.color_r2_key`
-- But those only mean “a raw source file exists”, not “the browser can render/edit it”.
-- So maps are shown as usable even when the editor cannot actually display the source.
+3. Preview generation is happening in the wrong place.
+- Admin upload and user upload still try to generate previews in the browser with `convertTifToDataUrl`.
+- That is exactly the fragile path that already fails for some TIFFs.
+- So the system stores raw source keys successfully, but often fails to store usable editor previews.
 
-4. Your own newly uploaded public map fails for the same reason.
-- `PublishMapDialog` just publishes the existing processed `route_map`.
-- That `route_map` only has usable editor assets if preview URLs were copied through.
-- For your recent maps, both `user_maps.color_preview_url` and `user_maps.bw_preview_url` are null, so the published map has no editable preview sources.
+4. The current UI and backend disagree about “available”.
+- Selection page treats color availability mostly as `color_image_url OR route_images fallback`.
+- B&W status is partly inferred from raw keys.
+- Wizard paint step still needs an actual browser-loadable B&W image URL.
+- Result: maps are shown as partly available even though the B&W editor cannot render.
 
-5. There is also a backend consistency gap.
-- `map-processing-webhook` normal completion copies preview URLs into `route_maps`.
-- But the stale/auto-complete path creates `route_maps` without copying preview URLs.
-- So even if preview generation starts working, some maps can still be created in a broken editor state.
+5. Route-image fallback is the wrong architecture for this feature.
+- It can help old color-only maps display something.
+- But it is not the original full source map.
+- It cannot be the long-term basis for public/official editing.
 
-6. The “color fallback” is only half solved.
-- The wizard can fall back to `route_images` for the color background after clone.
-- But that fallback is not used on the map selection page to decide whether a map is truly editable.
-- And there is no equivalent fallback for B&W, so B&W editing still disappears.
+Root cause
 
-Why this is occurring
+The public editor was changed to require browser-safe full-map preview assets, but preview creation and propagation were never made server-side and reliable.
 
-The core issue is that the public editor was redesigned to depend on browser-safe preview URLs, but the data pipeline never got completed end-to-end.
-
-Current state:
+Current broken chain:
 ```text
-user uploads TIFFs
-  -> raw source stored in R2
-  -> processing creates route images
-  -> public route_map created
-  -> editor expects preview URLs
-  -> preview URLs are mostly never stored/copied
-  -> UI still treats raw R2 keys as “available”
-  -> editor gets stuck / has no color source / hides B&W step
+source TIFF exists
+-> raw key saved
+-> client tries to generate preview PNG
+-> preview generation often fails or never runs
+-> route/public map is still published
+-> editor receives has source / has key
+-> but receives no browser-loadable full-map preview
+-> B&W editor disappears or cannot render
 ```
 
-So there are really 3 separate failures:
-1. preview generation/storage is not succeeding for new user maps
-2. preview propagation into `route_maps` is incomplete
-3. frontend availability logic is checking the wrong thing
+Solid solution direction
 
-Plan
+Use a two-asset model for every editable public/official map:
+1. processing source asset = original TIFF/raw file
+2. editor preview asset = full-map browser-safe PNG/WebP generated from the source on the backend
 
-1. Fix the source-of-truth for editor readiness
-- Add a clear editor asset model for each public map:
-  - `hasColorEditorSource`
-  - `hasBwEditorSource`
-  - `canEditPublicMap`
-- Compute this from real browser-loadable assets:
-  - color preview URL, or route-image fallback
-  - B&W preview URL only
-- Stop using raw `r2_*_key` presence as the UI signal for “available”.
+The editor must only use the editor preview asset.
+Processing must only use the original source asset.
 
-2. Fix `PublicMapEditWizard.tsx`
-- Always resolve assets into explicit states before entering edit steps:
-  - `ready`
-  - `partial`
+Implementation plan
+
+1. Introduce a real “editor assets” contract
+- Treat these as required editor inputs:
+  - full color editor preview
+  - full B&W editor preview
+- Stop treating raw `r2_color_key` / `r2_bw_key` as UI-ready.
+- Add a single resolved status model such as:
+  - `ready_full`
+  - `ready_color_only`
+  - `source_present_preview_missing`
   - `unavailable`
-  - `error`
-- Use route-image fallback for color preview when no color preview URL exists.
-- Restore the B&W step when a B&W preview exists.
-- If only color exists, skip B&W cleanly and explain why.
-- Ensure the wizard always exits loading state.
 
-3. Fix the map selection page
-- Precompute editability per map before showing badges/buttons.
-- Replace current labels with truthful statuses, for example:
-  - “Color editing available”
-  - “B&W editing available”
-  - “Partially editable”
-  - “Not available for editing”
-- Prevent starting edit mode for maps with no usable editor assets.
+2. Move preview generation fully to the backend
+- Add a backend function/job that generates full-map browser-safe previews from original source files.
+- It should support:
+  - user-uploaded maps from R2 keys
+  - official maps from admin-uploaded source keys
+  - existing legacy maps that only have source keys
+- This replaces browser-side TIFF preview generation as the source of truth.
 
-4. Fix upload/publish pipeline for new maps
-- Review and harden `UserMapUploadWizard.tsx` preview generation path.
-- Make preview creation observable instead of silent:
-  - if preview generation fails, store an explicit warning/state
-  - do not silently leave the map with no editor previews
-- Ensure preview URLs are written to `user_maps` for new uploads.
+3. Fix admin upload flow
+- Admin color/B&W uploads should:
+  - save raw source to storage first
+  - trigger backend preview generation
+  - update `route_maps.color_image_url` / `route_maps.impassability_image_url` only after backend generation succeeds
+- If preview generation fails:
+  - keep the source key
+  - mark preview status as missing/failed
+  - do not show the map as editable
 
-5. Fix route-map propagation
-- In `map-processing-webhook/index.ts`, make both completion paths copy:
-  - `color_preview_url -> route_maps.color_image_url`
-  - `bw_preview_url -> route_maps.impassability_image_url`
-  - plus existing R2 keys
-- Ensure stale/auto-complete path does the same.
+4. Fix user upload flow
+- `UserMapUploadWizard` should stop being responsible for reliable preview generation in the browser.
+- After source upload and DB insert, trigger backend preview generation.
+- Save preview URLs back to `user_maps`.
+- Publishing should only expose full editing capability when those preview URLs exist.
 
-6. Backfill existing broken maps
-- Add one migration/backfill step that copies preview URLs from linked `user_maps` into `route_maps` where available.
-- Also backfill R2 keys where missing.
-- Then identify maps still lacking previews so they can be marked unavailable rather than pretending to work.
+5. Fix public map cloning and asset resolution
+- `clone-public-map` should resolve and return a strict asset object:
+  - source keys present?
+  - color editor preview URL
+  - B&W editor preview URL
+  - editor readiness status
+- It should not claim B&W editing is available unless a real B&W editor preview URL exists.
+- If previews are missing but source keys exist, return a “preview missing” state instead of pretending it is ready.
 
-7. Handle legacy/offical maps explicitly
-- Official maps may only have admin-uploaded assets.
-- Community/private-derived maps should prefer original uploaded source previews.
-- If an official map has only route crops and no B&W preview, allow color-only boundary/ROI editing but do not claim B&W editing is available.
+6. Refactor `PublicMapEditWizard`
+- Make the wizard depend on resolved asset readiness, not on scattered booleans.
+- Behavior:
+  - full previews available -> show paint + annotations + ROI
+  - only color preview available -> allow annotations + ROI only
+  - source exists but preview missing -> show explicit unavailable/repair message, no false editing
+  - no assets -> unavailable
+- Remove route-image fallback from the core public editing path for official/public maps.
 
-Files to update
+7. Fix map selection truthfulness
+- On the select screen, show statuses based on full-map editor previews only.
+- Replace optimistic labels with truthful ones:
+  - “Full editing available”
+  - “Color editing only”
+  - “Source exists but preview missing”
+  - “Not editable”
+- Disable start for maps that do not have the required full preview assets.
 
-Frontend:
+8. Backfill and repair old data
+- Add a repair path for existing maps:
+  - for `user_maps` with `r2_*_key` but missing preview URLs, generate previews and save them
+  - for `route_maps` linked to those user maps, propagate the preview URLs
+  - for official maps with raw source keys but no previews, generate previews directly from source keys
+- This is a data backfill plus asset regeneration task, not just a UI fix.
+
+9. Add explicit observability
+- Store preview generation state/errors so the app can explain why a map is not editable.
+- Log whether failure is:
+  - missing source
+  - unsupported source format
+  - preview generation failed
+  - propagation failed
+- This prevents future “it says available but doesn’t work” regressions.
+
+Files likely involved
+
+Frontend
 - `src/components/user-maps/PublicMapEditWizard.tsx`
 - `src/components/user-maps/UserMapUploadWizard.tsx`
-- `src/components/user-maps/PublishMapDialog.tsx` if publish-time validation is needed
-- possibly `src/pages/UserMaps.tsx` if entry gating/message belongs there
+- `src/components/user-maps/PublishMapDialog.tsx`
+- `src/components/admin/AdminMapCard.tsx`
 
-Backend:
+Backend
 - `supabase/functions/clone-public-map/index.ts`
 - `supabase/functions/map-processing-webhook/index.ts`
+- likely a new backend function for preview generation/regeneration
 
-Database:
-- new migration to backfill `route_maps` from linked `user_maps`
-- optionally add a derived/editability flag if we want simpler frontend queries
+Database/data work
+- possibly add preview status/error fields
+- backfill existing `user_maps` and `route_maps` preview URLs from source assets
+- regenerate missing preview assets for legacy maps
 
-Technical details
+Recommended order
 
-Current confirmed broken examples:
-```text
-Public route map "Erikslund"
-- has color_r2_key
-- has bw_r2_key
-- has NO color_image_url
-- has NO impassability_image_url
+1. Define editor asset contract and truthful statuses
+2. Add backend preview generation for full source maps
+3. Update admin/user upload flows to use backend preview generation
+4. Refactor clone + wizard to use strict readiness states
+5. Fix selection-page availability labels/gating
+6. Backfill existing public/official maps
+7. Verify official maps, newly uploaded user maps, and published community maps separately
 
-Source user_map "Erikslund4"
-- has r2_color_key
-- has r2_bw_key
-- has NO color_preview_url
-- has NO bw_preview_url
-```
+Success criteria
 
-That exactly explains:
-- no color preview from source previews
-- no B&W step
-- map still looking “available” because raw keys exist
-
-Recommended implementation order
-
-1. Fix selection-page availability logic
-2. Fix wizard state machine so it never hangs
-3. Fix clone/backend asset resolution
-4. Fix upload + processing propagation for new maps
-5. Backfill existing maps
-6. Verify official maps, community maps, and newly uploaded maps separately
+- Public/official maps only show “editable” when full source-based preview assets exist
+- B&W paint step appears whenever a real B&W editor preview exists
+- No public editing flow depends on route export images
+- Newly uploaded/published maps automatically get usable editor assets
+- Legacy maps can be repaired through preview regeneration instead of manual guesswork
