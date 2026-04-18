@@ -28,6 +28,73 @@ Deno.serve(async (req) => {
     const url = new URL(req.url)
     const action = url.pathname.split('/').pop()
 
+    // ====== EDITOR PREVIEW SUPPORT ======
+    // Accept a generated full-map PNG and store it in the public route-images bucket.
+    // Called by the Modal preview generator.
+    if (req.method === 'POST' && action === 'upload-public-image') {
+      const body = await req.json()
+      const { bucket, storage_path, image_data, content_type = 'image/png' } = body
+      if (!bucket || !storage_path || !image_data) {
+        return new Response(JSON.stringify({ error: 'Missing fields' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const bin = atob(image_data)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const { error: upErr } = await supabase.storage.from(bucket)
+        .upload(storage_path, bytes, { contentType: content_type, cacheControl: '3600', upsert: true })
+      if (upErr) {
+        console.error('Public image upload error:', upErr)
+        return new Response(JSON.stringify({ error: upErr.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storage_path)
+      return new Response(JSON.stringify({ success: true, public_url: urlData.publicUrl }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // Register the resulting preview URLs (color and/or BW) onto the target row.
+    // Modal calls this after generate_previews finishes.
+    if (req.method === 'POST' && action === 'register-previews') {
+      const body = await req.json()
+      const { target_table, target_id, color_preview_url, bw_preview_url, error } = body
+      console.log('register-previews:', { target_table, target_id, color: !!color_preview_url, bw: !!bw_preview_url, error })
+
+      if (!target_table || !target_id) {
+        return new Response(JSON.stringify({ error: 'target_table and target_id required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      let status = 'failed'
+      if (color_preview_url && bw_preview_url) status = 'ready'
+      else if (color_preview_url || bw_preview_url) status = 'partial'
+      else if (error) status = 'failed'
+
+      if (target_table === 'user_maps') {
+        const update: Record<string, any> = { preview_status: status, preview_error: error || null }
+        if (color_preview_url) update.color_preview_url = color_preview_url
+        if (bw_preview_url) update.bw_preview_url = bw_preview_url
+        await supabase.from('user_maps').update(update).eq('id', target_id)
+
+        // Also propagate to any route_maps that link back to this user_map
+        const propagate: Record<string, any> = { preview_status: status, preview_error: error || null }
+        if (color_preview_url) propagate.color_image_url = color_preview_url
+        if (bw_preview_url) propagate.impassability_image_url = bw_preview_url
+        await supabase.from('route_maps').update(propagate).eq('source_map_id', target_id)
+      } else if (target_table === 'route_maps') {
+        const update: Record<string, any> = { preview_status: status, preview_error: error || null }
+        if (color_preview_url) update.color_image_url = color_preview_url
+        if (bw_preview_url) update.impassability_image_url = bw_preview_url
+        await supabase.from('route_maps').update(update).eq('id', target_id)
+      } else {
+        return new Response(JSON.stringify({ error: 'Unknown target_table' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      return new Response(JSON.stringify({ success: true, preview_status: status }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     // UPDATE STATUS
     if (req.method === 'POST' && action === 'update-status') {
       const body = await req.json()
