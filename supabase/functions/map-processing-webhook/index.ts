@@ -131,6 +131,12 @@ Deno.serve(async (req) => {
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
+      const computedPreviewStatus = userMap.color_preview_url && userMap.bw_preview_url
+        ? 'ready'
+        : userMap.color_preview_url || userMap.bw_preview_url
+          ? 'partial'
+          : 'pending'
+
       const { data: routeMap, error: routeMapError } = await supabase.from('route_maps').insert({
         name: userMap.name,
         user_id: userMap.user_id,
@@ -143,6 +149,7 @@ Deno.serve(async (req) => {
         bw_r2_key: userMap.r2_bw_key || null,
         color_image_url: userMap.color_preview_url || null,
         impassability_image_url: userMap.bw_preview_url || null,
+        preview_status: computedPreviewStatus,
       }).select().single()
 
       if (routeMapError) {
@@ -331,6 +338,11 @@ Deno.serve(async (req) => {
         const count = files?.length || 0
 
         if (count > 0) {
+          const stalePreviewStatus = map.color_preview_url && map.bw_preview_url
+            ? 'ready'
+            : map.color_preview_url || map.bw_preview_url
+              ? 'partial'
+              : 'pending'
           const { data: routeMap } = await supabase.from('route_maps').insert({
             name: map.name, user_id: map.user_id, source_map_id: map.id,
             is_public: false, description: `${count} routes (auto-completed)`, map_type: 'forest',
@@ -338,6 +350,7 @@ Deno.serve(async (req) => {
             bw_r2_key: map.r2_bw_key || null,
             color_image_url: map.color_preview_url || null,
             impassability_image_url: map.bw_preview_url || null,
+            preview_status: stalePreviewStatus,
           }).select().single()
 
           if (routeMap) {
