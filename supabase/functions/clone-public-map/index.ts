@@ -7,8 +7,13 @@ const corsHeaders = {
 
 /**
  * Clone a public map's user_maps record for the current user.
- * Returns browser-friendly preview URLs so the client never needs
- * to fetch TIFFs from R2 or query private user_maps rows.
+ * Returns strict editor-readiness so the wizard never has to guess.
+ *
+ * editor_status:
+ *   - 'ready_full'                   : color + bw editor previews available
+ *   - 'ready_color_only'             : color preview available, no bw preview
+ *   - 'source_present_preview_missing' : raw R2 source(s) exist but no preview
+ *   - 'unavailable'                  : nothing usable
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,23 +25,22 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
+      authHeader.replace('Bearer ', ''),
     );
 
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authorization' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -44,11 +48,10 @@ Deno.serve(async (req) => {
     if (!source_map_id) {
       return new Response(
         JSON.stringify({ error: 'source_map_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Get the public route_map
     const { data: routeMap, error: rmError } = await supabase
       .from('route_maps')
       .select('*')
@@ -58,11 +61,23 @@ Deno.serve(async (req) => {
     if (rmError || !routeMap) {
       return new Response(
         JSON.stringify({ error: 'Route map not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Check if user already cloned this map
+    const resolved = await resolveAssets(supabase, routeMap);
+
+    // Refuse to clone if there is literally nothing to edit
+    if (resolved.editor_status === 'unavailable') {
+      return new Response(
+        JSON.stringify({
+          error: 'This map has no editable assets',
+          editor_status: 'unavailable',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const { data: existingClone } = await supabase
       .from('user_maps')
       .select('id')
@@ -70,26 +85,24 @@ Deno.serve(async (req) => {
       .eq('source_public_map_id', source_map_id)
       .maybeSingle();
 
-    // Resolve assets server-side
-    const resolved = await resolveAssets(supabase, routeMap);
-
     if (existingClone) {
       return new Response(
         JSON.stringify({
           user_map_id: existingClone.id,
           already_exists: true,
           message: 'You already have a clone of this map',
-          has_impassability: resolved.hasBw,
           color_image_url: resolved.colorPreviewUrl,
           impassability_image_url: resolved.bwPreviewUrl,
+          editor_status: resolved.editor_status,
+          has_color_source: resolved.hasColorSource,
+          has_bw_source: resolved.hasBwSource,
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
     const cloneName = `${routeMap.name} (edited)`;
 
-    // Build the insert record
     const insertData: Record<string, any> = {
       user_id: user.id,
       name: cloneName,
@@ -105,6 +118,15 @@ Deno.serve(async (req) => {
       is_tiled: resolved.sourceUserMap?.is_tiled || false,
       tile_grid: resolved.sourceUserMap?.tile_grid || null,
       impassable_annotations: resolved.sourceUserMap?.impassable_annotations || null,
+      color_preview_url: resolved.colorPreviewUrl,
+      bw_preview_url: resolved.bwPreviewUrl,
+      preview_status: resolved.editor_status === 'ready_full'
+        ? 'ready'
+        : resolved.editor_status === 'ready_color_only'
+          ? 'partial'
+          : resolved.editor_status === 'source_present_preview_missing'
+            ? 'pending'
+            : 'unavailable',
     };
 
     const { data: newUserMap, error: insertError } = await supabase
@@ -117,7 +139,7 @@ Deno.serve(async (req) => {
       console.error('Failed to create cloned map:', insertError);
       return new Response(
         JSON.stringify({ error: `Failed to clone map: ${insertError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -126,34 +148,34 @@ Deno.serve(async (req) => {
         user_map_id: newUserMap.id,
         name: cloneName,
         already_exists: false,
-        has_impassability: resolved.hasBw,
         color_image_url: resolved.colorPreviewUrl,
         impassability_image_url: resolved.bwPreviewUrl,
+        editor_status: resolved.editor_status,
+        has_color_source: resolved.hasColorSource,
+        has_bw_source: resolved.hasBwSource,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Clone error:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });
 
 /**
- * Resolve source assets server-side, bypassing RLS.
- * Returns R2 keys for cloning AND browser-friendly preview URLs for the editor.
- * Also falls back to route_images for color preview if no dedicated preview URL exists.
+ * Resolve real editor-ready assets. Only browser-loadable URLs count as previews.
+ * Raw R2 keys count as "source present but preview missing".
  */
 async function resolveAssets(supabase: any, routeMap: any) {
-  let colorR2Key = routeMap.color_r2_key || null;
-  let bwR2Key = routeMap.bw_r2_key || null;
-  let colorPreviewUrl = routeMap.color_image_url || null;
-  let bwPreviewUrl = routeMap.impassability_image_url || null;
+  let colorR2Key: string | null = routeMap.color_r2_key || null;
+  let bwR2Key: string | null = routeMap.bw_r2_key || null;
+  let colorPreviewUrl: string | null = routeMap.color_image_url || null;
+  let bwPreviewUrl: string | null = routeMap.impassability_image_url || null;
   let sourceUserMap: any = null;
 
-  // If route_map links to a source user_maps, fetch it server-side (no RLS issue)
   if (routeMap.source_map_id) {
     const { data: sum } = await supabase
       .from('user_maps')
@@ -168,25 +190,35 @@ async function resolveAssets(supabase: any, routeMap: any) {
     if (!bwPreviewUrl && sum?.bw_preview_url) bwPreviewUrl = sum.bw_preview_url;
   }
 
-  // Fallback: use a route_image as color preview (cropped but browser-displayable)
-  if (!colorPreviewUrl) {
-    const { data: routeImages } = await supabase
-      .from('route_images')
-      .select('image_path')
-      .eq('map_id', routeMap.id)
-      .limit(1);
-    
-    if (routeImages && routeImages.length > 0) {
-      // Determine which bucket: user maps use 'user-route-images', official use 'route-images'
-      const bucket = routeMap.user_id ? 'user-route-images' : 'route-images';
-      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(routeImages[0].image_path);
-      if (urlData?.publicUrl) {
-        colorPreviewUrl = urlData.publicUrl;
-      }
-    }
+  const hasColorSource = !!(colorR2Key || colorPreviewUrl);
+  const hasBwSource = !!(bwR2Key || bwPreviewUrl);
+
+  let editor_status:
+    | 'ready_full'
+    | 'ready_color_only'
+    | 'source_present_preview_missing'
+    | 'unavailable';
+
+  if (colorPreviewUrl && bwPreviewUrl) {
+    editor_status = 'ready_full';
+  } else if (colorPreviewUrl && !bwPreviewUrl && !bwR2Key) {
+    editor_status = 'ready_color_only';
+  } else if ((colorR2Key || bwR2Key) && (!colorPreviewUrl || (bwR2Key && !bwPreviewUrl))) {
+    editor_status = 'source_present_preview_missing';
+  } else if (colorPreviewUrl) {
+    editor_status = 'ready_color_only';
+  } else {
+    editor_status = 'unavailable';
   }
 
-  const hasBw = !!(bwR2Key || bwPreviewUrl || routeMap.impassability_image_url);
-
-  return { colorR2Key, bwR2Key, colorPreviewUrl, bwPreviewUrl, hasBw, sourceUserMap };
+  return {
+    colorR2Key,
+    bwR2Key,
+    colorPreviewUrl,
+    bwPreviewUrl,
+    hasColorSource,
+    hasBwSource,
+    editor_status,
+    sourceUserMap,
+  };
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Loader2, Check, Search, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Check, Search, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +26,38 @@ interface PublicMap {
   bw_r2_key: string | null;
   country_code: string | null;
   description: string | null;
+  preview_status: string | null;
+}
+
+type EditorReadiness =
+  | 'ready_full'
+  | 'ready_color_only'
+  | 'source_present_preview_missing'
+  | 'unavailable';
+
+function readinessOf(map: PublicMap): EditorReadiness {
+  const hasColorPreview = !!map.color_image_url;
+  const hasBwPreview = !!map.impassability_image_url;
+  const hasBwSource = !!map.bw_r2_key;
+  const hasColorSource = !!map.color_r2_key || hasColorPreview;
+
+  if (hasColorPreview && hasBwPreview) return 'ready_full';
+  if (hasColorPreview && !hasBwSource) return 'ready_color_only';
+  if (hasColorSource || hasBwSource) return 'source_present_preview_missing';
+  return 'unavailable';
+}
+
+function readinessLabel(r: EditorReadiness): { text: string; cls: string } {
+  switch (r) {
+    case 'ready_full':
+      return { text: 'Full editing available', cls: 'text-green-600' };
+    case 'ready_color_only':
+      return { text: 'Color editing only', cls: 'text-blue-600' };
+    case 'source_present_preview_missing':
+      return { text: 'Preview missing — needs regeneration', cls: 'text-amber-600' };
+    case 'unavailable':
+      return { text: 'Not editable', cls: 'text-red-500' };
+  }
 }
 
 interface ImpassableArea {
@@ -39,7 +71,6 @@ interface ImpassableLine {
 
 type WizardStep = 'select' | 'paint' | 'annotations' | 'roi' | 'parameters' | 'submit';
 type ProcessingMode = 'route_choice' | 'route_finder' | 'both';
-type AssetState = 'idle' | 'loading' | 'ready' | 'unavailable' | 'error';
 
 interface Point {
   x: number;
@@ -60,17 +91,16 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const [loadingMaps, setLoadingMaps] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMap, setSelectedMap] = useState<PublicMap | null>(null);
+  const [regeneratingMapId, setRegeneratingMapId] = useState<string | null>(null);
 
   // Cloning
   const [clonedMapId, setClonedMapId] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
 
-  // Preview URLs from server (browser-friendly, no TIFF)
+  // Resolved editor assets (server-side only — no client TIFF conversion, no route_images fallback)
   const [colorPreviewUrl, setColorPreviewUrl] = useState<string | null>(null);
-  const [colorAssetState, setColorAssetState] = useState<AssetState>('idle');
   const [bwPreviewUrl, setBwPreviewUrl] = useState<string | null>(null);
-  const [bwAssetState, setBwAssetState] = useState<AssetState>('idle');
-  const [hasImpassability, setHasImpassability] = useState(false);
+  const [editorReadiness, setEditorReadiness] = useState<EditorReadiness>('unavailable');
 
   // Paint state
   const [editedBwBlob, setEditedBwBlob] = useState<Blob | null>(null);
@@ -91,58 +121,54 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  // Precomputed editability: maps that have at least one route_image (color fallback)
-  const [editableMaps, setEditableMaps] = useState<Set<string>>(new Set());
-
-  // Load public maps and check which ones actually have browser-loadable assets
-  useEffect(() => {
-    const loadPublicMaps = async () => {
-      setLoadingMaps(true);
-      try {
-        const { data, error } = await supabase
-          .from('route_maps')
-          .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description')
-          .eq('is_public', true)
-          .order('name');
-
-        if (error) throw error;
-        const maps = (data || []) as PublicMap[];
-        setPublicMaps(maps);
-
-        // Check which maps have browser-loadable assets (color_image_url OR route_images fallback)
-        const mapIds = maps.map(m => m.id);
-        if (mapIds.length > 0) {
-          const { data: routeImagesCheck } = await supabase
-            .from('route_images')
-            .select('map_id')
-            .in('map_id', mapIds)
-            .limit(1000);
-          
-          const mapsWithRouteImages = new Set((routeImagesCheck || []).map(r => r.map_id));
-          const editable = new Set<string>();
-          for (const m of maps) {
-            // A map is editable if it has a color_image_url OR at least one route_image as fallback
-            if (m.color_image_url || mapsWithRouteImages.has(m.id)) {
-              editable.add(m.id);
-            }
-          }
-          setEditableMaps(editable);
-        }
-      } catch (err) {
-        console.error('Failed to load public maps:', err);
-      } finally {
-        setLoadingMaps(false);
-      }
-    };
-    loadPublicMaps();
+  const loadPublicMaps = useCallback(async () => {
+    setLoadingMaps(true);
+    try {
+      const { data, error } = await supabase
+        .from('route_maps')
+        .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description, preview_status')
+        .eq('is_public', true)
+        .order('name');
+      if (error) throw error;
+      setPublicMaps((data || []) as PublicMap[]);
+    } catch (err) {
+      console.error('Failed to load public maps:', err);
+    } finally {
+      setLoadingMaps(false);
+    }
   }, []);
 
-  const filteredMaps = publicMaps.filter(m =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    loadPublicMaps();
+  }, [loadPublicMaps]);
+
+  const filteredMaps = publicMaps.filter((m) =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleSelectMap = async (map: PublicMap) => {
+  const handleSelectMap = (map: PublicMap) => {
+    if (readinessOf(map) === 'unavailable') return;
     setSelectedMap(map);
+  };
+
+  const handleRegeneratePreviews = async (map: PublicMap) => {
+    setRegeneratingMapId(map.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-map-previews', {
+        body: { route_map_id: map.id },
+      });
+      if (error) throw new Error(error.message || 'Failed to start regeneration');
+      toast({
+        title: 'Preview generation started',
+        description: data?.message || 'This usually takes under a minute. Refresh shortly.',
+      });
+      // Poll once after a short delay to refresh the UI
+      setTimeout(() => loadPublicMaps(), 8000);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setRegeneratingMapId(null);
+    }
   };
 
   const handleCloneAndProceed = async () => {
@@ -152,44 +178,38 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       const { data, error } = await supabase.functions.invoke('clone-public-map', {
         body: { source_map_id: selectedMap.id },
       });
-
       if (error) throw new Error(error.message || 'Failed to clone map');
 
       setClonedMapId(data.user_map_id);
+      const colorUrl: string | null = data.color_image_url || null;
+      const bwUrl: string | null = data.impassability_image_url || null;
+      const status: EditorReadiness = data.editor_status || 'unavailable';
 
-      // Use preview URLs directly from server response — these are browser-friendly
-      const colorUrl = data.color_image_url || null;
-      const bwUrl = data.impassability_image_url || null;
-      const hasBw = data.has_impassability ?? !!bwUrl;
-
-      // Always try route_images fallback for color — most maps have these even without source previews
-      let finalColorUrl = colorUrl;
-      if (!finalColorUrl) {
-        try {
-          const { data: images } = await supabase
-            .from('route_images')
-            .select('image_path')
-            .eq('map_id', selectedMap.id)
-            .limit(1);
-          if (images && images.length > 0) {
-            const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(images[0].image_path);
-            finalColorUrl = urlData.publicUrl;
-          }
-        } catch (fallbackErr) {
-          console.warn('Route images fallback failed:', fallbackErr);
-        }
-      }
-
-      setColorPreviewUrl(finalColorUrl);
-      setColorAssetState(finalColorUrl ? 'ready' : 'unavailable');
+      setColorPreviewUrl(colorUrl);
       setBwPreviewUrl(bwUrl);
-      setBwAssetState(bwUrl ? 'ready' : 'unavailable');
-      setHasImpassability(hasBw);
+      setEditorReadiness(status);
 
-      if (hasBw && bwUrl) {
+      // Decide which step to enter based on real readiness
+      if (status === 'ready_full' && bwUrl) {
         setStep('paint');
-      } else {
+      } else if (status === 'ready_color_only' && colorUrl) {
         setStep('annotations');
+      } else if (status === 'source_present_preview_missing') {
+        toast({
+          title: 'Previews not ready',
+          description: 'This map has source files but no editor previews. Click "Regenerate previews" on the selection list and try again in ~1 minute.',
+          variant: 'destructive',
+        });
+        setCloning(false);
+        return;
+      } else {
+        toast({
+          title: 'Map not editable',
+          description: 'No editor assets available for this map.',
+          variant: 'destructive',
+        });
+        setCloning(false);
+        return;
       }
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -209,25 +229,13 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
     try {
       const hasAnnotations = impassableAreas.length > 0 || impassableLines.length > 0;
-
-      const updateData: Record<string, any> = {
-        status: 'pending',
-      };
-
-      if (roiCoordinates.length >= 3) {
-        updateData.roi_coordinates = roiCoordinates;
-      }
-      if (hasAnnotations) {
-        updateData.impassable_annotations = { areas: impassableAreas, lines: impassableLines };
-      }
+      const updateData: Record<string, any> = { status: 'pending' };
+      if (roiCoordinates.length >= 3) updateData.roi_coordinates = roiCoordinates;
+      if (hasAnnotations) updateData.impassable_annotations = { areas: impassableAreas, lines: impassableLines };
       updateData.processing_parameters = parameters;
 
-      await supabase
-        .from('user_maps' as any)
-        .update(updateData as any)
-        .eq('id', clonedMapId);
+      await supabase.from('user_maps' as any).update(updateData as any).eq('id', clonedMapId);
 
-      // If we have an edited B&W blob, upload it to R2
       if (editedBwBlob) {
         const endpoint = import.meta.env.VITE_R2_PRESIGNED_ENDPOINT;
         if (endpoint) {
@@ -250,22 +258,16 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
             });
             await supabase
               .from('user_maps' as any)
-              .update({
-                r2_bw_key: urls.bw_key,
-                bw_tif_path: urls.bw_key
-              } as any)
+              .update({ r2_bw_key: urls.bw_key, bw_tif_path: urls.bw_key } as any)
               .eq('id', clonedMapId);
           }
         }
       }
 
-      // Trigger processing
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         if (processingMode === 'route_choice' || processingMode === 'both') {
-          await supabase.functions.invoke('trigger-map-processing', {
-            body: { map_id: clonedMapId },
-          });
+          await supabase.functions.invoke('trigger-map-processing', { body: { map_id: clonedMapId } });
         }
         if (processingMode === 'route_finder' || processingMode === 'both') {
           await supabase.functions.invoke('trigger-route-finder-processing', {
@@ -289,11 +291,10 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     }
   };
 
+  // Steps depend on real readiness — paint only appears when full editing is possible
   const getSteps = (): { key: WizardStep; label: string }[] => {
-    const base: { key: WizardStep; label: string }[] = [
-      { key: 'select', label: 'Select Map' },
-    ];
-    if (hasImpassability) {
+    const base: { key: WizardStep; label: string }[] = [{ key: 'select', label: 'Select Map' }];
+    if (editorReadiness === 'ready_full') {
       base.push({ key: 'paint', label: 'Edit Impassability' });
     }
     base.push(
@@ -306,7 +307,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   };
 
   const steps = getSteps();
-  const currentStepIndex = steps.findIndex(s => s.key === step);
+  const currentStepIndex = steps.findIndex((s) => s.key === step);
   const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
 
   const handleNext = () => {
@@ -340,7 +341,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   const canProceed = () => {
     switch (step) {
-      case 'select': return !!selectedMap && editableMaps.has(selectedMap.id);
+      case 'select':
+        return !!selectedMap && readinessOf(selectedMap) !== 'unavailable' && readinessOf(selectedMap) !== 'source_present_preview_missing';
       case 'paint': return true;
       case 'annotations': return true;
       case 'roi': return roiCoordinates.length >= 3;
@@ -351,29 +353,12 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   };
 
   const renderBwStep = () => {
-    if (bwAssetState === 'loading') {
-      return (
-        <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading B&W image...</span>
-        </div>
-      );
-    }
-    if (bwAssetState === 'unavailable' || !bwPreviewUrl) {
+    if (!bwPreviewUrl) {
       return (
         <div className="flex flex-col items-center justify-center h-64 bg-muted rounded-lg gap-2">
           <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">This map has no editable B&W impassability source.</p>
+          <p className="text-sm text-muted-foreground">No B&W editor preview is available for this map.</p>
           <p className="text-xs text-muted-foreground">Click "Next" to skip this step.</p>
-        </div>
-      );
-    }
-    if (bwAssetState === 'error') {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 bg-muted rounded-lg gap-2">
-          <AlertTriangle className="h-8 w-8 text-destructive" />
-          <p className="text-sm text-destructive">Failed to load the B&W image.</p>
-          <p className="text-xs text-muted-foreground">You can skip this step and continue.</p>
         </div>
       );
     }
@@ -391,19 +376,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   };
 
   const renderColorCanvas = (children: (url: string) => React.ReactNode) => {
-    if (colorAssetState === 'loading') {
-      return (
-        <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading map image...</span>
-        </div>
-      );
-    }
-    if (colorAssetState === 'unavailable' || colorAssetState === 'error' || !colorPreviewUrl) {
+    if (!colorPreviewUrl) {
       return (
         <div className="flex flex-col items-center justify-center h-64 bg-muted rounded-lg gap-2">
           <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">No color map image available for this map.</p>
+          <p className="text-sm text-muted-foreground">No color editor preview available for this map.</p>
           <p className="text-xs text-muted-foreground">Click "Next" to skip.</p>
         </div>
       );
@@ -431,44 +408,65 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
               </div>
             ) : (
               <div className="max-h-96 overflow-y-auto space-y-2">
-                {filteredMaps.map((map) => (
-                  <div
-                    key={map.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedMap?.id === map.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                    onClick={() => handleSelectMap(map)}
-                  >
-                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{map.name}</p>
-                        {map.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{map.description}</p>
-                        )}
-                        <div className="flex gap-2 mt-1">
-                          {map.country_code && (
-                            <span className="text-xs text-muted-foreground">{map.country_code}</span>
+                {filteredMaps.map((map) => {
+                  const readiness = readinessOf(map);
+                  const label = readinessLabel(readiness);
+                  const isUnavailable = readiness === 'unavailable';
+                  const needsRegen = readiness === 'source_present_preview_missing';
+                  const isSelected = selectedMap?.id === map.id;
+                  return (
+                    <div
+                      key={map.id}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        isUnavailable
+                          ? 'border-border opacity-50 cursor-not-allowed'
+                          : isSelected
+                            ? 'border-primary bg-primary/5 cursor-pointer'
+                            : 'border-border hover:border-primary/50 cursor-pointer'
+                      }`}
+                      onClick={() => !isUnavailable && handleSelectMap(map)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{map.name}</p>
+                          {map.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{map.description}</p>
                           )}
-                          {map.impassability_image_url ? (
-                            <span className="text-xs text-green-600">B&W editing available</span>
-                          ) : map.bw_r2_key ? (
-                            <span className="text-xs text-amber-600">B&W source only (no preview)</span>
-                          ) : null}
-                          {editableMaps.has(map.id) ? (
-                            <span className="text-xs text-blue-600">Color editing available</span>
-                          ) : (
-                            <span className="text-xs text-red-500">Not editable</span>
+                          <div className="flex gap-2 mt-1 flex-wrap items-center">
+                            {map.country_code && (
+                              <span className="text-xs text-muted-foreground">{map.country_code}</span>
+                            )}
+                            <span className={`text-xs ${label.cls}`}>{label.text}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {needsRegen && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRegeneratePreviews(map);
+                              }}
+                              disabled={regeneratingMapId === map.id}
+                              className="h-7 text-xs"
+                            >
+                              {regeneratingMapId === map.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                  Regenerate
+                                </>
+                              )}
+                            </Button>
                           )}
+                          {isSelected && <Check className="h-5 w-5 text-primary" />}
                         </div>
                       </div>
-                      {selectedMap?.id === map.id && (
-                        <Check className="h-5 w-5 text-primary" />
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {filteredMaps.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-8">No maps found</p>
                 )}
@@ -542,16 +540,10 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
             </div>
 
             {(processingMode === 'route_choice' || processingMode === 'both') && (
-              <ProcessingParametersForm
-                parameters={parameters}
-                onChange={setParameters}
-              />
+              <ProcessingParametersForm parameters={parameters} onChange={setParameters} />
             )}
             {(processingMode === 'route_finder' || processingMode === 'both') && (
-              <RouteFinderParametersForm
-                parameters={routeFinderParameters}
-                onChange={setRouteFinderParameters}
-              />
+              <RouteFinderParametersForm parameters={routeFinderParameters} onChange={setRouteFinderParameters} />
             )}
           </div>
         );
@@ -628,7 +620,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
           </Button>
 
           {step === 'select' ? (
-            <Button onClick={handleCloneAndProceed} disabled={!selectedMap || cloning || !user}>
+            <Button onClick={handleCloneAndProceed} disabled={!canProceed() || cloning || !user}>
               {cloning ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
