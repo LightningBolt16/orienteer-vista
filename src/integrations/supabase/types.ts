@@ -640,6 +640,8 @@ export type Database = {
           map_category: string | null
           map_type: string | null
           name: string
+          preview_error: string | null
+          preview_status: string | null
           source_map_id: string | null
           updated_at: string
           user_id: string | null
@@ -663,6 +665,8 @@ export type Database = {
           map_category?: string | null
           map_type?: string | null
           name: string
+          preview_error?: string | null
+          preview_status?: string | null
           source_map_id?: string | null
           updated_at?: string
           user_id?: string | null
@@ -686,6 +690,8 @@ export type Database = {
           map_category?: string | null
           map_type?: string | null
           name?: string
+          preview_error?: string | null
+          preview_status?: string | null
           source_map_id?: string | null
           updated_at?: string
           user_id?: string | null
@@ -975,6 +981,8 @@ export type Database = {
           is_tiled: boolean | null
           last_activity_at: string | null
           name: string
+          preview_error: string | null
+          preview_status: string | null
           processing_parameters: Json | null
           r2_bw_key: string | null
           r2_color_key: string | null
@@ -999,6 +1007,8 @@ export type Database = {
           is_tiled?: boolean | null
           last_activity_at?: string | null
           name: string
+          preview_error?: string | null
+          preview_status?: string | null
           processing_parameters?: Json | null
           r2_bw_key?: string | null
           r2_color_key?: string | null
@@ -1023,6 +1033,8 @@ export type Database = {
           is_tiled?: boolean | null
           last_activity_at?: string | null
           name?: string
+          preview_error?: string | null
+          preview_status?: string | null
           processing_parameters?: Json | null
           r2_bw_key?: string | null
           r2_color_key?: string | null
