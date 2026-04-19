@@ -63,7 +63,7 @@ MAX_PREVIEW_SIDE = 4096
 
 @app.function(
     image=image,
-    secrets=[modal.Secret.from_name("map-processing-secrets")],
+    secrets=[modal.Secret.from_name("map-processing-secrets"), modal.Secret.from_name("r2-credentials")],
     timeout=600,
 )
 @modal.web_endpoint(method="POST")
