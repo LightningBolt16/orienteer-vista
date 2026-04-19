@@ -317,7 +317,7 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
             min={0}
             max={100}
             step={1}
-            className="flex-1 max-w-xs"
+            className="flex-1"
             disabled={!colorImageLoaded}
           />
           {!colorImageLoaded && (
