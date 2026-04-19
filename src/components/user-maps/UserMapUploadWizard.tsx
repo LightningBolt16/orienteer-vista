@@ -233,40 +233,18 @@ const UserMapUploadWizard: React.FC<UserMapUploadWizardProps> = ({
         onProgress: (color, bw) => setUploadProgress({ color, bw }),
       });
 
-      // After upload, generate and store PNG previews for public editing
+      // After upload, trigger backend (Modal) preview generation.
+      // The browser-side TIFF conversion is unreliable — Modal/Pillow handles
+      // every TIFF compression we encounter and writes preview URLs back via
+      // the map-processing-webhook.
       if (result) {
         try {
-          // Color preview
-          if (colorTifPreviewUrl) {
-            const colorResp = await fetch(colorTifPreviewUrl);
-            const colorBlob = await colorResp.blob();
-            const colorPath = `previews/${result.id}/color.png`;
-            await supabase.storage.from('route-images').upload(colorPath, colorBlob, { upsert: true, contentType: 'image/png' });
-            const { data: colorUrlData } = supabase.storage.from('route-images').getPublicUrl(colorPath);
-            
-            // B&W preview
-            let bwPreviewPublicUrl: string | null = null;
-            if (bwTifFile) {
-              const bwDataUrl = await convertTifToDataUrl(bwTifFile);
-              const bwResp = await fetch(bwDataUrl);
-              const bwBlob = await bwResp.blob();
-              const bwPath = `previews/${result.id}/bw.png`;
-              await supabase.storage.from('route-images').upload(bwPath, bwBlob, { upsert: true, contentType: 'image/png' });
-              const { data: bwUrlData } = supabase.storage.from('route-images').getPublicUrl(bwPath);
-              bwPreviewPublicUrl = bwUrlData.publicUrl;
-            }
-
-            // Update user_maps with preview URLs
-            await supabase
-              .from('user_maps' as any)
-              .update({
-                color_preview_url: colorUrlData.publicUrl,
-                bw_preview_url: bwPreviewPublicUrl,
-              } as any)
-              .eq('id', result.id);
-          }
+          await supabase.functions.invoke('generate-map-previews', {
+            body: { user_map_id: result.id },
+          });
+          console.log('Backend preview generation triggered for map:', result.id);
         } catch (previewErr) {
-          console.warn('Failed to generate preview PNGs (non-critical):', previewErr);
+          console.warn('Failed to trigger backend preview generation (non-critical):', previewErr);
         }
       }
 
