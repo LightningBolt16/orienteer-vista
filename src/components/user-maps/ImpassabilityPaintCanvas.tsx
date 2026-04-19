@@ -212,8 +212,24 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
+    const canvas = displayCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom(prev => Math.max(0.25, Math.min(8, prev + delta)));
+    setZoom(prevZoom => {
+      const newZoom = Math.max(0.25, Math.min(8, prevZoom + delta));
+      if (newZoom === prevZoom) return prevZoom;
+      // Keep the image point under the cursor stationary
+      const ratio = newZoom / prevZoom;
+      setPan(prevPan => ({
+        x: mx - canvas.width / 2 - (mx - canvas.width / 2 - prevPan.x) * ratio,
+        y: my - canvas.height / 2 - (my - canvas.height / 2 - prevPan.y) * ratio,
+      }));
+      return newZoom;
+    });
   }, []);
 
   const handleUndo = useCallback(() => {
