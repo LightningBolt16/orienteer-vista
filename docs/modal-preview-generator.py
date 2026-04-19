@@ -120,26 +120,50 @@ def generate_previews(payload: dict):
         bucket = os.environ["R2_BUCKET"]
 
         def fetch_and_convert(key: str) -> bytes:
-            """Download a TIFF from R2 and convert to a downsampled PNG."""
-            obj = r2.get_object(Bucket=bucket, Key=key)
-            data = obj["Body"].read()
-            with Image.open(io.BytesIO(data)) as im:
-                # Convert to RGB / L for PNG output
-                if im.mode in ("RGBA", "LA", "P"):
-                    im = im.convert("RGB")
-                elif im.mode not in ("RGB", "L"):
-                    im = im.convert("RGB")
-                # Downscale if huge
-                w, h = im.size
-                scale = min(1.0, MAX_PREVIEW_SIDE / max(w, h))
-                if scale < 1.0:
-                    im = im.resize(
-                        (int(w * scale), int(h * scale)),
-                        Image.LANCZOS,
-                    )
-                buf = io.BytesIO()
-                im.save(buf, format="PNG", optimize=True)
-                return buf.getvalue()
+            """Download a TIFF from R2 and convert to a downsampled PNG.
+
+            Uses download_fileobj (which retries chunks on IncompleteRead)
+            and writes to a temp file so very large TIFFs (50MB+) don't get
+            truncated by a broken response stream.
+            """
+            import tempfile
+            from botocore.config import Config as BotoConfig
+
+            # Per-call client with longer timeouts and retries for big objects
+            big_r2 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+                aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+                aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+                config=BotoConfig(
+                    signature_version="s3v4",
+                    retries={"max_attempts": 5, "mode": "adaptive"},
+                    read_timeout=300,
+                    connect_timeout=60,
+                ),
+            )
+
+            with tempfile.NamedTemporaryFile(suffix=".tif", delete=True) as tmp:
+                big_r2.download_fileobj(bucket, key, tmp)
+                tmp.flush()
+                tmp.seek(0)
+                with Image.open(tmp.name) as im:
+                    # Convert to RGB / L for PNG output
+                    if im.mode in ("RGBA", "LA", "P"):
+                        im = im.convert("RGB")
+                    elif im.mode not in ("RGB", "L"):
+                        im = im.convert("RGB")
+                    # Downscale if huge
+                    w, h = im.size
+                    scale = min(1.0, MAX_PREVIEW_SIDE / max(w, h))
+                    if scale < 1.0:
+                        im = im.resize(
+                            (int(w * scale), int(h * scale)),
+                            Image.LANCZOS,
+                        )
+                    buf = io.BytesIO()
+                    im.save(buf, format="PNG", optimize=True)
+                    return buf.getvalue()
 
         color_bytes = None
         bw_bytes = None
