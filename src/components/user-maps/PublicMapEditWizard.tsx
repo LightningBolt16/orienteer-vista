@@ -367,7 +367,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
         <p className="text-sm text-muted-foreground">
           Paint or erase black pixels on the impassability map. Black areas will be treated as impassable terrain.
         </p>
-        <ImpassabilityPaintCanvas imageUrl={bwPreviewUrl} onExport={handlePaintExport} />
+        <ImpassabilityPaintCanvas
+          imageUrl={bwPreviewUrl}
+          colorImageUrl={colorPreviewUrl ?? undefined}
+          onExport={handlePaintExport}
+        />
         {editedBwBlob && (
           <p className="text-sm text-green-600">✓ B&W edits captured ({(editedBwBlob.size / 1024).toFixed(0)} KB)</p>
         )}
