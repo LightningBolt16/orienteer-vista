@@ -147,39 +147,37 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
     setUploadingBw(true);
     try {
       const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
-      
+
       // Upload source file to R2
       const urls = await getPresignedUrls(user.id, `admin-bw-${map.id}`);
       await uploadToR2(urls.bw_presigned_url, file);
-      
-      // Update route_maps with R2 key
+
       const updateData: Record<string, any> = { bw_r2_key: urls.bw_key };
-      
-      // Generate browser-friendly preview and upload to route-images bucket
-      let previewBlob: Blob | null = null;
-      if (isTiff) {
-        try {
-          const dataUrl = await convertTifToDataUrl(file);
-          const resp = await fetch(dataUrl);
-          previewBlob = await resp.blob();
-        } catch (convErr) {
-          console.warn('TIFF preview conversion failed:', convErr);
-          toast({ title: 'Preview generation failed', description: 'Source file uploaded to R2 but browser preview could not be generated from this TIFF format. Try uploading a PNG version for preview.', variant: 'default' });
-        }
-      } else {
-        previewBlob = file;
-      }
-      
-      if (previewBlob) {
-        const ext = isTiff ? 'png' : file.name.split('.').pop();
+
+      // Non-TIFF files can be used directly as the preview
+      if (!isTiff) {
+        const ext = file.name.split('.').pop();
         const path = `bw/${map.id}.${ext}`;
-        await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
+        await supabase.storage.from('route-images').upload(path, file, { upsert: true, contentType: file.type });
         const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
         updateData.impassability_image_url = urlData.publicUrl;
       }
-      
+
       await supabase.from(table).update(updateData).eq('id', map.id);
-      toast({ title: 'B&W impassability image uploaded' });
+
+      // For TIFFs, trigger the backend preview generator (Modal/Pillow)
+      if (isTiff) {
+        try {
+          await supabase.functions.invoke('generate-map-previews', {
+            body: { route_map_id: map.id },
+          });
+          toast({ title: 'B&W source uploaded', description: 'Backend is generating a browser preview — this may take ~1 minute.' });
+        } catch (e: any) {
+          toast({ title: 'B&W source uploaded', description: 'Backend preview generation could not be triggered automatically.', variant: 'default' });
+        }
+      } else {
+        toast({ title: 'B&W impassability image uploaded' });
+      }
       onUpdate();
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
@@ -195,39 +193,35 @@ const AdminMapCard: React.FC<AdminMapCardProps> = ({ map, table, onUpdate, showD
     setUploadingColor(true);
     try {
       const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
-      
+
       // Upload source file to R2
       const urls = await getPresignedUrls(user.id, `admin-color-${map.id}`);
       await uploadToR2(urls.color_presigned_url, file);
-      
-      // Update route_maps with R2 key
+
       const updateData: Record<string, any> = { color_r2_key: urls.color_key };
-      
-      // Generate browser-friendly preview and upload to route-images bucket
-      let previewBlob: Blob | null = null;
-      if (isTiff) {
-        try {
-          const dataUrl = await convertTifToDataUrl(file);
-          const resp = await fetch(dataUrl);
-          previewBlob = await resp.blob();
-        } catch (convErr) {
-          console.warn('TIFF preview conversion failed:', convErr);
-          toast({ title: 'Preview generation failed', description: 'Source file uploaded to R2 but browser preview could not be generated from this TIFF format. Try uploading a PNG version for preview.', variant: 'default' });
-        }
-      } else {
-        previewBlob = file;
-      }
-      
-      if (previewBlob) {
-        const ext = isTiff ? 'png' : file.name.split('.').pop();
+
+      if (!isTiff) {
+        const ext = file.name.split('.').pop();
         const path = `color/${map.id}.${ext}`;
-        await supabase.storage.from('route-images').upload(path, previewBlob, { upsert: true, contentType: isTiff ? 'image/png' : file.type });
+        await supabase.storage.from('route-images').upload(path, file, { upsert: true, contentType: file.type });
         const { data: urlData } = supabase.storage.from('route-images').getPublicUrl(path);
         updateData.color_image_url = urlData.publicUrl;
       }
-      
+
       await supabase.from(table).update(updateData).eq('id', map.id);
-      toast({ title: 'Color map image uploaded' });
+
+      if (isTiff) {
+        try {
+          await supabase.functions.invoke('generate-map-previews', {
+            body: { route_map_id: map.id },
+          });
+          toast({ title: 'Color source uploaded', description: 'Backend is generating a browser preview — this may take ~1 minute.' });
+        } catch (e: any) {
+          toast({ title: 'Color source uploaded', description: 'Backend preview generation could not be triggered automatically.', variant: 'default' });
+        }
+      } else {
+        toast({ title: 'Color map image uploaded' });
+      }
       onUpdate();
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
