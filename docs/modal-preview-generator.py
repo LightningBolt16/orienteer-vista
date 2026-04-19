@@ -54,6 +54,7 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
     "pillow",
     "requests",
     "boto3",
+    "fastapi[standard]",
 )
 
 # Limit PIL's max image size to something reasonable
