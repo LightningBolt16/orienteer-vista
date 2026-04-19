@@ -262,8 +262,22 @@ const ImpassableDrawingCanvas: React.FC<ImpassableDrawingCanvasProps> = ({
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    const canvas = e.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom(prev => Math.max(0.25, Math.min(5, prev + delta)));
+    setZoom(prevZoom => {
+      const newZoom = Math.max(0.25, Math.min(5, prevZoom + delta));
+      if (newZoom === prevZoom) return prevZoom;
+      const ratio = newZoom / prevZoom;
+      setPan(prevPan => ({
+        x: mx - canvas.width / 2 - (mx - canvas.width / 2 - prevPan.x) * ratio,
+        y: my - canvas.height / 2 - (my - canvas.height / 2 - prevPan.y) * ratio,
+      }));
+      return newZoom;
+    });
   }, []);
 
   const handleZoomIn = () => setZoom(prev => Math.min(5, prev + 0.25));
