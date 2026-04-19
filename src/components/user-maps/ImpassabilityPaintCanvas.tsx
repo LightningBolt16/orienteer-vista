@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { ZoomIn, ZoomOut, Move, RotateCcw, Paintbrush, Eraser, Undo2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Move, RotateCcw, Paintbrush, Eraser, Undo2, Layers } from 'lucide-react';
 
 interface ImpassabilityPaintCanvasProps {
   imageUrl: string;
+  colorImageUrl?: string;
   onExport: (blob: Blob) => void;
   width?: number;
   height?: number;
@@ -12,6 +13,7 @@ interface ImpassabilityPaintCanvasProps {
 
 const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
   imageUrl,
+  colorImageUrl,
   onExport,
   width: canvasContainerWidth,
   height: canvasContainerHeight,
@@ -21,9 +23,11 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
   // Off-screen canvas at full image resolution for edits
   const editCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const colorImageRef = useRef<HTMLImageElement | null>(null);
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [colorImageLoaded, setColorImageLoaded] = useState(false);
   const [imageDims, setImageDims] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -35,11 +39,14 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
+  // Color overlay opacity (0 = hidden, 1 = fully visible)
+  const [overlayOpacity, setOverlayOpacity] = useState(0);
+
   // Undo stack: stores ImageData snapshots
   const undoStack = useRef<ImageData[]>([]);
   const MAX_UNDO = 20;
 
-  // Load image
+  // Load B&W image
   useEffect(() => {
     setImageError(null);
     setImageLoaded(false);
@@ -66,6 +73,24 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
     };
     img.src = imageUrl;
   }, [imageUrl]);
+
+  // Load color overlay image (optional)
+  useEffect(() => {
+    setColorImageLoaded(false);
+    colorImageRef.current = null;
+    if (!colorImageUrl) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      colorImageRef.current = img;
+      setColorImageLoaded(true);
+    };
+    img.onerror = () => {
+      colorImageRef.current = null;
+      setColorImageLoaded(false);
+    };
+    img.src = colorImageUrl;
+  }, [colorImageUrl]);
 
   // Calculate base scale
   useEffect(() => {
@@ -101,10 +126,18 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
     ctx.scale(baseScale * zoom, baseScale * zoom);
     ctx.translate(-imageDims.width / 2, -imageDims.height / 2);
 
-    // Draw the edited image
+    // Draw the edited B&W image
     ctx.drawImage(editCanvas, 0, 0);
+
+    // Optional color overlay
+    if (colorImageRef.current && colorImageLoaded && overlayOpacity > 0) {
+      ctx.globalAlpha = overlayOpacity;
+      ctx.drawImage(colorImageRef.current, 0, 0, imageDims.width, imageDims.height);
+      ctx.globalAlpha = 1;
+    }
+
     ctx.restore();
-  }, [imageLoaded, imageDims, zoom, pan, baseScale]);
+  }, [imageLoaded, imageDims, zoom, pan, baseScale, colorImageLoaded, overlayOpacity]);
 
   useEffect(() => { redraw(); }, [redraw]);
 
@@ -270,6 +303,28 @@ const ImpassabilityPaintCanvas: React.FC<ImpassabilityPaintCanvasProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Color overlay control */}
+      {colorImageUrl && (
+        <div className="flex items-center gap-3 px-3 py-2 border rounded-lg bg-muted/40">
+          <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Color overlay: {Math.round(overlayOpacity * 100)}%
+          </span>
+          <Slider
+            value={[overlayOpacity * 100]}
+            onValueChange={([v]) => setOverlayOpacity(v / 100)}
+            min={0}
+            max={100}
+            step={1}
+            className="flex-1 max-w-xs"
+            disabled={!colorImageLoaded}
+          />
+          {!colorImageLoaded && (
+            <span className="text-xs text-muted-foreground">Loading…</span>
+          )}
+        </div>
+      )}
 
       {/* Status */}
       <div className="text-sm text-muted-foreground">
