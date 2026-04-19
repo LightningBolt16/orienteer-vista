@@ -148,22 +148,22 @@ def generate_previews(payload: dict):
                 tmp.flush()
                 tmp.seek(0)
                 with Image.open(tmp.name) as im:
-                # Convert to RGB / L for PNG output
-                if im.mode in ("RGBA", "LA", "P"):
-                    im = im.convert("RGB")
-                elif im.mode not in ("RGB", "L"):
-                    im = im.convert("RGB")
-                # Downscale if huge
-                w, h = im.size
-                scale = min(1.0, MAX_PREVIEW_SIDE / max(w, h))
-                if scale < 1.0:
-                    im = im.resize(
-                        (int(w * scale), int(h * scale)),
-                        Image.LANCZOS,
-                    )
-                buf = io.BytesIO()
-                im.save(buf, format="PNG", optimize=True)
-                return buf.getvalue()
+                    # Convert to RGB / L for PNG output
+                    if im.mode in ("RGBA", "LA", "P"):
+                        im = im.convert("RGB")
+                    elif im.mode not in ("RGB", "L"):
+                        im = im.convert("RGB")
+                    # Downscale if huge
+                    w, h = im.size
+                    scale = min(1.0, MAX_PREVIEW_SIDE / max(w, h))
+                    if scale < 1.0:
+                        im = im.resize(
+                            (int(w * scale), int(h * scale)),
+                            Image.LANCZOS,
+                        )
+                    buf = io.BytesIO()
+                    im.save(buf, format="PNG", optimize=True)
+                    return buf.getvalue()
 
         color_bytes = None
         bw_bytes = None
