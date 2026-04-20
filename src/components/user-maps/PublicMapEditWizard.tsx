@@ -718,7 +718,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-lg">Edit Public Map</CardTitle>
+        <CardTitle className="text-lg">Edit Map</CardTitle>
         <Progress value={progressPercent} className="mt-2" />
         <div className="flex gap-1 mt-2 flex-wrap">
           {steps.map((s, i) => (
