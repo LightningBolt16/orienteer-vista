@@ -68,6 +68,9 @@ const UserMaps: React.FC = () => {
   const [editNameValue, setEditNameValue] = useState('');
   const logoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Publish dialog state
+  const [publishTarget, setPublishTarget] = useState<{ id: string; name: string; table: 'route_maps' | 'route_finder_maps' } | null>(null);
+
   useEffect(() => {
     if (user) {
       fetchUserMaps();
