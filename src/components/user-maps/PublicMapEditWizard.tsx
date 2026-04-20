@@ -572,8 +572,19 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
             </div>
             {mapSource === 'own' && (
               <p className="text-xs text-muted-foreground">
-                Editing your own map updates it in place — no copy is created.
+                Editing one of your own maps creates a new copy with a different name — your original is left untouched.
               </p>
+            )}
+            {mapSource === 'own' && selectedMap?.__isOwnUserMap && (
+              <div className="space-y-1">
+                <Label htmlFor="clone-name" className="text-xs">New map name</Label>
+                <Input
+                  id="clone-name"
+                  value={cloneName}
+                  onChange={(e) => setCloneName(e.target.value)}
+                  placeholder="Enter a new name for the copy"
+                />
+              </div>
             )}
             {loadingMaps ? (
               <div className="flex items-center justify-center h-32">
