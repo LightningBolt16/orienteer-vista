@@ -258,21 +258,35 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     if (!selectedMap || !user) return;
     setCloning(true);
     try {
-      const { data, error } = await supabase.functions.invoke('clone-public-map', {
-        body: { source_map_id: selectedMap.id },
-      });
-      if (error) throw new Error(error.message || 'Failed to clone map');
+      let userMapId: string;
+      let colorUrl: string | null;
+      let bwUrl: string | null;
+      let status: EditorReadiness;
 
-      setClonedMapId(data.user_map_id);
-      const colorUrl: string | null = data.color_image_url || null;
-      const bwUrl: string | null = data.impassability_image_url || null;
-      const status: EditorReadiness = data.editor_status || 'unavailable';
+      if (selectedMap.__isOwnUserMap) {
+        // Edit own map in-place — no cloning, no auto-cleanup
+        userMapId = selectedMap.id;
+        colorUrl = selectedMap.color_image_url;
+        bwUrl = selectedMap.impassability_image_url;
+        status = readinessOf(selectedMap);
+        setEditingOwnMap(true);
+      } else {
+        const { data, error } = await supabase.functions.invoke('clone-public-map', {
+          body: { source_map_id: selectedMap.id },
+        });
+        if (error) throw new Error(error.message || 'Failed to clone map');
+        userMapId = data.user_map_id;
+        colorUrl = data.color_image_url || null;
+        bwUrl = data.impassability_image_url || null;
+        status = data.editor_status || 'unavailable';
+        setEditingOwnMap(false);
+      }
 
+      setClonedMapId(userMapId);
       setColorPreviewUrl(colorUrl);
       setBwPreviewUrl(bwUrl);
       setEditorReadiness(status);
 
-      // Decide which step to enter based on real readiness
       if (status === 'ready_full' && bwUrl) {
         setStep('paint');
       } else if (status === 'ready_color_only' && colorUrl) {
@@ -280,7 +294,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       } else if (status === 'source_present_preview_missing') {
         toast({
           title: 'Previews not ready',
-          description: 'This map has source files but no editor previews. Click "Regenerate previews" on the selection list and try again in ~1 minute.',
+          description: 'This map has source files but no editor previews. Click "Regenerate previews" and try again in ~1 minute.',
           variant: 'destructive',
         });
         setCloning(false);
