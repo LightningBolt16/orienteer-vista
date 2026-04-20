@@ -27,6 +27,9 @@ interface PublicMap {
   country_code: string | null;
   description: string | null;
   preview_status: string | null;
+  // Marks rows that are actually a user_maps row (not a public route_maps row)
+  __isOwnUserMap?: boolean;
+  __ownerName?: string | null;
 }
 
 type EditorReadiness =
@@ -88,6 +91,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   // Map selection
   const [publicMaps, setPublicMaps] = useState<PublicMap[]>([]);
+  const [ownMaps, setOwnMaps] = useState<PublicMap[]>([]);
+  const [mapSource, setMapSource] = useState<'public' | 'own'>('public');
   const [loadingMaps, setLoadingMaps] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMap, setSelectedMap] = useState<PublicMap | null>(null);
@@ -95,6 +100,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   // Cloning
   const [clonedMapId, setClonedMapId] = useState<string | null>(null);
+  // For own maps we edit in-place — no cleanup on cancel
+  const [editingOwnMap, setEditingOwnMap] = useState(false);
   const [cloning, setCloning] = useState(false);
 
   // Resolved editor assets (server-side only — no client TIFF conversion, no route_images fallback)
