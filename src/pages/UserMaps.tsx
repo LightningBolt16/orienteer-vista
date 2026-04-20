@@ -158,9 +158,8 @@ const UserMaps: React.FC = () => {
     updateResultMap(table, map.id, { is_hidden: !map.is_hidden });
   };
 
-  const publishToCommunity = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
-    updateResultMap(table, map.id, { is_public: true, map_category: 'community', is_hidden: false });
-    toast({ title: 'Published!', description: `${map.name} is now available in Community Maps.` });
+  const openPublishDialog = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
+    setPublishTarget({ id: map.id, name: map.name, table });
   };
 
   const unpublishFromCommunity = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
