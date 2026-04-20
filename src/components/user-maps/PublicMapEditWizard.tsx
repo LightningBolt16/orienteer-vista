@@ -497,6 +497,24 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       case 'select':
         return (
           <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={mapSource === 'public' ? 'default' : 'outline'}
+                onClick={() => { setMapSource('public'); setSelectedMap(null); }}
+              >
+                Official & community
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mapSource === 'own' ? 'default' : 'outline'}
+                onClick={() => { setMapSource('own'); setSelectedMap(null); }}
+              >
+                My maps ({ownMaps.length})
+              </Button>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -506,6 +524,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
                 className="pl-10"
               />
             </div>
+            {mapSource === 'own' && (
+              <p className="text-xs text-muted-foreground">
+                Editing your own map updates it in place — no copy is created.
+              </p>
+            )}
             {loadingMaps ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
