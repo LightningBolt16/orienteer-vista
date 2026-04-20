@@ -131,13 +131,15 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   // Refs so unmount/beforeunload handlers see latest values
   const clonedMapIdRef = useRef<string | null>(null);
   const isSubmittedRef = useRef(false);
+  const editingOwnMapRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
   useEffect(() => { clonedMapIdRef.current = clonedMapId; }, [clonedMapId]);
   useEffect(() => { isSubmittedRef.current = isSubmitted; }, [isSubmitted]);
+  useEffect(() => { editingOwnMapRef.current = editingOwnMap; }, [editingOwnMap]);
 
   // Auto-cleanup abandoned clone on unmount or page unload
+  // (own-map editing skips cleanup — we never delete the user's own source maps)
   useEffect(() => {
-    // Cache access token so beforeunload (sync) can use it
     supabase.auth.getSession().then(({ data }) => {
       accessTokenRef.current = data.session?.access_token || null;
     });
@@ -148,7 +150,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     const handleBeforeUnload = () => {
       const id = clonedMapIdRef.current;
       const token = accessTokenRef.current;
-      if (!id || isSubmittedRef.current || !token) return;
+      if (!id || isSubmittedRef.current || editingOwnMapRef.current || !token) return;
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_maps?id=eq.${id}`;
         const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -166,9 +168,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       sub?.subscription?.unsubscribe?.();
-      // Component unmounting within SPA — async delete is fine here
       const id = clonedMapIdRef.current;
-      if (id && !isSubmittedRef.current) {
+      if (id && !isSubmittedRef.current && !editingOwnMapRef.current) {
         supabase.from('user_maps').delete().eq('id', id).then(() => {});
       }
     };
@@ -413,14 +414,16 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   };
 
   const cleanupClone = async () => {
-    if (clonedMapId && !isSubmitted) {
+    // Never delete user's own maps — they're not clones
+    if (clonedMapId && !isSubmitted && !editingOwnMap) {
       try {
         await supabase.from('user_maps').delete().eq('id', clonedMapId);
       } catch (e) {
         console.warn('Failed to cleanup cloned map:', e);
       }
-      setClonedMapId(null);
     }
+    setClonedMapId(null);
+    setEditingOwnMap(false);
   };
 
   const handleBack = () => {
