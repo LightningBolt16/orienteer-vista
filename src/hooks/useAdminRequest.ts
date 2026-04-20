@@ -15,13 +15,13 @@ export interface AdminRequest {
 
 export function useAdminRequest() {
   const { user } = useUser();
-  const [existingRequest, setExistingRequest] = useState<AdminRequest | null>(null);
+  const [requests, setRequests] = useState<AdminRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchExistingRequest = useCallback(async () => {
+  const fetchRequests = useCallback(async () => {
     if (!user) {
-      setExistingRequest(null);
+      setRequests([]);
       setLoading(false);
       return;
     }
@@ -31,25 +31,32 @@ export function useAdminRequest() {
         .from('admin_requests')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching admin request:', error);
+        console.error('Error fetching admin requests:', error);
       } else {
-        setExistingRequest(data as AdminRequest | null);
+        setRequests((data || []) as AdminRequest[]);
       }
     } catch (error) {
-      console.error('Error fetching admin request:', error);
+      console.error('Error fetching admin requests:', error);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
-    fetchExistingRequest();
-  }, [fetchExistingRequest]);
+    fetchRequests();
+  }, [fetchRequests]);
+
+  // Latest request — drives the current status display
+  const existingRequest = requests[0] ?? null;
+
+  // Past attempts (everything older than the latest)
+  const pastAttempts = requests.slice(1);
+
+  // The user can submit a new request if they have none, or their latest was rejected.
+  const canSubmitNew = !existingRequest || existingRequest.status === 'rejected';
 
   const submitRequest = useCallback(async (reason: string): Promise<boolean> => {
     if (!user) {
@@ -59,6 +66,28 @@ export function useAdminRequest() {
         variant: 'destructive',
       });
       return false;
+    }
+
+    // Enforce a different reason than the most recent rejection
+    if (existingRequest?.status === 'rejected') {
+      const previous = (existingRequest.reason || '').trim().toLowerCase();
+      const next = reason.trim().toLowerCase();
+      if (!next) {
+        toast({
+          title: 'Reason required',
+          description: 'Please provide a new reason for re-applying.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      if (next === previous) {
+        toast({
+          title: 'New reason required',
+          description: 'Please provide a different reason than your previous request.',
+          variant: 'destructive',
+        });
+        return false;
+      }
     }
 
     setSubmitting(true);
@@ -77,7 +106,7 @@ export function useAdminRequest() {
         throw error;
       }
 
-      setExistingRequest(data as AdminRequest);
+      setRequests((prev) => [data as AdminRequest, ...prev]);
       toast({
         title: 'Request Submitted',
         description: 'Your pro access request has been submitted for review.',
@@ -94,13 +123,15 @@ export function useAdminRequest() {
     } finally {
       setSubmitting(false);
     }
-  }, [user]);
+  }, [user, existingRequest]);
 
   return {
     existingRequest,
+    pastAttempts,
+    canSubmitNew,
     loading,
     submitting,
     submitRequest,
-    refetch: fetchExistingRequest,
+    refetch: fetchRequests,
   };
 }
