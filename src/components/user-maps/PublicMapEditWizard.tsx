@@ -177,26 +177,55 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const loadPublicMaps = useCallback(async () => {
     setLoadingMaps(true);
     try {
-      const { data, error } = await supabase
-        .from('route_maps')
-        .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description, preview_status')
-        .eq('is_public', true)
-        .eq('is_hidden', false)
-        .order('name');
-      if (error) throw error;
-      setPublicMaps((data || []) as PublicMap[]);
+      const [publicRes, ownRes] = await Promise.all([
+        supabase
+          .from('route_maps')
+          .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description, preview_status')
+          .eq('is_public', true)
+          .eq('is_hidden', false)
+          .order('name'),
+        user
+          ? supabase
+              .from('user_maps')
+              .select('id, name, color_preview_url, bw_preview_url, r2_color_key, r2_bw_key, status')
+              .eq('user_id', user.id)
+              .eq('status', 'completed')
+              .order('name')
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (publicRes.error) throw publicRes.error;
+      setPublicMaps((publicRes.data || []) as PublicMap[]);
+
+      if (!ownRes.error && ownRes.data) {
+        // Map user_maps rows into the PublicMap shape so the same UI works
+        const mapped: PublicMap[] = (ownRes.data as any[]).map((m) => ({
+          id: m.id,
+          name: m.name,
+          source_map_id: null,
+          impassability_image_url: m.bw_preview_url || null,
+          color_image_url: m.color_preview_url || null,
+          color_r2_key: m.r2_color_key || null,
+          bw_r2_key: m.r2_bw_key || null,
+          country_code: null,
+          description: null,
+          preview_status: null,
+          __isOwnUserMap: true,
+        }));
+        setOwnMaps(mapped);
+      }
     } catch (err) {
-      console.error('Failed to load public maps:', err);
+      console.error('Failed to load maps:', err);
     } finally {
       setLoadingMaps(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadPublicMaps();
   }, [loadPublicMaps]);
 
-  const filteredMaps = publicMaps.filter((m) =>
+  const sourceList = mapSource === 'public' ? publicMaps : ownMaps;
+  const filteredMaps = sourceList.filter((m) =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
