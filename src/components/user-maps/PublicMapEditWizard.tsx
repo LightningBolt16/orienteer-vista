@@ -236,6 +236,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const handleSelectMap = (map: PublicMap) => {
     if (readinessOf(map) === 'unavailable') return;
     setSelectedMap(map);
+    if (map.__isOwnUserMap) {
+      setCloneName(`${map.name} (copy)`);
+    } else {
+      setCloneName('');
+    }
   };
 
   const handleRegeneratePreviews = async (map: PublicMap) => {
