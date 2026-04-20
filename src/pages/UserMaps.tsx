@@ -393,7 +393,7 @@ const UserMaps: React.FC = () => {
                   Make Private
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => publishToCommunity(table, map)} className="gap-1">
+                <Button size="sm" variant="outline" onClick={() => openPublishDialog(table, map)} className="gap-1">
                   <Globe className="h-3 w-3" /> Publish
                 </Button>
               )}
