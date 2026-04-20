@@ -124,40 +124,42 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   // Refs so unmount/beforeunload handlers see latest values
   const clonedMapIdRef = useRef<string | null>(null);
   const isSubmittedRef = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
   useEffect(() => { clonedMapIdRef.current = clonedMapId; }, [clonedMapId]);
   useEffect(() => { isSubmittedRef.current = isSubmitted; }, [isSubmitted]);
 
   // Auto-cleanup abandoned clone on unmount or page unload
   useEffect(() => {
-    const deleteAbandonedClone = (useKeepalive: boolean) => {
+    // Cache access token so beforeunload (sync) can use it
+    supabase.auth.getSession().then(({ data }) => {
+      accessTokenRef.current = data.session?.access_token || null;
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      accessTokenRef.current = session?.access_token || null;
+    });
+
+    const handleBeforeUnload = () => {
       const id = clonedMapIdRef.current;
-      if (!id || isSubmittedRef.current) return;
+      const token = accessTokenRef.current;
+      if (!id || isSubmittedRef.current || !token) return;
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_maps?id=eq.${id}`;
         const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        // Get current access token synchronously from supabase storage
-        const session = (supabase.auth as any).currentSession;
-        const token = session?.access_token;
-        if (!token) return;
         fetch(url, {
           method: 'DELETE',
-          headers: {
-            apikey,
-            Authorization: `Bearer ${token}`,
-          },
-          keepalive: useKeepalive,
+          headers: { apikey, Authorization: `Bearer ${token}` },
+          keepalive: true,
         }).catch(() => {});
       } catch {
         // ignore
       }
     };
-
-    const handleBeforeUnload = () => deleteAbandonedClone(true);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Component unmounting (e.g. user navigated away within SPA) — async delete
+      sub?.subscription?.unsubscribe?.();
+      // Component unmounting within SPA — async delete is fine here
       const id = clonedMapIdRef.current;
       if (id && !isSubmittedRef.current) {
         supabase.from('user_maps').delete().eq('id', id).then(() => {});
