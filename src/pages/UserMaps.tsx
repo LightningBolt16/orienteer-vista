@@ -560,6 +560,32 @@ const UserMaps: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Publish dialogs */}
+      {publishTarget?.table === 'route_maps' && (
+        <PublishRouteMapDialog
+          open={!!publishTarget}
+          onOpenChange={(open) => { if (!open) setPublishTarget(null); }}
+          mapId={publishTarget.id}
+          mapName={publishTarget.name}
+          onPublished={() => {
+            setPublishTarget(null);
+            loadResultMaps();
+          }}
+        />
+      )}
+      {publishTarget?.table === 'route_finder_maps' && (
+        <PublishRouteFinderMapDialog
+          open={!!publishTarget}
+          onOpenChange={(open) => { if (!open) setPublishTarget(null); }}
+          mapId={publishTarget.id}
+          mapName={publishTarget.name}
+          onPublished={() => {
+            setPublishTarget(null);
+            loadResultMaps();
+          }}
+        />
+      )}
     </div>
   );
 };
