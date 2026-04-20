@@ -27,6 +27,9 @@ interface PublicMap {
   country_code: string | null;
   description: string | null;
   preview_status: string | null;
+  // Marks rows that are actually a user_maps row (not a public route_maps row)
+  __isOwnUserMap?: boolean;
+  __ownerName?: string | null;
 }
 
 type EditorReadiness =
@@ -88,6 +91,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   // Map selection
   const [publicMaps, setPublicMaps] = useState<PublicMap[]>([]);
+  const [ownMaps, setOwnMaps] = useState<PublicMap[]>([]);
+  const [mapSource, setMapSource] = useState<'public' | 'own'>('public');
   const [loadingMaps, setLoadingMaps] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMap, setSelectedMap] = useState<PublicMap | null>(null);
@@ -95,6 +100,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   // Cloning
   const [clonedMapId, setClonedMapId] = useState<string | null>(null);
+  // For own maps we edit in-place — no cleanup on cancel
+  const [editingOwnMap, setEditingOwnMap] = useState(false);
   const [cloning, setCloning] = useState(false);
 
   // Resolved editor assets (server-side only — no client TIFF conversion, no route_images fallback)
@@ -124,13 +131,15 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   // Refs so unmount/beforeunload handlers see latest values
   const clonedMapIdRef = useRef<string | null>(null);
   const isSubmittedRef = useRef(false);
+  const editingOwnMapRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
   useEffect(() => { clonedMapIdRef.current = clonedMapId; }, [clonedMapId]);
   useEffect(() => { isSubmittedRef.current = isSubmitted; }, [isSubmitted]);
+  useEffect(() => { editingOwnMapRef.current = editingOwnMap; }, [editingOwnMap]);
 
   // Auto-cleanup abandoned clone on unmount or page unload
+  // (own-map editing skips cleanup — we never delete the user's own source maps)
   useEffect(() => {
-    // Cache access token so beforeunload (sync) can use it
     supabase.auth.getSession().then(({ data }) => {
       accessTokenRef.current = data.session?.access_token || null;
     });
@@ -141,7 +150,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     const handleBeforeUnload = () => {
       const id = clonedMapIdRef.current;
       const token = accessTokenRef.current;
-      if (!id || isSubmittedRef.current || !token) return;
+      if (!id || isSubmittedRef.current || editingOwnMapRef.current || !token) return;
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_maps?id=eq.${id}`;
         const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -159,9 +168,8 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       sub?.subscription?.unsubscribe?.();
-      // Component unmounting within SPA — async delete is fine here
       const id = clonedMapIdRef.current;
-      if (id && !isSubmittedRef.current) {
+      if (id && !isSubmittedRef.current && !editingOwnMapRef.current) {
         supabase.from('user_maps').delete().eq('id', id).then(() => {});
       }
     };
@@ -170,26 +178,55 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const loadPublicMaps = useCallback(async () => {
     setLoadingMaps(true);
     try {
-      const { data, error } = await supabase
-        .from('route_maps')
-        .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description, preview_status')
-        .eq('is_public', true)
-        .eq('is_hidden', false)
-        .order('name');
-      if (error) throw error;
-      setPublicMaps((data || []) as PublicMap[]);
+      const [publicRes, ownRes] = await Promise.all([
+        supabase
+          .from('route_maps')
+          .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description, preview_status')
+          .eq('is_public', true)
+          .eq('is_hidden', false)
+          .order('name'),
+        user
+          ? supabase
+              .from('user_maps')
+              .select('id, name, color_preview_url, bw_preview_url, r2_color_key, r2_bw_key, status')
+              .eq('user_id', user.id)
+              .eq('status', 'completed')
+              .order('name')
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (publicRes.error) throw publicRes.error;
+      setPublicMaps((publicRes.data || []) as PublicMap[]);
+
+      if (!ownRes.error && ownRes.data) {
+        // Map user_maps rows into the PublicMap shape so the same UI works
+        const mapped: PublicMap[] = (ownRes.data as any[]).map((m) => ({
+          id: m.id,
+          name: m.name,
+          source_map_id: null,
+          impassability_image_url: m.bw_preview_url || null,
+          color_image_url: m.color_preview_url || null,
+          color_r2_key: m.r2_color_key || null,
+          bw_r2_key: m.r2_bw_key || null,
+          country_code: null,
+          description: null,
+          preview_status: null,
+          __isOwnUserMap: true,
+        }));
+        setOwnMaps(mapped);
+      }
     } catch (err) {
-      console.error('Failed to load public maps:', err);
+      console.error('Failed to load maps:', err);
     } finally {
       setLoadingMaps(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadPublicMaps();
   }, [loadPublicMaps]);
 
-  const filteredMaps = publicMaps.filter((m) =>
+  const sourceList = mapSource === 'public' ? publicMaps : ownMaps;
+  const filteredMaps = sourceList.filter((m) =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -222,21 +259,35 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
     if (!selectedMap || !user) return;
     setCloning(true);
     try {
-      const { data, error } = await supabase.functions.invoke('clone-public-map', {
-        body: { source_map_id: selectedMap.id },
-      });
-      if (error) throw new Error(error.message || 'Failed to clone map');
+      let userMapId: string;
+      let colorUrl: string | null;
+      let bwUrl: string | null;
+      let status: EditorReadiness;
 
-      setClonedMapId(data.user_map_id);
-      const colorUrl: string | null = data.color_image_url || null;
-      const bwUrl: string | null = data.impassability_image_url || null;
-      const status: EditorReadiness = data.editor_status || 'unavailable';
+      if (selectedMap.__isOwnUserMap) {
+        // Edit own map in-place — no cloning, no auto-cleanup
+        userMapId = selectedMap.id;
+        colorUrl = selectedMap.color_image_url;
+        bwUrl = selectedMap.impassability_image_url;
+        status = readinessOf(selectedMap);
+        setEditingOwnMap(true);
+      } else {
+        const { data, error } = await supabase.functions.invoke('clone-public-map', {
+          body: { source_map_id: selectedMap.id },
+        });
+        if (error) throw new Error(error.message || 'Failed to clone map');
+        userMapId = data.user_map_id;
+        colorUrl = data.color_image_url || null;
+        bwUrl = data.impassability_image_url || null;
+        status = data.editor_status || 'unavailable';
+        setEditingOwnMap(false);
+      }
 
+      setClonedMapId(userMapId);
       setColorPreviewUrl(colorUrl);
       setBwPreviewUrl(bwUrl);
       setEditorReadiness(status);
 
-      // Decide which step to enter based on real readiness
       if (status === 'ready_full' && bwUrl) {
         setStep('paint');
       } else if (status === 'ready_color_only' && colorUrl) {
@@ -244,7 +295,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       } else if (status === 'source_present_preview_missing') {
         toast({
           title: 'Previews not ready',
-          description: 'This map has source files but no editor previews. Click "Regenerate previews" on the selection list and try again in ~1 minute.',
+          description: 'This map has source files but no editor previews. Click "Regenerate previews" and try again in ~1 minute.',
           variant: 'destructive',
         });
         setCloning(false);
@@ -363,14 +414,16 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   };
 
   const cleanupClone = async () => {
-    if (clonedMapId && !isSubmitted) {
+    // Never delete user's own maps — they're not clones
+    if (clonedMapId && !isSubmitted && !editingOwnMap) {
       try {
         await supabase.from('user_maps').delete().eq('id', clonedMapId);
       } catch (e) {
         console.warn('Failed to cleanup cloned map:', e);
       }
-      setClonedMapId(null);
     }
+    setClonedMapId(null);
+    setEditingOwnMap(false);
   };
 
   const handleBack = () => {
@@ -444,6 +497,24 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       case 'select':
         return (
           <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={mapSource === 'public' ? 'default' : 'outline'}
+                onClick={() => { setMapSource('public'); setSelectedMap(null); }}
+              >
+                Official & community
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mapSource === 'own' ? 'default' : 'outline'}
+                onClick={() => { setMapSource('own'); setSelectedMap(null); }}
+              >
+                My maps ({ownMaps.length})
+              </Button>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -453,6 +524,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
                 className="pl-10"
               />
             </div>
+            {mapSource === 'own' && (
+              <p className="text-xs text-muted-foreground">
+                Editing your own map updates it in place — no copy is created.
+              </p>
+            )}
             {loadingMaps ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -642,7 +718,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-lg">Edit Public Map</CardTitle>
+        <CardTitle className="text-lg">Edit Map</CardTitle>
         <Progress value={progressPercent} className="mt-2" />
         <div className="flex gap-1 mt-2 flex-wrap">
           {steps.map((s, i) => (

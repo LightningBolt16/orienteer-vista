@@ -13,8 +13,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Globe, Loader2, X, Image, Users } from 'lucide-react';
 import LocationPicker from '@/components/map/LocationPicker';
+import CountrySelector from '@/components/CountrySelector';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { usePublicConfig } from '@/hooks/usePublicConfig';
+import { countryCodeFromLocation } from '@/utils/countryFromLocation';
 
 interface PublishRouteMapDialogProps {
   open: boolean;
@@ -44,11 +47,32 @@ const PublishRouteMapDialog: React.FC<PublishRouteMapDialogProps> = ({
   const [title, setTitle] = useState(mapName);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState<LocationData | null>(null);
+  const [countryCode, setCountryCode] = useState<string>('');
+  const [countryAutoFilled, setCountryAutoFilled] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<'community' | 'club'>(clubId ? 'club' : 'community');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { config } = usePublicConfig();
+  const mapboxToken = config?.mapboxToken || '';
+
+  // Auto-fill country from location (only if user hasn't manually set it)
+  React.useEffect(() => {
+    if (!location || !mapboxToken) return;
+    if (countryCode && !countryAutoFilled) return; // user picked manually
+    countryCodeFromLocation(location.lat, location.lng, mapboxToken).then((code) => {
+      if (code) {
+        setCountryCode(code);
+        setCountryAutoFilled(true);
+      }
+    });
+  }, [location?.lat, location?.lng, mapboxToken]);
+
+  const handleCountryChange = (code: string) => {
+    setCountryCode(code);
+    setCountryAutoFilled(false);
+  };
 
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,6 +139,7 @@ const PublishRouteMapDialog: React.FC<PublishRouteMapDialogProps> = ({
         updateData.latitude = location?.lat || null;
         updateData.longitude = location?.lng || null;
       }
+      if (countryCode) updateData.country_code = countryCode;
       if (logoPath) updateData.logo_path = logoPath;
 
       const { error: updateError } = await supabase
@@ -181,6 +206,10 @@ const PublishRouteMapDialog: React.FC<PublishRouteMapDialogProps> = ({
               <LocationPicker value={location || undefined} onChange={setLocation} />
             </div>
           )}
+          <div className="space-y-2">
+            <Label>Country {countryAutoFilled && <span className="text-xs text-muted-foreground font-normal">(auto-detected — change if wrong)</span>}</Label>
+            <CountrySelector value={countryCode} onChange={handleCountryChange} />
+          </div>
           <div className="space-y-2">
             <Label>Map Logo (optional)</Label>
             <p className="text-xs text-muted-foreground">Add a logo to represent your map</p>
