@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -120,6 +120,50 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   // Submission
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Refs so unmount/beforeunload handlers see latest values
+  const clonedMapIdRef = useRef<string | null>(null);
+  const isSubmittedRef = useRef(false);
+  useEffect(() => { clonedMapIdRef.current = clonedMapId; }, [clonedMapId]);
+  useEffect(() => { isSubmittedRef.current = isSubmitted; }, [isSubmitted]);
+
+  // Auto-cleanup abandoned clone on unmount or page unload
+  useEffect(() => {
+    const deleteAbandonedClone = (useKeepalive: boolean) => {
+      const id = clonedMapIdRef.current;
+      if (!id || isSubmittedRef.current) return;
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_maps?id=eq.${id}`;
+        const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        // Get current access token synchronously from supabase storage
+        const session = (supabase.auth as any).currentSession;
+        const token = session?.access_token;
+        if (!token) return;
+        fetch(url, {
+          method: 'DELETE',
+          headers: {
+            apikey,
+            Authorization: `Bearer ${token}`,
+          },
+          keepalive: useKeepalive,
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleBeforeUnload = () => deleteAbandonedClone(true);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Component unmounting (e.g. user navigated away within SPA) — async delete
+      const id = clonedMapIdRef.current;
+      if (id && !isSubmittedRef.current) {
+        supabase.from('user_maps').delete().eq('id', id).then(() => {});
+      }
+    };
+  }, []);
 
   const loadPublicMaps = useCallback(async () => {
     setLoadingMaps(true);
