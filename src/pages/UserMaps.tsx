@@ -18,6 +18,8 @@ import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
 import PublicMapEditWizard from '@/components/user-maps/PublicMapEditWizard';
 import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
 import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
+import PublishRouteMapDialog from '@/components/sharing/PublishRouteMapDialog';
+import PublishRouteFinderMapDialog from '@/components/route-finder/PublishRouteFinderMapDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useProAccess } from '@/hooks/useProAccess';
 import { toast } from '@/components/ui/use-toast';
@@ -65,6 +67,9 @@ const UserMaps: React.FC = () => {
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
   const logoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Publish dialog state
+  const [publishTarget, setPublishTarget] = useState<{ id: string; name: string; table: 'route_maps' | 'route_finder_maps' } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -153,9 +158,8 @@ const UserMaps: React.FC = () => {
     updateResultMap(table, map.id, { is_hidden: !map.is_hidden });
   };
 
-  const publishToCommunity = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
-    updateResultMap(table, map.id, { is_public: true, map_category: 'community', is_hidden: false });
-    toast({ title: 'Published!', description: `${map.name} is now available in Community Maps.` });
+  const openPublishDialog = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
+    setPublishTarget({ id: map.id, name: map.name, table });
   };
 
   const unpublishFromCommunity = (table: 'route_maps' | 'route_finder_maps', map: ResultMap) => {
@@ -389,7 +393,7 @@ const UserMaps: React.FC = () => {
                   Make Private
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => publishToCommunity(table, map)} className="gap-1">
+                <Button size="sm" variant="outline" onClick={() => openPublishDialog(table, map)} className="gap-1">
                   <Globe className="h-3 w-3" /> Publish
                 </Button>
               )}
@@ -556,6 +560,32 @@ const UserMaps: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Publish dialogs */}
+      {publishTarget?.table === 'route_maps' && (
+        <PublishRouteMapDialog
+          open={!!publishTarget}
+          onOpenChange={(open) => { if (!open) setPublishTarget(null); }}
+          mapId={publishTarget.id}
+          mapName={publishTarget.name}
+          onPublished={() => {
+            setPublishTarget(null);
+            loadResultMaps();
+          }}
+        />
+      )}
+      {publishTarget?.table === 'route_finder_maps' && (
+        <PublishRouteFinderMapDialog
+          open={!!publishTarget}
+          onOpenChange={(open) => { if (!open) setPublishTarget(null); }}
+          mapId={publishTarget.id}
+          mapName={publishTarget.name}
+          onPublished={() => {
+            setPublishTarget(null);
+            loadResultMaps();
+          }}
+        />
+      )}
     </div>
   );
 };

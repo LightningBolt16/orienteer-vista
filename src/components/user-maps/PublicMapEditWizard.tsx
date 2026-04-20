@@ -98,9 +98,12 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const [selectedMap, setSelectedMap] = useState<PublicMap | null>(null);
   const [regeneratingMapId, setRegeneratingMapId] = useState<string | null>(null);
 
+  // Force a new name when cloning own maps
+  const [cloneName, setCloneName] = useState<string>('');
+
   // Cloning
   const [clonedMapId, setClonedMapId] = useState<string | null>(null);
-  // For own maps we edit in-place — no cleanup on cancel
+  // Always treat the wizard as cloning (own-map editing also clones now)
   const [editingOwnMap, setEditingOwnMap] = useState(false);
   const [cloning, setCloning] = useState(false);
 
@@ -233,6 +236,11 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const handleSelectMap = (map: PublicMap) => {
     if (readinessOf(map) === 'unavailable') return;
     setSelectedMap(map);
+    if (map.__isOwnUserMap) {
+      setCloneName(`${map.name} (copy)`);
+    } else {
+      setCloneName('');
+    }
   };
 
   const handleRegeneratePreviews = async (map: PublicMap) => {
@@ -265,12 +273,50 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       let status: EditorReadiness;
 
       if (selectedMap.__isOwnUserMap) {
-        // Edit own map in-place — no cloning, no auto-cleanup
-        userMapId = selectedMap.id;
+        // Force a new name for own-map clones
+        const newName = cloneName.trim();
+        if (!newName) {
+          toast({ title: 'Name required', description: 'Please enter a new name for the cloned map.', variant: 'destructive' });
+          setCloning(false);
+          return;
+        }
+        if (newName.toLowerCase() === selectedMap.name.toLowerCase()) {
+          toast({ title: 'Name must be different', description: 'Choose a name different from the original map.', variant: 'destructive' });
+          setCloning(false);
+          return;
+        }
+
+        // Clone the user_maps row by reading the original and inserting a copy
+        const { data: original, error: fetchErr } = await supabase
+          .from('user_maps')
+          .select('*')
+          .eq('id', selectedMap.id)
+          .single();
+        if (fetchErr || !original) throw new Error(fetchErr?.message || 'Could not load source map');
+
+        const insertData: Record<string, any> = { ...(original as any) };
+        delete insertData.id;
+        delete insertData.created_at;
+        delete insertData.updated_at;
+        delete insertData.last_activity_at;
+        insertData.name = newName;
+        insertData.user_id = user.id;
+        insertData.status = 'pending';
+        insertData.error_message = null;
+
+        const { data: inserted, error: insertErr } = await supabase
+          .from('user_maps')
+          .insert(insertData as any)
+          .select('id')
+          .single();
+        if (insertErr || !inserted) throw new Error(insertErr?.message || 'Failed to clone map');
+
+        userMapId = inserted.id;
         colorUrl = selectedMap.color_image_url;
         bwUrl = selectedMap.impassability_image_url;
         status = readinessOf(selectedMap);
-        setEditingOwnMap(true);
+        // Treat as a normal clone — auto-cleanup on cancel applies
+        setEditingOwnMap(false);
       } else {
         const { data, error } = await supabase.functions.invoke('clone-public-map', {
           body: { source_map_id: selectedMap.id },
@@ -441,8 +487,13 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   const canProceed = () => {
     switch (step) {
-      case 'select':
-        return !!selectedMap && readinessOf(selectedMap) !== 'unavailable' && readinessOf(selectedMap) !== 'source_present_preview_missing';
+      case 'select': {
+        if (!selectedMap) return false;
+        const r = readinessOf(selectedMap);
+        if (r === 'unavailable' || r === 'source_present_preview_missing') return false;
+        if (selectedMap.__isOwnUserMap && !cloneName.trim()) return false;
+        return true;
+      }
       case 'paint': return true;
       case 'annotations': return true;
       case 'roi': return roiCoordinates.length >= 3;
@@ -526,8 +577,19 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
             </div>
             {mapSource === 'own' && (
               <p className="text-xs text-muted-foreground">
-                Editing your own map updates it in place — no copy is created.
+                Editing one of your own maps creates a new copy with a different name — your original is left untouched.
               </p>
+            )}
+            {mapSource === 'own' && selectedMap?.__isOwnUserMap && (
+              <div className="space-y-1">
+                <Label htmlFor="clone-name" className="text-xs">New map name</Label>
+                <Input
+                  id="clone-name"
+                  value={cloneName}
+                  onChange={(e) => setCloneName(e.target.value)}
+                  placeholder="Enter a new name for the copy"
+                />
+              </div>
             )}
             {loadingMaps ? (
               <div className="flex items-center justify-center h-32">
