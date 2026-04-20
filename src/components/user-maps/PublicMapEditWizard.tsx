@@ -98,9 +98,12 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
   const [selectedMap, setSelectedMap] = useState<PublicMap | null>(null);
   const [regeneratingMapId, setRegeneratingMapId] = useState<string | null>(null);
 
+  // Force a new name when cloning own maps
+  const [cloneName, setCloneName] = useState<string>('');
+
   // Cloning
   const [clonedMapId, setClonedMapId] = useState<string | null>(null);
-  // For own maps we edit in-place — no cleanup on cancel
+  // Always treat the wizard as cloning (own-map editing also clones now)
   const [editingOwnMap, setEditingOwnMap] = useState(false);
   const [cloning, setCloning] = useState(false);
 
