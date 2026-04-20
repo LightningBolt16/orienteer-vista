@@ -18,6 +18,8 @@ import UserMapUploadWizard from '@/components/user-maps/UserMapUploadWizard';
 import PublicMapEditWizard from '@/components/user-maps/PublicMapEditWizard';
 import AdminRequestDialog from '@/components/user-maps/AdminRequestDialog';
 import RecoverMapButton from '@/components/user-maps/RecoverMapButton';
+import PublishRouteMapDialog from '@/components/sharing/PublishRouteMapDialog';
+import PublishRouteFinderMapDialog from '@/components/route-finder/PublishRouteFinderMapDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useProAccess } from '@/hooks/useProAccess';
 import { toast } from '@/components/ui/use-toast';
