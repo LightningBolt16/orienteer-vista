@@ -487,8 +487,13 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
 
   const canProceed = () => {
     switch (step) {
-      case 'select':
-        return !!selectedMap && readinessOf(selectedMap) !== 'unavailable' && readinessOf(selectedMap) !== 'source_present_preview_missing';
+      case 'select': {
+        if (!selectedMap) return false;
+        const r = readinessOf(selectedMap);
+        if (r === 'unavailable' || r === 'source_present_preview_missing') return false;
+        if (selectedMap.__isOwnUserMap && !cloneName.trim()) return false;
+        return true;
+      }
       case 'paint': return true;
       case 'annotations': return true;
       case 'roi': return roiCoordinates.length >= 3;
