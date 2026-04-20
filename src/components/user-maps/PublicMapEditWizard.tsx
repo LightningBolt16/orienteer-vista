@@ -268,12 +268,50 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
       let status: EditorReadiness;
 
       if (selectedMap.__isOwnUserMap) {
-        // Edit own map in-place — no cloning, no auto-cleanup
-        userMapId = selectedMap.id;
+        // Force a new name for own-map clones
+        const newName = cloneName.trim();
+        if (!newName) {
+          toast({ title: 'Name required', description: 'Please enter a new name for the cloned map.', variant: 'destructive' });
+          setCloning(false);
+          return;
+        }
+        if (newName.toLowerCase() === selectedMap.name.toLowerCase()) {
+          toast({ title: 'Name must be different', description: 'Choose a name different from the original map.', variant: 'destructive' });
+          setCloning(false);
+          return;
+        }
+
+        // Clone the user_maps row by reading the original and inserting a copy
+        const { data: original, error: fetchErr } = await supabase
+          .from('user_maps')
+          .select('*')
+          .eq('id', selectedMap.id)
+          .single();
+        if (fetchErr || !original) throw new Error(fetchErr?.message || 'Could not load source map');
+
+        const insertData: Record<string, any> = { ...(original as any) };
+        delete insertData.id;
+        delete insertData.created_at;
+        delete insertData.updated_at;
+        delete insertData.last_activity_at;
+        insertData.name = newName;
+        insertData.user_id = user.id;
+        insertData.status = 'pending';
+        insertData.error_message = null;
+
+        const { data: inserted, error: insertErr } = await supabase
+          .from('user_maps')
+          .insert(insertData as any)
+          .select('id')
+          .single();
+        if (insertErr || !inserted) throw new Error(insertErr?.message || 'Failed to clone map');
+
+        userMapId = inserted.id;
         colorUrl = selectedMap.color_image_url;
         bwUrl = selectedMap.impassability_image_url;
         status = readinessOf(selectedMap);
-        setEditingOwnMap(true);
+        // Treat as a normal clone — auto-cleanup on cancel applies
+        setEditingOwnMap(false);
       } else {
         const { data, error } = await supabase.functions.invoke('clone-public-map', {
           body: { source_map_id: selectedMap.id },
