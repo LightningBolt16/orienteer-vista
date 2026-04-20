@@ -174,6 +174,7 @@ const PublicMapEditWizard: React.FC<PublicMapEditWizardProps> = ({ onComplete, o
         .from('route_maps')
         .select('id, name, source_map_id, impassability_image_url, color_image_url, color_r2_key, bw_r2_key, country_code, description, preview_status')
         .eq('is_public', true)
+        .eq('is_hidden', false)
         .order('name');
       if (error) throw error;
       setPublicMaps((data || []) as PublicMap[]);
