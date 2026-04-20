@@ -32,7 +32,7 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   const [pendingRouteIndex, setPendingRouteIndex] = useState<number | null>(null);
   const [preloadPool, setPreloadPool] = useState<number[]>([]);
   const preloadedImages = useRef<Map<string, HTMLImageElement>>(new Map());
-  const { user } = useUser();
+  const { user, updatePerformance } = useUser();
 
   const WARMUP_ROUTES = 3;
   const PRELOAD_COUNT = 10;
@@ -79,12 +79,9 @@ const MobileRouteSelector: React.FC<MobileRouteSelectorProps> = ({
   const recordAttempt = async (isCorrect: boolean, responseTime: number, mapName: string) => {
     if (!user?.id) return;
     try {
-      await supabase.from('route_attempts').insert({
-        user_id: user.id,
-        is_correct: isCorrect,
-        response_time: responseTime,
-        map_name: mapName,
-      });
+      // Delegates to UserContext: inserts into route_attempts AND
+      // recomputes user_profiles accuracy/speed/alltime_total (powers the leaderboard).
+      await updatePerformance(isCorrect, responseTime, mapName);
     } catch (error) {
       console.error('Failed to record attempt:', error);
     }
