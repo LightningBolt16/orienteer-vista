@@ -435,7 +435,33 @@ const Subscription: React.FC = () => {
           </CardFooter>
         </Card>
       </div>
-      
+
+      {/* Important subscription info - visible to all users */}
+      <div className="mt-12 border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg p-6 max-w-3xl mx-auto">
+        <h3 className="text-lg font-semibold mb-3 flex items-center text-amber-700 dark:text-amber-400">
+          <Shield className="h-5 w-5 mr-2" />
+          Important: What happens if you unsubscribe?
+        </h3>
+        <ul className="space-y-2 text-sm text-amber-800 dark:text-amber-300">
+          <li className="flex items-start">
+            <X className="h-4 w-4 mr-2 mt-0.5 shrink-0 text-amber-600" />
+            <span>You will <strong>lose access</strong> to all private maps that were processed while on a paid subscription (beyond the 3 free lifetime uploads).</span>
+          </li>
+          <li className="flex items-start">
+            <X className="h-4 w-4 mr-2 mt-0.5 shrink-0 text-amber-600" />
+            <span>Maps processed with pro parameters will be <strong>locked</strong> until you re-subscribe.</span>
+          </li>
+          <li className="flex items-start">
+            <Check className="h-4 w-4 mr-2 mt-0.5 shrink-0 text-green-600" />
+            <span>Your first 3 uploaded maps will always remain accessible on the free tier.</span>
+          </li>
+          <li className="flex items-start">
+            <Check className="h-4 w-4 mr-2 mt-0.5 shrink-0 text-green-600" />
+            <span>Re-subscribing will instantly restore access to all your maps.</span>
+          </li>
+        </ul>
+      </div>
+
 
       <div className="mt-8 bg-muted/50 rounded-lg p-8">
         <h2 className="text-2xl font-bold mb-6 flex items-center">
