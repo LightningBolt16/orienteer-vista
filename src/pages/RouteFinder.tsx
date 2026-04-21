@@ -12,6 +12,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import BetaFeedbackBox from '@/components/beta/BetaFeedbackBox';
 import Layout from '@/components/Layout';
 import PwtAttribution, { isPwtMap } from '@/components/PwtAttribution';
 import { toast as sonnerToast } from 'sonner';
@@ -37,6 +39,7 @@ const RouteFinder: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { plan, isActive, clubId: subClubId } = useSubscription();
+  const { betaEnabled, loading: betaLoading } = useBetaFeatures();
   const requestedMapParam = searchParams.get('map');
   const initialMapSelectionApplied = useRef(false);
   const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
@@ -276,7 +279,7 @@ const RouteFinder: React.FC = () => {
   };
 
   // Show loading while checking auth
-  if (userLoading) {
+  if (userLoading || betaLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -284,6 +287,13 @@ const RouteFinder: React.FC = () => {
         </div>
       </Layout>
     );
+  }
+
+  // Beta gate
+  if (!betaEnabled) {
+    sonnerToast.info(t('betaRequiredToast'));
+    navigate('/profile?tab=beta', { replace: true });
+    return null;
   }
 
   // Fullscreen mode - game takes over the entire screen
@@ -315,6 +325,11 @@ const RouteFinder: React.FC = () => {
   return (
     <Layout>
       <div className="pb-20 space-y-8">
+        {/* Beta feedback */}
+        <section className="max-w-4xl mx-auto">
+          <BetaFeedbackBox feature="route_finder" />
+        </section>
+
         {/* Guest Mode Banner */}
         {!user && (
           <section className="max-w-4xl mx-auto">

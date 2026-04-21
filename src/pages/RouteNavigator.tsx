@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogIn, ArrowLeft, Navigation } from 'lucide-react';
 import Layout from '@/components/Layout';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import { useLanguage } from '@/context/LanguageContext';
+import BetaFeedbackBox from '@/components/beta/BetaFeedbackBox';
+import { toast as sonnerToast } from 'sonner';
 
 interface NavMapOption {
   id: string;
@@ -21,6 +25,8 @@ interface NavMapOption {
 const RouteNavigator: React.FC = () => {
   const { user, loading: userLoading } = useUser();
   const navigate = useNavigate();
+  const { betaEnabled, loading: betaLoading } = useBetaFeatures();
+  const { t } = useLanguage();
   const [maps, setMaps] = useState<NavMapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
   const [selectedMap, setSelectedMap] = useState<NavMapOption | null>(null);
