@@ -10,9 +10,12 @@ import { COUNTRIES, CountryFlagImage, getCountryName } from '@/components/Countr
 import RouteFinderLeaderboardInline from '@/components/route-finder/RouteFinderLeaderboardInline';
 import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
 import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import BetaBadge from '@/components/beta/BetaBadge';
 
 const LeaderboardPage: React.FC = () => {
   const { t } = useLanguage();
+  const { betaEnabled } = useBetaFeatures();
   const [officialMapNames, setOfficialMapNames] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string>('all');
   const [countryFilter, setCountryFilter] = useState<string>('all');
@@ -36,6 +39,13 @@ const LeaderboardPage: React.FC = () => {
       setSelectedCommunityMap(favoriteMaps[0].name);
     }
   }, [favoriteMaps, selectedCommunityMap]);
+
+  // If beta gets disabled, snap back to Route Choice
+  useEffect(() => {
+    if (!betaEnabled && gameMode !== 'routeChoice') {
+      setGameMode('routeChoice');
+    }
+  }, [betaEnabled, gameMode]);
 
   // Fetch available countries from user_profiles
   useEffect(() => {
@@ -112,19 +122,22 @@ const LeaderboardPage: React.FC = () => {
           </Select>
         </div>
 
-        {/* Game Mode Tabs */}
-        <Tabs value={gameMode} onValueChange={(v) => setGameMode(v as 'routeChoice' | 'routeFinder')} className="w-full mb-8">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-            <TabsTrigger value="routeChoice" className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {t('routeChoice')}
-            </TabsTrigger>
-            <TabsTrigger value="routeFinder" className="flex items-center gap-2">
-              <Route className="h-4 w-4" />
-              {t('routeFinder')}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Game Mode Tabs - only visible to beta users */}
+        {betaEnabled && (
+          <Tabs value={gameMode} onValueChange={(v) => setGameMode(v as 'routeChoice' | 'routeFinder')} className="w-full mb-8">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+              <TabsTrigger value="routeChoice" className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                {t('routeChoice')}
+              </TabsTrigger>
+              <TabsTrigger value="routeFinder" className="flex items-center gap-2">
+                <Route className="h-4 w-4" />
+                {t('routeFinder')}
+                <BetaBadge className="ml-1" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {gameMode === 'routeChoice' ? (
           <Tabs value={selectedMap} onValueChange={setSelectedMap} className="w-full">
