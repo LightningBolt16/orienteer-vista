@@ -1,178 +1,78 @@
 
-Goal
 
-Make public/official map editing use the real full source assets again for:
-- Edit Impassability
-- Add Boundaries
-- Draw ROI
+# Plan: Beta Mode for Route Finder & Route Navigator
 
-and never rely on route export images as an editor source.
+Hide Route Finder and Route Navigator behind a per-user "Beta features" toggle. When enabled, surface them with clear BETA badges, show an intro popup explaining their experimental status, and add an in-game feedback box.
 
-What is actually going wrong
+## What the user will experience
 
-1. The editor currently depends on browser-safe preview URLs, not the original source files.
-- `PublicMapEditWizard` can only render `color_image_url` / `impassability_image_url`.
-- It cannot render raw `r2_*_key` values.
-- `clone-public-map` often returns `has_impassability: true` but `impassability_image_url: null`.
+**Default users (Beta off):**
+- No "Route Finder" or "Route Navigator" links in the header (desktop nav and mobile menu).
+- No "Route Finder" / "Route Navigator" buttons on the homepage.
+- Direct visits to `/route-finder` or `/route-navigator` redirect to `/profile?tab=beta` with a toast prompting them to enable beta features.
 
-2. Source files exist, but the browser usually cannot use them directly.
-- User/public maps keep raw source keys in R2.
-- Official maps may also keep raw source keys.
-- Direct browser TIFF loading is unreliable, and private/R2 source access is not browser-safe for this flow.
+**Beta-enabled users:**
+- Header and homepage show both modes again, each with a small magenta "BETA" badge next to the label.
+- The first time they enable beta, a popup appears: title "Beta features enabled", body explaining these modes are still in development and inviting feedback, plus a "Got it" button.
+- Inside Route Finder and Route Navigator pages, a compact, dismissible "Beta feedback" box sits above the game content with a textarea + Submit button. Submissions are stored as `feature_requests` rows (title auto-set to "Beta feedback: Route Finder" / "Beta feedback: Route Navigator").
 
-3. Preview generation is happening in the wrong place.
-- Admin upload and user upload still try to generate previews in the browser with `convertTifToDataUrl`.
-- That is exactly the fragile path that already fails for some TIFFs.
-- So the system stores raw source keys successfully, but often fails to store usable editor previews.
+**Profile → new "Beta features" section** (visible to all signed-in users):
+- A `Switch` labelled "Enable beta features" with a short description.
+- When toggled on, the explainer popup is shown immediately and the preference is persisted.
 
-4. The current UI and backend disagree about “available”.
-- Selection page treats color availability mostly as `color_image_url OR route_images fallback`.
-- B&W status is partly inferred from raw keys.
-- Wizard paint step still needs an actual browser-loadable B&W image URL.
-- Result: maps are shown as partly available even though the B&W editor cannot render.
+## Technical changes
 
-5. Route-image fallback is the wrong architecture for this feature.
-- It can help old color-only maps display something.
-- But it is not the original full source map.
-- It cannot be the long-term basis for public/official editing.
+**Database (migration):**
+- Add `beta_features_enabled boolean NOT NULL DEFAULT false` to `user_profiles`.
+- Add `beta_intro_seen boolean NOT NULL DEFAULT false` to `user_profiles` (so the intro popup only auto-shows once after first opt-in).
+- Relax `feature_requests` INSERT policy OR keep current pro-only restriction and instead store beta feedback in a new lightweight `beta_feedback` table:
+  - `beta_feedback (id uuid pk, user_id uuid, feature text check in ('route_finder','route_navigator'), message text, created_at timestamptz default now())`
+  - RLS: any authenticated user can insert their own row; admins can read all; users can read their own.
 
-Root cause
+**New hook:** `src/hooks/useBetaFeatures.ts`
+- Reads `beta_features_enabled` and `beta_intro_seen` from `user_profiles`.
+- Exposes `{ betaEnabled, introSeen, setBetaEnabled, markIntroSeen, loading }`.
+- Guests (`user.id === '1'`) always return `betaEnabled: false`.
 
-The public editor was changed to require browser-safe full-map preview assets, but preview creation and propagation were never made server-side and reliable.
+**Header (`src/components/Header.tsx`):**
+- Wrap the two `Link` blocks (desktop + mobile) for `/route-finder` and `/route-navigator` in `{betaEnabled && (...)}`.
+- Append a small `BETA` badge component inside each link.
 
-Current broken chain:
-```text
-source TIFF exists
--> raw key saved
--> client tries to generate preview PNG
--> preview generation often fails or never runs
--> route/public map is still published
--> editor receives has source / has key
--> but receives no browser-loadable full-map preview
--> B&W editor disappears or cannot render
-```
+**Homepage (`src/pages/Index.tsx`):**
+- Conditionally render the Route Finder / Route Navigator buttons based on `betaEnabled`, with a BETA badge inside each.
 
-Solid solution direction
+**Profile (`src/pages/Profile.tsx`):**
+- Add a "Beta features" card (above or alongside subscription section). Contains the toggle + description. When the user flips it on for the first time, open `BetaIntroDialog`.
 
-Use a two-asset model for every editable public/official map:
-1. processing source asset = original TIFF/raw file
-2. editor preview asset = full-map browser-safe PNG/WebP generated from the source on the backend
+**New components:**
+- `src/components/beta/BetaBadge.tsx` — small magenta pill ("BETA").
+- `src/components/beta/BetaIntroDialog.tsx` — explainer popup ("These features are in active development… your feedback is much appreciated"), with a "Got it" button that calls `markIntroSeen`.
+- `src/components/beta/BetaFeedbackBox.tsx` — collapsible card with textarea + Submit; takes a `feature: 'route_finder' | 'route_navigator'` prop; inserts into `beta_feedback`; shows toast on success; remembers dismissed state in `localStorage` per feature.
 
-The editor must only use the editor preview asset.
-Processing must only use the original source asset.
+**Route guards in `RouteFinder.tsx` and `RouteNavigator.tsx`:**
+- After auth load, if `!betaEnabled`, navigate to `/profile?tab=beta` with a sonner toast: "This feature is in beta. Enable beta features to access it."
+- If beta is enabled, mount `<BetaFeedbackBox feature="..." />` near the top of the page (above the map selector / game container).
 
-Implementation plan
+**Localization (`LanguageContext.tsx`):**
+- Add EN/SV strings: `betaFeatures`, `betaFeaturesDescription`, `betaEnabledTitle`, `betaEnabledBody`, `gotIt`, `betaFeedbackTitle`, `betaFeedbackPlaceholder`, `submitFeedback`, `feedbackThanks`, `betaRequiredToast`.
 
-1. Introduce a real “editor assets” contract
-- Treat these as required editor inputs:
-  - full color editor preview
-  - full B&W editor preview
-- Stop treating raw `r2_color_key` / `r2_bw_key` as UI-ready.
-- Add a single resolved status model such as:
-  - `ready_full`
-  - `ready_color_only`
-  - `source_present_preview_missing`
-  - `unavailable`
+**Files added:**
+- `supabase/migrations/<timestamp>_beta_features.sql`
+- `src/hooks/useBetaFeatures.ts`
+- `src/components/beta/BetaBadge.tsx`
+- `src/components/beta/BetaIntroDialog.tsx`
+- `src/components/beta/BetaFeedbackBox.tsx`
 
-2. Move preview generation fully to the backend
-- Add a backend function/job that generates full-map browser-safe previews from original source files.
-- It should support:
-  - user-uploaded maps from R2 keys
-  - official maps from admin-uploaded source keys
-  - existing legacy maps that only have source keys
-- This replaces browser-side TIFF preview generation as the source of truth.
+**Files edited:**
+- `src/components/Header.tsx`
+- `src/pages/Index.tsx`
+- `src/pages/Profile.tsx`
+- `src/pages/RouteFinder.tsx`
+- `src/pages/RouteNavigator.tsx`
+- `src/context/LanguageContext.tsx`
 
-3. Fix admin upload flow
-- Admin color/B&W uploads should:
-  - save raw source to storage first
-  - trigger backend preview generation
-  - update `route_maps.color_image_url` / `route_maps.impassability_image_url` only after backend generation succeeds
-- If preview generation fails:
-  - keep the source key
-  - mark preview status as missing/failed
-  - do not show the map as editable
+## Out of scope
+- Admins still see beta routes only if they personally enable the toggle (no admin override).
+- No analytics on beta usage beyond the feedback table.
+- Existing leaderboard / map data for these modes is left untouched.
 
-4. Fix user upload flow
-- `UserMapUploadWizard` should stop being responsible for reliable preview generation in the browser.
-- After source upload and DB insert, trigger backend preview generation.
-- Save preview URLs back to `user_maps`.
-- Publishing should only expose full editing capability when those preview URLs exist.
-
-5. Fix public map cloning and asset resolution
-- `clone-public-map` should resolve and return a strict asset object:
-  - source keys present?
-  - color editor preview URL
-  - B&W editor preview URL
-  - editor readiness status
-- It should not claim B&W editing is available unless a real B&W editor preview URL exists.
-- If previews are missing but source keys exist, return a “preview missing” state instead of pretending it is ready.
-
-6. Refactor `PublicMapEditWizard`
-- Make the wizard depend on resolved asset readiness, not on scattered booleans.
-- Behavior:
-  - full previews available -> show paint + annotations + ROI
-  - only color preview available -> allow annotations + ROI only
-  - source exists but preview missing -> show explicit unavailable/repair message, no false editing
-  - no assets -> unavailable
-- Remove route-image fallback from the core public editing path for official/public maps.
-
-7. Fix map selection truthfulness
-- On the select screen, show statuses based on full-map editor previews only.
-- Replace optimistic labels with truthful ones:
-  - “Full editing available”
-  - “Color editing only”
-  - “Source exists but preview missing”
-  - “Not editable”
-- Disable start for maps that do not have the required full preview assets.
-
-8. Backfill and repair old data
-- Add a repair path for existing maps:
-  - for `user_maps` with `r2_*_key` but missing preview URLs, generate previews and save them
-  - for `route_maps` linked to those user maps, propagate the preview URLs
-  - for official maps with raw source keys but no previews, generate previews directly from source keys
-- This is a data backfill plus asset regeneration task, not just a UI fix.
-
-9. Add explicit observability
-- Store preview generation state/errors so the app can explain why a map is not editable.
-- Log whether failure is:
-  - missing source
-  - unsupported source format
-  - preview generation failed
-  - propagation failed
-- This prevents future “it says available but doesn’t work” regressions.
-
-Files likely involved
-
-Frontend
-- `src/components/user-maps/PublicMapEditWizard.tsx`
-- `src/components/user-maps/UserMapUploadWizard.tsx`
-- `src/components/user-maps/PublishMapDialog.tsx`
-- `src/components/admin/AdminMapCard.tsx`
-
-Backend
-- `supabase/functions/clone-public-map/index.ts`
-- `supabase/functions/map-processing-webhook/index.ts`
-- likely a new backend function for preview generation/regeneration
-
-Database/data work
-- possibly add preview status/error fields
-- backfill existing `user_maps` and `route_maps` preview URLs from source assets
-- regenerate missing preview assets for legacy maps
-
-Recommended order
-
-1. Define editor asset contract and truthful statuses
-2. Add backend preview generation for full source maps
-3. Update admin/user upload flows to use backend preview generation
-4. Refactor clone + wizard to use strict readiness states
-5. Fix selection-page availability labels/gating
-6. Backfill existing public/official maps
-7. Verify official maps, newly uploaded user maps, and published community maps separately
-
-Success criteria
-
-- Public/official maps only show “editable” when full source-based preview assets exist
-- B&W paint step appears whenever a real B&W editor preview exists
-- No public editing flow depends on route export images
-- Newly uploaded/published maps automatically get usable editor assets
-- Legacy maps can be repaired through preview regeneration instead of manual guesswork
