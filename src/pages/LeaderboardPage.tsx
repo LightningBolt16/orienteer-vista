@@ -40,6 +40,13 @@ const LeaderboardPage: React.FC = () => {
     }
   }, [favoriteMaps, selectedCommunityMap]);
 
+  // If beta gets disabled, snap back to Route Choice
+  useEffect(() => {
+    if (!betaEnabled && gameMode !== 'routeChoice') {
+      setGameMode('routeChoice');
+    }
+  }, [betaEnabled, gameMode]);
+
   // Fetch available countries from user_profiles
   useEffect(() => {
     const loadCountries = async () => {
