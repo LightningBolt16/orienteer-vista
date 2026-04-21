@@ -98,6 +98,24 @@ const Profile: React.FC = () => {
     }
   };
 
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.functions.invoke('delete-account');
+      if (error) throw error;
+      await signOut();
+      toast({ title: t('deleteAccount'), description: 'Account deleted.' });
+      navigate('/');
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message || 'Failed to delete account', variant: 'destructive' });
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   // Handle checkout success redirect
   useEffect(() => {
     if (searchParams.get('checkout') === 'success') {
