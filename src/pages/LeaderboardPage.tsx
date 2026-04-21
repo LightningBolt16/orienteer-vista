@@ -10,9 +10,12 @@ import { COUNTRIES, CountryFlagImage, getCountryName } from '@/components/Countr
 import RouteFinderLeaderboardInline from '@/components/route-finder/RouteFinderLeaderboardInline';
 import { useCommunityFavorites } from '@/hooks/useCommunityFavorites';
 import CommunityMapBrowser from '@/components/map/CommunityMapBrowser';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import BetaBadge from '@/components/beta/BetaBadge';
 
 const LeaderboardPage: React.FC = () => {
   const { t } = useLanguage();
+  const { betaEnabled } = useBetaFeatures();
   const [officialMapNames, setOfficialMapNames] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string>('all');
   const [countryFilter, setCountryFilter] = useState<string>('all');
