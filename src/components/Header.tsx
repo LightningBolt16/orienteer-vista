@@ -4,6 +4,8 @@ import { Compass, User, Map, PenTool, FolderOpen, Medal, Menu, X, LogOut, LogIn,
 import { useUser } from '../context/UserContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useAdmin } from '../hooks/useAdmin';
+import { useBetaFeatures } from '../hooks/useBetaFeatures';
+import BetaBadge from './beta/BetaBadge';
 import { Loader2 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
@@ -31,6 +33,7 @@ const Header: React.FC = () => {
   const { user, getUserRank, signOut, leaderboard } = useUser();
   const { language, setLanguage, t } = useLanguage();
   const { isAdmin } = useAdmin();
+  const { betaEnabled } = useBetaFeatures();
   
   // Get rank only if leaderboard is loaded
   const currentRank = leaderboard.length > 0 ? getUserRank() : 0;
@@ -153,27 +156,33 @@ const Header: React.FC = () => {
                   <span>{t('duel')}</span>
                 </Link>
                 
-                <Link 
-                  to="/route-finder" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/route-finder') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Route className="h-5 w-5" />
-                  <span>{t('routeFinder') || 'Route Finder'}</span>
-                </Link>
+                {betaEnabled && (
+                  <Link 
+                    to="/route-finder" 
+                    className={`p-3 rounded-md flex items-center space-x-2 ${
+                      isCurrentPath('/route-finder') ? 'bg-muted text-orienteering' : ''
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Route className="h-5 w-5" />
+                    <span>{t('routeFinder') || 'Route Finder'}</span>
+                    <BetaBadge className="ml-auto" />
+                  </Link>
+                )}
                 
-                <Link 
-                  to="/route-navigator" 
-                  className={`p-3 rounded-md flex items-center space-x-2 ${
-                    isCurrentPath('/route-navigator') ? 'bg-muted text-orienteering' : ''
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Navigation className="h-5 w-5" />
-                  <span>Route Navigator</span>
-                </Link>
+                {betaEnabled && (
+                  <Link 
+                    to="/route-navigator" 
+                    className={`p-3 rounded-md flex items-center space-x-2 ${
+                      isCurrentPath('/route-navigator') ? 'bg-muted text-orienteering' : ''
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Navigation className="h-5 w-5" />
+                    <span>Route Navigator</span>
+                    <BetaBadge className="ml-auto" />
+                  </Link>
+                )}
                 
                 {isAuthenticated && (
                   <Link 
@@ -282,25 +291,31 @@ const Header: React.FC = () => {
               <span>{t('duel')}</span>
             </Link>
             
-            <Link 
-              to="/route-finder" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/route-finder') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <Route className="h-4 w-4" />
-              <span>{t('routeFinder') || 'Route Finder'}</span>
-            </Link>
+            {betaEnabled && (
+              <Link 
+                to="/route-finder" 
+                className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                  isCurrentPath('/route-finder') ? 'text-orienteering' : 'text-foreground'
+                }`}
+              >
+                <Route className="h-4 w-4" />
+                <span>{t('routeFinder') || 'Route Finder'}</span>
+                <BetaBadge />
+              </Link>
+            )}
             
-            <Link 
-              to="/route-navigator" 
-              className={`nav-link text-sm font-medium flex items-center space-x-1 ${
-                isCurrentPath('/route-navigator') ? 'text-orienteering' : 'text-foreground'
-              }`}
-            >
-              <Navigation className="h-4 w-4" />
-              <span>Navigator</span>
-            </Link>
+            {betaEnabled && (
+              <Link 
+                to="/route-navigator" 
+                className={`nav-link text-sm font-medium flex items-center space-x-1 ${
+                  isCurrentPath('/route-navigator') ? 'text-orienteering' : 'text-foreground'
+                }`}
+              >
+                <Navigation className="h-4 w-4" />
+                <span>Navigator</span>
+                <BetaBadge />
+              </Link>
+            )}
             
             <div className="flex items-center space-x-2 ml-4">
               {isAuthenticated && (
