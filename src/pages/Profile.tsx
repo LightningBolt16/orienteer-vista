@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut, Sparkles } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut, Sparkles, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
