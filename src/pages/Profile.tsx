@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut, Sparkles } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut, Sparkles, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
@@ -84,6 +95,24 @@ const Profile: React.FC = () => {
     await setBetaEnabled(checked);
     if (checked && !introSeen) {
       setBetaIntroOpen(true);
+    }
+  };
+
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.functions.invoke('delete-account');
+      if (error) throw error;
+      await signOut();
+      toast({ title: t('deleteAccount'), description: 'Account deleted.' });
+      navigate('/');
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message || 'Failed to delete account', variant: 'destructive' });
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -663,175 +692,10 @@ const Profile: React.FC = () => {
               </div>
             )}
 
-            {user.id !== '1' && (
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    await signOut();
-                    navigate('/');
-                  }}
-                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  {t('signOut')}
-                </Button>
-              </div>
-            )}
           </div>
         </div>
         
-        {/* Beta features Section */}
-        {user.id !== '1' && (
-          <div id="beta" className="mt-10 border-t border-muted pt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-orienteering" />
-                  {t('betaFeatures')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">
-                      {t('betaFeaturesDescription')}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={betaEnabled}
-                    onCheckedChange={handleBetaToggle}
-                    aria-label={t('betaFeatures')}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        <BetaIntroDialog
-          open={betaIntroOpen}
-          onOpenChange={setBetaIntroOpen}
-          onAcknowledge={markIntroSeen}
-        />
-
-        {/* Subscription Section */}
-        <div className="mt-10 border-t border-muted pt-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Subscription
-              </CardTitle>
-              {isActive && (
-                <Badge variant="default" className="bg-orienteering">
-                  {plan === 'personal' ? 'Personal' : 'Club'} Plan
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {subLoading ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Checking subscription...
-                </div>
-              ) : isActive ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Your {plan === 'personal' ? 'Personal' : 'Club'} plan is active.
-                    {!isManual && subscriptionEnd && ` Next billing: ${new Date(subscriptionEnd).toLocaleDateString()}`}
-                  </p>
-                  {isManual ? (
-                    <div className="p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-                      <p className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
-                        <Crown className="h-4 w-4" />
-                        You have a complimentary {plan === 'club' ? 'Club' : 'Personal'} licence. No billing required.
-                      </p>
-                    </div>
-                  ) : (
-                    <Button 
-                      variant="outline" 
-                      onClick={handleManageSubscription} 
-                      disabled={portalLoading}
-                    >
-                      {portalLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crown className="h-4 w-4 mr-2" />}
-                      Manage Subscription
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    You're on the Free plan. Upgrade to unlock unlimited features.
-                  </p>
-                  <Button 
-                    onClick={() => navigate('/subscription')}
-                    className="bg-orienteering hover:bg-orienteering/90"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Upgrade Plan
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Feature Requests Section - only for pro/club users */}
-        {(plan === 'personal' || plan === 'club') && isActive && (
-          <div className="mt-10 border-t border-muted pt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5" />
-                  Feature Requests
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Input
-                    placeholder="Feature title..."
-                    value={newFeatureTitle}
-                    onChange={(e) => setNewFeatureTitle(e.target.value)}
-                  />
-                  <Textarea
-                    placeholder="Describe the feature you'd like to see..."
-                    value={newFeatureDescription}
-                    onChange={(e) => setNewFeatureDescription(e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                  <Button 
-                    onClick={handleSubmitFeatureRequest} 
-                    disabled={submittingFeature || !newFeatureTitle.trim()}
-                    className="bg-orienteering hover:bg-orienteering/90"
-                  >
-                    {submittingFeature ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                    Submit Request
-                  </Button>
-                </div>
-
-                {featureRequests.length > 0 && (
-                  <div className="mt-6 space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">Your Requests</h4>
-                    {featureRequests.map((fr) => (
-                      <div key={fr.id} className="p-3 rounded-lg border border-border">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-sm">{fr.title}</p>
-                          <Badge variant="outline" className="text-xs capitalize">{fr.status}</Badge>
-                        </div>
-                        {fr.description && <p className="text-sm text-muted-foreground mt-1">{fr.description}</p>}
-                        <p className="text-xs text-muted-foreground mt-2">{new Date(fr.created_at).toLocaleDateString()}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Game Mode Toggle */}
+        {/* Statistics Section - moved to top */}
         <div className="mt-10 border-t border-muted pt-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -857,7 +721,7 @@ const Profile: React.FC = () => {
             {/* Overview Tab */}
             <TabsContent value="overview">
               <h2 className="text-xl font-semibold mb-6">{t('allTimeStatistics')}</h2>
-              
+
               {gameMode === 'routeChoice' ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -938,7 +802,7 @@ const Profile: React.FC = () => {
             {/* Per Map Tab */}
             <TabsContent value="maps">
               <h2 className="text-xl font-semibold mb-6">{t('performanceByMap')}</h2>
-              
+
               {(() => {
                 const statsToShow = gameMode === 'routeChoice' ? mapStats : rfMapStats;
                 return loadingStats && gameMode === 'routeChoice' ? (
@@ -995,7 +859,7 @@ const Profile: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {(gameMode === 'routeChoice' ? performanceData : rfPerformanceData).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -1011,17 +875,17 @@ const Profile: React.FC = () => {
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="date" className="text-xs" />
                         <YAxis domain={[0, 100]} className="text-xs" />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))', 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
                             border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }} 
+                            borderRadius: '8px',
+                          }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="accuracy" 
-                          stroke="hsl(24, 100%, 50%)" 
+                        <Line
+                          type="monotone"
+                          dataKey="accuracy"
+                          stroke="hsl(24, 100%, 50%)"
                           strokeWidth={2}
                           dot={{ fill: 'hsl(24, 100%, 50%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
@@ -1040,17 +904,17 @@ const Profile: React.FC = () => {
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="date" className="text-xs" />
                         <YAxis className="text-xs" />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))', 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
                             border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }} 
+                            borderRadius: '8px',
+                          }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="speed" 
-                          stroke="hsl(142, 76%, 36%)" 
+                        <Line
+                          type="monotone"
+                          dataKey="speed"
+                          stroke="hsl(142, 76%, 36%)"
                           strokeWidth={2}
                           dot={{ fill: 'hsl(142, 76%, 36%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
@@ -1069,17 +933,17 @@ const Profile: React.FC = () => {
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="date" className="text-xs" />
                         <YAxis className="text-xs" />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))', 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
                             border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }} 
+                            borderRadius: '8px',
+                          }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="attempts" 
-                          stroke="hsl(217, 91%, 60%)" 
+                        <Line
+                          type="monotone"
+                          dataKey="attempts"
+                          stroke="hsl(217, 91%, 60%)"
                           strokeWidth={2}
                           dot={{ fill: 'hsl(217, 91%, 60%)', r: 3, strokeWidth: 0 }}
                           activeDot={{ r: 5, strokeWidth: 0 }}
@@ -1094,6 +958,217 @@ const Profile: React.FC = () => {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Beta features + Feature Requests side-by-side */}
+        {user.id !== '1' && (
+          <div className="mt-10 border-t border-muted pt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Beta features */}
+            <Card id="beta">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-orienteering" />
+                  {t('betaFeatures')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      {t('betaFeaturesDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={betaEnabled}
+                    onCheckedChange={handleBetaToggle}
+                    aria-label={t('betaFeatures')}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Feature Requests - only for pro/club users */}
+            {(plan === 'personal' || plan === 'club') && isActive ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5" />
+                    Feature Requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Input
+                      placeholder="Feature title..."
+                      value={newFeatureTitle}
+                      onChange={(e) => setNewFeatureTitle(e.target.value)}
+                    />
+                    <Textarea
+                      placeholder="Describe the feature you'd like to see..."
+                      value={newFeatureDescription}
+                      onChange={(e) => setNewFeatureDescription(e.target.value)}
+                      className="min-h-[80px]"
+                    />
+                    <Button
+                      onClick={handleSubmitFeatureRequest}
+                      disabled={submittingFeature || !newFeatureTitle.trim()}
+                      className="bg-orienteering hover:bg-orienteering/90"
+                    >
+                      {submittingFeature ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                      Submit Request
+                    </Button>
+                  </div>
+
+                  {featureRequests.length > 0 && (
+                    <div className="mt-6 space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground">Your Requests</h4>
+                      {featureRequests.map((fr) => (
+                        <div key={fr.id} className="p-3 rounded-lg border border-border">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-sm">{fr.title}</p>
+                            <Badge variant="outline" className="text-xs capitalize">{fr.status}</Badge>
+                          </div>
+                          {fr.description && <p className="text-sm text-muted-foreground mt-1">{fr.description}</p>}
+                          <p className="text-xs text-muted-foreground mt-2">{new Date(fr.created_at).toLocaleDateString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-dashed">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2 text-muted-foreground">
+                    <Lightbulb className="h-5 w-5" />
+                    Feature Requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Upgrade to Personal or Club to submit and track feature requests.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        <BetaIntroDialog
+          open={betaIntroOpen}
+          onOpenChange={setBetaIntroOpen}
+          onAcknowledge={markIntroSeen}
+        />
+
+        {/* Subscription Section */}
+        <div className="mt-10 border-t border-muted pt-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Subscription
+              </CardTitle>
+              {isActive && (
+                <Badge variant="default" className="bg-orienteering">
+                  {plan === 'personal' ? 'Personal' : 'Club'} Plan
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {subLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking subscription...
+                </div>
+              ) : isActive ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Your {plan === 'personal' ? 'Personal' : 'Club'} plan is active.
+                    {!isManual && subscriptionEnd && ` Next billing: ${new Date(subscriptionEnd).toLocaleDateString()}`}
+                  </p>
+                  {isManual ? (
+                    <div className="p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                      <p className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+                        <Crown className="h-4 w-4" />
+                        You have a complimentary {plan === 'club' ? 'Club' : 'Personal'} licence. No billing required.
+                      </p>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={handleManageSubscription}
+                      disabled={portalLoading}
+                    >
+                      {portalLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crown className="h-4 w-4 mr-2" />}
+                      Manage Subscription
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    You're on the Free plan. Upgrade to unlock unlimited features.
+                  </p>
+                  <Button
+                    onClick={() => navigate('/subscription')}
+                    className="bg-orienteering hover:bg-orienteering/90"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Upgrade Plan
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Account actions - bottom */}
+        {user.id !== '1' && (
+          <div className="mt-10 border-t border-muted pt-8 flex flex-col sm:flex-row gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await signOut();
+                navigate('/');
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {t('signOut')}
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                  disabled={deletingAccount}
+                >
+                  {deletingAccount ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  {t('deleteAccount')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('deleteAccountConfirmTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('deleteAccountConfirmBody')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {t('deleteAccountConfirmAction')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </div>
     </div>
   );
