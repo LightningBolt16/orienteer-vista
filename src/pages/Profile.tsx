@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut } from 'lucide-react';
+import { User, Edit2, Save, CheckCircle, XCircle, Upload, Map, TrendingUp, MapPin, Route, CreditCard, Crown, Loader2, Lightbulb, Send, LogOut, Sparkles } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '../integrations/supabase/client';
@@ -15,6 +15,8 @@ import { format, subDays, subMonths, startOfDay, parseISO } from 'date-fns';
 import { ImageCropper } from '../components/ImageCropper';
 import CountrySelector from '@/components/CountrySelector';
 import { useSubscription, STRIPE_PLANS } from '@/hooks/useSubscription';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import BetaIntroDialog from '@/components/beta/BetaIntroDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -75,6 +77,15 @@ const Profile: React.FC = () => {
   const [newFeatureTitle, setNewFeatureTitle] = useState('');
   const [newFeatureDescription, setNewFeatureDescription] = useState('');
   const [submittingFeature, setSubmittingFeature] = useState(false);
+  const { betaEnabled, introSeen, setBetaEnabled, markIntroSeen } = useBetaFeatures();
+  const [betaIntroOpen, setBetaIntroOpen] = useState(false);
+
+  const handleBetaToggle = async (checked: boolean) => {
+    await setBetaEnabled(checked);
+    if (checked && !introSeen) {
+      setBetaIntroOpen(true);
+    }
+  };
 
   // Handle checkout success redirect
   useEffect(() => {
@@ -671,6 +682,40 @@ const Profile: React.FC = () => {
           </div>
         </div>
         
+        {/* Beta features Section */}
+        {user.id !== '1' && (
+          <div id="beta" className="mt-10 border-t border-muted pt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-orienteering" />
+                  {t('betaFeatures')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      {t('betaFeaturesDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={betaEnabled}
+                    onCheckedChange={handleBetaToggle}
+                    aria-label={t('betaFeatures')}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <BetaIntroDialog
+          open={betaIntroOpen}
+          onOpenChange={setBetaIntroOpen}
+          onAcknowledge={markIntroSeen}
+        />
+
         {/* Subscription Section */}
         <div className="mt-10 border-t border-muted pt-8">
           <Card>
