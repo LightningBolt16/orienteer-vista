@@ -692,22 +692,6 @@ const Profile: React.FC = () => {
               </div>
             )}
 
-            {user.id !== '1' && (
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    await signOut();
-                    navigate('/');
-                  }}
-                  className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  {t('signOut')}
-                </Button>
-              </div>
-            )}
           </div>
         </div>
         
