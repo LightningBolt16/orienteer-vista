@@ -103,6 +103,11 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       profile: 'Profile',
       guest: 'Guest',
       signOut: 'Sign Out',
+      deleteAccount: 'Delete Account',
+      deleteAccountConfirmTitle: 'Delete your account?',
+      deleteAccountConfirmBody: 'This will permanently delete your account and all associated data. This action cannot be undone.',
+      deleteAccountConfirmAction: 'Yes, delete my account',
+      cancel: 'Cancel',
       duel: 'Duel',
       
       // Google Auth
@@ -535,6 +540,11 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       profile: 'Profil',
       guest: 'Gäst',
       signOut: 'Logga ut',
+      deleteAccount: 'Radera konto',
+      deleteAccountConfirmTitle: 'Radera ditt konto?',
+      deleteAccountConfirmBody: 'Detta raderar permanent ditt konto och all tillhörande data. Åtgärden kan inte ångras.',
+      deleteAccountConfirmAction: 'Ja, radera mitt konto',
+      cancel: 'Avbryt',
       duel: 'Duell',
       
       // Google Auth
