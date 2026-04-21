@@ -4,15 +4,18 @@ import { Link } from 'react-router-dom';
 import { Map, PenTool, Trophy, ArrowRight } from 'lucide-react';
 import Leaderboard from '../components/Leaderboard';
 import OnboardingTutorial from '../components/OnboardingTutorial';
+import BetaBadge from '../components/beta/BetaBadge';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { useUser } from '../context/UserContext';
+import { useBetaFeatures } from '../hooks/useBetaFeatures';
 import { useLogger } from '../hooks/useLogger';
 import { supabase } from '../integrations/supabase/client';
 
 const Index: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useUser();
+  const { betaEnabled } = useBetaFeatures();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -99,16 +102,22 @@ const Index: React.FC = () => {
               Duel Mode
             </Button>
           </Link>
-          <Link to="/route-finder">
-            <Button size="lg" variant="outline">
-              Route Finder
-            </Button>
-          </Link>
-          <Link to="/route-navigator">
-            <Button size="lg" variant="outline">
-              Route Navigator
-            </Button>
-          </Link>
+          {betaEnabled && (
+            <Link to="/route-finder">
+              <Button size="lg" variant="outline">
+                Route Finder
+                <BetaBadge className="ml-2" />
+              </Button>
+            </Link>
+          )}
+          {betaEnabled && (
+            <Link to="/route-navigator">
+              <Button size="lg" variant="outline">
+                Route Navigator
+                <BetaBadge className="ml-2" />
+              </Button>
+            </Link>
+          )}
         </div>
         
         <div className="w-full">

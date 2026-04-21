@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      beta_feedback: {
+        Row: {
+          created_at: string
+          feature: string
+          id: string
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature: string
+          id?: string
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feature?: string
+          id?: string
+          message?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       club_members: {
         Row: {
           club_id: string
@@ -1063,6 +1087,8 @@ export type Database = {
           alltime_time_sum: number | null
           alltime_total: number | null
           attempts: Json | null
+          beta_features_enabled: boolean
+          beta_intro_seen: boolean
           bio: string | null
           country_code: string | null
           created_at: string
@@ -1083,6 +1109,8 @@ export type Database = {
           alltime_time_sum?: number | null
           alltime_total?: number | null
           attempts?: Json | null
+          beta_features_enabled?: boolean
+          beta_intro_seen?: boolean
           bio?: string | null
           country_code?: string | null
           created_at?: string
@@ -1103,6 +1131,8 @@ export type Database = {
           alltime_time_sum?: number | null
           alltime_total?: number | null
           attempts?: Json | null
+          beta_features_enabled?: boolean
+          beta_intro_seen?: boolean
           bio?: string | null
           country_code?: string | null
           created_at?: string

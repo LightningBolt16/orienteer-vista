@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogIn, ArrowLeft, Navigation } from 'lucide-react';
 import Layout from '@/components/Layout';
+import { useBetaFeatures } from '@/hooks/useBetaFeatures';
+import { useLanguage } from '@/context/LanguageContext';
+import BetaFeedbackBox from '@/components/beta/BetaFeedbackBox';
+import { toast as sonnerToast } from 'sonner';
 
 interface NavMapOption {
   id: string;
@@ -21,6 +25,8 @@ interface NavMapOption {
 const RouteNavigator: React.FC = () => {
   const { user, loading: userLoading } = useUser();
   const navigate = useNavigate();
+  const { betaEnabled, loading: betaLoading } = useBetaFeatures();
+  const { t } = useLanguage();
   const [maps, setMaps] = useState<NavMapOption[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(true);
   const [selectedMap, setSelectedMap] = useState<NavMapOption | null>(null);
@@ -67,6 +73,22 @@ const RouteNavigator: React.FC = () => {
     loadMaps();
   }, []);
 
+  // Beta gate
+  if (betaLoading || userLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+  if (!betaEnabled) {
+    sonnerToast.info(t('betaRequiredToast'));
+    navigate('/profile?tab=beta', { replace: true });
+    return null;
+  }
+
   if (selectedMap && selectedMap.source_image_url && selectedMap.image_width && selectedMap.image_height) {
     return (
       <div className="w-full h-screen">
@@ -86,7 +108,8 @@ const RouteNavigator: React.FC = () => {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto p-4">
-        <div className="flex items-center gap-3 mb-6">
+        <BetaFeedbackBox feature="route_navigator" />
+        <div className="flex items-center gap-3 mb-6 mt-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>

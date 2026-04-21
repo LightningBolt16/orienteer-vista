@@ -448,6 +448,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       discoverMaps: 'Discover Maps',
       noFavoritedMaps: 'No favorited maps yet',
       noFavoritedMapsDesc: 'Use the map browser below to discover and favorite community maps',
+      // Beta features
+      betaFeatures: 'Beta features',
+      betaFeaturesDescription: 'Get early access to experimental game modes like Route Finder and Route Navigator. These are still in active development.',
+      betaEnabledTitle: 'Beta features enabled',
+      betaEnabledBody: 'Route Finder and Route Navigator are still in active development. You may run into rough edges — your feedback is much appreciated and helps us shape the final experience.',
+      gotIt: 'Got it',
+      betaFeedbackTitle: 'Send beta feedback',
+      betaFeedbackPlaceholder: 'Tell us what worked, what broke, or what you wish was different...',
+      submitFeedback: 'Send',
+      feedbackThanks: 'Thanks for your feedback!',
+      betaRequiredToast: 'This feature is in beta. Enable beta features in your profile to access it.',
     },
     sv: {
       // Navigation & Common Elements
@@ -870,6 +881,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       discoverMaps: 'Utforska kartor',
       noFavoritedMaps: 'Inga favoritkartor än',
       noFavoritedMapsDesc: 'Använd kartbläddraren nedan för att utforska och favoritmarkera community-kartor',
+      // Beta features
+      betaFeatures: 'Beta-funktioner',
+      betaFeaturesDescription: 'Få tidig tillgång till experimentella spellägen som Ruttfinnare och Route Navigator. Dessa är fortfarande under aktiv utveckling.',
+      betaEnabledTitle: 'Beta-funktioner aktiverade',
+      betaEnabledBody: 'Ruttfinnare och Route Navigator är fortfarande under aktiv utveckling. Du kan stöta på buggar — din feedback är mycket uppskattad och hjälper oss att forma den slutliga upplevelsen.',
+      gotIt: 'Uppfattat',
+      betaFeedbackTitle: 'Skicka beta-feedback',
+      betaFeedbackPlaceholder: 'Berätta vad som fungerade, vad som gick sönder, eller vad du önskar var annorlunda...',
+      submitFeedback: 'Skicka',
+      feedbackThanks: 'Tack för din feedback!',
+      betaRequiredToast: 'Denna funktion är i beta. Aktivera beta-funktioner i din profil för att komma åt den.',
     },
   };
 
