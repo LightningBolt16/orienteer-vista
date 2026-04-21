@@ -115,19 +115,22 @@ const LeaderboardPage: React.FC = () => {
           </Select>
         </div>
 
-        {/* Game Mode Tabs */}
-        <Tabs value={gameMode} onValueChange={(v) => setGameMode(v as 'routeChoice' | 'routeFinder')} className="w-full mb-8">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-            <TabsTrigger value="routeChoice" className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {t('routeChoice')}
-            </TabsTrigger>
-            <TabsTrigger value="routeFinder" className="flex items-center gap-2">
-              <Route className="h-4 w-4" />
-              {t('routeFinder')}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Game Mode Tabs - only visible to beta users */}
+        {betaEnabled && (
+          <Tabs value={gameMode} onValueChange={(v) => setGameMode(v as 'routeChoice' | 'routeFinder')} className="w-full mb-8">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+              <TabsTrigger value="routeChoice" className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                {t('routeChoice')}
+              </TabsTrigger>
+              <TabsTrigger value="routeFinder" className="flex items-center gap-2">
+                <Route className="h-4 w-4" />
+                {t('routeFinder')}
+                <BetaBadge className="ml-1" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {gameMode === 'routeChoice' ? (
           <Tabs value={selectedMap} onValueChange={setSelectedMap} className="w-full">
